@@ -2,15 +2,21 @@
 
 #import <React/RCTBundleURLProvider.h>
 #import <React/RCTLinkingManager.h>
+#import <AVFoundation/AVFoundation.h>
 
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
   self.moduleName = @"Reaxn";
-  // You can add your custom initial props in the dictionary below.
-  // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
+
+  // Allow react-native-video and WKWebView (YouTube) to play simultaneously.
+  // Without this, iOS gives each source exclusive audio session ownership,
+  // causing one player to pause the other when both try to play at once.
+  [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback
+                                   withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                                         error:nil];
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
 }
