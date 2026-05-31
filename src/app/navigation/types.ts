@@ -4,6 +4,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 // Auth stack
 export type AuthStackParamList = {
   Welcome: undefined;
+  SignIn: undefined;
   EnterInviteCode: undefined;
   CreateProfile: { inviteCode: string };
 };
@@ -11,31 +12,35 @@ export type AuthStackParamList = {
 // Main tabs
 export type MainTabParamList = {
   Feed: undefined;
-  Friends: undefined;
   Share: undefined;
-  Notifications: undefined;
+  Friends: undefined;
+  Account: undefined;
+};
+
+export type AccountStackParamList = {
+  AccountHome: undefined;
+  InviteManagement: undefined;
+  PasswordSetup: undefined;
 };
 
 // Feed stack
 export type FeedStackParamList = {
   FeedHome: undefined;
   Thread: { threadId: string };
-  WatchReaction: { reactionId: string };
+  WatchReaction: { reactionId: string; videoId: string; videoTitle?: string };
 };
 
 // Friends stack
 export type FriendsStackParamList = {
   FriendsHome: undefined;
   AddFriend: undefined;
-  Groups: undefined;
-  CreateGroup: undefined;
-  GroupDetail: { groupId: string };
   InviteManagement: undefined;
 };
 
 // Share stack
 export type ShareStackParamList = {
   ShareHome: undefined;
+  VideoPreview: { videoId: string; videoTitle: string; videoThumbnail: string; channelTitle: string };
   SelectRecipients: { videoId: string; videoTitle: string; videoThumbnail: string };
 };
 
@@ -58,6 +63,9 @@ export type ShareStackScreenProps<T extends keyof ShareStackParamList> =
 
 export type RecordStackScreenProps<T extends keyof RecordStackParamList> =
   NativeStackScreenProps<RecordStackParamList, T>;
+
+export type AccountStackScreenProps<T extends keyof AccountStackParamList> =
+  NativeStackScreenProps<AccountStackParamList, T>;
 
 export type MainTabScreenProps<T extends keyof MainTabParamList> =
   BottomTabScreenProps<MainTabParamList, T>;

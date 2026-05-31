@@ -2,27 +2,39 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text } from 'react-native';
-import { C } from '../../theme';
+import { C, FONT } from '../../theme';
 import type {
   MainTabParamList,
   FeedStackParamList,
   FriendsStackParamList,
   ShareStackParamList,
-  RecordStackParamList,
+  AccountStackParamList,
 } from './types';
 
 import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
+import WatchReactionScreen from '../../features/threads/screens/WatchReactionScreen';
 import FriendsHomeScreen from '../../features/friends/screens/FriendsHomeScreen';
+import AddFriendScreen from '../../features/friends/screens/AddFriendScreen';
+import InviteManagementScreen from '../../features/friends/screens/InviteManagementScreen';
 import ShareHomeScreen from '../../features/share/screens/ShareHomeScreen';
+import VideoPreviewScreen from '../../features/share/screens/VideoPreviewScreen';
 import SelectRecipientsScreen from '../../features/share/screens/SelectRecipientsScreen';
-import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
+import AccountScreen from '../../features/account/screens/AccountScreen';
+import PasswordSetupScreen from '../../features/account/screens/PasswordSetupScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+const icon = (glyph: string) =>
+  ({ color }: { color: string }) => (
+    <Text style={[tabIconStyle, { color }]}>{glyph}</Text>
+  );
+
+const tabIconStyle = { fontSize: 18 };
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
 const FriendsStack = createNativeStackNavigator<FriendsStackParamList>();
 const ShareStack = createNativeStackNavigator<ShareStackParamList>();
-const RecordStack = createNativeStackNavigator<RecordStackParamList>();
+const AccountStack = createNativeStackNavigator<AccountStackParamList>();
 
 const NAV_OPTS = {
   headerStyle: { backgroundColor: C.BG },
@@ -36,7 +48,8 @@ function FeedNavigator() {
   return (
     <FeedStack.Navigator screenOptions={NAV_OPTS}>
       <FeedStack.Screen name="FeedHome" component={FeedHomeScreen} options={{ headerShown: false }} />
-      <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ title: '' }} />
+      <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ title: '', headerBackTitle: 'Feed' }} />
+      <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </FeedStack.Navigator>
   );
 }
@@ -45,16 +58,38 @@ function FriendsNavigator() {
   return (
     <FriendsStack.Navigator screenOptions={NAV_OPTS}>
       <FriendsStack.Screen name="FriendsHome" component={FriendsHomeScreen} options={{ headerShown: false }} />
+      <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ title: 'Add Friend' }} />
+      <FriendsStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
     </FriendsStack.Navigator>
   );
 }
 
 function ShareNavigator() {
+  const shareHomeOptions: any = {
+    title: 'Share',
+    headerTitleAlign: 'left',
+    headerTitleStyle: {
+      fontSize: FONT.SIZES.XXL,
+      fontFamily: FONT.DISPLAY_BOLD,
+      fontWeight: '700', color: C.INK,
+    },
+  };
   return (
     <ShareStack.Navigator screenOptions={NAV_OPTS}>
-      <ShareStack.Screen name="ShareHome" component={ShareHomeScreen} options={{ title: 'share' }} />
-      <ShareStack.Screen name="SelectRecipients" component={SelectRecipientsScreen} options={{ title: 'send to' }} />
+      <ShareStack.Screen name="ShareHome" component={ShareHomeScreen} options={shareHomeOptions} />
+      <ShareStack.Screen name="VideoPreview" component={VideoPreviewScreen} options={{ title: '' }} />
+      <ShareStack.Screen name="SelectRecipients" component={SelectRecipientsScreen} options={{ title: 'Send To' }} />
     </ShareStack.Navigator>
+  );
+}
+
+function AccountNavigator() {
+  return (
+    <AccountStack.Navigator screenOptions={NAV_OPTS}>
+      <AccountStack.Screen name="AccountHome" component={AccountScreen} options={{ headerShown: false }} />
+      <AccountStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Account' }} />
+      <AccountStack.Screen name="PasswordSetup" component={PasswordSetupScreen} options={{ title: 'Password Login' }} />
+    </AccountStack.Navigator>
   );
 }
 
@@ -68,25 +103,18 @@ export default function MainTabs() {
           borderTopColor: C.BORDER,
           borderTopWidth: 1,
         },
-        tabBarActiveTintColor: C.ACCENT,
+        tabBarActiveTintColor: C.ACCENT_HOT,
         tabBarInactiveTintColor: C.SUBTLE,
         tabBarShowLabel: true,
       }}>
-      <Tab.Screen
-        name="Feed"
-        component={FeedNavigator}
-        options={{ tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>⚡</Text>, tabBarLabel: 'feed' }}
-      />
-      <Tab.Screen
-        name="Share"
-        component={ShareNavigator}
-        options={{ tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>＋</Text>, tabBarLabel: 'share' }}
-      />
-      <Tab.Screen
-        name="Friends"
-        component={FriendsNavigator}
-        options={{ tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>👥</Text>, tabBarLabel: 'friends' }}
-      />
+      <Tab.Screen name="Feed" component={FeedNavigator}
+        options={{ tabBarIcon: icon('⚡'), tabBarLabel: 'Feed' }} />
+      <Tab.Screen name="Share" component={ShareNavigator}
+        options={{ tabBarIcon: icon('＋'), tabBarLabel: 'Share' }} />
+      <Tab.Screen name="Friends" component={FriendsNavigator}
+        options={{ tabBarIcon: icon('👥'), tabBarLabel: 'Friends' }} />
+      <Tab.Screen name="Account" component={AccountNavigator}
+        options={{ tabBarIcon: icon('◉'), tabBarLabel: 'Account' }} />
     </Tab.Navigator>
   );
 }

@@ -1,0 +1,61 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "src/assets/fonts/PlayfairDisplay-Bold.ttf",
+      "sha1": "57360f49f076d7bdd7a9e1e93abf3bed7d56d726"
+    },
+    {
+      "path": "src/assets/fonts/PlayfairDisplay-BoldItalic.ttf",
+      "sha1": "5e5a5d9a16f0c8a5ffd6afbc5ffa5b5af51916b1"
+    },
+    {
+      "path": "src/assets/fonts/PlayfairDisplay-Medium.ttf",
+      "sha1": "de85ce98fad06daf64f86d670e13fa3ecef5b515"
+    },
+    {
+      "path": "src/assets/fonts/PlayfairDisplay-MediumItalic.ttf",
+      "sha1": "96456a5921dbec77ee23ed839c9f449abb43948c"
+    },
+    {
+      "path": "src/assets/fonts/PlayfairDisplay-Regular.ttf",
+      "sha1": "3e12c2cf422de852cd0af0227179901b155abf14"
+    },
+    {
+      "path": "src/assets/fonts/PlayfairDisplay-SemiBold.ttf",
+      "sha1": "7fa24e8796734ec17d72f1e97cfb5d427508e337"
+    },
+    {
+      "path": "src/assets/fonts/PlayfairDisplay-SemiBoldItalic.ttf",
+      "sha1": "f31580d7e567c50400544996e014dfeca9aaa9c7"
+    },
+    {
+      "path": "src/assets/fonts/Raleway-Bold.ttf",
+      "sha1": "633fc874da0a04f51950f11729651f14718778d4"
+    },
+    {
+      "path": "src/assets/fonts/Raleway-BoldItalic.ttf",
+      "sha1": "cc2e776c8131c6356341a54aaf897c066b62ea38"
+    },
+    {
+      "path": "src/assets/fonts/Raleway-Medium.ttf",
+      "sha1": "a9a82617db2caca029742885ea86e2384b512dc7"
+    },
+    {
+      "path": "src/assets/fonts/Raleway-MediumItalic.ttf",
+      "sha1": "38021041e795aebac9e3a961a1c19df0695eed2e"
+    },
+    {
+      "path": "src/assets/fonts/Raleway-Regular.ttf",
+      "sha1": "de56c2d00968cb63feda2bdf924a90b7079eec48"
+    },
+    {
+      "path": "src/assets/fonts/Raleway-SemiBold.ttf",
+      "sha1": "60b619bc3a65fbd7497eebca05550e916fbb0ac9"
+    },
+    {
+      "path": "src/assets/fonts/Raleway-SemiBoldItalic.ttf",
+      "sha1": "c42b7304f432bea3c6e2177c9ab20ff6dbf1777d"
+    }
+  ]
+}

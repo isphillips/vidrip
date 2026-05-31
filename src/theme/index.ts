@@ -1,23 +1,27 @@
 export const C = {
-  // Backgrounds
-  BG: '#0A0A0A',
-  SURFACE: '#141414',
-  SURFACE_2: '#1E1E1E',
+  // Backgrounds — warm near-black to match logo's dark warmth
+  BG: '#0C0A09',
+  SURFACE: '#171210',
+  SURFACE_2: '#221A17',
 
   // Borders
-  BORDER: '#2A2A2A',
-  BORDER_STRONG: '#3A3A3A',
+  BORDER: '#2E2420',
+  BORDER_STRONG: '#3E3028',
 
   // Text
-  INK: '#F5F5F5',
-  MUTED: '#A0A0A0',
-  SUBTLE: '#606060',
+  INK: '#F5F0EE',
+  MUTED: '#A09088',
+  SUBTLE: '#655550',
 
-  // Brand
-  ACCENT: '#FF3B5C',        // primary CTA — hot pink/red
-  ACCENT_LITE: '#2A0A10',
-  ACCENT_2: '#7C3AED',      // secondary — violet
-  ACCENT_2_LITE: '#1A0A2A',
+  // Brand — deep crimson pulled from logo wax seal
+  ACCENT: '#8C1A14',        // deep wax seal crimson — primary actions
+  ACCENT_MID: '#A82820',    // warm crimson mid — hover/active
+  ACCENT_HOT: '#C43C30',    // bright crimson highlight
+  ACCENT_LITE: '#1C0806',   // dark crimson tint for surfaces
+
+  // Gradient pair (bright → deep crimson, matches logo wax highlights)
+  GRAD_START: '#C43C30',
+  GRAD_END: '#8C1A14',
 
   // Status
   SUCCESS: '#22C55E',
@@ -30,9 +34,26 @@ export const C = {
   TRANSPARENT: 'transparent',
 } as const;
 
+// Playfair Display — high-contrast serif, 1920s editorial/speakeasy headings
+// Raleway — geometric Art Nouveau sans, body + UI
 export const FONT = {
-  REGULAR: 'System',
-  BOLD: 'System',
+  // Display (Playfair Display) — for large headings, screen titles, brand
+  DISPLAY: 'PlayfairDisplay-Regular',
+  DISPLAY_MEDIUM: 'PlayfairDisplay-Medium',
+  DISPLAY_SEMIBOLD: 'PlayfairDisplay-SemiBold',
+  DISPLAY_BOLD: 'PlayfairDisplay-Bold',
+  DISPLAY_ITALIC: 'PlayfairDisplay-Regular', // italic via fontStyle
+
+  // Body (Raleway) — for all UI text, buttons, labels, body copy
+  BODY: 'Raleway-Regular',
+  BODY_MEDIUM: 'Raleway-Medium',
+  BODY_SEMIBOLD: 'Raleway-SemiBold',
+  BODY_BOLD: 'Raleway-Bold',
+
+  // Legacy aliases (screens not yet updated)
+  REGULAR: 'Raleway-Regular',
+  BOLD: 'Raleway-Bold',
+
   SIZES: {
     XS: 11,
     SM: 13,

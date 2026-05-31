@@ -20,5 +20,22 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Raleway-BoldItalic.ttf</string>
+		<string>Raleway-MediumItalic.ttf</string>
+		<string>PlayfairDisplay-Bold.ttf</string>
+		<string>Raleway-Medium.ttf</string>
+		<string>Raleway-SemiBold.ttf</string>
+		<string>PlayfairDisplay-SemiBold.ttf</string>
+		<string>PlayfairDisplay-Medium.ttf</string>
+		<string>Raleway-Regular.ttf</string>
+		<string>Raleway-SemiBoldItalic.ttf</string>
+		<string>PlayfairDisplay-BoldItalic.ttf</string>
+		<string>PlayfairDisplay-Regular.ttf</string>
+		<string>PlayfairDisplay-SemiBoldItalic.ttf</string>
+		<string>PlayfairDisplay-MediumItalic.ttf</string>
+		<string>Raleway-Bold.ttf</string>
+	</array>
 </dict>
 </plist>

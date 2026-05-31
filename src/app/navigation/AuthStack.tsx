@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import WelcomeScreen from '../../features/auth/screens/WelcomeScreen';
+import SignInScreen from '../../features/auth/screens/SignInScreen';
 import EnterInviteCodeScreen from '../../features/auth/screens/EnterInviteCodeScreen';
 import CreateProfileScreen from '../../features/auth/screens/CreateProfileScreen';
 import type { AuthStackParamList } from './types';
@@ -19,6 +20,7 @@ export default function AuthStack() {
         contentStyle: { backgroundColor: C.BG },
       }}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: '' }} />
       <Stack.Screen name="EnterInviteCode" component={EnterInviteCodeScreen} options={{ title: '' }} />
       <Stack.Screen name="CreateProfile" component={CreateProfileScreen} options={{ title: '' }} />
     </Stack.Navigator>

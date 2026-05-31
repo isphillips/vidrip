@@ -32,6 +32,7 @@ export default function CreateProfileScreen({
       const { data: authData, error: authError } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
+          emailRedirectTo: 'reaxn://auth/callback',
           data: {
             handle: trimmedHandle,
             display_name: displayName.trim(),
@@ -61,12 +62,12 @@ export default function CreateProfileScreen({
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Text style={styles.title}>create your profile</Text>
-      <Text style={styles.subtitle}>invite code: {inviteCode}</Text>
+      <Text style={styles.title}>Create your profile</Text>
+      <Text style={styles.subtitle}>Invite code: {inviteCode}</Text>
 
       <View style={styles.form}>
         <View style={styles.field}>
-          <Text style={styles.label}>display name</Text>
+          <Text style={styles.label}>Display Name</Text>
           <TextInput
             style={styles.input}
             value={displayName}
@@ -78,7 +79,7 @@ export default function CreateProfileScreen({
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>handle</Text>
+          <Text style={styles.label}>Handle</Text>
           <TextInput
             style={styles.input}
             value={handle}
@@ -91,7 +92,7 @@ export default function CreateProfileScreen({
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>email</Text>
+          <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
             value={email}
@@ -112,7 +113,7 @@ export default function CreateProfileScreen({
         {loading ? (
           <ActivityIndicator color={C.WHITE} />
         ) : (
-          <Text style={styles.buttonText}>send magic link</Text>
+          <Text style={styles.buttonText}>Send Magic Link</Text>
         )}
       </TouchableOpacity>
     </KeyboardAvoidingView>
@@ -128,6 +129,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FONT.SIZES.XXL,
+    fontFamily: FONT.DISPLAY_BOLD,
     fontWeight: '700',
     color: C.INK,
     marginBottom: SPACE.XS,
@@ -172,6 +174,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: C.WHITE,
     fontSize: FONT.SIZES.LG,
+    fontFamily: FONT.BODY_BOLD,
     fontWeight: '700',
   },
 });
