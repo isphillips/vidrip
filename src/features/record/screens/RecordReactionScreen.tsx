@@ -20,7 +20,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
-import { uploadReaction } from '../../../infrastructure/supabase/queries/reactions';
+import { saveReaction } from '../../../infrastructure/storage/reactionStorage';
+import { STORAGE_MODE } from '../../../infrastructure/storage/config';
 import {
   startScreenCapture,
   stopScreenCapture,
@@ -105,11 +106,12 @@ export default function RecordReactionScreen({
     setUploading(true);
     try {
       const filePath = await stopScreenCapture();
-      await uploadReaction({
+      await saveReaction({
         userId: user!.id,
         threadId,
         filePath,
         duration: elapsedRef.current,
+        mode: STORAGE_MODE,
       });
       navigation.goBack();
     } catch (e: any) {
