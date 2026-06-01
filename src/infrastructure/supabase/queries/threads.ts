@@ -1,4 +1,5 @@
 import { supabase } from '../client';
+import { resolveReactionUri } from '../../storage/reactionStorage';
 
 export type FeedThread = {
   id: string;
@@ -24,11 +25,15 @@ export type ThreadDetail = {
 
 export type ReactionItem = {
   id: string;
-  video_url: string;
+  video_url: string | null;       // null for local-mode reactions
+  storage_mode: 'local' | 'cloud' | 'deleted';
   duration: number;
   created_at: string;
   user: { handle: string; display_name: string } | null;
   emoji_reactions: { emoji: string; user_id: string }[];
+  // Resolved at fetch time by resolveReactionUri
+  resolvedUri: string | null;
+  needsDownload: boolean;         // true = cloud URL available but not yet local
 };
 
 export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
@@ -85,11 +90,27 @@ export async function fetchThread(threadId: string, userId: string): Promise<Thr
   };
 }
 
+async function hydrateReaction(raw: any): Promise<ReactionItem> {
+  const base: ReactionItem = {
+    ...raw,
+    video_url: raw.video_url ?? null,
+    storage_mode: raw.storage_mode ?? 'cloud',
+    resolvedUri: null,
+    needsDownload: false,
+  };
+  const resolved = await resolveReactionUri(base);
+  return {
+    ...base,
+    resolvedUri: resolved?.uri ?? null,
+    needsDownload: resolved?.needsDownload ?? false,
+  };
+}
+
 export async function fetchReactionById(reactionId: string): Promise<ReactionItem | null> {
   const { data, error } = await supabase
     .from('reactions')
     .select(`
-      id, video_url, duration, created_at,
+      id, video_url, storage_mode, duration, created_at,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id)
     `)
@@ -97,38 +118,22 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
     .single();
 
   if (error || !data) return null;
-
-  // Exchange the stored public URL for a 1-hour signed URL.
-  // The reactions bucket is private so the raw public URL returns 403.
-  const storedUrl: string = (data as any).video_url ?? '';
-  const pathMatch = storedUrl.match(/\/storage\/v1\/object\/(?:public\/)?reactions\/(.+?)(?:\?|$)/);
-  if (pathMatch) {
-    const { data: signed, error: signErr } = await supabase.storage
-      .from('reactions')
-      .createSignedUrl(decodeURIComponent(pathMatch[1]), 3600);
-    console.log('[fetchReactionById] signedUrl:', signed?.signedUrl ?? 'NONE', 'error:', signErr?.message ?? 'none');
-    if (signed?.signedUrl) {
-      return { ...(data as unknown as ReactionItem), video_url: signed.signedUrl };
-    }
-  }
-  console.log('[fetchReactionById] falling back to raw url:', storedUrl);
-
-  return data as unknown as ReactionItem;
+  return hydrateReaction(data);
 }
 
 export async function fetchReactions(threadId: string): Promise<ReactionItem[]> {
   const { data, error } = await supabase
     .from('reactions')
     .select(`
-      id, video_url, duration, created_at,
+      id, video_url, storage_mode, duration, created_at,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id)
     `)
     .eq('thread_id', threadId)
     .order('created_at', { ascending: true });
 
-  if (error) throw error;
-  return (data ?? []) as ReactionItem[];
+  if (error) { throw error; }
+  return Promise.all((data ?? []).map(hydrateReaction));
 }
 
 export async function markThreadSeen(threadId: string) {

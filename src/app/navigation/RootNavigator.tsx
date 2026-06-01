@@ -5,6 +5,7 @@ import { ActivityIndicator, Linking, View } from 'react-native';
 import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
 import { useAuthStore } from '../../store/authStore';
+import { ensureReactionsDir } from '../../infrastructure/storage/localReactionStorage';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
@@ -13,6 +14,9 @@ const Root = createNativeStackNavigator();
 
 export default function RootNavigator() {
   const { session, isLoading, setSession, setProfile, setLoading } = useAuthStore();
+  useEffect(() => {
+    ensureReactionsDir().catch(() => {});
+  }, []);
 
   useEffect(() => {
     // onAuthStateChange fires with INITIAL_SESSION on mount — covers both
