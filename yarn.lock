@@ -2195,6 +2195,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-community/push-notification-ios@npm:^1.12.0":
+  version: 1.12.0
+  resolution: "@react-native-community/push-notification-ios@npm:1.12.0"
+  dependencies:
+    invariant: ^2.2.4
+  peerDependencies:
+    react: ">=16.6.3"
+    react-native: ">=0.58.4"
+  checksum: 650b9022efffb1eea0e6c34ea71e210b486d16dfbd0a75a907fd747c8c22dd633c55a54533f135381f603cacc09d10d38780f0ab03d680eb7a51810d5db1bdb7
+  languageName: node
+  linkType: hard
+
 "@react-native/assets-registry@npm:0.76.5":
   version: 0.76.5
   resolution: "@react-native/assets-registry@npm:0.76.5"
@@ -3037,6 +3049,7 @@ __metadata:
     "@react-native-community/cli": 15.0.1
     "@react-native-community/cli-platform-android": 15.0.1
     "@react-native-community/cli-platform-ios": 15.0.1
+    "@react-native-community/push-notification-ios": ^1.12.0
     "@react-native/babel-preset": 0.76.5
     "@react-native/eslint-config": 0.76.5
     "@react-native/metro-config": 0.76.5
