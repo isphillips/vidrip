@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text } from 'react-native';
+import { Image } from 'react-native';
 import { C, FONT } from '../../theme';
 import type {
   MainTabParamList,
@@ -25,12 +25,14 @@ import PasswordSetupScreen from '../../features/account/screens/PasswordSetupScr
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const icon = (glyph: string) =>
-  ({ color }: { color: string }) => (
-    <Text style={[tabIconStyle, { color }]}>{glyph}</Text>
+const tabIcon = (source: ReturnType<typeof require>, w = 28, h = 28) =>
+  ({ color, focused }: { color: string; focused: boolean }) => (
+    <Image
+      source={source}
+      style={{ width: w, height: h, opacity: focused ? 1 : 0.45, tintColor: color }}
+      resizeMode="contain"
+    />
   );
-
-const tabIconStyle = { fontSize: 18 };
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
 const FriendsStack = createNativeStackNavigator<FriendsStackParamList>();
 const ShareStack = createNativeStackNavigator<ShareStackParamList>();
@@ -104,17 +106,17 @@ export default function MainTabs() {
           borderTopWidth: 1,
         },
         tabBarActiveTintColor: C.ACCENT_HOT,
-        tabBarInactiveTintColor: C.SUBTLE,
+        tabBarInactiveTintColor: C.WHITE,
         tabBarShowLabel: true,
       }}>
       <Tab.Screen name="Feed" component={FeedNavigator}
-        options={{ tabBarIcon: icon('⚡'), tabBarLabel: 'Feed' }} />
+        options={{ tabBarIcon: tabIcon(require('../../assets/icon-feed.png')), tabBarLabel: 'Feed' }} />
       <Tab.Screen name="Share" component={ShareNavigator}
-        options={{ tabBarIcon: icon('＋'), tabBarLabel: 'Share' }} />
+        options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Share' }} />
       <Tab.Screen name="Friends" component={FriendsNavigator}
-        options={{ tabBarIcon: icon('👥'), tabBarLabel: 'Friends' }} />
+        options={{ tabBarIcon: tabIcon(require('../../assets/icon-friends.png')), tabBarLabel: 'Friends' }} />
       <Tab.Screen name="Account" component={AccountNavigator}
-        options={{ tabBarIcon: icon('◉'), tabBarLabel: 'Account' }} />
+        options={{ tabBarIcon: tabIcon(require('../../assets/icon-account.png')), tabBarLabel: 'Account' }} />
     </Tab.Navigator>
   );
 }
