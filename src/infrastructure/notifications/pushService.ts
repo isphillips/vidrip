@@ -17,8 +17,6 @@ async function saveToken(userId: string, token: string) {
     );
   if (error) {
     console.error('[Push] token save error:', JSON.stringify(error));
-  } else {
-    console.log('[Push] token saved for user', userId);
   }
 }
 
@@ -67,7 +65,6 @@ export function bootstrapNotifications(): () => void {
   // 'register' listener must be set up before requestPermissions is called
   // so the token is never missed regardless of timing
   PushNotificationIOS.addEventListener('register', async (token: string) => {
-    console.log('[Push] received APNs token:', token);
     if (_pendingUserId) {
       await saveToken(_pendingUserId, token);
     }
