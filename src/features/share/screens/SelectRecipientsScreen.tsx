@@ -11,7 +11,7 @@ import {
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
-import { sendThread } from '../../../infrastructure/supabase/queries/threads';
+import { sendThread, fetchAlreadySentRecipients } from '../../../infrastructure/supabase/queries/threads';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
 
 export default function SelectRecipientsScreen({
@@ -24,32 +24,45 @@ export default function SelectRecipientsScreen({
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [alreadySent, setAlreadySent] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      setFriends(await fetchFriends(user.id));
-    } catch {
-      // silently degrade — empty list shown
+      const [friendList, sentIds] = await Promise.all([
+        fetchFriends(user.id),
+        fetchAlreadySentRecipients(user.id, videoId),
+      ]);
+      setFriends(friendList);
+      setAlreadySent(new Set(sentIds));
+    } catch (e) {
+      console.error('[SelectRecipients] load error:', JSON.stringify(e));
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, videoId]);
 
   useEffect(() => { load(); }, [load]);
 
-  const toggle = (userId: string) =>
+  const toggle = (item: Friend) => {
+    if (alreadySent.has(item.userId)) { return; }
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(userId) ? next.delete(userId) : next.add(userId);
+      next.has(item.userId) ? next.delete(item.userId) : next.add(item.userId);
       return next;
     });
+  };
 
   const handleSend = async () => {
     if (!user || selected.size === 0) return;
     setSending(true);
     try {
-      await sendThread(user.id, videoId, videoTitle, videoThumbnail, Array.from(selected));
+      const { alreadySentTo } = await sendThread(
+        user.id, videoId, videoTitle, videoThumbnail, Array.from(selected),
+      );
+      // Update local already-sent set so subsequent selections reflect reality
+      setAlreadySent(prev => new Set([...prev, ...alreadySentTo, ...selected]));
+      setSelected(new Set());
       Alert.alert('Sent!', 'Your friends will be notified.', [
         { text: 'OK', onPress: () => navigation.getParent()?.navigate('Feed') },
       ]);
@@ -85,20 +98,27 @@ export default function SelectRecipientsScreen({
           style={styles.list}
           renderItem={({ item }) => {
             const isSelected = selected.has(item.userId);
+            const isSent = alreadySent.has(item.userId);
             return (
               <TouchableOpacity
-                style={[styles.row, isSelected && styles.rowSelected]}
-                onPress={() => toggle(item.userId)}>
+                style={[styles.row, isSelected && styles.rowSelected, isSent && styles.rowSent]}
+                onPress={() => toggle(item)}
+                disabled={isSent}
+                activeOpacity={isSent ? 1 : 0.7}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{item.displayName[0]?.toUpperCase()}</Text>
                 </View>
                 <View style={styles.rowInfo}>
-                  <Text style={styles.name}>{item.displayName}</Text>
-                  <Text style={styles.handle}>@{item.handle}</Text>
+                  <Text style={[styles.name, isSent && styles.nameSent]}>{item.displayName}</Text>
+                  <Text style={styles.handle}>
+                    @{item.handle}{isSent ? '  ✓ Sent' : ''}
+                  </Text>
                 </View>
-                <View style={[styles.check, isSelected && styles.checkSelected]}>
-                  {isSelected && <Text style={styles.checkMark}>✓</Text>}
-                </View>
+                {!isSent && (
+                  <View style={[styles.check, isSelected && styles.checkSelected]}>
+                    {isSelected && <Text style={styles.checkMark}>✓</Text>}
+                  </View>
+                )}
               </TouchableOpacity>
             );
           }}
@@ -153,6 +173,8 @@ const styles = StyleSheet.create({
     borderBottomColor: C.BORDER,
   },
   rowSelected: { backgroundColor: C.SURFACE },
+  rowSent: { opacity: 0.5 },
+  nameSent: { color: C.MUTED },
   avatar: {
     width: 44,
     height: 44,
