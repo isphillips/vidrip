@@ -8,7 +8,35 @@ import {
   Alert,
   StatusBar,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
+
+const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
+
+function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  // Random initial sway direction per emoji instance
+  const dir = useRef(Math.random() > 0.5 ? 1 : -1).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: 1, duration: 1800, useNativeDriver: true }).start(onDone);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -220] });
+  const translateX = anim.interpolate({
+    inputRange: [0, 0.2, 0.4, 0.6, 0.8, 1],
+    outputRange: [0, dir * 28, dir * -22, dir * 30, dir * -18, dir * 12],
+  });
+  const opacity = anim.interpolate({ inputRange: [0, 0.65, 1], outputRange: [1, 1, 0] });
+  const scale = anim.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0.5, 1.2, 1] });
+  return (
+    <Animated.Text style={[floatStyles.emoji, { transform: [{ translateY }, { translateX }, { scale }], opacity }]}>
+      {emoji}
+    </Animated.Text>
+  );
+}
+const floatStyles = StyleSheet.create({
+  emoji: { position: 'absolute', bottom: 100, alignSelf: 'center', fontSize: 36 },
+});
 import Orientation from 'react-native-orientation-locker';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import {
@@ -41,7 +69,6 @@ export default function RecordReactionScreen({
   const { width, height } = useWindowDimensions();
   const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
 
-  // 30% YouTube (horizontal video fits well) / 70% camera
   const usableH = height - topInset - bottomInset - 2;
   const topH = Math.round(usableH * 0.30);
   const bottomH = usableH - topH;
@@ -55,7 +82,9 @@ export default function RecordReactionScreen({
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [uploading, setUploading] = useState(false);
-  const [startingCapture, setStartingCapture] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [floating, setFloating] = useState<{ id: number; emoji: string }[]>([]);
+  const floatIdRef = useRef(0);
 
   const ytRef = useRef<YoutubeIframeRef>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -63,16 +92,14 @@ export default function RecordReactionScreen({
   const hasStartedRef = useRef(false);
   const skipNextPausedRef = useRef(false);
   const ytKeyRef = useRef(0);
-  const isRecordingRef = useRef(false);
   const [ytKey, setYtKey] = useState(0);
-
-  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
   useEffect(() => {
     Orientation.lockToPortrait();
     return () => { Orientation.unlockAllOrientations(); };
   }, []);
 
+  // Request cam/mic permissions then start screen capture immediately
   useEffect(() => {
     (async () => {
       const cam = hasCam || (await requestCam());
@@ -86,6 +113,13 @@ export default function RecordReactionScreen({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Start capture as soon as cam/mic are granted
+  useEffect(() => {
+    if (!ready) { return; }
+    startScreenCapture().catch(() => { navigation.goBack(); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
   const startTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); }
     timerRef.current = setInterval(() => {
@@ -98,20 +132,16 @@ export default function RecordReactionScreen({
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
 
-  // Called when the user taps the play overlay — shows the ReplayKit dialog,
-  // then starts YouTube only once permission is granted.
-  const handleStartRecording = useCallback(async () => {
-    if (startingCapture) { return; }
-    setStartingCapture(true);
-    try {
-      await startScreenCapture();
-      setYtPlaying(true);
-    } catch {
-      navigation.goBack();
-    } finally {
-      setStartingCapture(false);
-    }
-  }, [startingCapture, navigation]);
+  // Start recording (timer + state) — called by YouTube play or record button
+  const beginRecording = useCallback(() => {
+    if (hasStartedRef.current) { return; }
+    hasStartedRef.current = true;
+    elapsedRef.current = 0;
+    setElapsed(0);
+    setIsRecording(true);
+    StatusBar.setHidden(true, 'fade');
+    startTimer();
+  }, [startTimer]);
 
   const handleStop = useCallback(async () => {
     if (!isRecording) { return; }
@@ -144,6 +174,7 @@ export default function RecordReactionScreen({
     setYtPlaying(false);
     StatusBar.setHidden(false, 'fade');
     await cancelScreenCapture().catch(() => {});
+    await startScreenCapture().catch(() => {});
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
   }, [stopTimer]);
@@ -151,22 +182,23 @@ export default function RecordReactionScreen({
   const onYtStateChange = useCallback((state: string) => {
     if (state === 'playing') {
       skipNextPausedRef.current = true;
-      if (!hasStartedRef.current) {
-        hasStartedRef.current = true;
-        elapsedRef.current = 0;
-        setElapsed(0);
-        setIsRecording(true);
-        StatusBar.setHidden(true, 'fade');
-        startTimer();
-      }
+      setYtPlaying(true);
+      beginRecording();
     } else if (state === 'paused') {
+      setYtPlaying(false);
       if (skipNextPausedRef.current) {
         skipNextPausedRef.current = false;
       }
     } else if (state === 'ended') {
+      setYtPlaying(false);
       skipNextPausedRef.current = false;
     }
-  }, [startTimer]);
+  }, [beginRecording]);
+
+  const handleEmoji = useCallback((emoji: string) => {
+    const id = ++floatIdRef.current;
+    setFloating(prev => [...prev, { id, emoji }]);
+  }, []);
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -190,7 +222,7 @@ export default function RecordReactionScreen({
     <View style={styles.container}>
       <View style={{ height: topInset, backgroundColor: C.BLACK }} />
 
-      {/* Top 30% — YouTube */}
+      {/* Top 30% — YouTube (no overlay, user plays directly) */}
       <View style={[styles.pane, { height: topH }]}>
         <YoutubePlayer
           key={ytKey}
@@ -203,32 +235,12 @@ export default function RecordReactionScreen({
           initialPlayerParams={YT_PARAMS}
           webViewStyle={YT_WV_STYLE}
         />
-        {/* Overlay covers YouTube until the user accepts the recording dialog */}
-        {!ytPlaying && (
-          <TouchableOpacity
-            style={styles.startOverlay}
-            onPress={handleStartRecording}
-            activeOpacity={0.85}
-            disabled={startingCapture}>
-            {startingCapture
-              ? <ActivityIndicator color={C.WHITE} size="large" />
-              : (
-                <>
-                  <View style={styles.startCircle}>
-                    <Text style={styles.startIcon}>▶</Text>
-                  </View>
-                  <Text style={styles.startLabel}>Tap to record</Text>
-                </>
-              )
-            }
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Divider */}
       <View style={[styles.divider, isRecording && styles.dividerActive]} />
 
-      {/* Bottom 70% — camera preview (ReplayKit captures this) */}
+      {/* Bottom 70% — camera */}
       <View style={[styles.pane, { height: bottomH }]}>
         <Camera
           style={StyleSheet.absoluteFill}
@@ -243,13 +255,52 @@ export default function RecordReactionScreen({
           </View>
         )}
 
-        {isRecording && !uploading && (
-          <View style={styles.controls}>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleRestart} activeOpacity={0.8}>
-              <Text style={styles.secondaryBtnIcon}>↺</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.stopBtn} onPress={handleStop} activeOpacity={0.8}>
-              <View style={styles.stopInner} />
+        {/* Controls always visible */}
+        {!uploading && (
+          <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
+            {isRecording ? (
+              <>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={handleRestart} activeOpacity={0.8}>
+                  <Text style={styles.secondaryBtnIcon}>↺</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.stopBtn} onPress={handleStop} activeOpacity={0.8}>
+                  <View style={styles.stopInner} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity style={styles.recordBtn} onPress={beginRecording} activeOpacity={0.8}>
+                <View style={styles.recordInner} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Floating emojis */}
+        {floating.map(f => (
+          <FloatingEmoji
+            key={f.id}
+            emoji={f.emoji}
+            onDone={() => setFloating(prev => prev.filter(x => x.id !== f.id))}
+          />
+        ))}
+
+        {/* Emoji drawer */}
+        {!uploading && (
+          <View style={styles.emojiDrawer}>
+            {emojiOpen && (
+              <View style={styles.emojiPicker}>
+                {QUICK_EMOJIS.map(e => (
+                  <TouchableOpacity key={e} onPress={() => handleEmoji(e)} hitSlop={4}>
+                    <Text style={styles.emojiGlyph}>{e}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.emojiToggle}
+              onPress={() => setEmojiOpen(o => !o)}
+              activeOpacity={0.8}>
+              <Text style={styles.emojiToggleIcon}>{emojiOpen ? '✕' : '😊'}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -296,7 +347,7 @@ const styles = StyleSheet.create({
   recText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
   controls: {
     position: 'absolute',
-    bottom: SPACE.XL, left: 0, right: 0,
+    left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: SPACE.XL,
   },
   secondaryBtn: {
@@ -306,6 +357,15 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   secondaryBtnIcon: { color: C.WHITE, fontSize: 20 },
+  recordBtn: {
+    width: 72, height: 72, borderRadius: RADIUS.FULL,
+    borderWidth: 4, borderColor: C.WHITE,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  recordInner: {
+    width: 54, height: 54, borderRadius: RADIUS.FULL,
+    backgroundColor: C.ACCENT_HOT,
+  },
   stopBtn: {
     width: 72, height: 72, borderRadius: RADIUS.FULL,
     borderWidth: 4, borderColor: C.ACCENT_MID,
@@ -328,17 +388,21 @@ const styles = StyleSheet.create({
   infoText: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center' },
   backBtn: { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, paddingVertical: SPACE.MD, paddingHorizontal: SPACE.LG },
   backBtnText: { color: C.INK, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM },
-  startOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center', justifyContent: 'center', gap: SPACE.SM,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+  emojiDrawer: {
+    position: 'absolute', right: SPACE.MD, bottom: 100,
+    alignItems: 'center', gap: SPACE.SM,
   },
-  startCircle: {
-    width: 56, height: 56, borderRadius: RADIUS.FULL,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)',
+  emojiPicker: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: RADIUS.LG, padding: SPACE.SM,
+    alignItems: 'center', gap: SPACE.SM,
+  },
+  emojiGlyph: { fontSize: 28 },
+  emojiToggle: {
+    width: 44, height: 44, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center', justifyContent: 'center',
   },
-  startIcon: { color: C.WHITE, fontSize: 22, marginLeft: 4 },
-  startLabel: { color: 'rgba(255,255,255,0.8)', fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
+  emojiToggleIcon: { fontSize: 22 },
 });
