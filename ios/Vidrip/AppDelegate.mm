@@ -13,7 +13,7 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-  self.moduleName = @"Reaxn";
+  self.moduleName = @"Vidrip";
   self.initialProps = @{};
 
   // PlayAndRecord + MixWithOthers + DefaultToSpeaker:

@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		00E356F31AD99517003FC87E /* ReaxnTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F21AD99517003FC87E /* ReaxnTests.m */; };
-		0C80B921A6F3F58F76C31292 /* libPods-Reaxn.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Reaxn.a */; };
+		00E356F31AD99517003FC87E /* VidripTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F21AD99517003FC87E /* VidripTests.m */; };
+		0C80B921A6F3F58F76C31292 /* libPods-Vidrip.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Vidrip.a */; };
 		13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.mm */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
@@ -29,7 +29,7 @@
 		538AC4D0B76F4FFAB81A0E56 /* Raleway-MediumItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0E8D049974574AA7A8641252 /* Raleway-MediumItalic.ttf */; };
 		5A28F45B42764FB5984D32F9 /* Raleway-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 243796B3B0DF4A6F94CA20F6 /* Raleway-BoldItalic.ttf */; };
 		6D0B9720B41248FB9060A27E /* PlayfairDisplay-SemiBoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7362B429A1FF424FBCB57E6D /* PlayfairDisplay-SemiBoldItalic.ttf */; };
-		7699B88040F8A987B510C191 /* libPods-Reaxn-ReaxnTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 19F6CBCC0A4E27FBF8BF4A61 /* libPods-Reaxn-ReaxnTests.a */; };
+		7699B88040F8A987B510C191 /* libPods-Vidrip-VidripTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 19F6CBCC0A4E27FBF8BF4A61 /* libPods-Vidrip-VidripTests.a */; };
 		78F3E7A82FB14377A06D4D2D /* Raleway-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 006A7915EBBE47A08DD3EC4C /* Raleway-SemiBold.ttf */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		85AA367EAD5D4054A21C273F /* PlayfairDisplay-SemiBoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7362B429A1FF424FBCB57E6D /* PlayfairDisplay-SemiBoldItalic.ttf */; };
@@ -54,43 +54,43 @@
 			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
-			remoteInfo = Reaxn;
+			remoteInfo = "Vidrip";
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		006A7915EBBE47A08DD3EC4C /* Raleway-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-SemiBold.ttf"; path = "../src/assets/fonts/Raleway-SemiBold.ttf"; sourceTree = "<group>"; };
-		00E356EE1AD99517003FC87E /* ReaxnTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ReaxnTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		00E356EE1AD99517003FC87E /* VidripTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "VidripTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		00E356F11AD99517003FC87E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		00E356F21AD99517003FC87E /* ReaxnTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ReaxnTests.m; sourceTree = "<group>"; };
+		00E356F21AD99517003FC87E /* VidripTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "VidripTests.m"; sourceTree = "<group>"; };
 		0E8D049974574AA7A8641252 /* Raleway-MediumItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-MediumItalic.ttf"; path = "../src/assets/fonts/Raleway-MediumItalic.ttf"; sourceTree = "<group>"; };
-		13B07F961A680F5B00A75B9A /* Reaxn.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reaxn.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		13B07FAF1A68108700A75B9A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = Reaxn/AppDelegate.h; sourceTree = "<group>"; };
-		13B07FB01A68108700A75B9A /* AppDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = AppDelegate.mm; path = Reaxn/AppDelegate.mm; sourceTree = "<group>"; };
-		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Reaxn/Images.xcassets; sourceTree = "<group>"; };
-		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Reaxn/Info.plist; sourceTree = "<group>"; };
-		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = Reaxn/main.m; sourceTree = "<group>"; };
-		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Reaxn/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* Vidrip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Vidrip.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FAF1A68108700A75B9A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = "Vidrip/AppDelegate.h"; sourceTree = "<group>"; };
+		13B07FB01A68108700A75B9A /* AppDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = AppDelegate.mm; path = "Vidrip/AppDelegate.mm"; sourceTree = "<group>"; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = "Vidrip/Images.xcassets"; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = "Vidrip/Info.plist"; sourceTree = "<group>"; };
+		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = "Vidrip/main.m"; sourceTree = "<group>"; };
+		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Vidrip/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		19F19A9119EE4D458E2EBA12 /* PlayfairDisplay-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-SemiBold.ttf"; path = "../src/assets/fonts/PlayfairDisplay-SemiBold.ttf"; sourceTree = "<group>"; };
-		19F6CBCC0A4E27FBF8BF4A61 /* libPods-Reaxn-ReaxnTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Reaxn-ReaxnTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		19F6CBCC0A4E27FBF8BF4A61 /* libPods-Vidrip-VidripTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Vidrip-VidripTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		243796B3B0DF4A6F94CA20F6 /* Raleway-BoldItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-BoldItalic.ttf"; path = "../src/assets/fonts/Raleway-BoldItalic.ttf"; sourceTree = "<group>"; };
-		3B4392A12AC88292D35C810B /* Pods-Reaxn.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Reaxn.debug.xcconfig"; path = "Target Support Files/Pods-Reaxn/Pods-Reaxn.debug.xcconfig"; sourceTree = "<group>"; };
+		3B4392A12AC88292D35C810B /* Pods-Vidrip.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip.debug.xcconfig"; path = "Target Support Files/Pods-Vidrip/Pods-Vidrip.debug.xcconfig"; sourceTree = "<group>"; };
 		3F3141392FCCFE8F0066BB5B /* ReaxnScreenRecorder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ReaxnScreenRecorder.m; sourceTree = "<group>"; };
 		3F31413A2FCCFE8F0066BB5B /* ReaxnScreenRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaxnScreenRecorder.swift; sourceTree = "<group>"; };
-		3F31413D2FCCFE920066BB5B /* Reaxn-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Reaxn-Bridging-Header.h"; sourceTree = "<group>"; };
-		3F9787AB2FCE506800F638C2 /* ReaxnDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = ReaxnDebug.entitlements; path = Reaxn/ReaxnDebug.entitlements; sourceTree = "<group>"; };
+		3F31413D2FCCFE920066BB5B /* Vidrip-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Vidrip-Bridging-Header.h"; sourceTree = "<group>"; };
+		3F9787AB2FCE506800F638C2 /* ReaxnDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = ReaxnDebug.entitlements; path = Vidrip/ReaxnDebug.entitlements; sourceTree = "<group>"; };
 		3FE1E2A72FCFA89500381E5F /* RXNSafeAppend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RXNSafeAppend.h; sourceTree = "<group>"; };
 		3FE1E2A82FCFA89500381E5F /* RXNSafeAppend.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RXNSafeAppend.m; sourceTree = "<group>"; };
-		5709B34CF0A7D63546082F79 /* Pods-Reaxn.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Reaxn.release.xcconfig"; path = "Target Support Files/Pods-Reaxn/Pods-Reaxn.release.xcconfig"; sourceTree = "<group>"; };
-		5B7EB9410499542E8C5724F5 /* Pods-Reaxn-ReaxnTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Reaxn-ReaxnTests.debug.xcconfig"; path = "Target Support Files/Pods-Reaxn-ReaxnTests/Pods-Reaxn-ReaxnTests.debug.xcconfig"; sourceTree = "<group>"; };
-		5DCACB8F33CDC322A6C60F78 /* libPods-Reaxn.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Reaxn.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5709B34CF0A7D63546082F79 /* Pods-Vidrip.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip.release.xcconfig"; path = "Target Support Files/Pods-Vidrip/Pods-Vidrip.release.xcconfig"; sourceTree = "<group>"; };
+		5B7EB9410499542E8C5724F5 /* Pods-Vidrip-VidripTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip-VidripTests.debug.xcconfig"; path = "Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests.debug.xcconfig"; sourceTree = "<group>"; };
+		5DCACB8F33CDC322A6C60F78 /* libPods-Vidrip.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Vidrip.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		619F602BFE464AC5A7C2EB67 /* Raleway-SemiBoldItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-SemiBoldItalic.ttf"; path = "../src/assets/fonts/Raleway-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
 		6DF0C3023D344828AA39600A /* PlayfairDisplay-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-Medium.ttf"; path = "../src/assets/fonts/PlayfairDisplay-Medium.ttf"; sourceTree = "<group>"; };
 		71907B69462442E792D56629 /* PlayfairDisplay-MediumItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-MediumItalic.ttf"; path = "../src/assets/fonts/PlayfairDisplay-MediumItalic.ttf"; sourceTree = "<group>"; };
 		7362B429A1FF424FBCB57E6D /* PlayfairDisplay-SemiBoldItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-SemiBoldItalic.ttf"; path = "../src/assets/fonts/PlayfairDisplay-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
 		7589D571FC6F4B33B3A44856 /* PlayfairDisplay-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-Bold.ttf"; path = "../src/assets/fonts/PlayfairDisplay-Bold.ttf"; sourceTree = "<group>"; };
-		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Reaxn/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		89C6BE57DB24E9ADA2F236DE /* Pods-Reaxn-ReaxnTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Reaxn-ReaxnTests.release.xcconfig"; path = "Target Support Files/Pods-Reaxn-ReaxnTests/Pods-Reaxn-ReaxnTests.release.xcconfig"; sourceTree = "<group>"; };
+		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = "Vidrip/LaunchScreen.storyboard"; sourceTree = "<group>"; };
+		89C6BE57DB24E9ADA2F236DE /* Pods-Vidrip-VidripTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip-VidripTests.release.xcconfig"; path = "Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests.release.xcconfig"; sourceTree = "<group>"; };
 		9161CC9660ED45DB989B0D09 /* PlayfairDisplay-BoldItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-BoldItalic.ttf"; path = "../src/assets/fonts/PlayfairDisplay-BoldItalic.ttf"; sourceTree = "<group>"; };
 		AE806C071F864BDEB71F10AB /* PlayfairDisplay-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-Regular.ttf"; path = "../src/assets/fonts/PlayfairDisplay-Regular.ttf"; sourceTree = "<group>"; };
 		CA4C5CEB81104AD2A1392A26 /* Raleway-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-Regular.ttf"; path = "../src/assets/fonts/Raleway-Regular.ttf"; sourceTree = "<group>"; };
@@ -104,7 +104,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7699B88040F8A987B510C191 /* libPods-Reaxn-ReaxnTests.a in Frameworks */,
+				7699B88040F8A987B510C191 /* libPods-Vidrip-VidripTests.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,20 +112,20 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0C80B921A6F3F58F76C31292 /* libPods-Reaxn.a in Frameworks */,
+				0C80B921A6F3F58F76C31292 /* libPods-Vidrip.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		00E356EF1AD99517003FC87E /* ReaxnTests */ = {
+		00E356EF1AD99517003FC87E /* VidripTests */ = {
 			isa = PBXGroup;
 			children = (
-				00E356F21AD99517003FC87E /* ReaxnTests.m */,
+				00E356F21AD99517003FC87E /* VidripTests.m */,
 				00E356F01AD99517003FC87E /* Supporting Files */,
 			);
-			path = ReaxnTests;
+			path = "VidripTests";
 			sourceTree = "<group>";
 		};
 		00E356F01AD99517003FC87E /* Supporting Files */ = {
@@ -136,7 +136,7 @@
 			name = "Supporting Files";
 			sourceTree = "<group>";
 		};
-		13B07FAE1A68108700A75B9A /* Reaxn */ = {
+		13B07FAE1A68108700A75B9A /* Vidrip */ = {
 			isa = PBXGroup;
 			children = (
 				3F9787AB2FCE506800F638C2 /* ReaxnDebug.entitlements */,
@@ -148,7 +148,7 @@
 				13B07FB71A68108700A75B9A /* main.m */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 			);
-			name = Reaxn;
+			name = "Vidrip";
 			sourceTree = "<group>";
 		};
 		1E589163A338447281B0627B /* Resources */ = {
@@ -176,8 +176,8 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				5DCACB8F33CDC322A6C60F78 /* libPods-Reaxn.a */,
-				19F6CBCC0A4E27FBF8BF4A61 /* libPods-Reaxn-ReaxnTests.a */,
+				5DCACB8F33CDC322A6C60F78 /* libPods-Vidrip.a */,
+				19F6CBCC0A4E27FBF8BF4A61 /* libPods-Vidrip-VidripTests.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -196,14 +196,14 @@
 				3FE1E2A82FCFA89500381E5F /* RXNSafeAppend.m */,
 				3F3141392FCCFE8F0066BB5B /* ReaxnScreenRecorder.m */,
 				3F31413A2FCCFE8F0066BB5B /* ReaxnScreenRecorder.swift */,
-				13B07FAE1A68108700A75B9A /* Reaxn */,
+				13B07FAE1A68108700A75B9A /* Vidrip */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
-				00E356EF1AD99517003FC87E /* ReaxnTests */,
+				00E356EF1AD99517003FC87E /* VidripTests */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
 				1E589163A338447281B0627B /* Resources */,
-				3F31413D2FCCFE920066BB5B /* Reaxn-Bridging-Header.h */,
+				3F31413D2FCCFE920066BB5B /* Vidrip-Bridging-Header.h */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -213,8 +213,8 @@
 		83CBBA001A601CBA00E9B192 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13B07F961A680F5B00A75B9A /* Reaxn.app */,
-				00E356EE1AD99517003FC87E /* ReaxnTests.xctest */,
+				13B07F961A680F5B00A75B9A /* Vidrip.app */,
+				00E356EE1AD99517003FC87E /* VidripTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -222,10 +222,10 @@
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				3B4392A12AC88292D35C810B /* Pods-Reaxn.debug.xcconfig */,
-				5709B34CF0A7D63546082F79 /* Pods-Reaxn.release.xcconfig */,
-				5B7EB9410499542E8C5724F5 /* Pods-Reaxn-ReaxnTests.debug.xcconfig */,
-				89C6BE57DB24E9ADA2F236DE /* Pods-Reaxn-ReaxnTests.release.xcconfig */,
+				3B4392A12AC88292D35C810B /* Pods-Vidrip.debug.xcconfig */,
+				5709B34CF0A7D63546082F79 /* Pods-Vidrip.release.xcconfig */,
+				5B7EB9410499542E8C5724F5 /* Pods-Vidrip-VidripTests.debug.xcconfig */,
+				89C6BE57DB24E9ADA2F236DE /* Pods-Vidrip-VidripTests.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -233,9 +233,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		00E356ED1AD99517003FC87E /* ReaxnTests */ = {
+		00E356ED1AD99517003FC87E /* VidripTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "ReaxnTests" */;
+			buildConfigurationList = 00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "VidripTests" */;
 			buildPhases = (
 				A55EABD7B0C7F3A422A6CC61 /* [CP] Check Pods Manifest.lock */,
 				00E356EA1AD99517003FC87E /* Sources */,
@@ -249,14 +249,14 @@
 			dependencies = (
 				00E356F51AD99517003FC87E /* PBXTargetDependency */,
 			);
-			name = ReaxnTests;
-			productName = ReaxnTests;
-			productReference = 00E356EE1AD99517003FC87E /* ReaxnTests.xctest */;
+			name = "VidripTests";
+			productname = "VidripTests";
+			productReference = 00E356EE1AD99517003FC87E /* VidripTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		13B07F861A680F5B00A75B9A /* Reaxn */ = {
+		13B07F861A680F5B00A75B9A /* Vidrip */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Reaxn" */;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Vidrip" */;
 			buildPhases = (
 				C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */,
 				13B07F871A680F5B00A75B9A /* Sources */,
@@ -270,9 +270,9 @@
 			);
 			dependencies = (
 			);
-			name = Reaxn;
-			productName = Reaxn;
-			productReference = 13B07F961A680F5B00A75B9A /* Reaxn.app */;
+			name = "Vidrip";
+			productName = "Vidrip";
+			productReference = 13B07F961A680F5B00A75B9A /* Vidrip.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -292,7 +292,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Reaxn" */;
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Vidrip" */;
 			compatibilityVersion = "Xcode 12.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -305,8 +305,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				13B07F861A680F5B00A75B9A /* Reaxn */,
-				00E356ED1AD99517003FC87E /* ReaxnTests */,
+				13B07F861A680F5B00A75B9A /* Vidrip */,
+				00E356ED1AD99517003FC87E /* VidripTests */,
 			);
 		};
 /* End PBXProject section */
@@ -382,15 +382,15 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Reaxn/Pods-Reaxn-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vidrip/Pods-Vidrip-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Reaxn/Pods-Reaxn-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vidrip/Pods-Vidrip-frameworks-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Reaxn/Pods-Reaxn-frameworks.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Vidrip/Pods-Vidrip-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		A55EABD7B0C7F3A422A6CC61 /* [CP] Check Pods Manifest.lock */ = {
@@ -408,7 +408,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Reaxn-ReaxnTests-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-Vidrip-VidripTests-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -430,7 +430,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Reaxn-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-Vidrip-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -443,15 +443,15 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Reaxn-ReaxnTests/Pods-Reaxn-ReaxnTests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Reaxn-ReaxnTests/Pods-Reaxn-ReaxnTests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Reaxn-ReaxnTests/Pods-Reaxn-ReaxnTests-frameworks.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		E235C05ADACE081382539298 /* [CP] Copy Pods Resources */ = {
@@ -460,15 +460,15 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Reaxn/Pods-Reaxn-resources-${CONFIGURATION}-input-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vidrip/Pods-Vidrip-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Reaxn/Pods-Reaxn-resources-${CONFIGURATION}-output-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vidrip/Pods-Vidrip-resources-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Reaxn/Pods-Reaxn-resources.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Vidrip/Pods-Vidrip-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		F6A41C54EA430FDDC6A6ED99 /* [CP] Copy Pods Resources */ = {
@@ -477,15 +477,15 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Reaxn-ReaxnTests/Pods-Reaxn-ReaxnTests-resources-${CONFIGURATION}-input-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Reaxn-ReaxnTests/Pods-Reaxn-ReaxnTests-resources-${CONFIGURATION}-output-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests-resources-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Reaxn-ReaxnTests/Pods-Reaxn-ReaxnTests-resources.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -495,7 +495,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00E356F31AD99517003FC87E /* ReaxnTests.m in Sources */,
+				00E356F31AD99517003FC87E /* VidripTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -516,7 +516,7 @@
 /* Begin PBXTargetDependency section */
 		00E356F51AD99517003FC87E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 13B07F861A680F5B00A75B9A /* Reaxn */;
+			target = 13B07F861A680F5B00A75B9A /* Vidrip */;
 			targetProxy = 00E356F41AD99517003FC87E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -524,14 +524,14 @@
 /* Begin XCBuildConfiguration section */
 		00E356F61AD99517003FC87E /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5B7EB9410499542E8C5724F5 /* Pods-Reaxn-ReaxnTests.debug.xcconfig */;
+			baseConfigurationReference = 5B7EB9410499542E8C5724F5 /* Pods-Vidrip-VidripTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				INFOPLIST_FILE = ReaxnTests/Info.plist;
+				INFOPLIST_FILE = "VidripTests/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -545,17 +545,17 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Reaxn.app/Reaxn";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vidrip.app/Vidrip";
 			};
 			name = Debug;
 		};
 		00E356F71AD99517003FC87E /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 89C6BE57DB24E9ADA2F236DE /* Pods-Reaxn-ReaxnTests.release.xcconfig */;
+			baseConfigurationReference = 89C6BE57DB24E9ADA2F236DE /* Pods-Vidrip-VidripTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COPY_PHASE_STRIP = NO;
-				INFOPLIST_FILE = ReaxnTests/Info.plist;
+				INFOPLIST_FILE = "VidripTests/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -569,21 +569,22 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Reaxn.app/Reaxn";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Vidrip.app/Vidrip";
 			};
 			name = Release;
 		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-Reaxn.debug.xcconfig */;
+			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-Vidrip.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = Reaxn/ReaxnDebug.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Vidrip/ReaxnDebug.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6F98QXGZHU;
 				ENABLE_BITCODE = NO;
-				INFOPLIST_FILE = Reaxn/Info.plist;
+				INFOPLIST_FILE = "Vidrip/Info.plist";
+             INFOPLIST_KEY_CFBundleDisplayName = "Vidrip";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -596,8 +597,8 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
-				PRODUCT_NAME = Reaxn;
-				SWIFT_OBJC_BRIDGING_HEADER = "Reaxn-Bridging-Header.h";
+				PRODUCT_NAME = "Vidrip";
+				SWIFT_OBJC_BRIDGING_HEADER = "Vidrip-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -606,13 +607,14 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-Reaxn.release.xcconfig */;
+			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-Vidrip.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6F98QXGZHU;
-				INFOPLIST_FILE = Reaxn/Info.plist;
+				INFOPLIST_FILE = "Vidrip/Info.plist";
+             INFOPLIST_KEY_CFBundleDisplayName = "Vidrip";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -625,8 +627,8 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
-				PRODUCT_NAME = Reaxn;
-				SWIFT_OBJC_BRIDGING_HEADER = "Reaxn-Bridging-Header.h";
+				PRODUCT_NAME = "Vidrip";
+				SWIFT_OBJC_BRIDGING_HEADER = "Vidrip-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -781,7 +783,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "ReaxnTests" */ = {
+		00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "VidripTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				00E356F61AD99517003FC87E /* Debug */,
@@ -790,7 +792,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Reaxn" */ = {
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Vidrip" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
@@ -799,7 +801,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Reaxn" */ = {
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Vidrip" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Reaxn</string>
+	<string>Vidrip</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,7 +45,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Reaxn records your reaction to videos shared by friends.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Reaxn captures your audio while recording reactions.</string>
 	<key>UIAppFonts</key>

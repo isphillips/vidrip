@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "Reaxn.app"
-               BlueprintName = "Reaxn"
-               ReferencedContainer = "container:Reaxn.xcodeproj">
+               BuildableName = "Vidrip.app"
+               BlueprintName = "Vidrip"
+               ReferencedContainer = "container:Vidrip.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "ReaxnTests.xctest"
-               BlueprintName = "ReaxnTests"
-               ReferencedContainer = "container:Reaxn.xcodeproj">
+               BuildableName = "VidripTests.xctest"
+               BlueprintName = "VidripTests"
+               ReferencedContainer = "container:Vidrip.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "Reaxn.app"
-            BlueprintName = "Reaxn"
-            ReferencedContainer = "container:Reaxn.xcodeproj">
+            BuildableName = "Vidrip.app"
+            BlueprintName = "Vidrip"
+            ReferencedContainer = "container:Vidrip.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "Reaxn.app"
-            BlueprintName = "Reaxn"
-            ReferencedContainer = "container:Reaxn.xcodeproj">
+            BuildableName = "Vidrip.app"
+            BlueprintName = "Vidrip"
+            ReferencedContainer = "container:Vidrip.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
