@@ -1,0 +1,14 @@
+diff --git a/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerButtonViewManager.kt b/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerButtonViewManager.kt
+--- a/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerButtonViewManager.kt
++++ b/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerButtonViewManager.kt
+@@ -214,7 +214,9 @@
+
+     var exclusive = true
+
+-    override var pointerEvents: PointerEvents = PointerEvents.AUTO
++    @JvmField
++    var pointerEvents: PointerEvents = PointerEvents.AUTO
++    override fun getPointerEvents(): PointerEvents = pointerEvents
+
+     private var buttonBackgroundColor = Color.TRANSPARENT
+     private var needBackgroundUpdate = false
