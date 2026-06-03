@@ -18,6 +18,7 @@ import {
   type ChannelPost,
 } from '../../../infrastructure/supabase/queries/channels';
 import ChannelPostCard from '../components/ChannelPostCard';
+import ChannelMessageBubble from '../components/ChannelMessageBubble';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 export default function ChannelScreen({
@@ -55,7 +56,14 @@ export default function ChannelScreen({
   // even if a re-render races with an in-flight toggle.
   useEffect(() => { postsRef.current = posts; }, [posts]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load().then(() => {
+      if (!isPublic) {
+        // Give the ScrollView one frame to render before scrolling to bottom
+        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 50);
+      }
+    });
+  }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Silently reload whenever the screen comes back into focus — covers the case
   // where the user returns from ChannelVideoRecordScreen after posting a clip.
@@ -78,12 +86,16 @@ export default function ChannelScreen({
           const rest = prev.filter(p => !p.is_pinned);
           return [...pinned, newPost, ...rest];
         });
-        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        if (isPublic) {
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        } else {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }
       })
       .subscribe();
 
     return () => { channel.unsubscribe(); };
-  }, [channelId]);
+  }, [channelId, isPublic]);
 
   const handleJoinLeave = useCallback(async () => {
     if (!user?.id || joiningLeaving || isOwner) { return; }
@@ -198,11 +210,12 @@ export default function ChannelScreen({
             </Text>
           </TouchableOpacity>
         ) : (
+          // Private channel — camera send button
           <TouchableOpacity
-            style={styles.postVideoBtn}
+            style={styles.cameraBtn}
             onPress={() => navigation.navigate('ChannelVideoRecord', { channelId })}
             activeOpacity={0.8}>
-            <Text style={styles.postVideoBtnText}>+ Video</Text>
+            <Text style={styles.cameraBtnIcon}>📹</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -224,9 +237,11 @@ export default function ChannelScreen({
           }>
           {posts.length === 0 ? (
             <View style={styles.center}>
-              <Text style={styles.emptyText}>No posts yet</Text>
+              <Text style={styles.emptyText}>
+                {isPublic ? 'No posts yet' : 'No messages yet — send a video!'}
+              </Text>
             </View>
-          ) : (
+          ) : isPublic ? (
             posts.map(item => (
               <ChannelPostCard
                 key={item.id}
@@ -245,6 +260,18 @@ export default function ChannelScreen({
                     navigation.navigate('WatchChannelClip', { postId: item.id });
                   }
                 }}
+                onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)}
+              />
+            ))
+          ) : (
+            // Private channel — message-style, oldest first (newest at bottom)
+            [...posts].reverse().map(item => (
+              <ChannelMessageBubble
+                key={item.id}
+                post={item}
+                isMe={item.poster_id === user?.id}
+                userId={user?.id}
+                onPress={() => navigation.navigate('WatchChannelClip', { postId: item.id })}
                 onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)}
               />
             ))
@@ -311,9 +338,15 @@ const styles = StyleSheet.create({
     fontFamily: FONT.BODY_MEDIUM,
     color: C.WHITE,
   },
+  cameraBtn: {
+    width: 36, height: 36,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cameraBtnIcon: { fontSize: 22 },
   emptyText: {
     color: C.MUTED,
     fontSize: FONT.SIZES.MD,
     fontFamily: FONT.BODY,
+    textAlign: 'center',
   },
 });
