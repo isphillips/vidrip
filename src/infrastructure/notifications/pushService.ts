@@ -1,8 +1,14 @@
 import { Platform, AppState } from 'react-native';
-import PushNotificationIOS, {
-  type PushNotification,
-} from '@react-native-community/push-notification-ios';
 import { supabase } from '../supabase/client';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let PushNotificationIOS: any = null;
+if (Platform.OS === 'ios') {
+  PushNotificationIOS = require('@react-native-community/push-notification-ios').default;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PushNotification = any;
 
 // ── Token management ─────────────────────────────────────────────────────────
 
@@ -39,6 +45,7 @@ export async function unregisterPushToken(userId: string): Promise<void> {
 }
 
 export function clearBadge(): void {
+  if (Platform.OS !== 'ios') { return; }
   PushNotificationIOS.setApplicationIconBadgeNumber(0);
 }
 
@@ -77,6 +84,10 @@ function handleNotification(notification: PushNotification): void {
 // ── Bootstrap — call once at app startup ─────────────────────────────────────
 
 export function bootstrapNotifications(): () => void {
+  if (Platform.OS !== 'ios') {
+    return () => {};
+  }
+
   // 'register' listener must be set up before requestPermissions is called
   // so the token is never missed regardless of timing
   PushNotificationIOS.addEventListener('register', async (token: string) => {
@@ -92,7 +103,7 @@ export function bootstrapNotifications(): () => void {
   PushNotificationIOS.addEventListener('localNotification', handleNotification);
   PushNotificationIOS.addEventListener('notification', handleNotification);
 
-  PushNotificationIOS.getInitialNotification().then((notification) => {
+  PushNotificationIOS.getInitialNotification().then((notification: PushNotification) => {
     if (notification) { handleNotification(notification); }
   });
 
