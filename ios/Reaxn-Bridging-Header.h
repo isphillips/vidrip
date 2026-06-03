@@ -3,4 +3,5 @@
 //
 
 #import <React/RCTBridgeModule.h>
+#import "RXNSafeAppend.h"
 

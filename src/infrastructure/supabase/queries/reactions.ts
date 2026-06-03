@@ -1,6 +1,50 @@
 import RNFS from 'react-native-fs';
 import { supabase } from '../client';
 
+export type EmojiReaction = { id: string; emoji: string; user_id: string };
+
+export async function fetchEmojiReactions(reactionId: string): Promise<EmojiReaction[]> {
+  const { data, error } = await (supabase as any)
+    .from('emoji_reactions')
+    .select('id, emoji, user_id')
+    .eq('reaction_id', reactionId);
+  if (error) { throw error; }
+  return data ?? [];
+}
+
+export async function addEmojiReaction(
+  reactionId: string,
+  userId: string,
+  emoji: string,
+): Promise<string> {
+  const { data, error } = await (supabase as any)
+    .from('emoji_reactions')
+    .insert({ reaction_id: reactionId, user_id: userId, emoji })
+    .select('id')
+    .single();
+  if (error) {
+    throw error;
+  }
+  return data.id;
+}
+
+export async function removeEmojiReaction(
+  reactionId: string,
+  userId: string,
+  emoji: string,
+): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('emoji_reactions')
+    .delete()
+    .eq('reaction_id', reactionId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji);
+  if (error) {
+    console.error('[removeEmojiReaction] error:', JSON.stringify(error));
+    throw error;
+  }
+}
+
 export async function uploadReaction({
   userId,
   threadId,

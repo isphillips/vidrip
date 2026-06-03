@@ -16,9 +16,14 @@
   self.moduleName = @"Reaxn";
   self.initialProps = @{};
 
-  // Allow react-native-video and WKWebView (YouTube) to play simultaneously.
-  [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback
-                                   withOptions:AVAudioSessionCategoryOptionMixWithOthers
+  // PlayAndRecord + MixWithOthers + DefaultToSpeaker:
+  // PlayAndRecord is required so ReplayKit can access the microphone without
+  // fighting the audio session on first launch (pure Playback blocks mic init).
+  // MixWithOthers lets YouTube/react-native-video play alongside recording.
+  // DefaultToSpeaker keeps audio on the speaker rather than the earpiece.
+  [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayAndRecord
+                                   withOptions:AVAudioSessionCategoryOptionMixWithOthers |
+                                               AVAudioSessionCategoryOptionDefaultToSpeaker
                                          error:nil];
 
   // Set up notification center delegate so foreground notifications display

@@ -26,3 +26,4 @@ export function cancelScreenCapture(): Promise<void> {
   assertModule();
   return ReaxnScreenRecorder.cancelCapture();
 }
+
