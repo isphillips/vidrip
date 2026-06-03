@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, RefreshControl, TouchableOpacity,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
@@ -67,6 +68,14 @@ export default function ChannelScreen({
 
   // Silently reload whenever the screen comes back into focus — covers the case
   // where the user returns from ChannelVideoRecordScreen after posting a clip.
+  // Private channels: reload + scroll to bottom when returning from recording.
+  // Safe for public channels to skip — pin toggle relies on no reload-on-focus there.
+  useFocusEffect(useCallback(() => {
+    if (isPublic) { return; }
+    load(true).then(() => {
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 50);
+    });
+  }, [isPublic, load]));
   // Realtime subscription handles new posts — no focus-reload needed here.
 
   // Realtime: new posts appear live
@@ -192,7 +201,7 @@ export default function ChannelScreen({
 
         <Text style={styles.channelName} numberOfLines={1}>{channelName}</Text>
 
-        {isOwner ? (
+        {isOwner && isPublic ? (
           <TouchableOpacity
             style={styles.postVideoBtn}
             onPress={() => navigation.navigate('AddChannelVideo', { channelId })}

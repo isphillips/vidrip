@@ -114,7 +114,9 @@ serve(async (req) => {
     ? { channel_id, post_id, channel_name }
     : { thread_id };
 
+  console.log(`[send-push] sending to user_id=${user_id} title="${title}"`);
   const ok = await sendPush(tokenRow.token, title, body, data);
+  console.log(`[send-push] APNs result: ${ok ? 'ok' : 'failed'}`);
   return new Response(JSON.stringify({ ok }), {
     headers: { 'content-type': 'application/json' },
   });

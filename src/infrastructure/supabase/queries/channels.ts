@@ -296,33 +296,15 @@ export async function postChannelClip({
   duration: number;
   parentPostId?: string;
 }): Promise<string> {
-  const uploadPath = `${userId}/${channelId}/${Date.now()}.mp4`;
-  const localPath = filePath.replace(/^file:\/\//, '');
-
-  const base64 = await RNFS.readFile(localPath, 'base64');
-  const binaryStr = atob(base64);
-  const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) {
-    bytes[i] = binaryStr.charCodeAt(i);
-  }
-
-  const { error: uploadError } = await supabase.storage
-    .from('channel-clips')
-    .upload(uploadPath, bytes, { contentType: 'video/mp4', upsert: false });
-  if (uploadError) { throw uploadError; }
-
-  const { data: { publicUrl } } = supabase.storage
-    .from('channel-clips')
-    .getPublicUrl(uploadPath);
-
+  // Insert first to get a stable ID — stored locally, not uploaded to cloud.
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .insert({
       channel_id: channelId,
       poster_id: userId,
       post_type: 'clip',
-      video_url: publicUrl,
-      storage_mode: 'cloud',
+      video_url: null,
+      storage_mode: 'local',
       duration: Math.round(duration),
       ...(parentPostId ? { parent_post_id: parentPostId } : {}),
     })
@@ -330,7 +312,15 @@ export async function postChannelClip({
     .single();
 
   if (error) { throw error; }
-  return data.id as string;
+  const postId = data.id as string;
+
+  // Move the temp recording to the permanent local clips dir.
+  // WatchChannelClipScreen uses localPathForClip(postId) to find this file.
+  const dir = `${RNFS.DocumentDirectoryPath}/channel-clips`;
+  if (!(await RNFS.exists(dir))) { await RNFS.mkdir(dir); }
+  await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), `${dir}/${postId}.mp4`);
+
+  return postId;
 }
 
 export async function removeChannelPostEmojiReaction(

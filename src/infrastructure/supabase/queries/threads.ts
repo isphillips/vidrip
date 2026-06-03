@@ -145,32 +145,82 @@ export async function markThreadSeen(threadId: string) {
     .eq('status', 'pending');
 }
 
+// Returns user IDs who have already been sent this video by this sender.
+export async function fetchAlreadySentRecipients(
+  senderId: string,
+  videoId: string,
+): Promise<string[]> {
+  const { data, error } = await (supabase as any)
+    .rpc('get_thread_recipients', { p_sender_id: senderId, p_video_id: videoId });
+
+  if (error) {
+    console.error('[fetchAlreadySentRecipients] rpc error:', JSON.stringify(error));
+    return [];
+  }
+  return (data ?? []) as string[];
+}
+
 export async function sendThread(
   senderId: string,
   videoId: string,
   videoTitle: string,
   videoThumbnail: string,
   recipientIds: string[],
-): Promise<string> {
-  const { data: thread, error: threadError } = await supabase
+): Promise<{ threadId: string; alreadySentTo: string[] }> {
+  // Find or create the thread for this (sender, video) pair — stacking behaviour.
+  // Use limit(1) + order so legacy duplicates don't break the lookup.
+  const { data: existingRows } = await supabase
     .from('threads')
-    .insert({ video_id: videoId, video_title: videoTitle, video_thumbnail: videoThumbnail, sender_id: senderId })
     .select('id')
-    .single();
+    .eq('sender_id', senderId)
+    .eq('video_id', videoId)
+    .order('created_at', { ascending: true })
+    .limit(1);
+  const existing = existingRows?.[0] ?? null;
 
-  if (threadError || !thread) throw threadError ?? new Error('Failed to create thread');
+  let threadId: string;
+  let alreadySentTo: string[] = [];
 
-  const { error: membersError } = await supabase
-    .from('thread_members')
-    .insert(recipientIds.map((userId) => ({ thread_id: thread.id, user_id: userId, status: 'pending' })));
+  if (existing) {
+    threadId = existing.id;
 
-  if (membersError) throw membersError;
+    // Determine which of the requested recipients are already in this thread.
+    const { data: existingMembers } = await supabase
+      .from('thread_members')
+      .select('user_id')
+      .eq('thread_id', threadId)
+      .in('user_id', recipientIds);
 
-  // Ensure a private channel exists for each sender↔recipient pair.
-  // Fire-and-forget — failure never blocks the thread send.
+    const alreadySet = new Set((existingMembers ?? []).map((m: any) => m.user_id as string));
+    alreadySentTo = [...alreadySet];
+    const newRecipients = recipientIds.filter(id => !alreadySet.has(id));
+
+    if (newRecipients.length > 0) {
+      const { error } = await supabase
+        .from('thread_members')
+        .insert(newRecipients.map(userId => ({ thread_id: threadId, user_id: userId, status: 'pending' })));
+      if (error) { throw error; }
+    }
+  } else {
+    const { data: thread, error: threadError } = await supabase
+      .from('threads')
+      .insert({ video_id: videoId, video_title: videoTitle, video_thumbnail: videoThumbnail, sender_id: senderId })
+      .select('id')
+      .single();
+
+    if (threadError || !thread) { throw threadError ?? new Error('Failed to create thread'); }
+    threadId = thread.id;
+
+    const { error: membersError } = await supabase
+      .from('thread_members')
+      .insert(recipientIds.map(userId => ({ thread_id: threadId, user_id: userId, status: 'pending' })));
+    if (membersError) { throw membersError; }
+  }
+
+  // Ensure private channels exist for each new pair — fire-and-forget.
   recipientIds.forEach(recipientId => {
     ensurePrivateChannel(senderId, recipientId).catch(() => {});
   });
 
-  return thread.id;
+  return { threadId, alreadySentTo };
 }
