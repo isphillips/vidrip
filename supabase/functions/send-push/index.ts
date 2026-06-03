@@ -94,7 +94,7 @@ serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const { user_id, title, body, thread_id } = await req.json();
+  const { user_id, title, body, thread_id, channel_id, post_id, channel_name } = await req.json();
   if (!user_id || !title || !body) {
     return new Response('Missing fields', { status: 400 });
   }
@@ -109,7 +109,12 @@ serve(async (req) => {
     return new Response('No token for user', { status: 200 });
   }
 
-  const ok = await sendPush(tokenRow.token, title, body, { thread_id });
+  // Build notification data — thread or channel, not both
+  const data = channel_id
+    ? { channel_id, post_id, channel_name }
+    : { thread_id };
+
+  const ok = await sendPush(tokenRow.token, title, body, data);
   return new Response(JSON.stringify({ ok }), {
     headers: { 'content-type': 'application/json' },
   });

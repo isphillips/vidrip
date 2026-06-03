@@ -12,6 +12,7 @@ import {
   registerPushToken,
   unregisterPushToken,
   setNotificationOpenedHandler,
+  setChannelNotificationHandler,
 } from '../../infrastructure/notifications/pushService';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
@@ -32,6 +33,17 @@ export default function RootNavigator() {
       navRef.current?.navigate('Main', {
         screen: 'Feed',
         params: { screen: 'Thread', params: { threadId } },
+      });
+    });
+
+    // Wire channel notification tap → navigate to private channel
+    setChannelNotificationHandler((channelId: string, channelName: string) => {
+      navRef.current?.navigate('Main', {
+        screen: 'Channels',
+        params: {
+          screen: 'Channel',
+          params: { channelId, channelName, isPublic: false, isJoined: true },
+        },
       });
     });
 

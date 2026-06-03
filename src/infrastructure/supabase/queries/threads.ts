@@ -1,5 +1,6 @@
 import { supabase } from '../client';
 import { resolveReactionUri } from '../../storage/reactionStorage';
+import { ensurePrivateChannel } from './channels';
 
 export type FeedThread = {
   id: string;
@@ -164,6 +165,12 @@ export async function sendThread(
     .insert(recipientIds.map((userId) => ({ thread_id: thread.id, user_id: userId, status: 'pending' })));
 
   if (membersError) throw membersError;
+
+  // Ensure a private channel exists for each sender↔recipient pair.
+  // Fire-and-forget — failure never blocks the thread send.
+  recipientIds.forEach(recipientId => {
+    ensurePrivateChannel(senderId, recipientId).catch(() => {});
+  });
 
   return thread.id;
 }
