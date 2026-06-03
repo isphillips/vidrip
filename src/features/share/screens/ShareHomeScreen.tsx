@@ -18,6 +18,7 @@ import {
   type ShortItem,
 } from '../../../infrastructure/youtube/api';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function extractYouTubeId(url: string): string | null {
   const patterns = [
@@ -35,6 +36,7 @@ function extractYouTubeId(url: string): string | null {
 type Mode = 'browse' | 'paste';
 
 export default function ShareHomeScreen({ navigation }: ShareStackScreenProps<'ShareHome'>) {
+  const { top } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [mode, setMode] = useState<Mode>('browse');
 
@@ -132,6 +134,7 @@ export default function ShareHomeScreen({ navigation }: ShareStackScreenProps<'S
   return (
     <View style={styles.container}>
       {/* Mode toggle */}
+      <Text style={[styles.header, { marginTop: top }]}>Share</Text>
       <View style={styles.toggle}>
         <TouchableOpacity
           style={[styles.toggleBtn, mode === 'browse' && styles.toggleBtnActive]}
@@ -242,6 +245,15 @@ export default function ShareHomeScreen({ navigation }: ShareStackScreenProps<'S
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
+  header: {
+    fontSize: FONT.SIZES.XXL,
+    fontFamily: FONT.DISPLAY_BOLD,
+    color: C.INK,
+    letterSpacing: -1,
+    padding: SPACE.LG,
+    paddingBottom: 0,
+    marginTop: 0,
+  },
   toggle: {
     flexDirection: 'row',
     margin: SPACE.LG,

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -50,7 +52,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.header, { marginTop: top }]}>Reaxn</Text>
+      <Text style={[styles.header, { marginTop: top }]}>Vidrip</Text>
       <FlatList
         data={threads}
         keyExtractor={(item) => item.id}
@@ -105,9 +107,10 @@ const styles = StyleSheet.create({
   header: {
     fontSize: FONT.SIZES.XXL,
     fontFamily: FONT.DISPLAY_BOLD,
-    color: C.ACCENT,
+    color: C.INK,
     letterSpacing: -1,
     padding: SPACE.LG,
+    paddingBottom: 0,
     marginTop: 0,
   },
   list: { padding: SPACE.LG, gap: SPACE.MD },

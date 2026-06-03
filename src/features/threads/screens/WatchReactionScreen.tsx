@@ -4,27 +4,81 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import Video from 'react-native-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import { supabase } from '../../../infrastructure/supabase/client';
 import { fetchReactionById, type ReactionItem } from '../../../infrastructure/supabase/queries/threads';
 import { downloadAndCache, recordReactionDownload } from '../../../infrastructure/storage/reactionStorage';
+import {
+  fetchEmojiReactions,
+  addEmojiReaction,
+  removeEmojiReaction,
+  type EmojiReaction,
+} from '../../../infrastructure/supabase/queries/reactions';
 import { useAuthStore } from '../../../store/authStore';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
+const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
+const MAX_EMOJIS_PER_USER = 10;
 type DownloadState = 'idle' | 'downloading' | 'ready' | 'unavailable';
 
+// ── Animated emoji button ────────────────────────────────────────────────────
+function EmojiBtn({
+  emoji, count, isMine, isDisabled,
+  onPress,
+}: {
+  emoji: string;
+  count: number;
+  isMine: boolean;
+  isDisabled: boolean;
+  onPress: () => void;
+}) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const handlePress = () => {
+    scale.value = withSequence(
+      withSpring(1.28, { damping: 5, stiffness: 600 }),
+      withSpring(1,    { damping: 14, stiffness: 400 }),
+    );
+    onPress();
+  };
+
+  // Pressable has no built-in opacity change, so the Reanimated scale is the
+  // only feedback — TouchableOpacity's activeOpacity was fighting the animation.
+  return (
+    <Pressable onPress={handlePress} disabled={isDisabled}>
+      <Animated.View style={[styles.emojiBtn, isMine && styles.emojiBtnActive, animStyle]}>
+        <Text style={styles.emojiGlyph}>{emoji}</Text>
+        {count > 0 && (
+          <Text style={[styles.emojiCount, isMine && styles.emojiCountActive]}>
+            {count}
+          </Text>
+        )}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// ── Main screen ──────────────────────────────────────────────────────────────
 export default function WatchReactionScreen({
-  route,
-  navigation,
+  route, navigation,
 }: FeedStackScreenProps<'WatchReaction'>) {
   const { reactionId } = route.params;
   const { user } = useAuthStore();
   const { width, height } = useWindowDimensions();
-  const { top: topInset } = useSafeAreaInsets();
+  const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
 
   const [reaction, setReaction] = useState<ReactionItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,31 +88,31 @@ export default function WatchReactionScreen({
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [emojiReactions, setEmojiReactions] = useState<EmojiReaction[]>([]);
+  const [processing, setProcessing] = useState<Set<string>>(new Set());
+  const [emojiOpen, setEmojiOpen] = useState(false);
 
   const videoRef = useRef<any>(null);
 
+  // Load reaction + emoji reactions
   useEffect(() => {
     fetchReactionById(reactionId)
       .then(async (r) => {
         if (!r) { setLoading(false); return; }
         setReaction(r);
+        fetchEmojiReactions(r.id).then(setEmojiReactions).catch(() => {});
 
         if (r.resolvedUri && !r.needsDownload) {
-          // Already local — play immediately
           setLocalUri(r.resolvedUri);
           setDownloadState('ready');
         } else if (r.resolvedUri && r.needsDownload) {
-          // Cloud available — download first
           setDownloadState('downloading');
           try {
             const uri = await downloadAndCache(r.id, r.resolvedUri, setDownloadPct);
             setLocalUri(uri);
             setDownloadState('ready');
-            // Record download so cloud relay knows all recipients have it
             if (user?.id) { recordReactionDownload(r.id, user.id).catch(() => {}); }
-          } catch {
-            setDownloadState('unavailable');
-          }
+          } catch { setDownloadState('unavailable'); }
         } else {
           setDownloadState('unavailable');
         }
@@ -67,23 +121,58 @@ export default function WatchReactionScreen({
       .finally(() => setLoading(false));
   }, [reactionId, user?.id]);
 
-  const handleTogglePlay = useCallback(() => setPaused(p => !p), []);
+  // Realtime emoji updates
+  useEffect(() => {
+    const channel = (supabase as any)
+      .channel(`emoji:${reactionId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public',
+        table: 'emoji_reactions',
+        filter: `reaction_id=eq.${reactionId}`,
+      }, () => {
+        fetchEmojiReactions(reactionId).then(setEmojiReactions).catch(() => {});
+      })
+      .subscribe();
+    return () => { channel.unsubscribe(); };
+  }, [reactionId]);
 
+  const handleTogglePlay = useCallback(() => setPaused(p => !p), []);
   const handleEnd = useCallback(() => {
-    setPaused(true);
-    setProgress(0);
-    videoRef.current?.seek(0);
+    setPaused(true); setProgress(0); videoRef.current?.seek(0);
   }, []);
+
+  const handleEmojiPress = useCallback(async (emoji: string) => {
+    if (!reaction || !user?.id) { return; }
+    if (processing.has(emoji)) { return; }
+
+    const myMatch = emojiReactions.find(r => r.emoji === emoji && r.user_id === user.id);
+    const myCount = emojiReactions.filter(r => r.user_id === user.id).length;
+    if (!myMatch && myCount >= MAX_EMOJIS_PER_USER) { return; }
+
+    setProcessing(prev => new Set([...prev, emoji]));
+    try {
+      if (myMatch) {
+        await removeEmojiReaction(reaction.id, user.id, emoji);
+        // Remove by natural key — avoids stale id issues
+        setEmojiReactions(prev =>
+          prev.filter(r => !(r.emoji === emoji && r.user_id === user.id))
+        );
+      } else {
+        const newId = await addEmojiReaction(reaction.id, user.id, emoji);
+        setEmojiReactions(prev => [...prev, { id: newId, emoji, user_id: user.id! }]);
+      }
+    } catch (e) {
+      console.error('[handleEmojiPress] error:', String(e));
+    }
+    setProcessing(prev => { const n = new Set(prev); n.delete(emoji); return n; });
+  }, [reaction, user?.id, processing, emojiReactions]);
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
+  // ── Loading states ──────────────────────────────────────────────────────
   if (loading || downloadState === 'idle') {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={C.ACCENT} size="large" />
-      </View>
-    );
+    return <View style={styles.center}><ActivityIndicator color={C.ACCENT} size="large" /></View>;
   }
 
   if (downloadState === 'downloading') {
@@ -121,13 +210,11 @@ export default function WatchReactionScreen({
   const handle = (reaction?.user as any)?.handle ?? '?';
   const totalDuration = duration || (reaction?.duration ?? 0);
   const progressPct = totalDuration > 0 ? Math.min((progress / totalDuration) * 100, 100) : 0;
+  const myEmojiCount = emojiReactions.filter(r => r.user_id === user?.id).length;
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={StyleSheet.absoluteFill}
-        activeOpacity={1}
-        onPress={handleTogglePlay}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleTogglePlay}>
         <Video
           ref={videoRef}
           source={{ uri: localUri }}
@@ -150,15 +237,49 @@ export default function WatchReactionScreen({
         </View>
       )}
 
+      {/* Handle + timer */}
       <View style={[styles.infoBar, { top: topInset + SPACE.SM }]} pointerEvents="none">
         <Text style={styles.handle}>@{handle}</Text>
         <Text style={styles.timer}>{fmt(progress)} / {fmt(totalDuration)}</Text>
       </View>
 
+      {/* Emoji drawer — right side, collapses into toggle button */}
+      <View style={[styles.emojiDrawer, { right: SPACE.MD, bottom: bottomInset + SPACE.LG }]}>
+        {emojiOpen && (
+          <View style={styles.emojiList}>
+            {QUICK_EMOJIS.map((emoji) => {
+              const count = emojiReactions.filter(r => r.emoji === emoji).length;
+              const isMine = emojiReactions.some(r => r.emoji === emoji && r.user_id === user?.id);
+              const atLimit = !isMine && myEmojiCount >= MAX_EMOJIS_PER_USER;
+              return (
+                <EmojiBtn
+                  key={emoji}
+                  emoji={emoji}
+                  count={count}
+                  isMine={isMine}
+                  isDisabled={processing.has(emoji) || atLimit}
+                  onPress={() => handleEmojiPress(emoji)}
+                />
+              );
+            })}
+          </View>
+        )}
+
+        {/* Toggle button */}
+        <TouchableOpacity
+          style={[styles.emojiToggle, emojiOpen && styles.emojiToggleOpen]}
+          onPress={() => setEmojiOpen(o => !o)}
+          activeOpacity={0.8}>
+          <Text style={styles.emojiToggleIcon}>{emojiOpen ? '✕' : '😊'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Progress bar */}
       <View style={styles.progressTrack} pointerEvents="none">
         <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
 
+      {/* Close */}
       <TouchableOpacity
         style={[styles.closeBtn, { top: topInset + SPACE.SM }]}
         onPress={() => navigation.goBack()}>
@@ -183,14 +304,8 @@ const styles = StyleSheet.create({
   },
   progressBar: { height: 4, backgroundColor: C.ACCENT_HOT, borderRadius: RADIUS.FULL },
   unavailableIcon: { fontSize: 48 },
-  unavailableTitle: {
-    color: C.WHITE, fontSize: FONT.SIZES.LG,
-    fontFamily: FONT.DISPLAY_BOLD, marginTop: SPACE.SM,
-  },
-  unavailableText: {
-    color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY,
-    textAlign: 'center', paddingHorizontal: SPACE.XL,
-  },
+  unavailableTitle: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, marginTop: SPACE.SM },
+  unavailableText: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center', paddingHorizontal: SPACE.XL },
   backBtn: { marginTop: SPACE.MD, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG },
   backBtnText: { color: C.ACCENT_HOT, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM },
   playOverlay: {
@@ -217,6 +332,47 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY,
     textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
+  emojiDrawer: {
+    position: 'absolute',
+    alignItems: 'center',
+    gap: SPACE.SM,
+  },
+  emojiList: {
+    alignItems: 'center',
+    gap: SPACE.SM,
+    marginBottom: SPACE.SM,
+  },
+  emojiToggle: {
+    width: 44, height: 44,
+    borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiToggleOpen: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  emojiToggleIcon: { fontSize: 22 },
+  emojiBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: RADIUS.FULL,
+    width: 52, paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    gap: 2,
+  },
+  emojiBtnActive: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'transparent',
+  },
+  emojiGlyph: { fontSize: 24 },
+  emojiCount: { color: 'rgba(255,255,255,0.6)', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY },
+  emojiCountActive: { color: C.WHITE, fontFamily: FONT.BODY_BOLD },
   progressTrack: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     height: 3, backgroundColor: 'rgba(255,255,255,0.15)',

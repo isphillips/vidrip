@@ -51,9 +51,11 @@ export default function RecordReactionScreen({
   const { hasPermission: hasMic, requestPermission: requestMic } = useMicrophonePermission();
 
   const [ready, setReady] = useState(false);
+  const [ytPlaying, setYtPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [startingCapture, setStartingCapture] = useState(false);
 
   const ytRef = useRef<YoutubeIframeRef>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -68,9 +70,7 @@ export default function RecordReactionScreen({
 
   useEffect(() => {
     Orientation.lockToPortrait();
-    return () => {
-      Orientation.unlockAllOrientations();
-    };
+    return () => { Orientation.unlockAllOrientations(); };
   }, []);
 
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function RecordReactionScreen({
     })();
     return () => {
       if (timerRef.current) { clearInterval(timerRef.current); }
-      if (isRecordingRef.current) { cancelScreenCapture().catch(() => {}); }
+      cancelScreenCapture().catch(() => {});
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -97,6 +97,21 @@ export default function RecordReactionScreen({
   const stopTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
+
+  // Called when the user taps the play overlay — shows the ReplayKit dialog,
+  // then starts YouTube only once permission is granted.
+  const handleStartRecording = useCallback(async () => {
+    if (startingCapture) { return; }
+    setStartingCapture(true);
+    try {
+      await startScreenCapture();
+      setYtPlaying(true);
+    } catch {
+      navigation.goBack();
+    } finally {
+      setStartingCapture(false);
+    }
+  }, [startingCapture, navigation]);
 
   const handleStop = useCallback(async () => {
     if (!isRecording) { return; }
@@ -126,6 +141,7 @@ export default function RecordReactionScreen({
     setElapsed(0);
     hasStartedRef.current = false;
     setIsRecording(false);
+    setYtPlaying(false);
     StatusBar.setHidden(false, 'fade');
     await cancelScreenCapture().catch(() => {});
     ytKeyRef.current += 1;
@@ -142,12 +158,6 @@ export default function RecordReactionScreen({
         setIsRecording(true);
         StatusBar.setHidden(true, 'fade');
         startTimer();
-        startScreenCapture().catch((e) => {
-          Alert.alert('Recording Error', e?.message ?? 'Could not start screen recording.');
-          setIsRecording(false);
-          StatusBar.setHidden(false, 'fade');
-          stopTimer();
-        });
       }
     } else if (state === 'paused') {
       if (skipNextPausedRef.current) {
@@ -156,7 +166,7 @@ export default function RecordReactionScreen({
     } else if (state === 'ended') {
       skipNextPausedRef.current = false;
     }
-  }, [startTimer, stopTimer]);
+  }, [startTimer]);
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -180,7 +190,7 @@ export default function RecordReactionScreen({
     <View style={styles.container}>
       <View style={{ height: topInset, backgroundColor: C.BLACK }} />
 
-      {/* Top 30% — YouTube (horizontal videos sit well here) */}
+      {/* Top 30% — YouTube */}
       <View style={[styles.pane, { height: topH }]}>
         <YoutubePlayer
           key={ytKey}
@@ -188,11 +198,31 @@ export default function RecordReactionScreen({
           height={topH}
           width={width}
           videoId={videoId}
-          play={false}
+          play={ytPlaying}
           onChangeState={onYtStateChange}
           initialPlayerParams={YT_PARAMS}
           webViewStyle={YT_WV_STYLE}
         />
+        {/* Overlay covers YouTube until the user accepts the recording dialog */}
+        {!ytPlaying && (
+          <TouchableOpacity
+            style={styles.startOverlay}
+            onPress={handleStartRecording}
+            activeOpacity={0.85}
+            disabled={startingCapture}>
+            {startingCapture
+              ? <ActivityIndicator color={C.WHITE} size="large" />
+              : (
+                <>
+                  <View style={styles.startCircle}>
+                    <Text style={styles.startIcon}>▶</Text>
+                  </View>
+                  <Text style={styles.startLabel}>Tap to record</Text>
+                </>
+              )
+            }
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Divider */}
@@ -298,4 +328,17 @@ const styles = StyleSheet.create({
   infoText: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center' },
   backBtn: { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, paddingVertical: SPACE.MD, paddingHorizontal: SPACE.LG },
   backBtnText: { color: C.INK, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM },
+  startOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center', gap: SPACE.SM,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  startCircle: {
+    width: 56, height: 56, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  startIcon: { color: C.WHITE, fontSize: 22, marginLeft: 4 },
+  startLabel: { color: 'rgba(255,255,255,0.8)', fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
 });

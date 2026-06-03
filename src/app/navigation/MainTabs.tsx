@@ -67,18 +67,9 @@ function FriendsNavigator() {
 }
 
 function ShareNavigator() {
-  const shareHomeOptions: any = {
-    title: 'Share',
-    headerTitleAlign: 'left',
-    headerTitleStyle: {
-      fontSize: FONT.SIZES.XXL,
-      fontFamily: FONT.DISPLAY_BOLD,
-      fontWeight: '700', color: C.INK,
-    },
-  };
   return (
     <ShareStack.Navigator screenOptions={NAV_OPTS}>
-      <ShareStack.Screen name="ShareHome" component={ShareHomeScreen} options={shareHomeOptions} />
+      <ShareStack.Screen name="ShareHome" component={ShareHomeScreen} options={{ headerShown: false }} />
       <ShareStack.Screen name="VideoPreview" component={VideoPreviewScreen} options={{ title: '' }} />
       <ShareStack.Screen name="SelectRecipients" component={SelectRecipientsScreen} options={{ title: 'Send To' }} />
     </ShareStack.Navigator>

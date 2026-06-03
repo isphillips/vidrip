@@ -75,7 +75,7 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
 
   return (
     <View style={styles.container}>
-      <View style={[styles.headerRow, { paddingTop: top + SPACE.SM }]}>
+      <View style={[styles.headerRow, { paddingTop: top }]}>
         <Text style={styles.title}>Friends</Text>
         <TouchableOpacity
           style={styles.addButton}
@@ -150,11 +150,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: 0,
+    marginTop: 0,
+  },
+  title: {
+    fontSize: FONT.SIZES.XXL,
+    fontFamily: FONT.DISPLAY_BOLD,
+    fontWeight: '700',
+    color: C.INK,
     padding: SPACE.LG,
     marginTop: 0,
   },
-  title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD,
-    fontWeight: '700', color: C.INK },
   addButton: {
     backgroundColor: C.SURFACE,
     borderRadius: RADIUS.FULL,

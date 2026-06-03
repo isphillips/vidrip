@@ -1,14 +1,115 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
+
+// ── Inline emoji reactions on thread card ────────────────────────────────────
+function ReactionEmojiChips({
+  reactions, userId, onToggle,
+}: {
+  reactions: Array<{ emoji: string; user_id: string }>;
+  userId: string | undefined;
+  onToggle: (emoji: string) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const counts = (reactions ?? []).reduce((acc: Record<string, number>, e) => {
+    acc[e.emoji] = (acc[e.emoji] ?? 0) + 1;
+    return acc;
+  }, {});
+  const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+  const top3 = sorted.slice(0, 3);
+  const overflow = sorted.length - 3;
+
+  return (
+    <View style={chipStyles.wrap}>
+      {/* Existing emoji chips — tappable to toggle */}
+      <View style={chipStyles.row}>
+        {top3.map(([emoji, count]) => {
+          const isMine = (reactions ?? []).some(r => r.emoji === emoji && r.user_id === userId);
+          return (
+            <TouchableOpacity
+              key={emoji}
+              style={[chipStyles.chip, isMine && chipStyles.chipMine]}
+              onPress={() => onToggle(emoji)}
+              activeOpacity={0.7}
+              hitSlop={4}>
+              <Text style={chipStyles.glyph}>{emoji}</Text>
+              <Text style={chipStyles.count}>{count}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        {overflow > 0 && (
+          <View style={chipStyles.chip}>
+            <Text style={chipStyles.count}>+{overflow}</Text>
+          </View>
+        )}
+        {/* Add emoji button */}
+        <TouchableOpacity
+          style={chipStyles.addBtn}
+          onPress={() => setPickerOpen(o => !o)}
+          hitSlop={4}>
+          <Text style={chipStyles.addGlyph}>{pickerOpen ? '✕' : '+'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Quick emoji picker */}
+      {pickerOpen && (
+        <View style={chipStyles.picker}>
+          {QUICK_EMOJIS.map(emoji => (
+            <TouchableOpacity
+              key={emoji}
+              onPress={() => { onToggle(emoji); setPickerOpen(false); }}
+              hitSlop={4}>
+              <Text style={chipStyles.pickerGlyph}>{emoji}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const chipStyles = StyleSheet.create({
+  wrap: { flexShrink: 0, gap: 4 },
+  row: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 20, paddingHorizontal: 7, paddingVertical: 3,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  chipMine: {
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  glyph: { fontSize: 13 },
+  count: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.9)' },
+  addBtn: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  addGlyph: { fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: '700', lineHeight: 16 },
+  picker: {
+    flexDirection: 'row', gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  pickerGlyph: { fontSize: 22 },
+});
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
@@ -22,11 +123,14 @@ import {
   downloadAndCache,
   recordReactionDownload,
 } from '../../../infrastructure/storage/reactionStorage';
+import {
+  addEmojiReaction,
+  removeEmojiReaction,
+} from '../../../infrastructure/supabase/queries/reactions';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 type DlStatus = 'local' | 'downloading' | 'unavailable';
 
-const YT_PARAMS = { rel: false as const, controls: true as const };
 
 export default function ThreadScreen({ route, navigation }: FeedStackScreenProps<'Thread'>) {
   const { threadId } = route.params;
@@ -37,11 +141,37 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [playing, setPlaying] = useState(false);
   const [dlStatus, setDlStatus] = useState<Record<string, DlStatus>>({});
   const [dlPct, setDlPct] = useState<Record<string, number>>({});
   const mountedRef = useRef(true);
-  const playerRef = useRef<YoutubeIframeRef>(null);
+  const activeDownloadsRef = useRef<Set<string>>(new Set());
+
+  const handleEmojiToggle = useCallback(async (reactionId: string, emoji: string) => {
+    if (!user?.id) { return; }
+    const reaction = reactions.find(r => r.id === reactionId);
+    if (!reaction) { return; }
+    const myMatch = reaction.emoji_reactions?.find(
+      e => e.emoji === emoji && e.user_id === user.id,
+    );
+    if (myMatch) {
+      // Optimistic remove
+      setReactions(prev => prev.map(r =>
+        r.id === reactionId
+          ? { ...r, emoji_reactions: r.emoji_reactions.filter(e => !(e.emoji === emoji && e.user_id === user.id)) }
+          : r,
+      ));
+      await removeEmojiReaction(reactionId, user.id, emoji).catch(() => load());
+    } else {
+      const tempId = `tmp-${Date.now()}`;
+      // Optimistic add
+      setReactions(prev => prev.map(r =>
+        r.id === reactionId
+          ? { ...r, emoji_reactions: [...(r.emoji_reactions ?? []), { id: tempId, emoji, user_id: user.id! }] }
+          : r,
+      ));
+      await addEmojiReaction(reactionId, user.id, emoji).catch(() => load());
+    }
+  }, [user?.id, reactions, load]);
 
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
@@ -62,6 +192,8 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   }, [threadId, user]);
 
   useEffect(() => { load(); }, [load]);
+  // Re-fetch whenever screen comes into focus — picks up new reactions after recording
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // Auto-download all cloud reactions when thread loads — messages inbox model
   useEffect(() => {
@@ -75,7 +207,9 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
 
     reactions.forEach(r => {
       if (!r.needsDownload || !r.resolvedUri) { return; }
+      if (activeDownloadsRef.current.has(r.id)) { return; }
 
+      activeDownloadsRef.current.add(r.id);
       setDlStatus(prev => ({ ...prev, [r.id]: 'downloading' }));
 
       downloadAndCache(r.id, r.resolvedUri, (pct) => {
@@ -84,18 +218,19 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
         }
       })
         .then(() => {
+          activeDownloadsRef.current.delete(r.id);
           if (!mountedRef.current) { return; }
           setDlStatus(prev => ({ ...prev, [r.id]: 'local' }));
           setDlPct(prev => ({ ...prev, [r.id]: 100 }));
           if (user?.id) { recordReactionDownload(r.id, user.id).catch(() => {}); }
         })
         .catch(() => {
+          activeDownloadsRef.current.delete(r.id);
           if (mountedRef.current) {
             setDlStatus(prev => ({ ...prev, [r.id]: 'unavailable' }));
           }
         });
     });
-  // reactions identity is stable after load; user.id is stable
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reactions]);
 
@@ -113,17 +248,12 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
 
   return (
     <ScrollView style={styles.container} bounces={false}>
-      {/* YouTube player */}
+      {/* Thumbnail only — video plays in RecordReactionScreen */}
       <View style={[styles.playerContainer, { height: playerHeight }]}>
-        <YoutubePlayer
-          ref={playerRef}
-          height={playerHeight}
-          width={width}
-          videoId={thread.video_id}
-          play={playing}
-          onChangeState={(state) => { if (state === 'ended') { setPlaying(false); } }}
-          initialPlayerParams={YT_PARAMS}
-          webViewStyle={styles.player}
+        <Image
+          source={{ uri: `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg` }}
+          style={styles.thumbnail}
+          resizeMode="cover"
         />
       </View>
 
@@ -144,9 +274,13 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
         <TouchableOpacity
           style={styles.reactButton}
           activeOpacity={0.85}
-          onPress={() => navigation.getParent()?.navigate('RecordReaction', {
-            threadId, videoId: thread.video_id,
-          })}>
+          onPress={() => {
+            // startCapture is now called inside RecordReactionScreen after
+            // VisionCamera has initialised — avoids the AVCapture lock race.
+            navigation.getParent()?.navigate('RecordReaction', {
+              threadId, videoId: thread.video_id,
+            });
+          }}>
           <Text style={styles.reactButtonText}>Record Your Reaction 🎬</Text>
         </TouchableOpacity>
       )}
@@ -181,7 +315,6 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
               : undefined
             }>
 
-            {/* Thumbnail / status indicator */}
             <View style={[styles.reactionThumb, status !== 'local' && styles.reactionThumbDim]}>
               {status === 'local' && <Text style={styles.reactionThumbIcon}>▶</Text>}
               {status === 'downloading' && (
@@ -193,7 +326,6 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
               {status === 'unavailable' && <Text style={styles.reactionThumbIcon}>🔒</Text>}
             </View>
 
-            {/* Info */}
             <View style={styles.reactionInfo}>
               <Text style={styles.reactionHandle}>@{handle}</Text>
               {status === 'local' && (
@@ -209,11 +341,11 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
               )}
             </View>
 
-            {r.emoji_reactions?.length > 0 && (
-              <Text style={styles.reactionEmojis}>
-                {r.emoji_reactions.slice(0, 3).map(e => e.emoji).join('')}
-              </Text>
-            )}
+            <ReactionEmojiChips
+              reactions={r.emoji_reactions}
+              userId={user?.id}
+              onToggle={(emoji) => handleEmojiToggle(r.id, emoji)}
+            />
           </TouchableOpacity>
         );
       })}
@@ -228,7 +360,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' },
   errorText: { color: C.MUTED, fontSize: FONT.SIZES.MD },
   playerContainer: { backgroundColor: C.BLACK, overflow: 'hidden' },
-  player: { backgroundColor: C.BLACK },
+  thumbnail: { width: '100%', height: '100%' },
   meta: { padding: SPACE.LG, gap: SPACE.XS },
   metaText: { fontSize: FONT.SIZES.SM, color: C.MUTED },
   metaHandle: { color: C.ACCENT_HOT, fontWeight: '600' },
@@ -267,6 +399,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACE.MD,
     borderTopWidth: 1,
     borderTopColor: C.BORDER,
+    overflow: 'hidden',
   },
   reactionThumb: {
     width: 56, height: 56,
@@ -283,6 +416,5 @@ const styles = StyleSheet.create({
   reactionHandle: { fontSize: FONT.SIZES.MD, fontWeight: '600', color: C.INK },
   reactionDuration: { fontSize: FONT.SIZES.SM, color: C.MUTED },
   reactionStatusText: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontStyle: 'italic' },
-  reactionEmojis: { fontSize: FONT.SIZES.LG },
   bottomPad: { height: SPACE.XXXL },
 });
