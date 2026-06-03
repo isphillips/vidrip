@@ -10,6 +10,7 @@ import type {
   ShareStackParamList,
   AccountStackParamList,
 } from './types';
+import ChannelsNavigator from './ChannelsStack';
 
 import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
@@ -102,6 +103,8 @@ export default function MainTabs() {
       }}>
       <Tab.Screen name="Feed" component={FeedNavigator}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-feed.png')), tabBarLabel: 'Feed' }} />
+      <Tab.Screen name="Channels" component={ChannelsNavigator}
+        options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Channels' }} />
       <Tab.Screen name="Share" component={ShareNavigator}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Share' }} />
       <Tab.Screen name="Friends" component={FriendsNavigator}

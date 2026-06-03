@@ -44,18 +44,33 @@ export function clearBadge(): void {
 
 // ── Notification routing ─────────────────────────────────────────────────────
 
-type NotificationHandler = (threadId: string) => void;
-let _onNotificationOpened: NotificationHandler | null = null;
+type ThreadNotificationHandler = (threadId: string) => void;
+type ChannelNotificationHandler = (channelId: string, channelName: string) => void;
 
-export function setNotificationOpenedHandler(handler: NotificationHandler): void {
+let _onNotificationOpened: ThreadNotificationHandler | null = null;
+let _onChannelNotification: ChannelNotificationHandler | null = null;
+
+export function setNotificationOpenedHandler(handler: ThreadNotificationHandler): void {
   _onNotificationOpened = handler;
 }
 
+export function setChannelNotificationHandler(handler: ChannelNotificationHandler): void {
+  _onChannelNotification = handler;
+}
+
 function handleNotification(notification: PushNotification): void {
-  const data = notification.getData() as { thread_id?: string };
-  if (data?.thread_id && _onNotificationOpened) {
+  const data = notification.getData() as {
+    thread_id?: string;
+    channel_id?: string;
+    channel_name?: string;
+  };
+
+  if (data?.channel_id && _onChannelNotification) {
+    _onChannelNotification(data.channel_id, data.channel_name ?? 'Channel');
+  } else if (data?.thread_id && _onNotificationOpened) {
     _onNotificationOpened(data.thread_id);
   }
+
   notification.finish(PushNotificationIOS.FetchResult.NoData);
 }
 

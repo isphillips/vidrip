@@ -12,10 +12,25 @@ export type AuthStackParamList = {
 // Main tabs
 export type MainTabParamList = {
   Feed: undefined;
+  Channels: undefined;
   Share: undefined;
   Friends: undefined;
   Account: undefined;
 };
+
+// Channels stack
+export type ChannelsStackParamList = {
+  ChannelsHome: undefined;
+  Channel: { channelId: string; channelName: string; isPublic: boolean; isJoined: boolean; isOwner: boolean };
+  ChannelPost: { postId: string; channelId: string; isJoined: boolean };
+  WatchYouTubePost: { postId: string; channelId: string };
+  WatchChannelClip: { postId: string };
+  ChannelVideoRecord: { channelId: string };
+  AddChannelVideo: { channelId: string };
+};
+
+export type ChannelsStackScreenProps<T extends keyof ChannelsStackParamList> =
+  NativeStackScreenProps<ChannelsStackParamList, T>;
 
 export type AccountStackParamList = {
   AccountHome: undefined;
