@@ -54,6 +54,7 @@ import {
   startScreenCapture,
   stopScreenCapture,
   cancelScreenCapture,
+  releaseScreenCapture,
 } from '../../../infrastructure/native/screenRecorder';
 import type { RecordStackScreenProps } from '../../../app/navigation/types';
 
@@ -108,7 +109,9 @@ export default function RecordReactionScreen({
     })();
     return () => {
       if (timerRef.current) { clearInterval(timerRef.current); }
-      cancelScreenCapture().catch(() => {});
+      // releaseScreenCapture tears down the MediaProjection + foreground service on Android.
+      // On iOS it's equivalent to cancelCapture.
+      releaseScreenCapture().catch(() => {});
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

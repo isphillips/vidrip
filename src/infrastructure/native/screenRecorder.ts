@@ -1,4 +1,4 @@
-import { NativeModules } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 
 const { ReaxnScreenRecorder } = NativeModules;
 
@@ -27,3 +27,10 @@ export function cancelScreenCapture(): Promise<void> {
   return ReaxnScreenRecorder.cancelCapture();
 }
 
+// Android only — releases the MediaProjection and stops the foreground service.
+// Call when leaving the RecordReaction screen so the recording notification clears.
+export function releaseScreenCapture(): Promise<void> {
+  if (Platform.OS !== 'android') { return Promise.resolve(); }
+  assertModule();
+  return ReaxnScreenRecorder.releaseCapture();
+}

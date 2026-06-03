@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import java.io.File
+import java.util.concurrent.Executors
 
 class ScreenRecordService : Service() {
 
@@ -27,9 +28,20 @@ class ScreenRecordService : Service() {
         var onForegroundStarted: (() -> Unit)? = null
     }
 
-    private var mediaProjection: MediaProjection? = null
+    // Projection is held for the lifetime of the screen session — survives stop/cancel.
+    var mediaProjection: MediaProjection? = null
+        private set
+
+    val isProjectionActive: Boolean get() = mediaProjection != null
     private var virtualDisplay: VirtualDisplay? = null
     private var mediaRecorder: MediaRecorder? = null
+
+    @Volatile private var isRecording = false
+    @Volatile private var hasWrittenData = false
+
+    // Single-thread executor keeps all recorder ops off the main thread.
+    private val ioExecutor = Executors.newSingleThreadExecutor()
+
     var outputFile: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -52,56 +64,122 @@ class ScreenRecordService : Service() {
         return START_NOT_STICKY
     }
 
-    fun startRecording(resultCode: Int, data: Intent, output: String, width: Int, height: Int, dpi: Int) {
-        outputFile = output
+    // Called once after permission is granted — initialises the MediaProjection.
+    fun initProjection(resultCode: Int, data: Intent) {
         val pm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = pm.getMediaProjection(resultCode, data)
-
-        val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(this)
-                       else @Suppress("DEPRECATION") MediaRecorder()
-        mediaRecorder = recorder
-
-        recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
-        recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
-        recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-        recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-        recorder.setVideoSize(width, height)
-        recorder.setVideoFrameRate(30)
-        recorder.setVideoEncodingBitRate(4_000_000)
-        recorder.setAudioEncodingBitRate(128_000)
-        recorder.setAudioSamplingRate(44_100)
-        recorder.setOutputFile(output)
-        recorder.prepare()
-
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "ReaxnRecorder", width, height, dpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            recorder.surface, null, null,
-        )
-        recorder.start()
     }
 
-    fun stopRecording(): String? {
-        try { mediaRecorder?.stop() } catch (_: Exception) {}
-        mediaRecorder?.release(); mediaRecorder = null
-        virtualDisplay?.release(); virtualDisplay = null
-        mediaProjection?.stop(); mediaProjection = null
-        val path = outputFile; outputFile = null
+    // Starts a new recording using the existing projection.
+    fun startRecording(
+        output: String,
+        width: Int,
+        height: Int,
+        dpi: Int,
+        onDone: (Exception?) -> Unit,
+    ) {
+        ioExecutor.execute {
+            try {
+                outputFile = output
+                hasWrittenData = false
+
+                val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(this)
+                               else @Suppress("DEPRECATION") MediaRecorder()
+                mediaRecorder = recorder
+
+                recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+                recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                recorder.setVideoSize(width, height)
+                recorder.setVideoFrameRate(30)
+                recorder.setVideoEncodingBitRate(4_000_000)
+                recorder.setAudioEncodingBitRate(128_000)
+                recorder.setAudioSamplingRate(44_100)
+                recorder.setOutputFile(output)
+                recorder.prepare()
+
+                virtualDisplay = mediaProjection?.createVirtualDisplay(
+                    "ReaxnRecorder", width, height, dpi,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    recorder.surface, null, null,
+                )
+
+                recorder.start()
+                isRecording = true
+
+                // Mark as having data after a short delay — MediaRecorder needs
+                // at least one frame before stop() is safe.
+                Thread.sleep(300)
+                hasWrittenData = true
+
+                onDone(null)
+            } catch (e: Exception) {
+                isRecording = false
+                onDone(e)
+            }
+        }
+    }
+
+    // Stops the current recording but keeps the MediaProjection alive for reuse.
+    fun stopRecording(onDone: (String?, Exception?) -> Unit) {
+        ioExecutor.execute {
+            val path = outputFile
+            try {
+                if (isRecording && hasWrittenData) {
+                    mediaRecorder?.stop()
+                }
+            } catch (_: Exception) {}
+            cleanupRecorder()
+            onDone(path, null)
+        }
+    }
+
+    // Cancels and deletes the output file, keeps projection alive.
+    fun cancelRecording(onDone: (Exception?) -> Unit) {
+        ioExecutor.execute {
+            try {
+                if (isRecording && hasWrittenData) {
+                    mediaRecorder?.stop()
+                }
+            } catch (_: Exception) {}
+            cleanupRecorder()
+            outputFile?.let { File(it).delete() }
+            outputFile = null
+            onDone(null)
+        }
+    }
+
+    // Full teardown — releases projection and stops the service.
+    fun release() {
+        ioExecutor.execute {
+            try {
+                if (isRecording && hasWrittenData) {
+                    mediaRecorder?.stop()
+                }
+            } catch (_: Exception) {}
+            cleanupRecorder()
+            mediaProjection?.stop()
+            mediaProjection = null
+        }
         stopSelf()
-        return path
     }
 
-    fun cancelRecording() {
-        try { mediaRecorder?.stop() } catch (_: Exception) {}
-        mediaRecorder?.release(); mediaRecorder = null
-        virtualDisplay?.release(); virtualDisplay = null
-        mediaProjection?.stop(); mediaProjection = null
-        outputFile?.let { File(it).delete() }; outputFile = null
-        stopSelf()
+    private fun cleanupRecorder() {
+        isRecording = false
+        hasWrittenData = false
+        try { mediaRecorder?.release() } catch (_: Exception) {}
+        mediaRecorder = null
+        virtualDisplay?.release()
+        virtualDisplay = null
     }
 
-    override fun onDestroy() { super.onDestroy(); instance = null }
+    override fun onDestroy() {
+        super.onDestroy()
+        ioExecutor.shutdown()
+        instance = null
+    }
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
