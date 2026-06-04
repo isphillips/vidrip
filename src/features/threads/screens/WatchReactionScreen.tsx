@@ -90,6 +90,7 @@ export default function WatchReactionScreen({
   const [emojiOpen, setEmojiOpen] = useState(false);
 
   const videoRef = useRef<any>(null);
+  const startFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
 
   // Load reaction + emoji reactions
@@ -134,15 +135,13 @@ export default function WatchReactionScreen({
     return () => { channel.unsubscribe(); };
   }, [reactionId]);
 
-  // Tapping the full-screen reaction PAUSES both (pausing YouTube in code is allowed).
-  // Starting/resuming must come from a real tap on the Short itself — Android
-  // WebViews only honor a genuine in-player gesture for unmuted playback.
+  // Tap the screen to pause both; tap again to resume. (Pause is always allowed;
+  // resume is programmatic and works because the Short already started once.)
   const handleScreenTap = useCallback(() => {
-    if (!hasStarted) { return; } // before first play, the Short's own tap starts things
-    if (!paused) {
-      setPaused(true);
-      setYtPlaying(false); // pauseVideo — allowed programmatically
-    }
+    if (!hasStarted) { return; }
+    const nowPaused = !paused;
+    setPaused(nowPaused);
+    setYtPlaying(!nowPaused);
   }, [hasStarted, paused]);
 
   const handleEnd = useCallback(() => {
@@ -258,42 +257,38 @@ export default function WatchReactionScreen({
           play={ytPlaying}
           mute={ytMute}
           volume={25}
-          onReady={() => setYtReady(true)}
+          onReady={() => {
+            setYtReady(true);
+            // Muted autoplay is allowed by mobile WebViews — kick it off immediately.
+            setYtPlaying(true);
+            // Safety net: if the Short hasn't started within 2s, play the reaction
+            // anyway so it always autoplays.
+            if (startFallbackRef.current) { clearTimeout(startFallbackRef.current); }
+            startFallbackRef.current = setTimeout(() => {
+              setHasStarted(true);
+              setPaused(false);
+            }, 2000);
+          }}
           onChangeState={(s: string) => {
             if (s === 'playing') {
+              if (startFallbackRef.current) { clearTimeout(startFallbackRef.current); startFallbackRef.current = null; }
               setHasStarted(true);
-              if (ytMute) { setYtMute(false); }   // unmute to 25% (volume prop)
-              setYtPlaying(true);                  // keep our state matching reality
-              setPaused(false);                    // start/resume reaction in sync
-            } else if (s === 'paused') {
-              setYtPlaying(false);
-              setPaused(true);                     // keep reaction paused in lockstep
+              setPaused(false);   // start reaction in sync at 100%; Short stays muted
             } else if (s === 'ended') {
               handleEnd();
             }
           }}
           onError={(e: string) => console.warn('[WatchReaction] yt error:', e)}
-          initialPlayerParams={{ rel: false, controls: true, modestbranding: true, playsinline: true }}
+          initialPlayerParams={{ rel: false, controls: false, modestbranding: true, playsinline: true }}
           webViewStyle={{ backgroundColor: C.BLACK }}
           webViewProps={{ mediaPlaybackRequiresUserGesture: false }}
         />
       </View>
 
-      {/* Spinner while the Short loads */}
-      {!ytReady && (
+      {/* Spinner until both videos start (muted autoplay kicks off on ready) */}
+      {!hasStarted && (
         <View style={styles.playOverlay} pointerEvents="none">
           <ActivityIndicator color={C.WHITE} size="large" />
-        </View>
-      )}
-
-      {/* Prompt pointing at the Short — shown whenever paused (initial + after pause).
-          The user must tap the Short itself to start/resume (real WebView gesture). */}
-      {ytReady && paused && (
-        <View
-          style={[styles.tapHint, { bottom: pipBottom + PIP_HEIGHT + SPACE.SM, right: SPACE.MD }]}
-          pointerEvents="none">
-          <Text style={styles.tapHintText}>Tap the Short to play ▶</Text>
-          <Text style={styles.tapHintArrow}>↓</Text>
         </View>
       )}
 
