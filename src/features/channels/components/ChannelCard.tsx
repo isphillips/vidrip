@@ -11,11 +11,15 @@ type Props = {
 
 export default function ChannelCard({ channel, userId, onPress }: Props) {
   const isOwner = !!userId && channel.created_by === userId;
+  const hasUnread = !channel.is_public && channel.unread_count > 0;
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.body}>
         <View style={styles.meta}>
-          <Text style={styles.name} numberOfLines={1}>{channel.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>{channel.name}</Text>
+            {hasUnread && <View style={styles.unreadDot} />}
+          </View>
           {channel.owner && (
             <Text style={styles.owner}>@{channel.owner.handle}</Text>
           )}
@@ -68,6 +72,11 @@ const styles = StyleSheet.create({
     gap: SPACE.MD,
   },
   meta: { flex: 1, gap: SPACE.XS },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
+  unreadDot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: C.ACCENT_HOT,
+  },
   name: {
     fontSize: FONT.SIZES.LG,
     fontFamily: FONT.DISPLAY_SEMIBOLD,
