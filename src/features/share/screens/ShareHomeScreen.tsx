@@ -219,6 +219,8 @@ export default function ShareHomeScreen({ navigation }: ShareStackScreenProps<'S
             </ScrollView>
           )}
 
+          <View style={styles.tabsGap} />
+
           {loading ? (
             <View style={styles.center}><ActivityIndicator color={C.ACCENT} /></View>
           ) : (
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
   searchSpinner: { marginLeft: SPACE.SM },
   tabs: { paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingBottom: SPACE.SM },
   tab: {
-    paddingHorizontal: SPACE.LG, display: 'flex', justifyContent: 'center', height: 38,
+    paddingHorizontal: SPACE.LG, display: 'flex', justifyContent: 'center', height: 36,
     borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, marginBottom: SPACE.SM,
     borderWidth: 1, borderColor: C.BORDER,
   },
@@ -295,7 +297,8 @@ const styles = StyleSheet.create({
   tabTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   tabTxtActive: { color: C.WHITE },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACE.XXXL },
-  grid: { paddingHorizontal: SPACE.LG, paddingBottom: SPACE.XXXL, paddingTop: SPACE.SM },
+  grid: { paddingHorizontal: SPACE.LG, paddingBottom: SPACE.XXXL },
+  tabsGap: { height: SPACE.SM },
   row: { gap: SPACE.MD, marginBottom: SPACE.MD },
   card: { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, overflow: 'hidden' },
   cardThumb: { width: '100%' },
