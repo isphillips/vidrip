@@ -64,6 +64,7 @@
 		<string>PlayfairDisplay-SemiBoldItalic.ttf</string>
 		<string>PlayfairDisplay-MediumItalic.ttf</string>
 		<string>Raleway-Bold.ttf</string>
+		<string>Ionicons.ttf</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
