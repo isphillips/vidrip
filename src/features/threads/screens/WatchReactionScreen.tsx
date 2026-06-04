@@ -230,6 +230,8 @@ export default function WatchReactionScreen({
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
         paused={paused}
+        volume={1.0}
+        disableFocus={true}
         onLoad={(d: any) => setDuration(d.duration)}
         onProgress={(d: any) => setProgress(d.currentTime)}
         onEnd={handleEnd}
@@ -249,6 +251,8 @@ export default function WatchReactionScreen({
           width={PIP_WIDTH}
           videoId={videoId}
           play={ytPlaying}
+          onReady={() => ytRef.current?.setVolume(25)}
+          onChangeState={(s: string) => { if (s === 'playing') { ytRef.current?.setVolume(25); } }}
           initialPlayerParams={{ rel: false, controls: false, playsinline: true }}
           webViewStyle={{ backgroundColor: C.BLACK }}
           webViewProps={{ mediaPlaybackRequiresUserGesture: false }}
