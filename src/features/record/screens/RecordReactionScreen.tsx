@@ -142,10 +142,12 @@ export default function RecordReactionScreen({
           }
           setPhase('uploading');
           try {
+            // Strip file:// prefix — RNFS.moveFile needs a bare path
+            const filePath = video.path.replace(/^file:\/\//, '');
             await saveReaction({
               userId: uid,
               threadId,
-              filePath: video.path,
+              filePath,
               duration: video.duration,
               mode: STORAGE_MODE,
             });
@@ -274,11 +276,10 @@ export default function RecordReactionScreen({
         </View>
       )}
 
-      {/* Overlay: buffering spinner after tap */}
+      {/* Non-blocking buffering indicator — small spinner over PiP so user can still interact */}
       {phase === 'buffering' && (
-        <View style={styles.overlay} pointerEvents="none">
-          <ActivityIndicator color={C.WHITE} size="large" />
-          <Text style={styles.overlayText}>Buffering…</Text>
+        <View style={[styles.pip, { bottom: pipBottom, left: SPACE.MD }, styles.pipSpinner]} pointerEvents="none">
+          <ActivityIndicator color={C.WHITE} size="small" />
         </View>
       )}
 
@@ -374,6 +375,10 @@ const styles = StyleSheet.create({
     backgroundColor: C.ACCENT_MID,
   },
   recDot: { flex: 1 },
+  pipSpinner: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   overlay: {
     ...StyleSheet.absoluteFillObject,
