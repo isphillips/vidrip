@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import EmojiChips from '../../../components/EmojiChips';
 import type { ChannelPost } from '../../../infrastructure/supabase/queries/channels';
@@ -44,17 +44,20 @@ export default function ChannelMessageBubble({
           <Text style={styles.handle}>@{post.poster?.handle ?? '?'}</Text>
         )}
 
-        {/* Clip bubble */}
+        {/* Clip / audio bubble */}
         <TouchableOpacity
           onPress={onPress}
           activeOpacity={0.85}
           style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
           <View style={styles.clipRow}>
             <View style={styles.playCircle}>
-              <Text style={styles.playIcon}>▶</Text>
+              {post.post_type === 'audio'
+                ? <Image source={require('../../../assets/icon-audio.png')} style={styles.audioIcon} resizeMode="contain" />
+                : <Text style={styles.playIcon}>▶</Text>
+              }
             </View>
             <Text style={[styles.duration, isMe && styles.durationMe]}>
-              {post.duration ?? 0}s video
+              {post.duration ?? 0}s {post.post_type === 'audio' ? 'audio' : 'video'}
             </Text>
           </View>
         </TouchableOpacity>
@@ -118,6 +121,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   playIcon: { color: C.WHITE, fontSize: 14, marginLeft: 2 },
+  audioIcon: { width: 16, height: 16, tintColor: C.WHITE },
   duration: {
     fontSize: FONT.SIZES.SM,
     fontFamily: FONT.BODY_MEDIUM,

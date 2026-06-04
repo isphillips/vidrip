@@ -23,6 +23,8 @@ import {
   hasLocalClip,
   localPathForClip,
   downloadChannelClip,
+  hasLocalAudio,
+  localPathForAudio,
 } from '../../../infrastructure/storage/localChannelClipStorage';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
@@ -86,6 +88,20 @@ export default function WatchChannelClipScreen({
       if (!p) { setLoadState('unavailable'); return; }
       setPost(p);
 
+      const isAudio = p.post_type === 'audio';
+
+      // Audio posts are always local — no cloud URL
+      if (isAudio) {
+        if (await hasLocalAudio(postId)) {
+          const path = localPathForAudio(postId);
+          setLocalUri(Platform.OS === 'ios' ? path : `file://${path}`);
+          setLoadState('ready');
+        } else {
+          setLoadState('unavailable');
+        }
+        return;
+      }
+
       if (!p.video_url) { setLoadState('unavailable'); return; }
 
       // Check local cache first — prefer local copy over streaming
@@ -96,7 +112,7 @@ export default function WatchChannelClipScreen({
         return;
       }
 
-      // Download to device then play — "stored on each other's devices"
+      // Download to device then play
       setLoadState('downloading');
       try {
         const dest = await downloadChannelClip(postId, p.video_url, setDownloadPct);
@@ -213,6 +229,7 @@ export default function WatchChannelClipScreen({
           style={{ width, height }}
           resizeMode="contain"
           paused={paused}
+          audioOnly={post?.post_type === 'audio'}
           onLoad={(d: any) => setDuration(d.duration)}
           onProgress={(d: any) => setProgress(d.currentTime)}
           onEnd={() => { setPaused(true); setProgress(0); videoRef.current?.seek(0); }}

@@ -41,3 +41,11 @@ export async function deleteClip(postId: string): Promise<void> {
   const path = localPathForClip(postId);
   if (await RNFS.exists(path)) { await RNFS.unlink(path); }
 }
+
+export function localPathForAudio(postId: string): string {
+  return `${CLIPS_DIR}/${postId}.m4a`;
+}
+
+export async function hasLocalAudio(postId: string): Promise<boolean> {
+  return RNFS.exists(localPathForAudio(postId));
+}

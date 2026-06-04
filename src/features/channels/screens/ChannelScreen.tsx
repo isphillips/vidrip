@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
+  View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,8 +16,14 @@ import {
   joinChannel,
   leaveChannel,
   togglePinPost,
+  postChannelAudio,
   type ChannelPost,
 } from '../../../infrastructure/supabase/queries/channels';
+import {
+  startAudioRecording,
+  stopAudioRecording,
+  cancelAudioRecording,
+} from '../../../infrastructure/native/audioRecorder';
 import ChannelPostCard from '../components/ChannelPostCard';
 import ChannelMessageBubble from '../components/ChannelMessageBubble';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
@@ -36,6 +42,11 @@ export default function ChannelScreen({
   const [joined, setJoined] = useState(isJoinedParam);
   const [joiningLeaving, setJoiningLeaving] = useState(false);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
+  const [isHoldingMic, setIsHoldingMic] = useState(false);
+  const [audioElapsed, setAudioElapsed] = useState(0);
+  const audioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pendingAudio, setPendingAudio] = useState<{ path: string; duration: number } | null>(null);
+  const [sendingAudio, setSendingAudio] = useState(false);
   const mountedRef = useRef(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const postsRef = useRef<ChannelPost[]>([]);   // always-current snapshot for handlers
@@ -189,103 +200,178 @@ export default function ChannelScreen({
     }
   }, [user?.id, posts, processing, load]);
 
+  // ── Audio recording handlers ──────────────────────────────────────────────
+  const handleMicPressIn = useCallback(async () => {
+    setIsHoldingMic(true);
+    setAudioElapsed(0);
+    audioTimerRef.current = setInterval(() => setAudioElapsed(s => s + 1), 1000);
+    try { await startAudioRecording(); } catch {
+      clearInterval(audioTimerRef.current!); audioTimerRef.current = null;
+      setIsHoldingMic(false);
+    }
+  }, []);
+
+  const handleMicPressOut = useCallback(async () => {
+    clearInterval(audioTimerRef.current!); audioTimerRef.current = null;
+    setIsHoldingMic(false);
+    setAudioElapsed(0);
+    try {
+      const result = await stopAudioRecording();
+      if (result.duration < 0.5) { await cancelAudioRecording().catch(() => {}); return; }
+      setPendingAudio(result);
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleAudioSend = useCallback(async () => {
+    if (!pendingAudio || !user?.id) { return; }
+    setSendingAudio(true);
+    try {
+      await postChannelAudio({ channelId, userId: user.id, filePath: pendingAudio.path, duration: pendingAudio.duration });
+      setPendingAudio(null);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not send audio.');
+    }
+    setSendingAudio(false);
+  }, [pendingAudio, user?.id, channelId]);
+
+  const handleAudioCancel = useCallback(async () => {
+    setPendingAudio(null);
+    await cancelAudioRecording().catch(() => {});
+  }, []);
+
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={[styles.header, { paddingTop: top + SPACE.SM }]}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          hitSlop={8}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
 
         <Text style={styles.channelName} numberOfLines={1}>{channelName}</Text>
 
         {isOwner && isPublic ? (
-          <TouchableOpacity
-            style={styles.postVideoBtn}
-            onPress={() => navigation.navigate('AddChannelVideo', { channelId })}
-            activeOpacity={0.8}>
+          <TouchableOpacity style={styles.postVideoBtn} activeOpacity={0.8}
+            onPress={() => navigation.navigate('AddChannelVideo', { channelId })}>
             <Text style={styles.postVideoBtnText}>+ Video</Text>
           </TouchableOpacity>
         ) : isPublic ? (
           <TouchableOpacity
             style={[styles.joinBtn, joined && styles.joinBtnActive]}
-            onPress={handleJoinLeave}
-            disabled={joiningLeaving}
-            activeOpacity={0.8}>
+            onPress={handleJoinLeave} disabled={joiningLeaving} activeOpacity={0.8}>
             <Text style={[styles.joinBtnText, joined && styles.joinBtnTextActive]}>
               {joiningLeaving ? '…' : joined ? 'Leave' : 'Join'}
             </Text>
           </TouchableOpacity>
         ) : (
-          // Private channel — camera send button
-          <TouchableOpacity
-            style={styles.cameraBtn}
-            onPress={() => navigation.navigate('ChannelVideoRecord', { channelId })}
-            activeOpacity={0.8}>
-            <Text style={styles.cameraBtnIcon}>📹</Text>
-          </TouchableOpacity>
+          // Private channel top-right: add people + leave
+          <View style={styles.headerActions}>
+            <TouchableOpacity hitSlop={8}
+              onPress={() => navigation.navigate('AddChannelMembers', { channelId })}>
+              <Image source={require('../../../assets/icon-addfriend.png')} style={styles.headerActionImg} resizeMode="contain" />
+            </TouchableOpacity>
+            <TouchableOpacity hitSlop={8} onPress={() => {
+              Alert.alert('Leave channel?', '', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Leave', style: 'destructive', onPress: () => {
+                  if (user?.id) { leaveChannel(channelId, user.id).then(() => navigation.goBack()); }
+                }},
+              ]);
+            }}>
+              <Image source={require('../../../assets/icon-leave.png')} style={styles.headerActionImg} resizeMode="contain" />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={C.ACCENT_HOT} />
+      {/* Recording toast — under header, only while holding mic */}
+      {isHoldingMic && (
+        <View style={styles.recordingToast}>
+          <View style={styles.recordingDot} />
+          <Text style={styles.recordingText}>
+            Recording… {String(Math.floor(audioElapsed / 60)).padStart(2, '0')}:{String(audioElapsed % 60).padStart(2, '0')}
+          </Text>
         </View>
+      )}
+
+      {loading ? (
+        <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
       ) : (
         <ScrollView
           ref={scrollViewRef}
-          contentContainerStyle={posts.length === 0 ? styles.emptyContainer : undefined}
+          contentContainerStyle={[
+            posts.length === 0 ? styles.emptyContainer : undefined,
+            !isPublic ? styles.msgPad : undefined,
+          ]}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
+            <RefreshControl refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); load(true); }}
-              tintColor={C.ACCENT_HOT}
-            />
+              tintColor={C.ACCENT_HOT} />
           }>
           {posts.length === 0 ? (
             <View style={styles.center}>
               <Text style={styles.emptyText}>
-                {isPublic ? 'No posts yet' : 'No messages yet — send a video!'}
+                {isPublic ? 'No posts yet' : 'No messages yet'}
               </Text>
             </View>
           ) : isPublic ? (
             posts.map(item => (
-              <ChannelPostCard
-                key={item.id}
-                post={item}
-                userId={user?.id}
-                isOwner={isOwner}
-                onTogglePin={() => handleTogglePin(item.id)}
+              <ChannelPostCard key={item.id} post={item} userId={user?.id}
+                isOwner={isOwner} onTogglePin={() => handleTogglePin(item.id)}
                 onPress={() => {
                   if (item.post_type === 'youtube') {
-                    navigation.navigate('ChannelPost', {
-                      postId: item.id,
-                      channelId,
-                      isJoined: joined,
-                    });
-                  } else {
-                    navigation.navigate('WatchChannelClip', { postId: item.id });
-                  }
+                    navigation.navigate('ChannelPost', { postId: item.id, channelId, isJoined: joined });
+                  } else { navigation.navigate('WatchChannelClip', { postId: item.id }); }
                 }}
-                onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)}
-              />
+                onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)} />
             ))
           ) : (
-            // Private channel — message-style, oldest first (newest at bottom)
             [...posts].reverse().map(item => (
-              <ChannelMessageBubble
-                key={item.id}
-                post={item}
-                isMe={item.poster_id === user?.id}
-                userId={user?.id}
+              <ChannelMessageBubble key={item.id} post={item}
+                isMe={item.poster_id === user?.id} userId={user?.id}
                 onPress={() => navigation.navigate('WatchChannelClip', { postId: item.id })}
-                onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)}
-              />
+                onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)} />
             ))
           )}
         </ScrollView>
+      )}
+
+      {/* Private channel: pending audio preview */}
+      {!isPublic && pendingAudio && (
+        <View style={styles.audioPreview}>
+          <Text style={styles.audioPreviewText}>🎤 {pendingAudio.duration.toFixed(1)}s</Text>
+          <TouchableOpacity onPress={handleAudioCancel} hitSlop={8}>
+            <Text style={styles.audioPreviewCancel}>✕</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.audioSendBtn} onPress={handleAudioSend}
+            disabled={sendingAudio} activeOpacity={0.8}>
+            {sendingAudio
+              ? <ActivityIndicator color={C.WHITE} size="small" />
+              : <Text style={styles.audioSendText}>Send</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Private channel: bottom bar with video + mic */}
+      {!isPublic && !pendingAudio && (
+        <View style={styles.bottomBar}>
+          <View style={styles.barBtns}>
+            <TouchableOpacity style={styles.barBtn}
+              onPress={() => navigation.navigate('ChannelVideoRecord', { channelId })}
+              activeOpacity={0.8}>
+              <Image source={require('../../../assets/icon-video.png')} style={styles.barIcon} resizeMode="contain" />
+            </TouchableOpacity>
+            <Pressable
+              onPressIn={handleMicPressIn}
+              onPressOut={handleMicPressOut}
+              style={[styles.barBtn, isHoldingMic && styles.barBtnActive]}>
+              <Image
+                source={require('../../../assets/icon-audio.png')}
+                style={[styles.barIcon, isHoldingMic && styles.barIconRecording]}
+                resizeMode="contain" />
+            </Pressable>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -353,9 +439,53 @@ const styles = StyleSheet.create({
   },
   cameraBtnIcon: { fontSize: 22 },
   emptyText: {
-    color: C.MUTED,
-    fontSize: FONT.SIZES.MD,
-    fontFamily: FONT.BODY,
-    textAlign: 'center',
+    color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center',
   },
+  msgPad: { paddingBottom: 100 },
+  // Private channel header actions
+  headerActions: { flexDirection: 'row', gap: SPACE.XL, alignItems: 'center' },
+  headerActionIcon: { fontSize: 20 },
+  headerActionImg: { width: 24, height: 24, tintColor: C.INK },
+  // Bottom bar (private)
+  bottomBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    gap: SPACE.XL, paddingVertical: SPACE.MD,
+    backgroundColor: C.SURFACE,
+    borderTopWidth: 1, borderTopColor: C.BORDER,
+  },
+  barBtn: {
+    width: 52, height: 52, borderRadius: RADIUS.FULL,
+    backgroundColor: C.SURFACE_2, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: C.BORDER,
+  },
+  barBtns: { flexDirection: 'row', justifyContent: 'center', gap: SPACE.XL },
+  barBtnActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
+  barBtnIcon: { fontSize: 24 },
+  barIcon: { width: 26, height: 26, tintColor: C.INK },
+  barIconRecording: { tintColor: C.ACCENT_HOT },
+  recordingBadge: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: SPACE.XS, paddingBottom: SPACE.XS,
+  },
+  recordingToast: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: SPACE.SM, backgroundColor: C.ACCENT, paddingVertical: SPACE.SM,
+  },
+  recordingDot: { width: 8, height: 8, borderRadius: RADIUS.FULL, backgroundColor: C.WHITE },
+  recordingText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
+  // Pending audio preview bar
+  audioPreview: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
+    paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD,
+    backgroundColor: C.SURFACE, borderTopWidth: 1, borderTopColor: C.BORDER,
+  },
+  audioPreviewText: { flex: 1, color: C.INK, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM },
+  audioPreviewCancel: { color: C.MUTED, fontSize: 18 },
+  audioSendBtn: {
+    backgroundColor: C.ACCENT, borderRadius: RADIUS.MD,
+    paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, minWidth: 60, alignItems: 'center',
+  },
+  audioSendText: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD },
 });

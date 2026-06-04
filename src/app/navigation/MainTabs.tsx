@@ -71,7 +71,7 @@ function ShareNavigator() {
   return (
     <ShareStack.Navigator screenOptions={NAV_OPTS}>
       <ShareStack.Screen name="ShareHome" component={ShareHomeScreen} options={{ headerShown: false }} />
-      <ShareStack.Screen name="VideoPreview" component={VideoPreviewScreen} options={{ title: '' }} />
+      <ShareStack.Screen name="VideoPreview" component={VideoPreviewScreen} options={{ title: '', headerBackTitle: 'Share' }} />
       <ShareStack.Screen name="SelectRecipients" component={SelectRecipientsScreen} options={{ title: 'Send To' }} />
     </ShareStack.Navigator>
   );

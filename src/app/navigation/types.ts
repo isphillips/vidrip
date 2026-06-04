@@ -27,6 +27,7 @@ export type ChannelsStackParamList = {
   WatchChannelClip: { postId: string };
   ChannelVideoRecord: { channelId: string };
   AddChannelVideo: { channelId: string };
+  AddChannelMembers: { channelId: string };
 };
 
 export type ChannelsStackScreenProps<T extends keyof ChannelsStackParamList> =

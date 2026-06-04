@@ -22,7 +22,7 @@ export type ChannelPost = {
   channel_id: string;
   poster_id: string;
   poster: { handle: string } | null;
-  post_type: 'youtube' | 'clip';
+  post_type: 'youtube' | 'clip' | 'audio';
   yt_video_id: string | null;
   yt_video_title: string | null;
   yt_video_thumbnail: string | null;
@@ -321,6 +321,28 @@ export async function postChannelClip({
   await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), `${dir}/${postId}.mp4`);
 
   return postId;
+}
+
+export async function postChannelAudio({
+  channelId, userId, filePath, duration,
+}: { channelId: string; userId: string; filePath: string; duration: number }): Promise<string> {
+  const { data, error } = await (supabase as any)
+    .from('channel_posts')
+    .insert({ channel_id: channelId, poster_id: userId, post_type: 'audio',
+              video_url: null, storage_mode: 'local', duration: Math.round(duration) })
+    .select('id').single();
+  if (error) { throw error; }
+  const postId = data.id as string;
+  const dir = `${RNFS.DocumentDirectoryPath}/channel-clips`;
+  if (!(await RNFS.exists(dir))) { await RNFS.mkdir(dir); }
+  await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), `${dir}/${postId}.m4a`);
+  return postId;
+}
+
+export async function addMemberToChannel(channelId: string, userId: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .rpc('add_member_to_channel', { channel_id: channelId, new_user_id: userId });
+  if (error) { throw error; }
 }
 
 export async function removeChannelPostEmojiReaction(
