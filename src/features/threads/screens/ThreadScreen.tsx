@@ -152,16 +152,22 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
 
   return (
     <ScrollView style={styles.container} bounces={false}>
-      {/* Thumbnail only — video plays in RecordReactionScreen */}
+      {/* Thumbnail — hidden for unreacted recipients */}
       <View style={[styles.playerContainer, { height: playerHeight }]}>
-        <Image
-          source={{ uri: `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg` }}
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
+        {canReact ? (
+          <View style={styles.thumbnailBlind}>
+            <Text style={styles.thumbnailBlindIcon}>?</Text>
+          </View>
+        ) : (
+          <Image
+            source={{ uri: `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg` }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+        )}
       </View>
 
-      {/* Meta */}
+      {/* Meta — title hidden for unreacted recipients */}
       <View style={styles.meta}>
         <Text style={styles.metaText}>
           Shared by{' '}
@@ -169,7 +175,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
             {isSender ? 'you' : `@${thread.sender?.handle ?? '?'}`}
           </Text>
         </Text>
-        {thread.video_title && (
+        {thread.video_title && !canReact && (
           <Text style={styles.videoTitle} numberOfLines={2}>{thread.video_title}</Text>
         )}
       </View>
@@ -265,6 +271,13 @@ const styles = StyleSheet.create({
   errorText: { color: C.MUTED, fontSize: FONT.SIZES.MD },
   playerContainer: { backgroundColor: C.BLACK, overflow: 'hidden' },
   thumbnail: { width: '100%', height: '100%' },
+  thumbnailBlind: {
+    flex: 1, backgroundColor: C.BLACK,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  thumbnailBlindIcon: {
+    fontSize: 64, color: 'rgba(255,255,255,0.25)', fontWeight: '700',
+  },
   meta: { padding: SPACE.LG, gap: SPACE.XS },
   metaText: { fontSize: FONT.SIZES.SM, color: C.MUTED },
   metaHandle: { color: C.ACCENT_HOT, fontWeight: '600' },

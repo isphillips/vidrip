@@ -61,7 +61,7 @@ function FriendsNavigator() {
   return (
     <FriendsStack.Navigator screenOptions={NAV_OPTS}>
       <FriendsStack.Screen name="FriendsHome" component={FriendsHomeScreen} options={{ headerShown: false }} />
-      <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ title: 'Add Friend' }} />
+      <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
       <FriendsStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
     </FriendsStack.Navigator>
   );

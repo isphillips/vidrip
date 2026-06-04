@@ -6,9 +6,11 @@ import type { StorageMode } from './config';
 export interface SaveReactionParams {
   userId: string;
   threadId: string;
-  filePath: string;  // temp path from ReplayKit stopCapture()
+  filePath: string;
   duration: number;
   mode: StorageMode;
+  ytVideoId?: string;
+  ytStartOffset?: number;
 }
 
 export interface SaveReactionResult {
@@ -44,10 +46,11 @@ export async function saveReaction({
   filePath,
   duration,
   mode,
+  ytVideoId,
+  ytStartOffset = 0,
 }: SaveReactionParams): Promise<SaveReactionResult> {
 
   if (mode === 'cloud') {
-    // Phase 1: identical to original uploadReaction — no behavior change
     const uploadPath = `${userId}/${threadId}/${Date.now()}.mp4`;
     const cloudUrl = await uploadToCloud(filePath, uploadPath);
 
@@ -59,6 +62,7 @@ export async function saveReaction({
         video_url: cloudUrl,
         duration: Math.round(duration),
         storage_mode: 'cloud',
+        ...(ytVideoId ? { yt_video_id: ytVideoId, yt_start_offset: ytStartOffset } : {}),
       })
       .select('id')
       .single();
@@ -83,6 +87,7 @@ export async function saveReaction({
       video_url: null,
       duration: Math.round(duration),
       storage_mode: 'local',
+      ...(ytVideoId ? { yt_video_id: ytVideoId, yt_start_offset: ytStartOffset } : {}),
     })
     .select('id')
     .single();

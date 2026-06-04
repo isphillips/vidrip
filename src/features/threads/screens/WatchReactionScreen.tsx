@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import {
   View,
   Text,
@@ -15,6 +16,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import Video from 'react-native-video';
+import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
@@ -85,14 +87,16 @@ export default function WatchReactionScreen({
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
   const [downloadPct, setDownloadPct] = useState(0);
   const [localUri, setLocalUri] = useState<string | null>(null);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPaused] = useState(true);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [emojiReactions, setEmojiReactions] = useState<EmojiReaction[]>([]);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [emojiOpen, setEmojiOpen] = useState(false);
-
+  const [hasStarted, setHasStarted] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const videoRef = useRef<any>(null);
+  const ytRef = useRef<YoutubeIframeRef>(null);
 
   // Load reaction + emoji reactions
   useEffect(() => {
@@ -136,9 +140,22 @@ export default function WatchReactionScreen({
     return () => { channel.unsubscribe(); };
   }, [reactionId]);
 
-  const handleTogglePlay = useCallback(() => setPaused(p => !p), []);
+  const handleYtStateChange = useCallback((state: string) => {
+    if (state === 'playing') {
+      setPaused(false);
+      setHasStarted(true);
+      // re-assert mixing after reaction video starts and may reset session
+      setTimeout(() => configureForMixedPlayback().catch(() => {}), 300);
+    } else if (state === 'ended') {
+      setPaused(true); setProgress(0); videoRef.current?.seek(0);
+    }
+    // ignore 'paused' — interruption-caused pauses would kill the reaction
+  }, [videoRef]);
+
   const handleEnd = useCallback(() => {
-    setPaused(true); setProgress(0); videoRef.current?.seek(0);
+    setPaused(true);
+    setProgress(0);
+    videoRef.current?.seek(0);
   }, []);
 
   const handleEmojiPress = useCallback(async (emoji: string) => {
@@ -214,28 +231,61 @@ export default function WatchReactionScreen({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleTogglePlay}>
+      <View style={StyleSheet.absoluteFill}>
         <Video
           ref={videoRef}
           source={{ uri: localUri }}
           style={{ width, height }}
-          resizeMode="contain"
+          resizeMode="cover"
           paused={paused}
-          onLoad={(d: any) => setDuration(d.duration)}
+          onLoad={(d: any) => {
+            setDuration(d.duration);
+            configureForMixedPlayback()
+              .then(() => setSessionReady(true))
+              .catch(() => setSessionReady(true));
+          }}
           onProgress={(d: any) => setProgress(d.currentTime)}
           onEnd={handleEnd}
           onError={(e: any) => console.error('[WatchReaction] error:', JSON.stringify(e))}
           repeat={false}
         />
-      </TouchableOpacity>
+      </View>
 
-      {paused && (
-        <View style={styles.playOverlay} pointerEvents="none">
-          <View style={styles.playCircle}>
-            <Text style={styles.playIcon}>▶</Text>
-          </View>
+      {/* Prompt overlay — shown until YouTube starts */}
+      {reaction?.yt_video_id && !hasStarted && (
+        <View style={styles.startPrompt} pointerEvents="none">
+          <Text style={styles.startPromptText}>Tap ▶ on the video to play reaction</Text>
         </View>
       )}
+
+      {/* YouTube PIP — vertical cover fill */}
+      {sessionReady && reaction?.yt_video_id && (() => {
+        const pipH = styles.ytPip.height;
+        const pipW = styles.ytPip.width;
+        const coverW = Math.round(pipH * (16 / 9));
+        const offsetX = -Math.round((coverW - pipW) / 2);
+        return (
+          <View style={[styles.ytPip, { bottom: bottomInset + 100, right: SPACE.LG }]}>
+            <View style={[styles.ytPipInner, { left: offsetX }]}>
+              <YoutubePlayer
+                ref={ytRef}
+                height={pipH}
+                width={coverW}
+                mute={true}
+                videoId={reaction.yt_video_id}
+                onChangeState={handleYtStateChange}
+                initialPlayerParams={{ controls: true, rel: false, mute: 1 } as any}
+                webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
+                onReady={() => {
+                  const offset = reaction.yt_start_offset ?? 0;
+                  if (offset > 0) { ytRef.current?.seekTo(offset, true); }
+                }}
+                webViewStyle={{ backgroundColor: '#000' }}
+              />
+            </View>
+          </View>
+        );
+      })()}
 
       {/* Handle + timer */}
       <View style={[styles.infoBar, { top: topInset + SPACE.SM }]} pointerEvents="none">
@@ -321,8 +371,8 @@ const styles = StyleSheet.create({
   },
   playIcon: { color: C.WHITE, fontSize: 26, marginLeft: 5 },
   infoBar: {
-    position: 'absolute', left: SPACE.LG, right: SPACE.LG,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    position: 'absolute', left: SPACE.LG, right: 60,
+    flexDirection: 'column', alignItems: 'flex-start', gap: 2,
   },
   handle: {
     color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD,
@@ -373,6 +423,19 @@ const styles = StyleSheet.create({
   emojiGlyph: { fontSize: 24 },
   emojiCount: { color: 'rgba(255,255,255,0.6)', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY },
   emojiCountActive: { color: C.WHITE, fontFamily: FONT.BODY_BOLD },
+  ytPip: {
+    position: 'absolute',
+    width: 90, height: 160,
+    borderRadius: RADIUS.MD, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
+  },
+  ytPipInner: { position: 'absolute' },
+  ytPipOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ytPipPlay: { color: C.WHITE, fontSize: 18 },
   progressTrack: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     height: 3, backgroundColor: 'rgba(255,255,255,0.15)',
@@ -385,4 +448,19 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   closeTxt: { color: C.WHITE, fontSize: 16, fontFamily: FONT.BODY_BOLD, lineHeight: 20 },
+  startPrompt: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, top: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  startPromptText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: FONT.SIZES.MD,
+    fontFamily: FONT.BODY_MEDIUM,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: SPACE.LG,
+    paddingVertical: SPACE.SM,
+    borderRadius: RADIUS.MD,
+    overflow: 'hidden',
+    textAlign: 'center',
+  },
 });

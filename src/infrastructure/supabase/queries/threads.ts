@@ -26,12 +26,14 @@ export type ThreadDetail = {
 
 export type ReactionItem = {
   id: string;
-  video_url: string | null;       // null for local-mode reactions
+  video_url: string | null;
   storage_mode: 'local' | 'cloud' | 'deleted';
   duration: number;
   created_at: string;
   user: { handle: string; display_name: string } | null;
   emoji_reactions: { emoji: string; user_id: string }[];
+  yt_video_id: string | null;
+  yt_start_offset: number;
   // Resolved at fetch time by resolveReactionUri
   resolvedUri: string | null;
   needsDownload: boolean;         // true = cloud URL available but not yet local
@@ -96,6 +98,8 @@ async function hydrateReaction(raw: any): Promise<ReactionItem> {
     ...raw,
     video_url: raw.video_url ?? null,
     storage_mode: raw.storage_mode ?? 'cloud',
+    yt_video_id: raw.yt_video_id ?? null,
+    yt_start_offset: raw.yt_start_offset ?? 0,
     resolvedUri: null,
     needsDownload: false,
   };
@@ -111,7 +115,7 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
   const { data, error } = await supabase
     .from('reactions')
     .select(`
-      id, video_url, storage_mode, duration, created_at,
+      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id)
     `)
@@ -126,7 +130,7 @@ export async function fetchReactions(threadId: string): Promise<ReactionItem[]> 
   const { data, error } = await supabase
     .from('reactions')
     .select(`
-      id, video_url, storage_mode, duration, created_at,
+      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id)
     `)

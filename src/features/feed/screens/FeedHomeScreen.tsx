@@ -68,6 +68,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           const isPending = item.my_status === 'pending';
           const isSender = item.sender_id === user?.id;
           const senderLabel = isSender ? 'you' : (item.sender?.handle ?? '?');
+          const unreacted = !isSender && item.my_status !== 'reacted';
 
           return (
             <TouchableOpacity
@@ -75,7 +76,11 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
               activeOpacity={0.8}
               onPress={() => navigation.navigate('Thread', { threadId: item.id })}>
               <View style={styles.thumbnail}>
-                {item.video_thumbnail ? (
+                {unreacted ? (
+                  <View style={styles.thumbnailBlind}>
+                    <Text style={styles.thumbnailBlindIcon}>?</Text>
+                  </View>
+                ) : item.video_thumbnail ? (
                   <Image source={{ uri: item.video_thumbnail }} style={styles.thumbnailImage} />
                 ) : (
                   <Text style={styles.thumbnailIcon}>▶</Text>
@@ -84,11 +89,14 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
               <View style={styles.info}>
                 <Text style={styles.sender}>{senderLabel}</Text>
                 <Text style={styles.title} numberOfLines={2}>
-                  {item.video_title ?? item.video_id}
+                  {unreacted
+                    ? `${item.sender?.handle ?? 'Someone'} requested your reaction`
+                    : (item.video_title ?? item.video_id)
+                  }
                 </Text>
                 <Text style={styles.meta}>
-                  {isPending
-                    ? '👀 Waiting for your reaction'
+                  {unreacted
+                    ? '👀 Tap to react'
                     : `${item.reaction_count} reaction${item.reaction_count !== 1 ? 's' : ''}`}
                 </Text>
               </View>
@@ -137,6 +145,14 @@ const styles = StyleSheet.create({
   },
   thumbnailImage: { width: 72, height: 72 },
   thumbnailIcon: { fontSize: 24 },
+  thumbnailBlind: {
+    width: 72, height: 72,
+    backgroundColor: C.BLACK,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  thumbnailBlindIcon: {
+    fontSize: 28, color: 'rgba(255,255,255,0.4)', fontWeight: '700',
+  },
   info: { flex: 1 },
   sender: { fontSize: FONT.SIZES.SM, color: C.MUTED, marginBottom: 2 },
   title: { fontSize: FONT.SIZES.MD, fontWeight: '600', color: C.INK, marginBottom: 4 },
