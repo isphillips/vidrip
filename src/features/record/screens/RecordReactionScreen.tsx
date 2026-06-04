@@ -53,7 +53,7 @@ const floatStyles = StyleSheet.create({
   emoji: { position: 'absolute', bottom: 160, alignSelf: 'center', fontSize: 36 },
 });
 
-type Phase = 'loading' | 'ready' | 'buffering' | 'recording' | 'uploading';
+type Phase = 'loading' | 'ready' | 'recording' | 'uploading';
 
 export default function RecordReactionScreen({
   route,
@@ -75,22 +75,28 @@ export default function RecordReactionScreen({
   const [floating, setFloating] = useState<{ id: number; emoji: string }[]>([]);
   const floatIdRef = useRef(0);
 
+  // Overlay fades out when recording starts
+  const overlayOpacity = useRef(new Animated.Value(1)).current;
+
   const cameraRef = useRef<Camera>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
   const isCancellingRef = useRef(false);
-  const hasPreloadedRef = useRef(false);
   const ytKeyRef = useRef(0);
   const [ytKey, setYtKey] = useState(0);
   const [ytPlaying, setYtPlaying] = useState(false);
+
+  // Shorts are 9:16 — size the player to fill the screen height,
+  // centred horizontally (will be slightly wider than screen on tall phones).
+  const playerHeight = height;
+  const playerWidth = Math.round(height * (9 / 16));
 
   useEffect(() => {
     Orientation.lockToPortrait();
     return () => { Orientation.unlockAllOrientations(); };
   }, []);
 
-  // Request cam + mic on mount
   useEffect(() => {
     (async () => {
       const cam = hasCam || (await requestCam());
@@ -119,69 +125,56 @@ export default function RecordReactionScreen({
     }, 1000);
   }, [stopTimer]);
 
-  // Called when user taps "Tap to record" — starts both video and camera
+  // User taps the play button — start recording and video simultaneously
   const handleTapToStart = useCallback(() => {
     if (phase !== 'ready') { return; }
-    setPhase('buffering');
+
+    // Fade out the overlay
+    Animated.timing(overlayOpacity, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
     isCancellingRef.current = false;
     setYtPlaying(true);
-  }, [phase]);
+    setPhase('recording');
+    StatusBar.setHidden(true, 'fade');
+    startTimer();
 
-  // YouTube state changes
-  const onYtStateChange = useCallback((state: string) => {
-    if (state === 'playing' && !hasPreloadedRef.current) {
-      // First play after onReady pre-buffer — pause immediately and show the CTA
-      hasPreloadedRef.current = true;
-      setYtPlaying(false);
-      setPhase('ready');
-      return;
-    }
-
-    if (state === 'playing' && (phase === 'buffering' || phase === 'ready')) {
-      setPhase('recording');
-      StatusBar.setHidden(true, 'fade');
-      startTimer();
-
-      const uid = user!.id;
-      cameraRef.current?.startRecording({
-        onRecordingFinished: async (video) => {
-          if (isCancellingRef.current) {
-            isCancellingRef.current = false;
-            return;
-          }
-          setPhase('uploading');
-          try {
-            // Strip file:// prefix — RNFS.moveFile needs a bare path
-            const filePath = video.path.replace(/^file:\/\//, '');
-            await saveReaction({
-              userId: uid,
-              threadId,
-              filePath,
-              duration: video.duration,
-              mode: STORAGE_MODE,
-            });
-            navigation.goBack();
-          } catch (e: any) {
-            Alert.alert('Upload Failed', e?.message ?? 'Could not save your reaction. Please try again.');
-            setPhase('recording');
-          }
-        },
-        onRecordingError: (e) => {
-          stopTimer();
-          setPhase('ready');
-          setYtPlaying(false);
-          StatusBar.setHidden(false, 'fade');
-          Alert.alert('Recording Error', e.message ?? 'Could not start recording.');
-        },
-      });
-    } else if (state === 'buffering' && phase === 'buffering') {
-      // Still buffering — keep spinner
-    } else if (state === 'ended') {
-      // Video finished — stop recording
-      if (phase === 'recording') { handleStop(); }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, startTimer, stopTimer, user, threadId, navigation]);
+    const uid = user!.id;
+    cameraRef.current?.startRecording({
+      onRecordingFinished: async (video) => {
+        if (isCancellingRef.current) {
+          isCancellingRef.current = false;
+          return;
+        }
+        setPhase('uploading');
+        try {
+          const filePath = video.path.replace(/^file:\/\//, '');
+          await saveReaction({
+            userId: uid,
+            threadId,
+            filePath,
+            duration: video.duration,
+            mode: STORAGE_MODE,
+          });
+          navigation.goBack();
+        } catch (e: any) {
+          Alert.alert('Upload Failed', e?.message ?? 'Could not save your reaction. Please try again.');
+          setPhase('recording');
+        }
+      },
+      onRecordingError: (e) => {
+        stopTimer();
+        setYtPlaying(false);
+        setPhase('ready');
+        StatusBar.setHidden(false, 'fade');
+        overlayOpacity.setValue(1);
+        Alert.alert('Recording Error', e.message ?? 'Could not start recording.');
+      },
+    });
+  }, [phase, overlayOpacity, user, threadId, navigation, startTimer, stopTimer]);
 
   const handleStop = useCallback(async () => {
     if (phase !== 'recording') { return; }
@@ -204,11 +197,17 @@ export default function RecordReactionScreen({
     StatusBar.setHidden(false, 'fade');
     isCancellingRef.current = true;
     try { await cameraRef.current?.stopRecording(); } catch {}
-    hasPreloadedRef.current = false;
+    overlayOpacity.setValue(1);
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
     setPhase('loading');
-  }, [stopTimer]);
+  }, [stopTimer, overlayOpacity]);
+
+  const onYtStateChange = useCallback((state: string) => {
+    if (state === 'ended' && phase === 'recording') {
+      handleStop();
+    }
+  }, [phase, handleStop]);
 
   const handleEmoji = useCallback((emoji: string) => {
     const id = ++floatIdRef.current;
@@ -218,7 +217,6 @@ export default function RecordReactionScreen({
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  // Permissions not ready yet
   if (!permissionsReady || !device) {
     return (
       <View style={styles.center}>
@@ -234,31 +232,28 @@ export default function RecordReactionScreen({
     );
   }
 
-  const pipBottom = bottomInset + SPACE.XL + 72; // above controls
+  const pipBottom = bottomInset + SPACE.XL + 72;
 
   return (
     <View style={styles.container}>
-      {/* Full screen YouTube Short */}
-      <YoutubePlayer
-        key={ytKey}
-        ref={ytRef}
-        height={height}
-        width={width}
-        videoId={videoId}
-        play={ytPlaying}
-        onChangeState={onYtStateChange}
-        onReady={() => {
-          if (phase === 'loading') {
-            // Kick off a silent pre-buffer — we'll pause as soon as 'playing' fires
-            hasPreloadedRef.current = false;
-            setYtPlaying(true);
-          }
-        }}
-        initialPlayerParams={{ rel: false, controls: false }}
-        webViewStyle={{ backgroundColor: C.BLACK }}
-      />
 
-      {/* Camera PiP — bottom-left corner */}
+      {/* YouTube Short — sized for 9:16, centred on screen */}
+      <View style={[styles.playerContainer, { width, height }]}>
+        <YoutubePlayer
+          key={ytKey}
+          ref={ytRef}
+          height={playerHeight}
+          width={playerWidth}
+          videoId={videoId}
+          play={ytPlaying}
+          onChangeState={onYtStateChange}
+          onReady={() => { if (phase === 'loading') { setPhase('ready'); } }}
+          initialPlayerParams={{ rel: false, controls: false, modestbranding: true }}
+          webViewStyle={{ backgroundColor: C.BLACK }}
+        />
+      </View>
+
+      {/* Camera PiP — bottom-left */}
       <View style={[styles.pip, { bottom: pipBottom, left: SPACE.MD }]}>
         <Camera
           ref={cameraRef}
@@ -269,9 +264,7 @@ export default function RecordReactionScreen({
           audio={true}
         />
         {phase === 'recording' && (
-          <View style={styles.recDotWrap}>
-            <View style={styles.recDot} />
-          </View>
+          <View style={styles.recDotWrap} />
         )}
       </View>
 
@@ -284,44 +277,31 @@ export default function RecordReactionScreen({
         />
       ))}
 
-      {/* Overlay: loading spinner while YouTube initialises */}
-      {phase === 'loading' && (
-        <View style={styles.overlay}>
-          <ActivityIndicator color={C.WHITE} size="large" />
-          <Text style={styles.overlayText}>Loading…</Text>
-        </View>
-      )}
-
-      {/* Non-blocking buffering indicator — small spinner over PiP so user can still interact */}
-      {phase === 'buffering' && (
-        <View style={[styles.pip, { bottom: pipBottom, left: SPACE.MD }, styles.pipSpinner]} pointerEvents="none">
-          <ActivityIndicator color={C.WHITE} size="small" />
-        </View>
-      )}
-
-      {/* Overlay: uploading */}
-      {phase === 'uploading' && (
-        <View style={styles.overlay}>
-          <ActivityIndicator color={C.WHITE} size="large" />
-          <Text style={styles.overlayText}>Saving reaction…</Text>
-        </View>
-      )}
-
-      {/* Tap to record CTA */}
-      {phase === 'ready' && (
-        <TouchableOpacity style={styles.ctaWrap} activeOpacity={0.85} onPress={handleTapToStart}>
-          <View style={styles.ctaBtn}>
-            <View style={styles.ctaDot} />
-            <Text style={styles.ctaText}>Tap to record</Text>
+      {/* Black overlay — hides video until user taps, fades away on start */}
+      <Animated.View
+        style={[styles.overlay, { opacity: overlayOpacity }]}
+        pointerEvents={phase === 'recording' || phase === 'uploading' ? 'none' : 'box-none'}>
+        {phase === 'loading' && (
+          <View style={styles.overlayContent}>
+            <ActivityIndicator color={C.WHITE} size="large" />
+            <Text style={styles.overlayText}>Loading…</Text>
           </View>
-        </TouchableOpacity>
-      )}
+        )}
+        {phase === 'ready' && (
+          <TouchableOpacity style={styles.overlayContent} activeOpacity={0.85} onPress={handleTapToStart}>
+            <View style={styles.playCircle}>
+              <View style={styles.playTriangle} />
+            </View>
+            <Text style={styles.tapText}>Tap to record</Text>
+          </TouchableOpacity>
+        )}
+      </Animated.View>
 
       {/* Recording controls */}
       {phase === 'recording' && (
         <View style={[styles.controls, { bottom: bottomInset + SPACE.LG }]}>
           <View style={styles.recTimer}>
-            <View style={styles.recDotLarge} />
+            <View style={styles.recDot} />
             <Text style={styles.recTimerText}>{fmt(elapsed)}</Text>
           </View>
           <TouchableOpacity style={styles.restartBtn} onPress={handleRestart} activeOpacity={0.8}>
@@ -334,7 +314,7 @@ export default function RecordReactionScreen({
       )}
 
       {/* Emoji drawer */}
-      {(phase === 'recording') && (
+      {phase === 'recording' && (
         <View style={[styles.emojiDrawer, { bottom: bottomInset + SPACE.LG, right: SPACE.MD }]}>
           {emojiOpen && (
             <View style={styles.emojiPicker}>
@@ -351,6 +331,14 @@ export default function RecordReactionScreen({
             activeOpacity={0.8}>
             <Text style={styles.emojiToggleIcon}>{emojiOpen ? '✕' : '😊'}</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Uploading overlay */}
+      {phase === 'uploading' && (
+        <View style={styles.uploadOverlay}>
+          <ActivityIndicator color={C.WHITE} size="large" />
+          <Text style={styles.overlayText}>Saving reaction…</Text>
         </View>
       )}
 
@@ -372,6 +360,12 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: C.BLACK,
     alignItems: 'center', justifyContent: 'center', gap: SPACE.LG, padding: SPACE.XL,
   },
+  playerContainer: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.BLACK,
+  },
   infoText: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center' },
   backBtn: { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, paddingVertical: SPACE.MD, paddingHorizontal: SPACE.LG },
   backBtnText: { color: C.INK, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM },
@@ -390,37 +384,47 @@ const styles = StyleSheet.create({
     width: 10, height: 10, borderRadius: 5,
     backgroundColor: C.ACCENT_MID,
   },
-  recDot: { flex: 1 },
-  pipSpinner: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center', justifyContent: 'center',
-  },
 
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center', justifyContent: 'center', gap: SPACE.MD,
+    backgroundColor: C.BLACK,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACE.LG,
+    flex: 1,
+    width: '100%',
   },
   overlayText: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY },
-
-  ctaWrap: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    alignItems: 'center',
-    paddingBottom: 80,
-  },
-  ctaBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACE.SM,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    paddingHorizontal: SPACE.XL, paddingVertical: SPACE.MD,
+  playCircle: {
+    width: 88, height: 88,
     borderRadius: RADIUS.FULL,
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 3,
+    borderColor: C.WHITE,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  ctaDot: {
-    width: 12, height: 12, borderRadius: 6,
-    backgroundColor: C.ACCENT_MID,
+  playTriangle: {
+    width: 0, height: 0,
+    marginLeft: 6,
+    borderTopWidth: 16,
+    borderBottomWidth: 16,
+    borderLeftWidth: 26,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: C.WHITE,
   },
-  ctaText: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
+  tapText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_SEMIBOLD },
+
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    alignItems: 'center', justifyContent: 'center', gap: SPACE.MD,
+  },
 
   controls: {
     position: 'absolute',
@@ -433,7 +437,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS,
     borderRadius: RADIUS.FULL,
   },
-  recDotLarge: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.ACCENT_MID },
+  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.ACCENT_MID },
   recTimerText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
   restartBtn: {
     width: 52, height: 52, borderRadius: RADIUS.FULL,
