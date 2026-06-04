@@ -215,7 +215,10 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
             style={styles.reactionCard}
             activeOpacity={canWatch ? 0.8 : 1}
             onPress={canWatch
-              ? () => navigation.navigate('WatchReaction', { reactionId: r.id })
+              ? () => navigation.navigate('WatchReaction', {
+                  reactionId: r.id,
+                  videoId: thread.video_id,
+                })
               : undefined
             }>
 

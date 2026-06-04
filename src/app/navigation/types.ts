@@ -42,7 +42,7 @@ export type AccountStackParamList = {
 export type FeedStackParamList = {
   FeedHome: undefined;
   Thread: { threadId: string };
-  WatchReaction: { reactionId: string };
+  WatchReaction: { reactionId: string; videoId: string };
 };
 
 // Friends stack

@@ -15,6 +15,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import Video from 'react-native-video';
+import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
@@ -31,51 +32,41 @@ import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
 const MAX_EMOJIS_PER_USER = 10;
+const PIP_WIDTH = 110;
+const PIP_HEIGHT = 170;
+
 type DownloadState = 'idle' | 'downloading' | 'ready' | 'unavailable';
 
-// ── Animated emoji button ────────────────────────────────────────────────────
 function EmojiBtn({
-  emoji, count, isMine, isDisabled,
-  onPress,
+  emoji, count, isMine, isDisabled, onPress,
 }: {
-  emoji: string;
-  count: number;
-  isMine: boolean;
-  isDisabled: boolean;
-  onPress: () => void;
+  emoji: string; count: number; isMine: boolean; isDisabled: boolean; onPress: () => void;
 }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
   const handlePress = () => {
     scale.value = withSequence(
       withSpring(1.28, { damping: 5, stiffness: 600 }),
-      withSpring(1,    { damping: 14, stiffness: 400 }),
+      withSpring(1, { damping: 14, stiffness: 400 }),
     );
     onPress();
   };
-
-  // Pressable has no built-in opacity change, so the Reanimated scale is the
-  // only feedback — TouchableOpacity's activeOpacity was fighting the animation.
   return (
     <Pressable onPress={handlePress} disabled={isDisabled}>
       <Animated.View style={[styles.emojiBtn, isMine && styles.emojiBtnActive, animStyle]}>
         <Text style={styles.emojiGlyph}>{emoji}</Text>
         {count > 0 && (
-          <Text style={[styles.emojiCount, isMine && styles.emojiCountActive]}>
-            {count}
-          </Text>
+          <Text style={[styles.emojiCount, isMine && styles.emojiCountActive]}>{count}</Text>
         )}
       </Animated.View>
     </Pressable>
   );
 }
 
-// ── Main screen ──────────────────────────────────────────────────────────────
 export default function WatchReactionScreen({
   route, navigation,
 }: FeedStackScreenProps<'WatchReaction'>) {
-  const { reactionId } = route.params;
+  const { reactionId, videoId } = route.params;
   const { user } = useAuthStore();
   const { width, height } = useWindowDimensions();
   const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
@@ -85,14 +76,19 @@ export default function WatchReactionScreen({
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
   const [downloadPct, setDownloadPct] = useState(0);
   const [localUri, setLocalUri] = useState<string | null>(null);
-  const [paused, setPaused] = useState(false);
+
+  const [paused, setPaused] = useState(true);
+  const [ytPlaying, setYtPlaying] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+
   const [emojiReactions, setEmojiReactions] = useState<EmojiReaction[]>([]);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [emojiOpen, setEmojiOpen] = useState(false);
 
   const videoRef = useRef<any>(null);
+  const ytRef = useRef<YoutubeIframeRef>(null);
 
   // Load reaction + emoji reactions
   useEffect(() => {
@@ -136,15 +132,31 @@ export default function WatchReactionScreen({
     return () => { channel.unsubscribe(); };
   }, [reactionId]);
 
-  const handleTogglePlay = useCallback(() => setPaused(p => !p), []);
+  // User taps to play — start both reaction video and YouTube Short from 0
+  const handleTapToPlay = useCallback(() => {
+    if (hasStarted) {
+      // Toggle pause/resume
+      const nowPaused = !paused;
+      setPaused(nowPaused);
+      setYtPlaying(!nowPaused);
+    } else {
+      setHasStarted(true);
+      setPaused(false);
+      setYtPlaying(true);
+    }
+  }, [hasStarted, paused]);
+
   const handleEnd = useCallback(() => {
-    setPaused(true); setProgress(0); videoRef.current?.seek(0);
+    setPaused(true);
+    setYtPlaying(false);
+    setProgress(0);
+    setHasStarted(false);
+    videoRef.current?.seek(0);
   }, []);
 
   const handleEmojiPress = useCallback(async (emoji: string) => {
     if (!reaction || !user?.id) { return; }
     if (processing.has(emoji)) { return; }
-
     const myMatch = emojiReactions.find(r => r.emoji === emoji && r.user_id === user.id);
     const myCount = emojiReactions.filter(r => r.user_id === user.id).length;
     if (!myMatch && myCount >= MAX_EMOJIS_PER_USER) { return; }
@@ -153,10 +165,7 @@ export default function WatchReactionScreen({
     try {
       if (myMatch) {
         await removeEmojiReaction(reaction.id, user.id, emoji);
-        // Remove by natural key — avoids stale id issues
-        setEmojiReactions(prev =>
-          prev.filter(r => !(r.emoji === emoji && r.user_id === user.id))
-        );
+        setEmojiReactions(prev => prev.filter(r => !(r.emoji === emoji && r.user_id === user.id)));
       } else {
         const newId = await addEmojiReaction(reaction.id, user.id, emoji);
         setEmojiReactions(prev => [...prev, { id: newId, emoji, user_id: user.id! }]);
@@ -170,7 +179,6 @@ export default function WatchReactionScreen({
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-  // ── Loading states ──────────────────────────────────────────────────────
   if (loading || downloadState === 'idle') {
     return <View style={styles.center}><ActivityIndicator color={C.ACCENT} size="large" /></View>;
   }
@@ -211,15 +219,17 @@ export default function WatchReactionScreen({
   const totalDuration = duration || (reaction?.duration ?? 0);
   const progressPct = totalDuration > 0 ? Math.min((progress / totalDuration) * 100, 100) : 0;
   const myEmojiCount = emojiReactions.filter(r => r.user_id === user?.id).length;
+  const pipBottom = bottomInset + SPACE.XL + 60;
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleTogglePlay}>
+      {/* Full screen reaction camera video */}
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleTapToPlay}>
         <Video
           ref={videoRef}
           source={{ uri: localUri }}
           style={{ width, height }}
-          resizeMode="contain"
+          resizeMode="cover"
           paused={paused}
           onLoad={(d: any) => setDuration(d.duration)}
           onProgress={(d: any) => setProgress(d.currentTime)}
@@ -229,7 +239,21 @@ export default function WatchReactionScreen({
         />
       </TouchableOpacity>
 
-      {paused && (
+      {/* YouTube Short PiP — bottom-right corner (opposite of camera PiP on record screen) */}
+      <View style={[styles.pip, { bottom: pipBottom, right: SPACE.MD }]}>
+        <YoutubePlayer
+          ref={ytRef}
+          height={PIP_HEIGHT}
+          width={PIP_WIDTH}
+          videoId={videoId}
+          play={ytPlaying}
+          initialPlayerParams={{ rel: false, controls: false }}
+          webViewStyle={{ backgroundColor: C.BLACK }}
+        />
+      </View>
+
+      {/* Tap to play overlay */}
+      {!hasStarted && (
         <View style={styles.playOverlay} pointerEvents="none">
           <View style={styles.playCircle}>
             <Text style={styles.playIcon}>▶</Text>
@@ -243,8 +267,8 @@ export default function WatchReactionScreen({
         <Text style={styles.timer}>{fmt(progress)} / {fmt(totalDuration)}</Text>
       </View>
 
-      {/* Emoji drawer — right side, collapses into toggle button */}
-      <View style={[styles.emojiDrawer, { right: SPACE.MD, bottom: bottomInset + SPACE.LG }]}>
+      {/* Emoji drawer */}
+      <View style={[styles.emojiDrawer, { bottom: bottomInset + SPACE.LG, left: SPACE.MD }]}>
         {emojiOpen && (
           <View style={styles.emojiList}>
             {QUICK_EMOJIS.map((emoji) => {
@@ -264,8 +288,6 @@ export default function WatchReactionScreen({
             })}
           </View>
         )}
-
-        {/* Toggle button */}
         <TouchableOpacity
           style={[styles.emojiToggle, emojiOpen && styles.emojiToggleOpen]}
           onPress={() => setEmojiOpen(o => !o)}
@@ -308,18 +330,30 @@ const styles = StyleSheet.create({
   unavailableText: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center', paddingHorizontal: SPACE.XL },
   backBtn: { marginTop: SPACE.MD, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG },
   backBtnText: { color: C.ACCENT_HOT, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM },
+
+  pip: {
+    position: 'absolute',
+    width: PIP_WIDTH,
+    height: PIP_HEIGHT,
+    borderRadius: RADIUS.LG,
+    overflow: 'hidden',
+    borderWidth: 2.5,
+    borderColor: C.WHITE,
+  },
+
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   playCircle: {
-    width: 72, height: 72, borderRadius: RADIUS.FULL,
+    width: 80, height: 80, borderRadius: RADIUS.FULL,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)',
     alignItems: 'center', justifyContent: 'center',
   },
-  playIcon: { color: C.WHITE, fontSize: 26, marginLeft: 5 },
+  playIcon: { color: C.WHITE, fontSize: 30, marginLeft: 6 },
+
   infoBar: {
     position: 'absolute', left: SPACE.LG, right: SPACE.LG,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -332,24 +366,14 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY,
     textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
-  emojiDrawer: {
-    position: 'absolute',
-    alignItems: 'center',
-    gap: SPACE.SM,
-  },
-  emojiList: {
-    alignItems: 'center',
-    gap: SPACE.SM,
-    marginBottom: SPACE.SM,
-  },
+
+  emojiDrawer: { position: 'absolute', alignItems: 'center', gap: SPACE.SM },
+  emojiList: { alignItems: 'center', gap: SPACE.SM, marginBottom: SPACE.SM },
   emojiToggle: {
-    width: 44, height: 44,
-    borderRadius: RADIUS.FULL,
+    width: 44, height: 44, borderRadius: RADIUS.FULL,
     backgroundColor: 'rgba(255,255,255,0.18)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center', justifyContent: 'center',
   },
   emojiToggleOpen: {
     backgroundColor: 'rgba(255,255,255,0.28)',
@@ -357,27 +381,23 @@ const styles = StyleSheet.create({
   },
   emojiToggleIcon: { fontSize: 22 },
   emojiBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderRadius: RADIUS.FULL,
     width: 52, paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 2,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', gap: 2,
   },
-  emojiBtnActive: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderColor: 'transparent',
-  },
+  emojiBtnActive: { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: 'transparent' },
   emojiGlyph: { fontSize: 24 },
   emojiCount: { color: 'rgba(255,255,255,0.6)', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY },
   emojiCountActive: { color: C.WHITE, fontFamily: FONT.BODY_BOLD },
+
   progressTrack: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     height: 3, backgroundColor: 'rgba(255,255,255,0.15)',
   },
   progressFill: { height: 3, backgroundColor: C.ACCENT_HOT },
+
   closeBtn: {
     position: 'absolute', right: SPACE.LG,
     width: 36, height: 36, borderRadius: RADIUS.FULL,
