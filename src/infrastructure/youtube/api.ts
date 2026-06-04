@@ -40,45 +40,21 @@ async function filterToShortDurations(ids: string[]): Promise<Set<string>> {
   return shorts;
 }
 
-export async function fetchTrendingShorts(
-  maxResults = 20,
+// Shared search → duration-filter pipeline. The search endpoint doesn't return
+// durations, so we do a second batched contentDetails lookup and keep only
+// true Shorts (<= 60s).
+async function searchAndFilterShorts(
+  q: string,
+  order: 'relevance' | 'viewCount',
+  maxResults: number,
   pageToken?: string,
 ): Promise<PagedShorts> {
   const page = pageToken ? `&pageToken=${pageToken}` : '';
-  // Pull contentDetails in the same call so we can filter to true Shorts (<= 60s).
   const res = await fetch(
-    `${YT_BASE}/videos?part=snippet,contentDetails&chart=mostPopular&videoDuration=short&maxResults=${maxResults}${page}&key=${YT_API_KEY}`,
+    `${YT_BASE}/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoDuration=short&order=${order}&maxResults=${maxResults}${page}&key=${YT_API_KEY}`,
   );
   const json = await res.json();
-  const items: ShortItem[] = (json.items ?? [])
-    .filter((item: any) => {
-      try {
-        const seconds = isoduration.toSeconds(isoduration.parse(item.contentDetails.duration));
-        return seconds > 0 && seconds <= MAX_SHORT_SECONDS;
-      } catch { return false; }
-    })
-    .map((item: any) => ({
-      videoId: item.id,
-      title: item.snippet.title,
-      channelTitle: item.snippet.channelTitle,
-      thumbnail: item.snippet.thumbnails.high?.url
-        ?? `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
-    }));
-  return { items, nextPageToken: json.nextPageToken };
-}
-
-export async function searchShorts(
-  query: string,
-  maxResults = 20,
-  pageToken?: string,
-): Promise<PagedShorts> {
-  const q = encodeURIComponent(`${query} #shorts`);
-  const page = pageToken ? `&pageToken=${pageToken}` : '';
-  const res = await fetch(
-    `${YT_BASE}/search?part=snippet&q=${q}&type=video&videoDuration=short&maxResults=${maxResults}${page}&key=${YT_API_KEY}`,
-  );
-  const json = await res.json();
-  const raw = (json.items ?? []).map((item: any) => ({
+  const raw: ShortItem[] = (json.items ?? []).map((item: any) => ({
     videoId: item.id.videoId,
     title: item.snippet.title,
     channelTitle: item.snippet.channelTitle,
@@ -86,12 +62,27 @@ export async function searchShorts(
       ?? `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
   }));
 
-  // The search endpoint doesn't return durations — do a second batched
-  // contentDetails lookup and keep only true Shorts (<= 60s).
-  const shortIds = await filterToShortDurations(raw.map((r: ShortItem) => r.videoId));
-  const items = raw.filter((r: ShortItem) => shortIds.has(r.videoId));
+  const shortIds = await filterToShortDurations(raw.map((r) => r.videoId));
+  const items = raw.filter((r) => shortIds.has(r.videoId));
 
   return { items, nextPageToken: json.nextPageToken };
+}
+
+// "Trending" = most-viewed Shorts. chart=mostPopular can't filter to Shorts
+// (videoDuration isn't supported there), so we search the #shorts tag by viewCount.
+export async function fetchTrendingShorts(
+  maxResults = 20,
+  pageToken?: string,
+): Promise<PagedShorts> {
+  return searchAndFilterShorts('#shorts', 'viewCount', maxResults, pageToken);
+}
+
+export async function searchShorts(
+  query: string,
+  maxResults = 20,
+  pageToken?: string,
+): Promise<PagedShorts> {
+  return searchAndFilterShorts(`${query} #shorts`, 'relevance', maxResults, pageToken);
 }
 
 // Validates a pasted URL is a YouTube Short and returns its video ID, or null.
