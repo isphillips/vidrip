@@ -15,23 +15,12 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import {
   fetchTrendingShorts,
   searchShorts,
+  extractShortId,
+  isShort,
   type ShortItem,
 } from '../../../infrastructure/youtube/api';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-function extractYouTubeId(url: string): string | null {
-  const patterns = [
-    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
-    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
-    /youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/,
-  ];
-  for (const p of patterns) {
-    const m = url.match(p);
-    if (m) { return m[1]; }
-  }
-  return null;
-}
 
 type Mode = 'browse' | 'paste';
 
@@ -106,12 +95,19 @@ export default function ShareHomeScreen({ navigation }: ShareStackScreenProps<'S
   }, [navigation]);
 
   const handlePasteNext = async () => {
-    const videoId = extractYouTubeId(url.trim());
+    const videoId = extractShortId(url.trim());
     if (!videoId) {
-      Alert.alert('Invalid Link', 'Paste a YouTube Shorts link to continue.');
+      Alert.alert('Shorts Only', 'Paste a YouTube Shorts link (youtube.com/shorts/...) to continue.');
       return;
     }
     setPasting(true);
+    // Confirm the link is actually a Short (<= 60s) before continuing
+    const shortOk = await isShort(videoId).catch(() => false);
+    if (!shortOk) {
+      setPasting(false);
+      Alert.alert('Shorts Only', 'That link is a regular video, not a YouTube Short. Please paste a Shorts link.');
+      return;
+    }
     let title = 'YouTube Short';
     let thumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
     try {
