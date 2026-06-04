@@ -80,6 +80,7 @@ export default function RecordReactionScreen({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
   const isCancellingRef = useRef(false);
+  const hasPreloadedRef = useRef(false);
   const ytKeyRef = useRef(0);
   const [ytKey, setYtKey] = useState(0);
   const [ytPlaying, setYtPlaying] = useState(false);
@@ -126,8 +127,16 @@ export default function RecordReactionScreen({
     setYtPlaying(true);
   }, [phase]);
 
-  // YouTube state changes: buffering → playing triggers recording start
+  // YouTube state changes
   const onYtStateChange = useCallback((state: string) => {
+    if (state === 'playing' && !hasPreloadedRef.current) {
+      // First play after onReady pre-buffer — pause immediately and show the CTA
+      hasPreloadedRef.current = true;
+      setYtPlaying(false);
+      setPhase('ready');
+      return;
+    }
+
     if (state === 'playing' && (phase === 'buffering' || phase === 'ready')) {
       setPhase('recording');
       StatusBar.setHidden(true, 'fade');
@@ -195,9 +204,10 @@ export default function RecordReactionScreen({
     StatusBar.setHidden(false, 'fade');
     isCancellingRef.current = true;
     try { await cameraRef.current?.stopRecording(); } catch {}
+    hasPreloadedRef.current = false;
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
-    setPhase('ready');
+    setPhase('loading');
   }, [stopTimer]);
 
   const handleEmoji = useCallback((emoji: string) => {
@@ -237,7 +247,13 @@ export default function RecordReactionScreen({
         videoId={videoId}
         play={ytPlaying}
         onChangeState={onYtStateChange}
-        onReady={() => { if (phase === 'loading') { setPhase('ready'); } }}
+        onReady={() => {
+          if (phase === 'loading') {
+            // Kick off a silent pre-buffer — we'll pause as soon as 'playing' fires
+            hasPreloadedRef.current = false;
+            setYtPlaying(true);
+          }
+        }}
         initialPlayerParams={{ rel: false, controls: false }}
         webViewStyle={{ backgroundColor: C.BLACK }}
       />
