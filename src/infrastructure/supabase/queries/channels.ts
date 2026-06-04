@@ -22,7 +22,7 @@ export type ChannelPost = {
   channel_id: string;
   poster_id: string;
   poster: { handle: string } | null;
-  post_type: 'youtube' | 'clip' | 'audio';
+  post_type: 'youtube' | 'clip' | 'audio' | 'status';
   yt_video_id: string | null;
   yt_video_title: string | null;
   yt_video_thumbnail: string | null;
@@ -30,6 +30,7 @@ export type ChannelPost = {
   duration: number | null;
   is_pinned: boolean;
   created_at: string;
+  message: string | null;
   emoji_reactions: { emoji: string; user_id: string }[];
   reaction_count: number;
 };
@@ -124,7 +125,7 @@ export async function fetchChannelPosts(channelId: string): Promise<ChannelPost[
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
-      id, channel_id, poster_id, post_type,
+      id, channel_id, poster_id, post_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
       video_url, duration, is_pinned, created_at,
       poster:users!poster_id(handle),
@@ -151,16 +152,30 @@ export async function fetchChannelPosts(channelId: string): Promise<ChannelPost[
     duration: p.duration ?? null,
     is_pinned: p.is_pinned,
     created_at: p.created_at,
+    message: p.message ?? null,
     emoji_reactions: p.emoji_reactions ?? [],
     reaction_count: Array.isArray(p.reactions) ? (p.reactions[0]?.count ?? 0) : 0,
   }));
+}
+
+export async function fetchChannelMembers(channelId: string): Promise<{ userId: string; handle: string }[]> {
+  const { data, error } = await (supabase as any)
+    .rpc('get_channel_members', { p_channel_id: channelId });
+  if (error) { throw error; }
+  return (data ?? []).map((m: any) => ({ userId: m.user_id as string, handle: m.handle as string }));
+}
+
+export async function fetchChannelName(channelId: string): Promise<string | null> {
+  const { data } = await (supabase as any)
+    .from('groups').select('name').eq('id', channelId).single();
+  return data?.name ?? null;
 }
 
 export async function fetchChannelPostReactions(parentPostId: string): Promise<ChannelPost[]> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
-      id, channel_id, poster_id, post_type,
+      id, channel_id, poster_id, post_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
       video_url, duration, is_pinned, created_at,
       poster:users!poster_id(handle),
@@ -183,6 +198,7 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
     duration: p.duration ?? null,
     is_pinned: p.is_pinned,
     created_at: p.created_at,
+    message: p.message ?? null,
     emoji_reactions: p.emoji_reactions ?? [],
     reaction_count: 0,
   }));
@@ -192,7 +208,7 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
-      id, channel_id, poster_id, post_type,
+      id, channel_id, poster_id, post_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
       video_url, duration, is_pinned, created_at,
       poster:users!poster_id(handle),
@@ -205,6 +221,7 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
   return {
     ...data,
     poster: data.poster ?? null,
+    message: data.message ?? null,
     emoji_reactions: data.emoji_reactions ?? [],
     reaction_count: 0,
   };
@@ -337,6 +354,12 @@ export async function postChannelAudio({
   if (!(await RNFS.exists(dir))) { await RNFS.mkdir(dir); }
   await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), `${dir}/${postId}.m4a`);
   return postId;
+}
+
+export async function deleteChannelPost(postId: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('channel_posts').delete().eq('id', postId);
+  if (error) { throw error; }
 }
 
 export async function addMemberToChannel(channelId: string, userId: string): Promise<void> {
