@@ -80,6 +80,7 @@ export default function WatchReactionScreen({
   const [paused, setPaused] = useState(true);
   const [ytPlaying, setYtPlaying] = useState(false);
   const [ytReady, setYtReady] = useState(false); // PiP iframe ready to receive play
+  const [ytMute, setYtMute] = useState(true);     // start muted so autoplay is allowed, then unmute
   const [hasStarted, setHasStarted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -133,25 +134,21 @@ export default function WatchReactionScreen({
     return () => { channel.unsubscribe(); };
   }, [reactionId]);
 
-  // User taps to play — start both reaction video and YouTube Short together
-  const handleTapToPlay = useCallback(() => {
-    if (hasStarted) {
-      // Toggle pause/resume — keep both in lockstep
-      const nowPaused = !paused;
-      setPaused(nowPaused);
-      setYtPlaying(!nowPaused);
-    } else {
-      // Don't start until the YouTube PiP is ready, or its play command is dropped
-      if (!ytReady) { return; }
-      setHasStarted(true);
-      setPaused(false);
-      setYtPlaying(true);
+  // Tapping the full-screen reaction PAUSES both (pausing YouTube in code is allowed).
+  // Starting/resuming must come from a real tap on the Short itself — Android
+  // WebViews only honor a genuine in-player gesture for unmuted playback.
+  const handleScreenTap = useCallback(() => {
+    if (!hasStarted) { return; } // before first play, the Short's own tap starts things
+    if (!paused) {
+      setPaused(true);
+      setYtPlaying(false); // pauseVideo — allowed programmatically
     }
-  }, [hasStarted, paused, ytReady]);
+  }, [hasStarted, paused]);
 
   const handleEnd = useCallback(() => {
     setPaused(true);
     setYtPlaying(false);
+    setYtMute(true); // re-arm muted autoplay for the next play
     setProgress(0);
     setHasStarted(false);
     videoRef.current?.seek(0);
@@ -243,36 +240,58 @@ export default function WatchReactionScreen({
       />
 
       {/* Transparent touch-catcher ON TOP of the video — the Video's TextureView
-          eats touches on Android, so the tap handler must be a sibling overlay. */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={handleTapToPlay} />
+          eats touches on Android. Tapping here PAUSES (resume is via the Short). */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleScreenTap} />
 
-      {/* YouTube Short PiP — bottom-right corner (opposite of camera PiP on record screen) */}
-      <View style={[styles.pip, { bottom: pipBottom, right: SPACE.MD }]} pointerEvents="none">
+      {/* YouTube Short PiP — bottom-right corner. Must stay interactive (no
+          pointerEvents="none") so a real tap reaches the WebView — that gesture
+          is the only thing Android lets start unmuted YouTube playback. The
+          reaction video follows the Short's actual play state. */}
+      <View style={[styles.pip, { bottom: pipBottom, right: SPACE.MD }]}>
         <YoutubePlayer
           ref={ytRef}
           height={PIP_HEIGHT}
           width={PIP_WIDTH}
           videoId={videoId}
           play={ytPlaying}
+          mute={ytMute}
           volume={25}
-          forceAndroidAutoplay
           onReady={() => setYtReady(true)}
-          initialPlayerParams={{ rel: false, controls: false, playsinline: true }}
+          onChangeState={(s: string) => {
+            if (s === 'playing') {
+              setHasStarted(true);
+              if (ytMute) { setYtMute(false); }   // unmute to 25% (volume prop)
+              setYtPlaying(true);                  // keep our state matching reality
+              setPaused(false);                    // start/resume reaction in sync
+            } else if (s === 'paused') {
+              setYtPlaying(false);
+              setPaused(true);                     // keep reaction paused in lockstep
+            } else if (s === 'ended') {
+              handleEnd();
+            }
+          }}
+          onError={(e: string) => console.warn('[WatchReaction] yt error:', e)}
+          initialPlayerParams={{ rel: false, controls: false, modestbranding: true, playsinline: true }}
           webViewStyle={{ backgroundColor: C.BLACK }}
           webViewProps={{ mediaPlaybackRequiresUserGesture: false }}
         />
       </View>
 
-      {/* Tap to play overlay — spinner until the PiP is ready, then the play button */}
-      {!hasStarted && (
+      {/* Spinner while the Short loads */}
+      {!ytReady && (
         <View style={styles.playOverlay} pointerEvents="none">
-          {ytReady ? (
-            <View style={styles.playCircle}>
-              <Text style={styles.playIcon}>▶</Text>
-            </View>
-          ) : (
-            <ActivityIndicator color={C.WHITE} size="large" />
-          )}
+          <ActivityIndicator color={C.WHITE} size="large" />
+        </View>
+      )}
+
+      {/* Prompt pointing at the Short — shown whenever paused (initial + after pause).
+          The user must tap the Short itself to start/resume (real WebView gesture). */}
+      {ytReady && paused && (
+        <View
+          style={[styles.tapHint, { bottom: pipBottom + PIP_HEIGHT + SPACE.SM, right: SPACE.MD }]}
+          pointerEvents="none">
+          <Text style={styles.tapHintText}>Tap the Short to play ▶</Text>
+          <Text style={styles.tapHintArrow}>↓</Text>
         </View>
       )}
 
@@ -368,6 +387,31 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   playIcon: { color: C.WHITE, fontSize: 30, marginLeft: 6 },
+
+  tapHint: {
+    position: 'absolute',
+    alignItems: 'center',
+    width: PIP_WIDTH,
+  },
+  tapHintText: {
+    color: C.WHITE,
+    fontSize: FONT.SIZES.XS,
+    fontFamily: FONT.BODY_SEMIBOLD,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: SPACE.SM,
+    paddingVertical: SPACE.XS,
+    borderRadius: RADIUS.FULL,
+    overflow: 'hidden',
+  },
+  tapHintArrow: {
+    color: C.WHITE,
+    fontSize: 20,
+    marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
 
   infoBar: {
     position: 'absolute', left: SPACE.LG, right: SPACE.LG,
