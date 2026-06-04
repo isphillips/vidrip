@@ -223,32 +223,35 @@ export default function WatchReactionScreen({
 
   return (
     <View style={styles.container}>
-      {/* Full screen reaction camera video */}
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleTapToPlay}>
-        <Video
-          ref={videoRef}
-          source={{ uri: localUri }}
-          style={{ width, height }}
-          resizeMode="cover"
-          paused={paused}
-          onLoad={(d: any) => setDuration(d.duration)}
-          onProgress={(d: any) => setProgress(d.currentTime)}
-          onEnd={handleEnd}
-          onError={(e: any) => console.error('[WatchReaction] error:', JSON.stringify(e))}
-          repeat={false}
-        />
-      </TouchableOpacity>
+      {/* Full screen reaction camera video — bare element so it doesn't swallow touches */}
+      <Video
+        ref={videoRef}
+        source={{ uri: localUri }}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+        paused={paused}
+        onLoad={(d: any) => setDuration(d.duration)}
+        onProgress={(d: any) => setProgress(d.currentTime)}
+        onEnd={handleEnd}
+        onError={(e: any) => console.error('[WatchReaction] error:', JSON.stringify(e))}
+        repeat={false}
+      />
+
+      {/* Transparent touch-catcher ON TOP of the video — the Video's TextureView
+          eats touches on Android, so the tap handler must be a sibling overlay. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleTapToPlay} />
 
       {/* YouTube Short PiP — bottom-right corner (opposite of camera PiP on record screen) */}
-      <View style={[styles.pip, { bottom: pipBottom, right: SPACE.MD }]}>
+      <View style={[styles.pip, { bottom: pipBottom, right: SPACE.MD }]} pointerEvents="none">
         <YoutubePlayer
           ref={ytRef}
           height={PIP_HEIGHT}
           width={PIP_WIDTH}
           videoId={videoId}
           play={ytPlaying}
-          initialPlayerParams={{ rel: false, controls: false }}
+          initialPlayerParams={{ rel: false, controls: false, playsinline: true }}
           webViewStyle={{ backgroundColor: C.BLACK }}
+          webViewProps={{ mediaPlaybackRequiresUserGesture: false }}
         />
       </View>
 
