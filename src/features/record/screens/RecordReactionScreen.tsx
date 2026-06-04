@@ -69,7 +69,9 @@ export default function RecordReactionScreen({
   const { hasPermission: hasMic, requestPermission: requestMic } = useMicrophonePermission();
 
   const [permissionsReady, setPermissionsReady] = useState(false);
-  const [phase, setPhase] = useState<Phase>('loading');
+  const [phase, _setPhase] = useState<Phase>('loading');
+  const phaseRef = useRef<Phase>('loading');
+  const setPhase = useCallback((p: Phase) => { phaseRef.current = p; _setPhase(p); }, []);
   const [elapsed, setElapsed] = useState(0);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [floating, setFloating] = useState<{ id: number; emoji: string }[]>([]);
@@ -125,13 +127,15 @@ export default function RecordReactionScreen({
     }, 1000);
   }, [stopTimer]);
 
-  // User taps the play button — camera starts immediately, video plays, timer starts on first frame
+  // User taps the play button — overlay removed instantly, camera starts, timer starts on first frame
   const handleTapToStart = useCallback(() => {
     if (phase !== 'ready') { return; }
 
+    // Fade overlay away immediately so the YouTube WebView receives the gesture
+    Animated.timing(overlayOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+    setPhase('buffering');
     isCancellingRef.current = false;
     setYtPlaying(true);
-    setPhase('buffering'); // show "Starting…" until 'playing' fires
 
     const uid = user!.id;
     cameraRef.current?.startRecording({
@@ -195,7 +199,7 @@ export default function RecordReactionScreen({
   }, [stopTimer, overlayOpacity]);
 
   const onYtStateChange = useCallback((state: string) => {
-    if (state === 'playing' && phase === 'buffering') {
+    if (state === 'playing' && phaseRef.current === 'buffering') {
       // Video is actually playing — fade overlay and start the timer
       Animated.timing(overlayOpacity, {
         toValue: 0,
@@ -205,10 +209,10 @@ export default function RecordReactionScreen({
       setPhase('recording');
       StatusBar.setHidden(true, 'fade');
       startTimer();
-    } else if (state === 'ended' && phase === 'recording') {
+    } else if (state === 'ended' && phaseRef.current === 'recording') {
       handleStop();
     }
-  }, [phase, overlayOpacity, startTimer, handleStop]);
+  }, [overlayOpacity, setPhase, startTimer, handleStop]);
 
   const handleEmoji = useCallback((emoji: string) => {
     const id = ++floatIdRef.current;
@@ -249,8 +253,9 @@ export default function RecordReactionScreen({
           play={ytPlaying}
           onChangeState={onYtStateChange}
           onReady={() => { if (phase === 'loading') { setPhase('ready'); } }}
-          initialPlayerParams={{ rel: false, controls: false, modestbranding: true }}
+          initialPlayerParams={{ rel: false, controls: false, modestbranding: true, playsinline: true }}
           webViewStyle={{ backgroundColor: C.BLACK }}
+          webViewProps={{ mediaPlaybackRequiresUserGesture: false }}
         />
       </View>
 
