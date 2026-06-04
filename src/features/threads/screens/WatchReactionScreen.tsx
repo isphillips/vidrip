@@ -254,6 +254,7 @@ export default function WatchReactionScreen({
           width={PIP_WIDTH}
           videoId={videoId}
           play={ytPlaying}
+          forceAndroidAutoplay
           onReady={() => { setYtReady(true); ytRef.current?.setVolume(25); }}
           onChangeState={(s: string) => { if (s === 'playing') { ytRef.current?.setVolume(25); } }}
           initialPlayerParams={{ rel: false, controls: false, playsinline: true }}
