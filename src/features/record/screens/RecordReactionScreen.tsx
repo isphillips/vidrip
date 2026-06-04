@@ -53,7 +53,7 @@ const floatStyles = StyleSheet.create({
   emoji: { position: 'absolute', bottom: 160, alignSelf: 'center', fontSize: 36 },
 });
 
-type Phase = 'loading' | 'ready' | 'recording' | 'uploading';
+type Phase = 'loading' | 'ready' | 'buffering' | 'recording' | 'uploading';
 
 export default function RecordReactionScreen({
   route,
@@ -125,22 +125,13 @@ export default function RecordReactionScreen({
     }, 1000);
   }, [stopTimer]);
 
-  // User taps the play button — start recording and video simultaneously
+  // User taps the play button — camera starts immediately, video plays, timer starts on first frame
   const handleTapToStart = useCallback(() => {
     if (phase !== 'ready') { return; }
 
-    // Fade out the overlay
-    Animated.timing(overlayOpacity, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-
     isCancellingRef.current = false;
     setYtPlaying(true);
-    setPhase('recording');
-    StatusBar.setHidden(true, 'fade');
-    startTimer();
+    setPhase('buffering'); // show "Starting…" until 'playing' fires
 
     const uid = user!.id;
     cameraRef.current?.startRecording({
@@ -204,10 +195,20 @@ export default function RecordReactionScreen({
   }, [stopTimer, overlayOpacity]);
 
   const onYtStateChange = useCallback((state: string) => {
-    if (state === 'ended' && phase === 'recording') {
+    if (state === 'playing' && phase === 'buffering') {
+      // Video is actually playing — fade overlay and start the timer
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+      setPhase('recording');
+      StatusBar.setHidden(true, 'fade');
+      startTimer();
+    } else if (state === 'ended' && phase === 'recording') {
       handleStop();
     }
-  }, [phase, handleStop]);
+  }, [phase, overlayOpacity, startTimer, handleStop]);
 
   const handleEmoji = useCallback((emoji: string) => {
     const id = ++floatIdRef.current;
@@ -294,6 +295,12 @@ export default function RecordReactionScreen({
             </View>
             <Text style={styles.tapText}>Tap to record</Text>
           </TouchableOpacity>
+        )}
+        {phase === 'buffering' && (
+          <View style={styles.overlayContent} pointerEvents="none">
+            <ActivityIndicator color={C.WHITE} size="large" />
+            <Text style={styles.overlayText}>Starting…</Text>
+          </View>
         )}
       </Animated.View>
 
