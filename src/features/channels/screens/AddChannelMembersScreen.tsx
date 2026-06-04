@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
-import { addMemberToChannel, fetchPrivateChannels } from '../../../infrastructure/supabase/queries/channels';
+import { addMemberToChannel, fetchChannelMembers } from '../../../infrastructure/supabase/queries/channels';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 export default function AddChannelMembersScreen({
@@ -26,13 +26,7 @@ export default function AddChannelMembersScreen({
     if (!user) { return; }
     Promise.all([
       fetchFriends(user.id),
-      // get current members via group_members
-      (async () => {
-        const { supabase } = await import('../../../infrastructure/supabase/client');
-        const { data } = await (supabase as any)
-          .from('group_members').select('user_id').eq('group_id', channelId);
-        return new Set<string>((data ?? []).map((m: any) => m.user_id as string));
-      })(),
+      fetchChannelMembers(channelId).then(ms => new Set<string>(ms.map(m => m.userId))),
     ]).then(([fl, ex]) => {
       setFriends(fl);
       setExisting(ex);
@@ -45,6 +39,7 @@ export default function AddChannelMembersScreen({
       await addMemberToChannel(channelId, friend.userId);
       setExisting(prev => new Set([...prev, friend.userId]));
     } catch (e: any) {
+      console.error('[AddMembers] addMemberToChannel error:', JSON.stringify(e));
       Alert.alert('Error', e?.message ?? 'Could not add member.');
     }
     setAdding(prev => { const n = new Set(prev); n.delete(friend.userId); return n; });
@@ -64,7 +59,7 @@ export default function AddChannelMembersScreen({
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
       ) : (
         <FlatList
-          data={friends}
+          data={friends.filter(f => !existing.has(f.userId))}
           keyExtractor={f => f.userId}
           renderItem={({ item }) => {
             const isIn = existing.has(item.userId);

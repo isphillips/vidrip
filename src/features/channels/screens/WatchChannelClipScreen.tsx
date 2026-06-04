@@ -252,7 +252,7 @@ export default function WatchChannelClipScreen({
         <Text style={styles.timer}>{fmt(progress)} / {fmt(totalDuration)}</Text>
       </View>
 
-      {/* Emoji drawer */}
+      {/* Emoji drawer — 😊 toggle hidden for own posts, reactions always visible */}
       <View style={[styles.emojiDrawer, { right: SPACE.MD, bottom: bottomInset + SPACE.LG }]}>
         {emojiOpen && (
           <View style={styles.emojiList}>
@@ -262,7 +262,7 @@ export default function WatchChannelClipScreen({
                 emoji={emoji}
                 count={counts[emoji] ?? 0}
                 isMine={post.emoji_reactions.some(r => r.emoji === emoji && r.user_id === user?.id)}
-                isDisabled={processing.has(emoji)}
+                isDisabled={post.poster_id === user?.id || processing.has(emoji)}
                 onPress={() => handleEmojiPress(emoji)}
               />
             ))}

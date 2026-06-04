@@ -1,10 +1,11 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
   ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../../../infrastructure/supabase/client';
 import { C, FONT, SPACE } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
@@ -64,6 +65,19 @@ export default function ChannelsHomeScreen({
     loadPublic();
     if (privateLoadedRef.current) { loadPrivate(true); }
   }, [loadPublic, loadPrivate]));
+
+  // Realtime: auto-show channel when someone adds this user
+  useEffect(() => {
+    if (!user) { return; }
+    const sub = (supabase as any)
+      .channel(`my-memberships-${user.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'group_members',
+        filter: `user_id=eq.${user.id}`,
+      }, () => { loadPrivate(true); privateLoadedRef.current = true; })
+      .subscribe();
+    return () => { sub.unsubscribe(); };
+  }, [user?.id, user, loadPrivate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTabChange = useCallback((t: string) => {
     setTab(t as Tab);
