@@ -79,6 +79,7 @@ export default function WatchReactionScreen({
 
   const [paused, setPaused] = useState(true);
   const [ytPlaying, setYtPlaying] = useState(false);
+  const [ytReady, setYtReady] = useState(false); // PiP iframe ready to receive play
   const [hasStarted, setHasStarted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -132,19 +133,21 @@ export default function WatchReactionScreen({
     return () => { channel.unsubscribe(); };
   }, [reactionId]);
 
-  // User taps to play — start both reaction video and YouTube Short from 0
+  // User taps to play — start both reaction video and YouTube Short together
   const handleTapToPlay = useCallback(() => {
     if (hasStarted) {
-      // Toggle pause/resume
+      // Toggle pause/resume — keep both in lockstep
       const nowPaused = !paused;
       setPaused(nowPaused);
       setYtPlaying(!nowPaused);
     } else {
+      // Don't start until the YouTube PiP is ready, or its play command is dropped
+      if (!ytReady) { return; }
       setHasStarted(true);
       setPaused(false);
       setYtPlaying(true);
     }
-  }, [hasStarted, paused]);
+  }, [hasStarted, paused, ytReady]);
 
   const handleEnd = useCallback(() => {
     setPaused(true);
@@ -251,7 +254,7 @@ export default function WatchReactionScreen({
           width={PIP_WIDTH}
           videoId={videoId}
           play={ytPlaying}
-          onReady={() => ytRef.current?.setVolume(25)}
+          onReady={() => { setYtReady(true); ytRef.current?.setVolume(25); }}
           onChangeState={(s: string) => { if (s === 'playing') { ytRef.current?.setVolume(25); } }}
           initialPlayerParams={{ rel: false, controls: false, playsinline: true }}
           webViewStyle={{ backgroundColor: C.BLACK }}
@@ -259,12 +262,16 @@ export default function WatchReactionScreen({
         />
       </View>
 
-      {/* Tap to play overlay */}
+      {/* Tap to play overlay — spinner until the PiP is ready, then the play button */}
       {!hasStarted && (
         <View style={styles.playOverlay} pointerEvents="none">
-          <View style={styles.playCircle}>
-            <Text style={styles.playIcon}>▶</Text>
-          </View>
+          {ytReady ? (
+            <View style={styles.playCircle}>
+              <Text style={styles.playIcon}>▶</Text>
+            </View>
+          ) : (
+            <ActivityIndicator color={C.WHITE} size="large" />
+          )}
         </View>
       )}
 
