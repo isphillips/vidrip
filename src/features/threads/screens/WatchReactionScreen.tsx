@@ -239,9 +239,11 @@ export default function WatchReactionScreen({
         repeat={false}
       />
 
-      {/* Transparent touch-catcher ON TOP of the video — the Video's TextureView
-          eats touches on Android. Tapping here PAUSES (resume is via the Short). */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={handleScreenTap} />
+      {/* Pause-catcher — only present WHILE playing, so before start (and while
+          paused) the Short's own tap target is completely unobstructed. */}
+      {hasStarted && !paused && (
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleScreenTap} />
+      )}
 
       {/* YouTube Short PiP — bottom-right corner. Must stay interactive (no
           pointerEvents="none") so a real tap reaches the WebView — that gesture
@@ -271,7 +273,7 @@ export default function WatchReactionScreen({
             }
           }}
           onError={(e: string) => console.warn('[WatchReaction] yt error:', e)}
-          initialPlayerParams={{ rel: false, controls: false, modestbranding: true, playsinline: true }}
+          initialPlayerParams={{ rel: false, controls: true, modestbranding: true, playsinline: true }}
           webViewStyle={{ backgroundColor: C.BLACK }}
           webViewProps={{ mediaPlaybackRequiresUserGesture: false }}
         />
