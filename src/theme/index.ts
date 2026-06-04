@@ -79,5 +79,6 @@ export const RADIUS = {
   SM: 6,
   MD: 12,
   LG: 20,
+  XL: 24,
   FULL: 999,
 } as const;

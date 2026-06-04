@@ -19,8 +19,6 @@ import FriendsHomeScreen from '../../features/friends/screens/FriendsHomeScreen'
 import AddFriendScreen from '../../features/friends/screens/AddFriendScreen';
 import InviteManagementScreen from '../../features/friends/screens/InviteManagementScreen';
 import ShareHomeScreen from '../../features/share/screens/ShareHomeScreen';
-import VideoPreviewScreen from '../../features/share/screens/VideoPreviewScreen';
-import SelectRecipientsScreen from '../../features/share/screens/SelectRecipientsScreen';
 import AccountScreen from '../../features/account/screens/AccountScreen';
 import PasswordSetupScreen from '../../features/account/screens/PasswordSetupScreen';
 
@@ -71,8 +69,6 @@ function ShareNavigator() {
   return (
     <ShareStack.Navigator screenOptions={NAV_OPTS}>
       <ShareStack.Screen name="ShareHome" component={ShareHomeScreen} options={{ headerShown: false }} />
-      <ShareStack.Screen name="VideoPreview" component={VideoPreviewScreen} options={{ title: '', headerBackTitle: 'Share' }} />
-      <ShareStack.Screen name="SelectRecipients" component={SelectRecipientsScreen} options={{ title: 'Send To' }} />
     </ShareStack.Navigator>
   );
 }

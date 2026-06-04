@@ -56,8 +56,6 @@ export type FriendsStackParamList = {
 // Share stack
 export type ShareStackParamList = {
   ShareHome: undefined;
-  VideoPreview: { videoId: string; videoTitle: string; videoThumbnail: string; channelTitle: string };
-  SelectRecipients: { videoId: string; videoTitle: string; videoThumbnail: string };
 };
 
 // Record stack
