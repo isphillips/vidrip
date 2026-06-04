@@ -15,6 +15,8 @@ export type ChannelSummary = {
   pinned_video_thumbnail: string | null;
   member_count: number;
   is_joined: boolean;
+  unread_count: number;
+  last_message_at: string | null;
 };
 
 export type ChannelPost = {
@@ -72,6 +74,8 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     pinned_video_thumbnail: c.pinned_video_thumbnail ?? null,
     member_count: c.member_count ?? 0,
     is_joined: joinedIds.has(c.id),
+    unread_count: 0,
+    last_message_at: null,
   }));
 }
 
@@ -99,7 +103,18 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
 
   if (error) { throw error; }
 
-  return (data ?? []).map((c: any) => ({
+  // Fetch unread counts via SECURITY DEFINER RPC
+  const { data: unreadData } = await (supabase as any)
+    .rpc('get_private_channels_with_unread', { p_user_id: userId });
+  const unreadMap = new Map<string, { count: number; lastMsg: string | null }>();
+  for (const row of (unreadData ?? [])) {
+    unreadMap.set(row.channel_id, {
+      count: Number(row.unread_count ?? 0),
+      lastMsg: row.last_message_at ?? null,
+    });
+  }
+
+  const channels = (data ?? []).map((c: any) => ({
     id: c.id,
     name: c.name,
     description: c.description ?? null,
@@ -111,7 +126,25 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
     pinned_video_thumbnail: null,
     member_count: c.member_count ?? 0,
     is_joined: true,
+    unread_count: unreadMap.get(c.id)?.count ?? 0,
+    last_message_at: unreadMap.get(c.id)?.lastMsg ?? null,
   }));
+
+  // Unread channels float to top, then sort by last message
+  return channels.sort((a: ChannelSummary, b: ChannelSummary) => {
+    if (a.unread_count > 0 && b.unread_count === 0) { return -1; }
+    if (a.unread_count === 0 && b.unread_count > 0) { return 1; }
+    const at = a.last_message_at ?? '';
+    const bt = b.last_message_at ?? '';
+    return bt.localeCompare(at);
+  });
+}
+
+export async function markChannelAsRead(channelId: string): Promise<void> {
+  await (supabase as any)
+    .from('group_members')
+    .update({ last_read_at: new Date().toISOString() })
+    .eq('group_id', channelId);
 }
 
 export async function ensurePrivateChannel(userA: string, userB: string): Promise<string> {

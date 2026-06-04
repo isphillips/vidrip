@@ -13,6 +13,7 @@ import {
   fetchChannelPost,
   fetchChannelMembers,
   fetchChannelName,
+  markChannelAsRead,
   addChannelPostEmojiReaction,
   removeChannelPostEmojiReaction,
   deleteChannelPost,
@@ -114,6 +115,7 @@ export default function ChannelScreen({
   // Safe for public channels to skip — pin toggle relies on no reload-on-focus there.
   useFocusEffect(useCallback(() => {
     if (isPublic) { return; }
+    markChannelAsRead(channelId).catch(() => {});
     load(true).then(() => {
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 50);
     });
