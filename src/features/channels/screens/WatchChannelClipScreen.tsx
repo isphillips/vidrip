@@ -229,26 +229,50 @@ export default function WatchChannelClipScreen({
     return acc;
   }, {});
 
+  // Standalone clip (no parent YouTube post) → main video self-controls via tap.
+  const hasParent = !!post?.parent_post_id;
+
+  const videoEl = (
+    <Video
+      ref={videoRef}
+      source={{ uri: localUri }}
+      style={{ width, height }}
+      resizeMode="contain"
+      paused={paused}
+      mixWithOthers="mix"
+      onLoad={(d: any) => {
+        setDuration(d.duration);
+        configureForMixedPlayback().then(() => setSessionReady(true)).catch(() => setSessionReady(true));
+      }}
+      onProgress={(d: any) => setProgress(d.currentTime)}
+      onEnd={() => { setPaused(true); setProgress(0); videoRef.current?.seek(0); }}
+      repeat={false}
+    />
+  );
+
   return (
     <View style={styles.container}>
-      {/* Full-screen video — controlled by YouTube PIP */}
-      <View style={StyleSheet.absoluteFill}>
-        <Video
-          ref={videoRef}
-          source={{ uri: localUri }}
-          style={{ width, height }}
-          resizeMode="contain"
-          paused={paused}
-          mixWithOthers="mix"
-          onLoad={(d: any) => {
-            setDuration(d.duration);
-            configureForMixedPlayback().then(() => setSessionReady(true)).catch(() => setSessionReady(true));
-          }}
-          onProgress={(d: any) => setProgress(d.currentTime)}
-          onEnd={() => { setPaused(true); setProgress(0); videoRef.current?.seek(0); }}
-          repeat={false}
-        />
-      </View>
+      {/* Full-screen video — YouTube PIP drives it when there's a parent,
+          otherwise tap the video to play/pause. */}
+      {hasParent ? (
+        <View style={StyleSheet.absoluteFill}>{videoEl}</View>
+      ) : (
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => { setPaused(p => !p); setHasStarted(true); }}>
+          {videoEl}
+        </TouchableOpacity>
+      )}
+
+      {/* Pause indicator — standalone clips only */}
+      {!hasParent && paused && (
+        <View style={styles.playOverlay} pointerEvents="none">
+          <View style={styles.playCircle}>
+            <Text style={styles.playIcon}>▶</Text>
+          </View>
+        </View>
+      )}
 
       {/* YouTube PIP — YouTube controls drive reaction playback */}
       {sessionReady && parentYtVideoId && (() => {
