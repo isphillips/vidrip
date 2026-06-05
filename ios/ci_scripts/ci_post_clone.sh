@@ -24,7 +24,12 @@ yarn install --immutable
 # .xcode.env.local is gitignored, so it must be written per-build.
 echo "export NODE_BINARY=$(command -v node)" > "$CI_PRIMARY_REPOSITORY_PATH/ios/.xcode.env.local"
 
-# --- CocoaPods via bundler (Gemfile pins a known-good version) ---
+# --- CocoaPods via Homebrew ---
+# Not bundler: the Cloud image's system Ruby is 2.6, and activesupport 6.1
+# (pulled by the Gemfile) crashes there with
+# "uninitialized constant ActiveSupport::LoggerThreadSafeLevel::Logger".
+# Homebrew's cocoapods ships its own modern Ruby and avoids that.
+export HOMEBREW_NO_INSTALL_CLEANUP=TRUE
+brew install cocoapods
 cd ios
-bundle install
-bundle exec pod install
+pod install
