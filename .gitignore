@@ -36,6 +36,10 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+android/app/google-services.json
+
+# npm lock file (project uses yarn)
+package-lock.json
 
 # node.js
 #

@@ -3,10 +3,12 @@ import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-ifram
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   Pressable,
   ActivityIndicator,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import Animated, {
@@ -140,9 +142,14 @@ export default function WatchReactionScreen({
     return () => { channel.unsubscribe(); };
   }, [reactionId]);
 
+  const handlePlayPause = useCallback(() => {
+    setPaused(prev => {
+      if (prev) { setHasStarted(true); }
+      return !prev;
+    });
+  }, []);
+
   const handleYtStateChange = useCallback((state: string) => {
-    // Video has mixWithOthers="mix" so it never interrupts the YouTube WebView —
-    // YouTube play/pause maps directly to the reaction video.
     if (state === 'playing') {
       setPaused(false);
       setHasStarted(true);
@@ -240,6 +247,7 @@ export default function WatchReactionScreen({
           resizeMode="cover"
           paused={paused}
           mixWithOthers="mix"
+          disableFocus={Platform.OS === 'android'}
           onLoad={(d: any) => {
             setDuration(d.duration);
             configureForMixedPlayback()
@@ -253,10 +261,29 @@ export default function WatchReactionScreen({
         />
       </View>
 
-      {/* Prompt overlay — shown until YouTube starts */}
-      {reaction?.yt_video_id && !hasStarted && (
+      {/* Tap-to-play background — disabled on Android when YouTube controls playback */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={Platform.OS === 'android' && reaction?.yt_video_id ? undefined : handlePlayPause}
+      />
+
+      {/* Play icon — shown when paused and tap-to-play is active */}
+      {paused && !(Platform.OS === 'android' && reaction?.yt_video_id) && (
+        <View style={styles.playOverlay} pointerEvents="none">
+          <View style={styles.playCircle}>
+            <Text style={styles.playIcon}>▶</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Prompt overlay — shown before first play */}
+      {!hasStarted && (
         <View style={styles.startPrompt} pointerEvents="none">
-          <Text style={styles.startPromptText}>Tap ▶ on the video to play reaction</Text>
+          <Text style={styles.startPromptText}>
+            {Platform.OS === 'android' && reaction?.yt_video_id
+              ? 'Tap ▶ on the YouTube video to start'
+              : reaction?.yt_video_id ? 'Tap ▶ to play reaction' : 'Tap to play reaction'}
+          </Text>
         </View>
       )}
 
@@ -274,6 +301,7 @@ export default function WatchReactionScreen({
                 height={pipH}
                 width={coverW}
                 videoId={reaction.yt_video_id}
+                play={Platform.OS === 'ios' ? !paused : undefined}
                 onChangeState={handleYtStateChange}
                 initialPlayerParams={{ controls: true, rel: false, mute: 1 } as any}
                 webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}

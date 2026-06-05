@@ -19,6 +19,7 @@ class MainApplication : Application(), ReactApplication {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
               add(ReaxnScreenRecorderPackage())
+              add(ReaxnAudioPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

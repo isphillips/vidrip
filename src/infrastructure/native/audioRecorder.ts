@@ -1,4 +1,4 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 const { AudioRecorder: _AR } = NativeModules;
 
@@ -15,6 +15,7 @@ export function cancelAudioRecording(): Promise<void> {
 }
 
 export function configureForMixedPlayback(): Promise<void> {
+  if (!_AR) { return Promise.resolve(); }
   return _AR.configureForMixedPlayback();
 }
 
