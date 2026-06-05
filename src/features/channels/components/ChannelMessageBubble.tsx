@@ -5,7 +5,7 @@ import {
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import type { ChannelPost } from '../../../infrastructure/supabase/queries/channels';
 
-const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
+import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 
 function formatTime(iso: string): string {
   const date = new Date(iso);
@@ -77,7 +77,7 @@ export default function ChannelMessageBubble({
           {hasReactions && (
             <View style={[styles.emojiTag, isMe ? styles.emojiTagLeft : styles.emojiTagRight]}>
               {shown.map(([emoji]) => (
-                <Text key={emoji} style={styles.emojiTagChar}>{emoji}</Text>
+                <EmojiGlyph key={emoji} emoji={emoji} size={22} />
               ))}
               {overflow > 0 && (
                 <Text style={styles.emojiTagOverflow}>+{overflow}</Text>
@@ -124,7 +124,7 @@ export default function ChannelMessageBubble({
                   key={emoji}
                   style={styles.pickerBtn}
                   onPress={() => { onEmojiToggle(emoji); setPickerVisible(false); }}>
-                  <Text style={styles.pickerEmoji}>{emoji}</Text>
+                  <EmojiGlyph emoji={emoji} size={32} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -SPACE.MD,
     flexDirection: 'row', alignItems: 'center', gap: 1,
-    backgroundColor: C.SURFACE_2,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: RADIUS.FULL,
     paddingHorizontal: SPACE.XS + 1, paddingVertical: 2,
     borderWidth: 1, borderColor: C.BORDER,

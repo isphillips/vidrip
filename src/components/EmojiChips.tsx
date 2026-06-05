@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-
-const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
+import EmojiGlyph, { QUICK_EMOJIS } from './EmojiGlyph';
 
 export type EmojiReactionItem = { emoji: string; user_id: string };
 
@@ -34,7 +33,7 @@ export default function EmojiChips({ reactions, userId, onToggle }: Props) {
               onPress={() => onToggle(emoji)}
               activeOpacity={0.7}
               hitSlop={4}>
-              <Text style={styles.glyph}>{emoji}</Text>
+              <EmojiGlyph emoji={emoji} size={14} />
               <Text style={styles.count}>{count}</Text>
             </TouchableOpacity>
           );
@@ -59,7 +58,7 @@ export default function EmojiChips({ reactions, userId, onToggle }: Props) {
               key={emoji}
               onPress={() => { onToggle(emoji); setPickerOpen(false); }}
               hitSlop={4}>
-              <Text style={styles.pickerGlyph}>{emoji}</Text>
+              <EmojiGlyph emoji={emoji} size={24} />
             </TouchableOpacity>
           ))}
         </View>

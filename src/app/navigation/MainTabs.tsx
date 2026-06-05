@@ -78,7 +78,7 @@ function AccountNavigator() {
     <AccountStack.Navigator screenOptions={NAV_OPTS}>
       <AccountStack.Screen name="AccountHome" component={AccountScreen} options={{ headerShown: false }} />
       <AccountStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Account' }} />
-      <AccountStack.Screen name="PasswordSetup" component={PasswordSetupScreen} options={{ title: 'Password Login' }} />
+      <AccountStack.Screen name="PasswordSetup" component={PasswordSetupScreen} options={{ title: 'Password Login', headerBackTitle: 'Account' }} />
     </AccountStack.Navigator>
   );
 }

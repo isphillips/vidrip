@@ -31,7 +31,7 @@ import {
 import { useAuthStore } from '../../../store/authStore';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
-const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
+import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 const MAX_EMOJIS_PER_USER = 10;
 type DownloadState = 'idle' | 'downloading' | 'ready' | 'unavailable';
 
@@ -62,7 +62,7 @@ function EmojiBtn({
   return (
     <Pressable onPress={handlePress} disabled={isDisabled}>
       <Animated.View style={[styles.emojiBtn, isMine && styles.emojiBtnActive, animStyle]}>
-        <Text style={styles.emojiGlyph}>{emoji}</Text>
+        <EmojiGlyph emoji={emoji} size={24} />
         {count > 0 && (
           <Text style={[styles.emojiCount, isMine && styles.emojiCountActive]}>
             {count}

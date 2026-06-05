@@ -30,7 +30,7 @@ import {
 } from '../../../infrastructure/storage/localChannelClipStorage';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
-const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
+import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 
 function EmojiBtn({
   emoji, count, isMine, isDisabled, onPress,
@@ -52,7 +52,7 @@ function EmojiBtn({
   return (
     <Pressable onPress={handlePress} disabled={isDisabled}>
       <Animated.View style={[styles.emojiBtn, isMine && styles.emojiBtnActive, animStyle]}>
-        <Text style={styles.emojiGlyph}>{emoji}</Text>
+        <EmojiGlyph emoji={emoji} size={24} />
         {count > 0 && (
           <Text style={[styles.emojiCount, isMine && styles.emojiCountActive]}>{count}</Text>
         )}

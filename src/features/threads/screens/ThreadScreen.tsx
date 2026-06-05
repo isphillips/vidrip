@@ -153,7 +153,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     <View style={styles.container}>
     <ScrollView bounces={false}>
       {/* Thumbnail / blind — full height with bottom overlay */}
-      <View style={[styles.thumbWrap, { height: height - 105, width: '100%' }]}>
+      <View style={[styles.thumbWrap, { height: height - 113, width: '100%' }]}>
         {obscured ? (
           <View style={styles.thumbBlind}>
             <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   thumbBlindImg: { width: 160, height: 200, opacity: 0.85 },
   blindOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    backgroundColor: C.BG,
     paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingTop: SPACE.LG, paddingBottom: SPACE.LG,
   },
   posterHandle: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
@@ -298,6 +298,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     paddingHorizontal: SPACE.LG,
     marginBottom: SPACE.SM,
+    paddingBottom: SPACE.SM,
   },
   reactionCard: {
     flexDirection: 'row',

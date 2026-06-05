@@ -148,7 +148,7 @@ export default function ChannelPostScreen({
     <View style={styles.container}>
     <ScrollView bounces={false}>
       {/* Thumbnail / blind */}
-      <View style={[styles.thumbWrap, { height: height - 105, width: '100%', marginTop: 0 }]}>
+      <View style={[styles.thumbWrap, { height: height - 113, width: '100%', marginTop: 0 }]}>
         {obscured ? (
           <View style={styles.thumbBlind}>
             <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
@@ -278,6 +278,7 @@ const styles = StyleSheet.create({
     fontSize: FONT.SIZES.SM, color: C.MUTED,
     textTransform: 'uppercase', letterSpacing: 1,
     paddingHorizontal: SPACE.LG, marginBottom: SPACE.SM,
+    paddingBottom: SPACE.SM,
   },
   reactionCard: {
     flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
@@ -312,7 +313,7 @@ const styles = StyleSheet.create({
   thumbBlindImg: { width: 160, height: 200, opacity: 0.85 },
   blindOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    backgroundColor: C.BG,
     paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingTop: SPACE.LG,
   },
   videoTitleObscured: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: 'rgba(255,255,255,0.7)', fontStyle: 'italic' },
