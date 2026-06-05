@@ -174,7 +174,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   return (
     <View style={styles.container}>
       <View style={{ marginTop: top }}>
-        <Text style={styles.header}>Vidrip</Text>
+        <Image source={require('../../../assets/textlogo.png')} style={styles.header} resizeMode="contain" />
         <View style={styles.tabRow}>
           <TouchableOpacity
             style={[styles.tabBtn, tab === 'feed' && styles.tabBtnActive]}
@@ -271,13 +271,11 @@ const styles = StyleSheet.create({
   center:     { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' },
 
   header: {
-    fontSize: FONT.SIZES.XXL,
-    fontFamily: FONT.DISPLAY_BOLD,
-    color: C.INK,
-    letterSpacing: -1,
-    paddingHorizontal: SPACE.LG,
-    paddingTop: SPACE.LG,
-    paddingBottom: SPACE.SM,
+    width: 80,
+    height: 44,
+    marginLeft: SPACE.LG,
+    marginTop: SPACE.LG,
+    marginBottom: SPACE.SM,
   },
 
   // Tab toggle
