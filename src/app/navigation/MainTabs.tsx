@@ -49,7 +49,7 @@ function FeedNavigator() {
   return (
     <FeedStack.Navigator screenOptions={NAV_OPTS}>
       <FeedStack.Screen name="FeedHome" component={FeedHomeScreen} options={{ headerShown: false }} />
-      <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ title: '', headerBackTitle: 'Feed' }} />
+      <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </FeedStack.Navigator>
   );

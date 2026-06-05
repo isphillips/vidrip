@@ -141,15 +141,16 @@ export default function WatchReactionScreen({
   }, [reactionId]);
 
   const handleYtStateChange = useCallback((state: string) => {
+    // Video has mixWithOthers="mix" so it never interrupts the YouTube WebView —
+    // YouTube play/pause maps directly to the reaction video.
     if (state === 'playing') {
       setPaused(false);
       setHasStarted(true);
-      // re-assert mixing after reaction video starts and may reset session
-      setTimeout(() => configureForMixedPlayback().catch(() => {}), 300);
+    } else if (state === 'paused') {
+      setPaused(true);
     } else if (state === 'ended') {
       setPaused(true); setProgress(0); videoRef.current?.seek(0);
     }
-    // ignore 'paused' — interruption-caused pauses would kill the reaction
   }, [videoRef]);
 
   const handleEnd = useCallback(() => {
@@ -238,6 +239,7 @@ export default function WatchReactionScreen({
           style={{ width, height }}
           resizeMode="cover"
           paused={paused}
+          mixWithOthers="mix"
           onLoad={(d: any) => {
             setDuration(d.duration);
             configureForMixedPlayback()
@@ -271,7 +273,6 @@ export default function WatchReactionScreen({
                 ref={ytRef}
                 height={pipH}
                 width={coverW}
-                mute={true}
                 videoId={reaction.yt_video_id}
                 onChangeState={handleYtStateChange}
                 initialPlayerParams={{ controls: true, rel: false, mute: 1 } as any}

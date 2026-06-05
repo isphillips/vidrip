@@ -35,6 +35,9 @@ export type ChannelPost = {
   message: string | null;
   emoji_reactions: { emoji: string; user_id: string }[];
   reaction_count: number;
+  has_my_reaction: boolean;
+  parent_post_id: string | null;
+  parent_yt_video_id: string | null;
 };
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -62,6 +65,33 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     (membershipsResult.data ?? []).map((m: any) => m.group_id),
   );
 
+  // Count unreacted YouTube posts per joined channel — drives the home-screen dot.
+  const unreactedByChannel = new Map<string, number>();
+  const joinedList = [...joinedIds];
+  if (joinedList.length) {
+    const [postsRes, mineRes] = await Promise.all([
+      (supabase as any)
+        .from('channel_posts')
+        .select('id, channel_id')
+        .in('channel_id', joinedList)
+        .eq('post_type', 'youtube')
+        .is('parent_post_id', null),
+      (supabase as any)
+        .from('channel_posts')
+        .select('parent_post_id')
+        .eq('poster_id', userId)
+        .not('parent_post_id', 'is', null),
+    ]);
+    const reacted = new Set<string>(
+      (mineRes.data ?? []).map((r: any) => r.parent_post_id),
+    );
+    (postsRes.data ?? []).forEach((p: any) => {
+      if (!reacted.has(p.id)) {
+        unreactedByChannel.set(p.channel_id, (unreactedByChannel.get(p.channel_id) ?? 0) + 1);
+      }
+    });
+  }
+
   return (channelsResult.data ?? []).map((c: any) => ({
     id: c.id,
     name: c.name,
@@ -74,7 +104,7 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     pinned_video_thumbnail: c.pinned_video_thumbnail ?? null,
     member_count: c.member_count ?? 0,
     is_joined: joinedIds.has(c.id),
-    unread_count: 0,
+    unread_count: joinedIds.has(c.id) ? (unreactedByChannel.get(c.id) ?? 0) : 0,
     last_message_at: null,
   }));
 }
@@ -154,7 +184,7 @@ export async function ensurePrivateChannel(userA: string, userB: string): Promis
   return data as string;
 }
 
-export async function fetchChannelPosts(channelId: string): Promise<ChannelPost[]> {
+export async function fetchChannelPosts(channelId: string, userId?: string): Promise<ChannelPost[]> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
@@ -166,11 +196,22 @@ export async function fetchChannelPosts(channelId: string): Promise<ChannelPost[
       reactions:channel_posts!parent_post_id(count)
     `)
     .eq('channel_id', channelId)
-    .is('parent_post_id', null)  // top-level posts only
+    .is('parent_post_id', null)
     .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false });
 
   if (error) { throw error; }
+
+  let reactedIds = new Set<string>();
+  if (userId) {
+    const { data: mine } = await (supabase as any)
+      .from('channel_posts')
+      .select('parent_post_id')
+      .eq('poster_id', userId)
+      .eq('channel_id', channelId)
+      .not('parent_post_id', 'is', null);
+    if (mine) { reactedIds = new Set((mine as any[]).map(r => r.parent_post_id)); }
+  }
 
   return (data ?? []).map((p: any) => ({
     id: p.id,
@@ -188,6 +229,9 @@ export async function fetchChannelPosts(channelId: string): Promise<ChannelPost[
     message: p.message ?? null,
     emoji_reactions: p.emoji_reactions ?? [],
     reaction_count: Array.isArray(p.reactions) ? (p.reactions[0]?.count ?? 0) : 0,
+    has_my_reaction: reactedIds.has(p.id),
+    parent_post_id: p.parent_post_id ?? null,
+    parent_yt_video_id: null,
   }));
 }
 
@@ -234,6 +278,9 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
     message: p.message ?? null,
     emoji_reactions: p.emoji_reactions ?? [],
     reaction_count: 0,
+    has_my_reaction: false,
+    parent_post_id: p.parent_post_id ?? null,
+    parent_yt_video_id: null,
   }));
 }
 
@@ -244,6 +291,8 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
       id, channel_id, poster_id, post_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
       video_url, duration, is_pinned, created_at,
+      parent_post_id,
+      parent:channel_posts!parent_post_id(yt_video_id),
       poster:users!poster_id(handle),
       emoji_reactions:channel_post_emoji_reactions(emoji, user_id)
     `)
@@ -257,6 +306,9 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
     message: data.message ?? null,
     emoji_reactions: data.emoji_reactions ?? [],
     reaction_count: 0,
+    has_my_reaction: false,
+    parent_post_id: data.parent_post_id ?? null,
+    parent_yt_video_id: (data.parent as any)?.yt_video_id ?? null,
   };
 }
 

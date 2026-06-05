@@ -11,7 +11,8 @@ type Props = {
 
 export default function ChannelCard({ channel, userId, onPress }: Props) {
   const isOwner = !!userId && channel.created_by === userId;
-  const hasUnread = !channel.is_public && channel.unread_count > 0;
+  // Public: unreacted YouTube posts. Private: unread messages.
+  const hasUnread = channel.unread_count > 0;
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.body}>

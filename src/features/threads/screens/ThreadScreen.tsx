@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
@@ -35,12 +36,11 @@ import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 type DlStatus = 'local' | 'downloading' | 'unavailable';
 
-
 export default function ThreadScreen({ route, navigation }: FeedStackScreenProps<'Thread'>) {
   const { threadId } = route.params;
   const { user } = useAuthStore();
-  const { width } = useWindowDimensions();
-  const playerHeight = Math.round(width * 0.6);
+  const { top } = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
@@ -49,33 +49,6 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   const [dlPct, setDlPct] = useState<Record<string, number>>({});
   const mountedRef = useRef(true);
   const activeDownloadsRef = useRef<Set<string>>(new Set());
-
-  const handleEmojiToggle = useCallback(async (reactionId: string, emoji: string) => {
-    if (!user?.id) { return; }
-    const reaction = reactions.find(r => r.id === reactionId);
-    if (!reaction) { return; }
-    const myMatch = reaction.emoji_reactions?.find(
-      e => e.emoji === emoji && e.user_id === user.id,
-    );
-    if (myMatch) {
-      // Optimistic remove
-      setReactions(prev => prev.map(r =>
-        r.id === reactionId
-          ? { ...r, emoji_reactions: r.emoji_reactions.filter(e => !(e.emoji === emoji && e.user_id === user.id)) }
-          : r,
-      ));
-      await removeEmojiReaction(reactionId, user.id, emoji).catch(() => load());
-    } else {
-      const tempId = `tmp-${Date.now()}`;
-      // Optimistic add
-      setReactions(prev => prev.map(r =>
-        r.id === reactionId
-          ? { ...r, emoji_reactions: [...(r.emoji_reactions ?? []), { id: tempId, emoji, user_id: user.id! }] }
-          : r,
-      ));
-      await addEmojiReaction(reactionId, user.id, emoji).catch(() => load());
-    }
-  }, [user?.id, reactions, load]);
 
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
@@ -95,8 +68,32 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     }
   }, [threadId, user]);
 
+  const handleEmojiToggle = useCallback(async (reactionId: string, emoji: string) => {
+    if (!user?.id) { return; }
+    const reaction = reactions.find(r => r.id === reactionId);
+    if (!reaction) { return; }
+    const myMatch = reaction.emoji_reactions?.find(
+      e => e.emoji === emoji && e.user_id === user.id,
+    );
+    if (myMatch) {
+      setReactions(prev => prev.map(r =>
+        r.id === reactionId
+          ? { ...r, emoji_reactions: r.emoji_reactions.filter(e => !(e.emoji === emoji && e.user_id === user.id)) }
+          : r,
+      ));
+      await removeEmojiReaction(reactionId, user.id, emoji).catch(() => load());
+    } else {
+      const tempId = `tmp-${Date.now()}`;
+      setReactions(prev => prev.map(r =>
+        r.id === reactionId
+          ? { ...r, emoji_reactions: [...(r.emoji_reactions ?? []), { id: tempId, emoji, user_id: user.id! }] }
+          : r,
+      ));
+      await addEmojiReaction(reactionId, user.id, emoji).catch(() => load());
+    }
+  }, [user?.id, reactions, load]);
+
   useEffect(() => { load(); }, [load]);
-  // Re-fetch whenever screen comes into focus — picks up new reactions after recording
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // Auto-download all cloud reactions when thread loads — messages inbox model
@@ -149,57 +146,44 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   const isSender = thread.sender_id === user?.id;
   const hasReacted = thread.my_status === 'reacted';
   const canReact = !isSender && !hasReacted;
+  const obscured = canReact;
+  const thumbnail = `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg`;
 
   return (
-    <ScrollView style={styles.container} bounces={false}>
-      {/* Thumbnail — hidden for unreacted recipients */}
-      <View style={[styles.playerContainer, { height: playerHeight }]}>
-        {canReact ? (
-          <View style={styles.thumbnailBlind}>
-            <Text style={styles.thumbnailBlindIcon}>?</Text>
+    <View style={styles.container}>
+    <ScrollView bounces={false}>
+      {/* Thumbnail / blind — full height with bottom overlay */}
+      <View style={[styles.thumbWrap, { height: height - 105, width: '100%' }]}>
+        {obscured ? (
+          <View style={styles.thumbBlind}>
+            <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
           </View>
         ) : (
-          <Image
-            source={{ uri: `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg` }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: thumbnail }} style={styles.thumb} resizeMode="cover" />
         )}
-      </View>
 
-      {/* Meta — title hidden for unreacted recipients */}
-      <View style={styles.meta}>
-        <Text style={styles.metaText}>
-          Shared by{' '}
-          <Text style={styles.metaHandle}>
-            {isSender ? 'you' : `@${thread.sender?.handle ?? '?'}`}
+        {/* Overlay — same position for both states */}
+        <View style={styles.blindOverlay}>
+          <Text style={styles.posterHandle}>
+            Shared by <Text style={styles.handle}>{isSender ? 'you' : `@${thread.sender?.handle ?? '?'}`}</Text>
           </Text>
-        </Text>
-        {thread.video_title && !canReact && (
-          <Text style={styles.videoTitle} numberOfLines={2}>{thread.video_title}</Text>
-        )}
-      </View>
-
-      {canReact && (
-        <TouchableOpacity
-          style={styles.reactButton}
-          activeOpacity={0.85}
-          onPress={() => {
-            // startCapture is now called inside RecordReactionScreen after
-            // VisionCamera has initialised — avoids the AVCapture lock race.
-            navigation.getParent()?.navigate('RecordReaction', {
-              threadId, videoId: thread.video_id,
-            });
-          }}>
-          <Text style={styles.reactButtonText}>Record Your Reaction 🎬</Text>
-        </TouchableOpacity>
-      )}
-
-      {hasReacted && (
-        <View style={styles.reactedBadge}>
-          <Text style={styles.reactedText}>You Reacted ✓</Text>
+          {obscured ? (
+            <Text style={styles.videoTitleObscured}>React to reveal this video</Text>
+          ) : thread.video_title ? (
+            <Text style={styles.videoTitle} numberOfLines={2}>{thread.video_title}</Text>
+          ) : null}
+          {canReact ? (
+            <TouchableOpacity style={styles.reactBtn} activeOpacity={0.85}
+              onPress={() => navigation.getParent()?.navigate('RecordReaction', { threadId, videoId: thread.video_id })}>
+              <Text style={styles.reactBtnText}>Record Your Reaction</Text>
+            </TouchableOpacity>
+          ) : hasReacted ? (
+            <View style={styles.reactedBadge}>
+              <Text style={styles.reactedText}>You Reacted ✓</Text>
+            </View>
+          ) : null}
         </View>
-      )}
+      </View>
 
       {/* All reactions — group inbox */}
       <Text style={styles.sectionTitle}>
@@ -211,7 +195,6 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
       {reactions.map((r) => {
         const status = dlStatus[r.id] ?? 'unavailable';
         const pct = dlPct[r.id] ?? 0;
-        const isMe = (r.user as any)?.handle === user?.id; // just for display
         const handle = (r.user as any)?.handle ?? '?';
         const canWatch = status === 'local';
 
@@ -262,6 +245,15 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
 
       <View style={styles.bottomPad} />
     </ScrollView>
+
+    {/* Floating back button over thumbnail */}
+    <TouchableOpacity
+      style={[styles.backBtn, { top: top + SPACE.SM }]}
+      onPress={() => navigation.goBack()}
+      hitSlop={8}>
+      <Text style={styles.backIcon}>‹</Text>
+    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -269,37 +261,36 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
   center: { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' },
   errorText: { color: C.MUTED, fontSize: FONT.SIZES.MD },
-  playerContainer: { backgroundColor: C.BLACK, overflow: 'hidden' },
-  thumbnail: { width: '100%', height: '100%' },
-  thumbnailBlind: {
-    flex: 1, backgroundColor: C.BLACK,
-    alignItems: 'center', justifyContent: 'center',
+  thumbWrap: { backgroundColor: C.BLACK, overflow: 'hidden' },
+  thumb: { width: '100%', height: '100%' },
+  thumbBlind: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: C.BLACK,
   },
-  thumbnailBlindIcon: {
-    fontSize: 64, color: 'rgba(255,255,255,0.25)', fontWeight: '700',
+  thumbBlindImg: { width: 160, height: 200, opacity: 0.85 },
+  blindOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingTop: SPACE.LG, paddingBottom: SPACE.LG,
   },
-  meta: { padding: SPACE.LG, gap: SPACE.XS },
-  metaText: { fontSize: FONT.SIZES.SM, color: C.MUTED },
-  metaHandle: { color: C.ACCENT_HOT, fontWeight: '600' },
-  videoTitle: { fontSize: FONT.SIZES.LG, fontWeight: '600', color: C.INK },
-  reactButton: {
+  posterHandle: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
+  handle: { color: C.ACCENT_HOT, fontFamily: FONT.BODY_MEDIUM },
+  videoTitle: { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_SEMIBOLD, color: C.WHITE },
+  videoTitleObscured: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: 'rgba(255,255,255,0.7)', fontStyle: 'italic' },
+  reactBtn: {
     backgroundColor: C.ACCENT,
     borderRadius: RADIUS.MD,
-    marginHorizontal: SPACE.LG,
-    marginBottom: SPACE.LG,
     padding: SPACE.LG,
     alignItems: 'center',
   },
-  reactButtonText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontWeight: '700' },
+  reactBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD },
   reactedBadge: {
-    marginHorizontal: SPACE.LG,
-    marginBottom: SPACE.LG,
     padding: SPACE.MD,
     borderRadius: RADIUS.MD,
-    backgroundColor: C.SURFACE,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
   },
-  reactedText: { color: C.MUTED, fontSize: FONT.SIZES.SM },
+  reactedText: { color: 'rgba(255,255,255,0.8)', fontSize: FONT.SIZES.SM },
   sectionTitle: {
     fontSize: FONT.SIZES.SM,
     color: C.MUTED,
@@ -333,5 +324,12 @@ const styles = StyleSheet.create({
   reactionHandle: { fontSize: FONT.SIZES.MD, fontWeight: '600', color: C.INK },
   reactionDuration: { fontSize: FONT.SIZES.SM, color: C.MUTED },
   reactionStatusText: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontStyle: 'italic' },
+  backBtn: {
+    position: 'absolute', left: SPACE.MD,
+    width: 36, height: 36, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  backIcon: { color: C.WHITE, fontSize: 26, lineHeight: 30, fontFamily: FONT.BODY },
   bottomPad: { height: SPACE.XXXL },
 });

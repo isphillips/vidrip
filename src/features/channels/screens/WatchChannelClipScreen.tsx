@@ -3,6 +3,8 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   ActivityIndicator, useWindowDimensions, Platform,
 } from 'react-native';
+import YoutubePlayer from 'react-native-youtube-iframe';
+import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import Animated, {
   useSharedValue, useAnimatedStyle,
   withSequence, withSpring,
@@ -74,19 +76,30 @@ export default function WatchChannelClipScreen({
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [downloadPct, setDownloadPct] = useState(0);
   const [localUri, setLocalUri] = useState<string | null>(null);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPaused] = useState(true);
+  const [hasStarted, setHasStarted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
+  const [sessionReady, setSessionReady] = useState(false);
+  const [parentYtVideoId, setParentYtVideoId] = useState<string | null>(null);
 
   const videoRef = useRef<any>(null);
+  const ytRef = useRef<any>(null);
 
   useEffect(() => {
     (async () => {
       const p = await fetchChannelPost(postId).catch(() => null);
       if (!p) { setLoadState('unavailable'); return; }
       setPost(p);
+
+      // Fetch parent post's YouTube video ID for PIP
+      if (p.parent_post_id) {
+        fetchChannelPost(p.parent_post_id)
+          .then(parent => { if (parent?.yt_video_id) { setParentYtVideoId(parent.yt_video_id); } })
+          .catch(() => {});
+      }
 
       const isAudio = p.post_type === 'audio';
 
@@ -102,15 +115,15 @@ export default function WatchChannelClipScreen({
         return;
       }
 
-      if (!p.video_url) { setLoadState('unavailable'); return; }
-
-      // Check local cache first — prefer local copy over streaming
+      // Check local cache first — local-only clips have no video_url
       if (await hasLocalClip(postId)) {
         const path = localPathForClip(postId);
         setLocalUri(Platform.OS === 'ios' ? path : `file://${path}`);
         setLoadState('ready');
         return;
       }
+
+      if (!p.video_url) { setLoadState('unavailable'); return; }
 
       // Download to device then play
       setLoadState('downloading');
@@ -218,33 +231,70 @@ export default function WatchChannelClipScreen({
 
   return (
     <View style={styles.container}>
-      {/* Full-screen video — tap to play/pause */}
-      <TouchableOpacity
-        style={StyleSheet.absoluteFill}
-        activeOpacity={1}
-        onPress={() => setPaused(p => !p)}>
+      {/* Full-screen video — controlled by YouTube PIP */}
+      <View style={StyleSheet.absoluteFill}>
         <Video
           ref={videoRef}
           source={{ uri: localUri }}
           style={{ width, height }}
           resizeMode="contain"
           paused={paused}
-          audioOnly={post?.post_type === 'audio'}
-          onLoad={(d: any) => setDuration(d.duration)}
+          mixWithOthers="mix"
+          onLoad={(d: any) => {
+            setDuration(d.duration);
+            configureForMixedPlayback().then(() => setSessionReady(true)).catch(() => setSessionReady(true));
+          }}
           onProgress={(d: any) => setProgress(d.currentTime)}
           onEnd={() => { setPaused(true); setProgress(0); videoRef.current?.seek(0); }}
           repeat={false}
         />
-      </TouchableOpacity>
+      </View>
 
-      {/* Pause indicator */}
-      {paused && (
-        <View style={styles.playOverlay} pointerEvents="none">
-          <View style={styles.playCircle}>
-            <Text style={styles.playIcon}>▶</Text>
+      {/* YouTube PIP — YouTube controls drive reaction playback */}
+      {sessionReady && parentYtVideoId && (() => {
+        const pipH = styles.ytPip.height;
+        const pipW = styles.ytPip.width;
+        const coverW = Math.round(pipH * (16 / 9));
+        const offsetX = -Math.round((coverW - pipW) / 2);
+        return (
+          <View style={[styles.ytPip, { bottom: bottomInset + 100, right: SPACE.LG }]}>
+            <View style={[styles.ytPipInner, { left: offsetX }]}>
+              <YoutubePlayer
+                ref={ytRef}
+                height={pipH}
+                width={coverW}
+                videoId={parentYtVideoId}
+                mute={true}
+                onChangeState={(state) => {
+                  // Video has mixWithOthers="mix" so it never interrupts the WebView —
+                  // YouTube play/pause maps directly to the reaction video.
+                  if (state === 'playing') {
+                    setPaused(false);
+                    setHasStarted(true);
+                  } else if (state === 'paused') {
+                    setPaused(true);
+                  } else if (state === 'ended') {
+                    setPaused(true);
+                    setProgress(0);
+                    videoRef.current?.seek(0);
+                  }
+                }}
+                initialPlayerParams={{ controls: true, rel: false, mute: 1 } as any}
+                webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
+                webViewStyle={{ backgroundColor: '#000' }}
+              />
+            </View>
           </View>
+        );
+      })()}
+
+      {/* Start prompt — until YouTube is tapped */}
+      {sessionReady && parentYtVideoId && !hasStarted && (
+        <View style={styles.startPrompt} pointerEvents="none">
+          <Text style={styles.startPromptText}>Tap ▶ on the video to play</Text>
         </View>
       )}
+
 
       {/* Info bar */}
       <View style={[styles.infoBar, { top: topInset + SPACE.SM }]} pointerEvents="none">
@@ -360,6 +410,28 @@ const styles = StyleSheet.create({
     height: 3, backgroundColor: 'rgba(255,255,255,0.15)',
   },
   progressFill: { height: 3, backgroundColor: C.ACCENT_HOT },
+  ytPip: {
+    position: 'absolute',
+    width: 90, height: 160,
+    borderRadius: RADIUS.MD, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
+  },
+  ytPipInner: { position: 'absolute' },
+  startPrompt: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, top: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  startPromptText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: FONT.SIZES.MD,
+    fontFamily: FONT.BODY_MEDIUM,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: SPACE.LG,
+    paddingVertical: SPACE.SM,
+    borderRadius: RADIUS.MD,
+    overflow: 'hidden',
+    textAlign: 'center',
+  },
   closeBtn: {
     position: 'absolute', right: SPACE.LG,
     width: 36, height: 36, borderRadius: RADIUS.FULL,

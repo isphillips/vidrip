@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity, Modal, FlatList,
+  useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +20,6 @@ import {
   deleteChannelPost,
   joinChannel,
   leaveChannel,
-  togglePinPost,
   postChannelAudio,
   type ChannelPost,
 } from '../../../infrastructure/supabase/queries/channels';
@@ -28,7 +28,6 @@ import {
   stopAudioRecording,
   cancelAudioRecording,
 } from '../../../infrastructure/native/audioRecorder';
-import ChannelPostCard from '../components/ChannelPostCard';
 import ChannelMessageBubble from '../components/ChannelMessageBubble';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
@@ -39,6 +38,9 @@ export default function ChannelScreen({
   const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner } = route.params;
   const { user } = useAuthStore();
   const { top } = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const cardW = (width - SPACE.LG * 2 - SPACE.MD) / 2;
+  const cardH = Math.round(cardW * (16 / 9));
 
   const [posts, setPosts] = useState<ChannelPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,14 +59,13 @@ export default function ChannelScreen({
   const mountedRef = useRef(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const postsRef = useRef<ChannelPost[]>([]);   // always-current snapshot for handlers
-  const togglingRef = useRef(false);             // debounce guard against double-fire
 
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) { setLoading(true); }
     try {
-      const data = await fetchChannelPosts(channelId);
+      const data = await fetchChannelPosts(channelId, user?.id);
       if (mountedRef.current) { setPosts(data); }
     } catch { /* swallow */ } finally {
       if (mountedRef.current) { setLoading(false); setRefreshing(false); }
@@ -109,12 +110,13 @@ export default function ChannelScreen({
     });
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Silently reload whenever the screen comes back into focus — covers the case
-  // where the user returns from ChannelVideoRecordScreen after posting a clip.
-  // Private channels: reload + scroll to bottom when returning from recording.
-  // Safe for public channels to skip — pin toggle relies on no reload-on-focus there.
+  // Silently reload whenever the screen comes back into focus — covers returning
+  // from AddChannelVideo (public) or ChannelVideoRecord (private) after posting.
   useFocusEffect(useCallback(() => {
-    if (isPublic) { return; }
+    if (isPublic) {
+      load(true);
+      return;
+    }
     markChannelAsRead(channelId).catch(() => {});
     load(true).then(() => {
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 50);
@@ -170,38 +172,6 @@ export default function ChannelScreen({
       if (mountedRef.current) { setJoiningLeaving(false); }
     }
   }, [user?.id, joined, joiningLeaving, channelId, isOwner, load]);
-
-  const handleTogglePin = useCallback(async (postId: string) => {
-    // Debounce: ignore the second fire that React Native's touch system
-    // emits when a component re-renders mid-press.
-    if (togglingRef.current) { return; }
-    togglingRef.current = true;
-
-    // Read the CURRENT pin state from the ref, not from a stale closure.
-    const currentPost = postsRef.current.find(p => p.id === postId);
-    if (!currentPost) { togglingRef.current = false; return; }
-    const currentlyPinned = currentPost.is_pinned;
-
-    const sort = (arr: ChannelPost[]) =>
-      [...arr].sort((a, b) => {
-        if (a.is_pinned !== b.is_pinned) { return a.is_pinned ? -1 : 1; }
-        return b.created_at.localeCompare(a.created_at);
-      });
-
-    setPosts(prev => sort(prev.map(p =>
-      p.id === postId ? { ...p, is_pinned: !currentlyPinned } : p,
-    )));
-
-    try {
-      await togglePinPost(postId, !currentlyPinned);
-    } catch {
-      setPosts(prev => sort(prev.map(p =>
-        p.id === postId ? { ...p, is_pinned: currentlyPinned } : p,
-      )));
-    } finally {
-      togglingRef.current = false;
-    }
-  }, []);
 
   const handleEmojiToggle = useCallback(async (postId: string, emoji: string) => {
     if (!user?.id || processing.has(`${postId}:${emoji}`)) { return; }
@@ -348,35 +318,66 @@ export default function ChannelScreen({
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
-      ) : (
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={[
-            posts.length === 0 ? styles.emptyContainer : undefined,
-            !isPublic ? styles.msgPad : undefined,
-          ]}
-          refreshControl={
-            <RefreshControl refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); load(true); }}
-              tintColor={C.ACCENT_HOT} />
-          }>
-          {posts.length === 0 ? (
-            <View style={styles.center}>
-              <Text style={styles.emptyText}>
-                {isPublic ? 'No posts yet' : 'No messages yet'}
-              </Text>
-            </View>
-          ) : isPublic ? (
-            posts.map(item => (
-              <ChannelPostCard key={item.id} post={item} userId={user?.id}
-                isOwner={isOwner} onTogglePin={() => handleTogglePin(item.id)}
+      ) : isPublic ? (
+        <FlatList
+          data={posts}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          contentContainerStyle={posts.length === 0 ? styles.emptyContainer : styles.grid}
+          columnWrapperStyle={styles.gridRow}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}
+          ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyText}>No posts yet</Text></View>}
+          renderItem={({ item }) => {
+            const isOwnerOrPoster = isOwner || item.poster_id === user?.id;
+            const obscured = !isOwnerOrPoster && !item.has_my_reaction;
+            return (
+              <TouchableOpacity
+                style={[styles.gridCard, { width: cardW }]}
+                activeOpacity={0.8}
                 onPress={() => {
                   if (item.post_type === 'youtube') {
                     navigation.navigate('ChannelPost', { postId: item.id, channelId, isJoined: joined });
-                  } else { navigation.navigate('WatchChannelClip', { postId: item.id }); }
-                }}
-                onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)} />
-            ))
+                  } else {
+                    navigation.navigate('WatchChannelClip', { postId: item.id });
+                  }
+                }}>
+                <View style={[styles.gridThumb, { height: cardH }]}>
+                  {obscured ? (
+                    <View style={styles.gridThumbBlind}>
+                      <Text style={styles.gridThumbBlindIcon}>?</Text>
+                    </View>
+                  ) : item.yt_video_thumbnail ? (
+                    <Image source={{ uri: item.yt_video_thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.gridThumbBlind, { backgroundColor: C.SURFACE_2 }]}>
+                      <Text style={styles.gridThumbBlindIcon}>▶</Text>
+                    </View>
+                  )}
+                  {item.is_pinned && (
+                    <View style={styles.pinBadge}><Text style={styles.pinBadgeText}>📌</Text></View>
+                  )}
+                </View>
+                {!obscured && item.yt_video_title ? (
+                  <Text style={styles.gridTitle} numberOfLines={2}>{item.yt_video_title}</Text>
+                ) : obscured ? (
+                  <Text style={styles.gridTitleObscured}>React to reveal</Text>
+                ) : null}
+                <Text style={styles.gridReactionCount}>
+                  {item.reaction_count > 0
+                    ? `${item.reaction_count} reaction${item.reaction_count !== 1 ? 's' : ''}`
+                    : 'No reactions yet'}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      ) : (
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={[posts.length === 0 ? styles.emptyContainer : undefined, styles.msgPad]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}>
+          {posts.length === 0 ? (
+            <View style={styles.center}><Text style={styles.emptyText}>No messages yet</Text></View>
           ) : (
             [...posts].reverse().map(item => (
               <ChannelMessageBubble key={item.id} post={item}
@@ -583,4 +584,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, minWidth: 60, alignItems: 'center',
   },
   audioSendText: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD },
+
+  // Public channel grid
+  grid:    { paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD, paddingBottom: SPACE.XXXL },
+  gridRow: { gap: SPACE.MD, marginBottom: SPACE.MD },
+  gridCard: { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, overflow: 'hidden' },
+  gridThumb: { width: '100%', backgroundColor: C.SURFACE_2, overflow: 'hidden' },
+  gridThumbBlind: { flex: 1, backgroundColor: C.BLACK, alignItems: 'center', justifyContent: 'center' },
+  gridThumbBlindIcon: { fontSize: 28, color: 'rgba(255,255,255,0.4)', fontWeight: '700' },
+  pinBadge: {
+    position: 'absolute', top: SPACE.XS, left: SPACE.XS,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.SM,
+    paddingHorizontal: 4, paddingVertical: 2,
+  },
+  pinBadgeText: { fontSize: 11 },
+  gridTitle: { padding: SPACE.SM, fontSize: FONT.SIZES.SM, color: C.INK, fontFamily: FONT.BODY_MEDIUM },
+  gridTitleObscured: { padding: SPACE.SM, fontSize: FONT.SIZES.XS, color: C.MUTED, fontFamily: FONT.BODY, fontStyle: 'italic' },
+  gridReactionCount: { paddingHorizontal: SPACE.SM, paddingBottom: SPACE.SM, fontSize: FONT.SIZES.XS, color: C.MUTED, fontFamily: FONT.BODY },
 });

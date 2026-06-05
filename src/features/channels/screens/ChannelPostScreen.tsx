@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, Image, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +29,7 @@ export default function ChannelPostScreen({
   const { postId, channelId, isJoined } = route.params;
   const { user } = useAuthStore();
   const { top } = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
   const [post, setPost] = useState<ChannelPost | null>(null);
   const [reactions, setReactions] = useState<ChannelPost[]>([]);
@@ -67,7 +68,6 @@ export default function ChannelPostScreen({
     setDlState(initial);
 
     reactions.forEach(r => {
-      if (!r.video_url) { return; }
       if (activeDownloadsRef.current.has(r.id)) { return; }
 
       hasLocalClip(r.id).then(cached => {
@@ -76,10 +76,13 @@ export default function ChannelPostScreen({
           setDlState(prev => ({ ...prev, [r.id]: 'local' }));
           return;
         }
+        // No local copy — try cloud URL if available
+        if (!r.video_url) { return; }
+
         activeDownloadsRef.current.add(r.id);
         setDlState(prev => ({ ...prev, [r.id]: 'downloading' }));
 
-        downloadChannelClip(r.id, r.video_url!, (pct) => {
+        downloadChannelClip(r.id, r.video_url, (pct) => {
           if (mountedRef.current) { setDlPct(prev => ({ ...prev, [r.id]: pct })); }
         })
           .then(() => {
@@ -139,46 +142,49 @@ export default function ChannelPostScreen({
   const thumbnail = post.yt_video_thumbnail ??
     (post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null);
   const hasReacted = reactions.some(r => r.poster_id === user?.id);
+  const obscured = !hasReacted && post.poster_id !== user?.id;
 
   return (
     <View style={styles.container}>
     <ScrollView bounces={false}>
-      {/* Thumbnail */}
-      <View style={[styles.thumbWrap, { marginTop: top }]}>
-        {thumbnail ? (
+      {/* Thumbnail / blind */}
+      <View style={[styles.thumbWrap, { height: height - 105, width: '100%', marginTop: 0 }]}>
+        {obscured ? (
+          <View style={styles.thumbBlind}>
+            <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
+          </View>
+        ) : thumbnail ? (
           <Image source={{ uri: thumbnail }} style={styles.thumb} resizeMode="cover" />
         ) : (
           <View style={[styles.thumb, styles.thumbPlaceholder]}>
             <Text style={styles.thumbIcon}>▶</Text>
           </View>
         )}
-      </View>
 
-      {/* Meta */}
-      <View style={styles.meta}>
-        {post.yt_video_title && (
-          <Text style={styles.videoTitle} numberOfLines={2}>{post.yt_video_title}</Text>
-        )}
-        <Text style={styles.posterHandle}>
-          Posted by <Text style={styles.handle}>@{post.poster?.handle ?? '?'}</Text>
-        </Text>
+        {/* Overlay — same position for both states */}
+        <View style={styles.blindOverlay}>
+          <Text style={styles.posterHandle}>
+            Posted by <Text style={styles.handle}>@{post.poster?.handle ?? '?'}</Text>
+          </Text>
+          {obscured ? (
+            <Text style={styles.videoTitleObscured}>React to reveal this video</Text>
+          ) : post.yt_video_title ? (
+            <Text style={styles.videoTitle} numberOfLines={2}>{post.yt_video_title}</Text>
+          ) : null}
+          {isJoined && (
+            hasReacted ? (
+              <View style={styles.reactedBadge}>
+                <Text style={styles.reactedText}>You Reacted ✓</Text>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.reactBtn} activeOpacity={0.85}
+                onPress={() => navigation.navigate('WatchYouTubePost', { postId, channelId })}>
+                <Text style={styles.reactBtnText}>Record Your Reaction</Text>
+              </TouchableOpacity>
+            )
+          )}
+        </View>
       </View>
-
-      {/* Record Reaction CTA */}
-      {isJoined && (
-        hasReacted ? (
-          <View style={styles.reactedBadge}>
-            <Text style={styles.reactedText}>You Reacted ✓</Text>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.reactBtn}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('WatchYouTubePost', { postId, channelId })}>
-            <Text style={styles.reactBtnText}>Record Your Reaction 🎬</Text>
-          </TouchableOpacity>
-        )
-      )}
 
       {/* Reactions list */}
       <Text style={styles.sectionTitle}>
@@ -244,7 +250,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
   center: { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' },
   muted: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY },
-  thumbWrap: { backgroundColor: C.BLACK, overflow: 'hidden', aspectRatio: 16 / 9 },
+  thumbWrap: { backgroundColor: C.BLACK, overflow: 'hidden' },
   thumb: { width: '100%', height: '100%' },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.SURFACE_2 },
   thumbIcon: { fontSize: 48, color: C.SUBTLE },
@@ -255,14 +261,12 @@ const styles = StyleSheet.create({
   reactBtn: {
     backgroundColor: C.ACCENT,
     borderRadius: RADIUS.MD,
-    marginHorizontal: SPACE.LG,
     marginBottom: SPACE.LG,
     padding: SPACE.LG,
     alignItems: 'center',
   },
   reactBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD },
   reactedBadge: {
-    marginHorizontal: SPACE.LG,
     marginBottom: SPACE.LG,
     padding: SPACE.MD,
     borderRadius: RADIUS.MD,
@@ -300,4 +304,16 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   backIcon: { color: C.WHITE, fontSize: 26, lineHeight: 30, fontFamily: FONT.BODY },
+  thumbBlind: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: C.BLACK,
+  },
+  thumbBlindIcon: { fontSize: 80, color: 'rgba(255,255,255,0.35)', fontWeight: '700', fontFamily: FONT.DISPLAY_SEMIBOLD },
+  thumbBlindImg: { width: 160, height: 200, opacity: 0.85 },
+  blindOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingTop: SPACE.LG,
+  },
+  videoTitleObscured: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: 'rgba(255,255,255,0.7)', fontStyle: 'italic' },
 });
