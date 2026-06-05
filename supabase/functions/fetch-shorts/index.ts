@@ -42,6 +42,7 @@ async function searchCategory(category: string, q: string) {
       title:    (item.snippet.title ?? '') as string,
       thumbnail:(item.snippet.thumbnails?.high?.url ?? item.snippet.thumbnails?.default?.url ?? '') as string,
       channel:  (item.snippet.channelTitle ?? '') as string,
+      publishedAt: item.snippet.publishedAt ?? null,
       category,
     }));
 }
@@ -124,6 +125,7 @@ serve(async (req) => {
           channel:    c.channel,
           duration:   c.duration,
           category:   c.category,
+          published_at: c.publishedAt,
           fetched_at: new Date().toISOString(),
         }));
 
