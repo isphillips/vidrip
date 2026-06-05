@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity, Modal, FlatList,
@@ -209,6 +209,23 @@ export default function ChannelScreen({
     try { await deleteChannelPost(postId); } catch { load(true); }
   }, [load]);
 
+  // Public grid: unseen (unreacted) videos bubble to top, pinned stays first.
+  // Stable within each group — preserves the query's pinned-then-recency order.
+  const gridPosts = useMemo(() => {
+    const rank = (p: ChannelPost) => {
+      if (p.is_pinned) { return 0; }
+      const seen = isOwner || p.poster_id === user?.id || p.has_my_reaction;
+      return seen ? 2 : 1;
+    };
+    return posts
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => {
+        const ra = rank(a.p), rb = rank(b.p);
+        return ra !== rb ? ra - rb : a.i - b.i;
+      })
+      .map(({ p }) => p);
+  }, [posts, isOwner, user?.id]);
+
   // ── Audio recording handlers ──────────────────────────────────────────────
   const handleMicPressIn = useCallback(async () => {
     setIsHoldingMic(true);
@@ -320,10 +337,10 @@ export default function ChannelScreen({
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
       ) : isPublic ? (
         <FlatList
-          data={posts}
+          data={gridPosts}
           keyExtractor={item => item.id}
           numColumns={2}
-          contentContainerStyle={posts.length === 0 ? styles.emptyContainer : styles.grid}
+          contentContainerStyle={gridPosts.length === 0 ? styles.emptyContainer : styles.grid}
           columnWrapperStyle={styles.gridRow}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}
           ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyText}>No posts yet</Text></View>}
