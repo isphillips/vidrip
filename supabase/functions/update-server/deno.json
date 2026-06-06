@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@hot-updater/server/runtime": "npm:@hot-updater/server@0.32.0/runtime",
+    "@hot-updater/supabase/edge": "npm:@hot-updater/supabase@0.32.0/edge"
+  }
+}
