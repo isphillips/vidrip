@@ -12,9 +12,13 @@ export default function WatchYouTubePostScreen({
   const { postId, channelId } = route.params;
   const { user } = useAuthStore();
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok'>('youtube');
 
   useEffect(() => {
-    fetchChannelPost(postId).then(p => setVideoId(p?.yt_video_id ?? null));
+    fetchChannelPost(postId).then(p => {
+      setVideoId(p?.yt_video_id ?? null);
+      setSourceType(p?.source_type ?? 'youtube');
+    });
   }, [postId]);
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
@@ -33,6 +37,7 @@ export default function WatchYouTubePostScreen({
   return (
     <ReactionRecorder
       videoId={videoId}
+      sourceType={sourceType}
       onBack={onBack}
       uploadingText="Posting reaction…"
       onSave={onSave}

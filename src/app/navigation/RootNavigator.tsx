@@ -5,12 +5,11 @@ import { ActivityIndicator, Linking, View } from 'react-native';
 import type { NavigationContainerRef } from '@react-navigation/native';
 import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
-import { useAuthStore, DEV_BYPASS_AUTH, DEV_FAKE_USER, DEV_FAKE_PROFILE } from '../../store/authStore';
+import { useAuthStore } from '../../store/authStore';
 import { ensureReactionsDir } from '../../infrastructure/storage/localReactionStorage';
 import {
   bootstrapNotifications,
   registerPushToken,
-  unregisterPushToken,
   setNotificationOpenedHandler,
   setChannelNotificationHandler,
 } from '../../infrastructure/notifications/pushService';
@@ -52,14 +51,6 @@ export default function RootNavigator() {
   }, []);
 
   useEffect(() => {
-    if (DEV_BYPASS_AUTH) {
-      // Skip Supabase auth entirely; seed a fake session so the gate renders Main.
-      setSession({ user: DEV_FAKE_USER } as any);
-      setProfile(DEV_FAKE_PROFILE);
-      setLoading(false);
-      return;
-    }
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setTimeout(async () => {

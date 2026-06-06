@@ -147,7 +147,8 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   const hasReacted = thread.my_status === 'reacted';
   const canReact = !isSender && !hasReacted;
   const obscured = canReact;
-  const thumbnail = `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg`;
+  const thumbnail = thread.video_thumbnail ??
+    (thread.source_type === 'youtube' ? `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg` : null);
 
   return (
     <View style={styles.container}>
@@ -174,7 +175,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
           ) : null}
           {canReact ? (
             <TouchableOpacity style={styles.reactBtn} activeOpacity={0.85}
-              onPress={() => navigation.getParent()?.navigate('RecordReaction', { threadId, videoId: thread.video_id })}>
+              onPress={() => navigation.getParent()?.navigate('RecordReaction', { threadId, videoId: thread.video_id, sourceType: thread.source_type })}>
               <Text style={styles.reactBtnText}>Record Your Reaction</Text>
             </TouchableOpacity>
           ) : hasReacted ? (

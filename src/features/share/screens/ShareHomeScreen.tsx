@@ -12,6 +12,7 @@ import {
 } from '../../../infrastructure/supabase/queries/shorts';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import { sendThread } from '../../../infrastructure/supabase/queries/threads';
+import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
 import { useAuthStore } from '../../../store/authStore';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
 
@@ -43,7 +44,7 @@ function DurationBadge({ seconds }: { seconds: number }) {
 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string };
+type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok' };
 type Mode = 'browse' | 'paste';
 const PAGE = 50;
 const DRAWER_HEIGHT_PCT = 0.68;
@@ -172,6 +173,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         selectedVideo.title,
         selectedVideo.thumbnail,
         [...selectedFriends],
+        selectedVideo.sourceType ?? 'youtube',
       );
       setSentThisSession(prev => new Set([...prev, ...selectedFriends]));
       setSelectedFriends(new Set());
@@ -187,8 +189,24 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
   // ── Paste flow ──────────────────────────────────────────────────────────────
   const handlePastePreview = async () => {
+    // TikTok first — if it parses as a TikTok URL, treat as TikTok.
+    const ttId = extractTikTokId(url.trim());
+    if (ttId) {
+      setPasting(true);
+      const meta = await fetchTikTokMeta(ttId);
+      setPasting(false);
+      openPlayer({
+        videoId: ttId,
+        title: meta?.title || 'TikTok',
+        thumbnail: meta?.thumbnail || '',
+        channelTitle: meta?.author || '',
+        sourceType: 'tiktok',
+      });
+      return;
+    }
+
     const videoId = extractYouTubeId(url.trim());
-    if (!videoId) { Alert.alert('Invalid Link', 'Paste a YouTube Shorts link to continue.'); return; }
+    if (!videoId) { Alert.alert('Invalid Link', 'Paste a YouTube Shorts or TikTok link to continue.'); return; }
     setPasting(true);
     let title = 'YouTube Short';
     let thumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
@@ -237,10 +255,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       {/* Paste mode */}
       {mode === 'paste' ? (
         <View style={styles.pasteContainer}>
-          <Text style={styles.pasteLabel}>YouTube Shorts URL</Text>
+          <Text style={styles.pasteLabel}>YouTube or TikTok URL</Text>
           <TextInput
             style={styles.pasteInput} value={url} onChangeText={setUrl}
-            placeholder="https://youtube.com/shorts/..." placeholderTextColor={C.SUBTLE}
+            placeholder="Paste a YouTube Shorts or TikTok link" placeholderTextColor={C.SUBTLE}
             autoCapitalize="none" autoCorrect={false} keyboardType="url" autoFocus
           />
           <TouchableOpacity
@@ -307,7 +325,9 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         <Animated.View style={[styles.playerOverlay, { opacity: playerOpacity, transform: [{ scale: playerScale }] }]}>
           <WebView
             style={StyleSheet.absoluteFill}
-            source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56.25vh;height:100vh;min-width:100vw;min-height:177.78vw}</style></head><body><iframe src="https://www.youtube.com/embed/${selectedVideo.videoId}?autoplay=1&playsinline=1&controls=1&rel=0&modestbranding=1&origin=https://youtube.com" frameborder="0" allow="autoplay;fullscreen" allowfullscreen></iframe></body></html>`, baseUrl: 'https://youtube.com' }}
+            source={selectedVideo.sourceType === 'tiktok'
+              ? { html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{width:100vw;height:100vh;border:0}</style></head><body><iframe id="tt" src="${tikTokPlayerUrl(selectedVideo.videoId, { controls: true, autoplay: true })}" allow="autoplay;fullscreen;encrypted-media" allowfullscreen></iframe><script>(function(){var f=document.getElementById('tt');function cmd(t){f.contentWindow.postMessage({'x-tiktok-player':true,type:t},'*');}window.addEventListener('message',function(e){var d=e.data;if(typeof d==='string'){try{d=JSON.parse(d);}catch(_){return;}}if(d&&d.type==='onPlayerReady'){cmd('unMute');cmd('play');}});document.addEventListener('click',function(){cmd('unMute');cmd('play');});document.addEventListener('touchstart',function(){cmd('unMute');cmd('play');});})();</script></body></html>`, baseUrl: 'https://www.tiktok.com' }
+              : { html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56.25vh;height:100vh;min-width:100vw;min-height:177.78vw}</style></head><body><iframe src="https://www.youtube.com/embed/${selectedVideo.videoId}?autoplay=1&playsinline=1&controls=1&rel=0&modestbranding=1&origin=https://youtube.com" frameborder="0" allow="autoplay;fullscreen" allowfullscreen></iframe></body></html>`, baseUrl: 'https://youtube.com' }}
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             allowsFullscreenVideo={false}

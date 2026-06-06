@@ -60,7 +60,7 @@ export type ShareStackParamList = {
 
 // Record stack
 export type RecordStackParamList = {
-  RecordReaction: { threadId: string; videoId: string };
+  RecordReaction: { threadId: string; videoId: string; sourceType?: 'youtube' | 'tiktok' };
 };
 
 export type AuthStackScreenProps<T extends keyof AuthStackParamList> =

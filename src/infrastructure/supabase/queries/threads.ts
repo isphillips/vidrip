@@ -7,6 +7,7 @@ export type FeedThread = {
   video_id: string;
   video_title: string | null;
   video_thumbnail: string | null;
+  source_type: 'youtube' | 'tiktok';
   sender_id: string;
   created_at: string;
   sender: { handle: string; display_name: string } | null;
@@ -18,6 +19,8 @@ export type ThreadDetail = {
   id: string;
   video_id: string;
   video_title: string | null;
+  video_thumbnail: string | null;
+  source_type: 'youtube' | 'tiktok';
   sender_id: string;
   created_at: string;
   sender: { handle: string; display_name: string } | null;
@@ -34,6 +37,7 @@ export type ReactionItem = {
   emoji_reactions: { emoji: string; user_id: string }[];
   yt_video_id: string | null;
   yt_start_offset: number;
+  source_type: 'youtube' | 'tiktok';
   // Resolved at fetch time by resolveReactionUri
   resolvedUri: string | null;
   needsDownload: boolean;         // true = cloud URL available but not yet local
@@ -43,7 +47,7 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
   const { data, error } = await supabase
     .from('threads')
     .select(`
-      id, video_id, video_title, video_thumbnail, sender_id, created_at,
+      id, video_id, video_title, video_thumbnail, source_type, sender_id, created_at,
       sender:users!sender_id(handle, display_name),
       thread_members(user_id, status),
       reactions(id)
@@ -59,6 +63,7 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
       video_id: t.video_id,
       video_title: t.video_title,
       video_thumbnail: t.video_thumbnail,
+      source_type: t.source_type ?? 'youtube',
       sender_id: t.sender_id,
       created_at: t.created_at,
       sender: t.sender,
@@ -72,7 +77,7 @@ export async function fetchThread(threadId: string, userId: string): Promise<Thr
   const { data, error } = await supabase
     .from('threads')
     .select(`
-      id, video_id, video_title, sender_id, created_at,
+      id, video_id, video_title, video_thumbnail, source_type, sender_id, created_at,
       sender:users!sender_id(handle, display_name),
       thread_members(user_id, status)
     `)
@@ -86,6 +91,8 @@ export async function fetchThread(threadId: string, userId: string): Promise<Thr
     id: data.id,
     video_id: data.video_id,
     video_title: data.video_title,
+    video_thumbnail: (data as any).video_thumbnail ?? null,
+    source_type: (data as any).source_type ?? 'youtube',
     sender_id: data.sender_id,
     created_at: data.created_at,
     sender: (data as any).sender,
@@ -100,6 +107,7 @@ async function hydrateReaction(raw: any): Promise<ReactionItem> {
     storage_mode: raw.storage_mode ?? 'cloud',
     yt_video_id: raw.yt_video_id ?? null,
     yt_start_offset: raw.yt_start_offset ?? 0,
+    source_type: raw.source_type ?? 'youtube',
     resolvedUri: null,
     needsDownload: false,
   };
@@ -115,7 +123,7 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
   const { data, error } = await supabase
     .from('reactions')
     .select(`
-      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset,
+      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id)
     `)
@@ -130,7 +138,7 @@ export async function fetchReactions(threadId: string): Promise<ReactionItem[]> 
   const { data, error } = await supabase
     .from('reactions')
     .select(`
-      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset,
+      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id)
     `)
@@ -170,6 +178,7 @@ export async function sendThread(
   videoTitle: string,
   videoThumbnail: string,
   recipientIds: string[],
+  sourceType: 'youtube' | 'tiktok' = 'youtube',
 ): Promise<{ threadId: string; alreadySentTo: string[] }> {
   // Find or create the thread for this (sender, video) pair — stacking behaviour.
   // Use limit(1) + order so legacy duplicates don't break the lookup.
@@ -208,7 +217,7 @@ export async function sendThread(
   } else {
     const { data: thread, error: threadError } = await supabase
       .from('threads')
-      .insert({ video_id: videoId, video_title: videoTitle, video_thumbnail: videoThumbnail, sender_id: senderId })
+      .insert({ video_id: videoId, video_title: videoTitle, video_thumbnail: videoThumbnail, source_type: sourceType, sender_id: senderId })
       .select('id')
       .single();
 

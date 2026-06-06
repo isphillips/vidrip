@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
+import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
 import {
   View,
   Text,
@@ -99,6 +100,7 @@ export default function WatchReactionScreen({
   const [sessionReady, setSessionReady] = useState(false);
   const videoRef = useRef<any>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
+  const ttRef = useRef<TikTokPlayerHandle>(null);
 
   // Load reaction + emoji reactions
   useEffect(() => {
@@ -159,6 +161,12 @@ export default function WatchReactionScreen({
       setPaused(true); setProgress(0); videoRef.current?.seek(0);
     }
   }, [videoRef]);
+
+  // TikTok has no `play` prop (unlike YoutubePlayer), so push our paused state in.
+  useEffect(() => {
+    if (reaction?.source_type !== 'tiktok') { return; }
+    if (paused) { ttRef.current?.pause(); } else { ttRef.current?.play(); }
+  }, [paused, reaction?.source_type]);
 
   const handleEnd = useCallback(() => {
     setPaused(true);
@@ -261,14 +269,15 @@ export default function WatchReactionScreen({
         />
       </View>
 
-      {/* Tap-to-play background — disabled on Android when YouTube controls playback */}
+      {/* Tap-to-play background — only when there's NO source PIP. When a PIP is
+          present, the source video's controls drive the reaction (no main controls). */}
       <Pressable
         style={StyleSheet.absoluteFill}
-        onPress={Platform.OS === 'android' && reaction?.yt_video_id ? undefined : handlePlayPause}
+        onPress={reaction?.yt_video_id ? undefined : handlePlayPause}
       />
 
-      {/* Play icon — shown when paused and tap-to-play is active */}
-      {paused && !(Platform.OS === 'android' && reaction?.yt_video_id) && (
+      {/* Play icon — only when tap-to-play is active (no PIP). */}
+      {paused && !reaction?.yt_video_id && (
         <View style={styles.playOverlay} pointerEvents="none">
           <View style={styles.playCircle}>
             <Text style={styles.playIcon}>▶</Text>
@@ -280,15 +289,29 @@ export default function WatchReactionScreen({
       {!hasStarted && (
         <View style={styles.startPrompt} pointerEvents="none">
           <Text style={styles.startPromptText}>
-            {Platform.OS === 'android' && reaction?.yt_video_id
-              ? 'Tap ▶ on the YouTube video to start'
-              : reaction?.yt_video_id ? 'Tap ▶ to play reaction' : 'Tap to play reaction'}
+            {reaction?.yt_video_id ? 'Tap ▶ on the video to start' : 'Tap to play reaction'}
           </Text>
         </View>
       )}
 
-      {/* YouTube PIP — vertical cover fill */}
-      {sessionReady && reaction?.yt_video_id && (() => {
+      {/* Source-video PIP */}
+      {sessionReady && reaction?.yt_video_id && reaction.source_type === 'tiktok' && (
+        // TikTok is already vertical (9:16) — fill the PIP directly, no cover-fill.
+        <View style={[styles.ytPip, { bottom: bottomInset + 100, right: SPACE.LG }]}>
+          <TikTokPlayer
+            ref={ttRef}
+            startMuted
+            style={{ width: styles.ytPip.width, height: styles.ytPip.height, backgroundColor: '#000' }}
+            videoId={reaction.yt_video_id}
+            onChangeState={handleYtStateChange}
+            onReady={() => {
+              const offset = reaction.yt_start_offset ?? 0;
+              if (offset > 0) { ttRef.current?.seekTo(offset); }
+            }}
+          />
+        </View>
+      )}
+      {sessionReady && reaction?.yt_video_id && reaction.source_type !== 'tiktok' && (() => {
         const pipH = styles.ytPip.height;
         const pipW = styles.ytPip.width;
         const coverW = Math.round(pipH * (16 / 9));

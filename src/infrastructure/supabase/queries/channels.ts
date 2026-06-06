@@ -25,6 +25,7 @@ export type ChannelPost = {
   poster_id: string;
   poster: { handle: string } | null;
   post_type: 'youtube' | 'clip' | 'audio' | 'status';
+  source_type: 'youtube' | 'tiktok';
   yt_video_id: string | null;
   yt_video_title: string | null;
   yt_video_thumbnail: string | null;
@@ -38,6 +39,7 @@ export type ChannelPost = {
   has_my_reaction: boolean;
   parent_post_id: string | null;
   parent_yt_video_id: string | null;
+  parent_source_type: 'youtube' | 'tiktok';
 };
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -188,7 +190,7 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
-      id, channel_id, poster_id, post_type, message,
+      id, channel_id, poster_id, post_type, source_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
       video_url, duration, is_pinned, created_at,
       poster:users!poster_id(handle),
@@ -219,6 +221,7 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
     poster_id: p.poster_id,
     poster: p.poster ?? null,
     post_type: p.post_type,
+    source_type: p.source_type ?? 'youtube',
     yt_video_id: p.yt_video_id ?? null,
     yt_video_title: p.yt_video_title ?? null,
     yt_video_thumbnail: p.yt_video_thumbnail ?? null,
@@ -232,6 +235,7 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
     has_my_reaction: reactedIds.has(p.id),
     parent_post_id: p.parent_post_id ?? null,
     parent_yt_video_id: null,
+    parent_source_type: 'youtube',
   }));
 }
 
@@ -252,7 +256,7 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
-      id, channel_id, poster_id, post_type, message,
+      id, channel_id, poster_id, post_type, source_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
       video_url, duration, is_pinned, created_at,
       poster:users!poster_id(handle),
@@ -268,6 +272,7 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
     poster_id: p.poster_id,
     poster: p.poster ?? null,
     post_type: p.post_type,
+    source_type: p.source_type ?? 'youtube',
     yt_video_id: p.yt_video_id ?? null,
     yt_video_title: p.yt_video_title ?? null,
     yt_video_thumbnail: p.yt_video_thumbnail ?? null,
@@ -281,6 +286,7 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
     has_my_reaction: false,
     parent_post_id: p.parent_post_id ?? null,
     parent_yt_video_id: null,
+    parent_source_type: 'youtube',
   }));
 }
 
@@ -288,11 +294,11 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
-      id, channel_id, poster_id, post_type, message,
+      id, channel_id, poster_id, post_type, source_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
       video_url, duration, is_pinned, created_at,
       parent_post_id,
-      parent:channel_posts!parent_post_id(yt_video_id),
+      parent:channel_posts!parent_post_id(yt_video_id, source_type),
       poster:users!poster_id(handle),
       emoji_reactions:channel_post_emoji_reactions(emoji, user_id)
     `)
@@ -303,12 +309,14 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
   return {
     ...data,
     poster: data.poster ?? null,
+    source_type: data.source_type ?? 'youtube',
     message: data.message ?? null,
     emoji_reactions: data.emoji_reactions ?? [],
     reaction_count: 0,
     has_my_reaction: false,
     parent_post_id: data.parent_post_id ?? null,
     parent_yt_video_id: (data.parent as any)?.yt_video_id ?? null,
+    parent_source_type: (data.parent as any)?.source_type ?? 'youtube',
   };
 }
 
@@ -318,6 +326,7 @@ export async function postYouTubeToChannel(params: {
   ytVideoId: string;
   ytVideoTitle: string | null;
   ytVideoThumbnail: string | null;
+  sourceType?: 'youtube' | 'tiktok';
 }): Promise<string> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
@@ -325,6 +334,7 @@ export async function postYouTubeToChannel(params: {
       channel_id: params.channelId,
       poster_id: params.userId,
       post_type: 'youtube',
+      source_type: params.sourceType ?? 'youtube',
       yt_video_id: params.ytVideoId,
       yt_video_title: params.ytVideoTitle,
       yt_video_thumbnail: params.ytVideoThumbnail,

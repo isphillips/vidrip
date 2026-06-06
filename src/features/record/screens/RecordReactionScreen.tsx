@@ -8,7 +8,7 @@ import type { RecordStackScreenProps } from '../../../app/navigation/types';
 export default function RecordReactionScreen({
   route, navigation,
 }: RecordStackScreenProps<'RecordReaction'>) {
-  const { threadId, videoId } = route.params;
+  const { threadId, videoId, sourceType = 'youtube' } = route.params;
   const { user } = useAuthStore();
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
@@ -21,12 +21,14 @@ export default function RecordReactionScreen({
       mode: STORAGE_MODE,
       ytVideoId: videoId,
       ytStartOffset,
+      sourceType,
     });
-  }, [user, threadId, videoId]);
+  }, [user, threadId, videoId, sourceType]);
 
   return (
     <ReactionRecorder
       videoId={videoId}
+      sourceType={sourceType}
       onBack={onBack}
       uploadingText="Saving reaction…"
       onSave={onSave}

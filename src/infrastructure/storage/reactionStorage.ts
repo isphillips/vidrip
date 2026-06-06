@@ -11,6 +11,7 @@ export interface SaveReactionParams {
   mode: StorageMode;
   ytVideoId?: string;
   ytStartOffset?: number;
+  sourceType?: 'youtube' | 'tiktok';
 }
 
 export interface SaveReactionResult {
@@ -48,6 +49,7 @@ export async function saveReaction({
   mode,
   ytVideoId,
   ytStartOffset = 0,
+  sourceType = 'youtube',
 }: SaveReactionParams): Promise<SaveReactionResult> {
 
   if (mode === 'cloud') {
@@ -62,6 +64,7 @@ export async function saveReaction({
         video_url: cloudUrl,
         duration: Math.round(duration),
         storage_mode: 'cloud',
+        source_type: sourceType,
         ...(ytVideoId ? { yt_video_id: ytVideoId, yt_start_offset: ytStartOffset } : {}),
       })
       .select('id')
@@ -87,6 +90,7 @@ export async function saveReaction({
       video_url: null,
       duration: Math.round(duration),
       storage_mode: 'local',
+      source_type: sourceType,
       ...(ytVideoId ? { yt_video_id: ytVideoId, yt_start_offset: ytStartOffset } : {}),
     })
     .select('id')

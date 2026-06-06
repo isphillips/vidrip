@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import Orientation from 'react-native-orientation-locker';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
+import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
 import {
   Camera,
   useCameraDevice,
@@ -46,6 +47,7 @@ const floatStyles = StyleSheet.create({
 
 export interface ReactionRecorderProps {
   videoId?: string;
+  sourceType?: 'youtube' | 'tiktok';
   onSave: (filePath: string, duration: number, ytStartOffset: number) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
@@ -58,6 +60,7 @@ const PIP_H = 155;
 
 export default function ReactionRecorder({
   videoId,
+  sourceType = 'youtube',
   onSave,
   onBack,
   uploadingText = 'Saving…',
@@ -78,6 +81,7 @@ export default function ReactionRecorder({
   const [floating, setFloating] = useState<{ id: number; emoji: string }[]>([]);
 
   const ytRef = useRef<YoutubeIframeRef>(null);
+  const ttRef = useRef<TikTokPlayerHandle>(null);
   const cameraRef = useRef<Camera>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
@@ -195,6 +199,12 @@ export default function ReactionRecorder({
     }
   }, [beginRecording]);
 
+  // TikTok has no `play` prop — push ytPlaying into the player.
+  useEffect(() => {
+    if (sourceType !== 'tiktok') { return; }
+    if (ytPlaying) { ttRef.current?.play(); } else { ttRef.current?.pause(); }
+  }, [ytPlaying, sourceType]);
+
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -211,8 +221,17 @@ export default function ReactionRecorder({
 
   return (
     <View style={styles.container}>
-      {/* YouTube full-screen background (or black if no videoId) */}
-      {videoId ? (() => {
+      {/* Source-video full-screen background (or black if no videoId) */}
+      {videoId && sourceType === 'tiktok' ? (
+        <View style={styles.ytCover}>
+          <TikTokPlayer
+            ref={ttRef}
+            style={{ width, height, backgroundColor: '#000' }}
+            videoId={videoId}
+            onChangeState={onYtStateChange}
+          />
+        </View>
+      ) : videoId ? (() => {
         const coverW = Math.round(height * (16 / 9));
         const offsetX = -Math.round((coverW - width) / 2);
         return (

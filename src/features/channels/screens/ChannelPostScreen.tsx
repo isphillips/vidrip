@@ -140,7 +140,7 @@ export default function ChannelPostScreen({
   }
 
   const thumbnail = post.yt_video_thumbnail ??
-    (post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null);
+    (post.source_type === 'youtube' && post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null);
   const hasReacted = reactions.some(r => r.poster_id === user?.id);
   const obscured = !hasReacted && post.poster_id !== user?.id;
 

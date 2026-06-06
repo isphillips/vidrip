@@ -4,6 +4,7 @@ import {
   ActivityIndicator, useWindowDimensions, Platform,
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
+import TikTokPlayer from '../../../components/TikTokPlayer';
 import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import Animated, {
   useSharedValue, useAnimatedStyle,
@@ -84,6 +85,7 @@ export default function WatchChannelClipScreen({
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [sessionReady, setSessionReady] = useState(false);
   const [parentYtVideoId, setParentYtVideoId] = useState<string | null>(null);
+  const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok'>('youtube');
 
   const videoRef = useRef<any>(null);
   const ytRef = useRef<any>(null);
@@ -97,7 +99,12 @@ export default function WatchChannelClipScreen({
       // Fetch parent post's YouTube video ID for PIP
       if (p.parent_post_id) {
         fetchChannelPost(p.parent_post_id)
-          .then(parent => { if (parent?.yt_video_id) { setParentYtVideoId(parent.yt_video_id); } })
+          .then(parent => {
+            if (parent?.yt_video_id) {
+              setParentYtVideoId(parent.yt_video_id);
+              setParentSourceType(parent.source_type ?? 'youtube');
+            }
+          })
           .catch(() => {});
       }
 
@@ -274,8 +281,22 @@ export default function WatchChannelClipScreen({
         </View>
       )}
 
-      {/* YouTube PIP — YouTube controls drive reaction playback */}
-      {sessionReady && parentYtVideoId && (() => {
+      {/* Source-video PIP — its controls drive reaction playback */}
+      {sessionReady && parentYtVideoId && parentSourceType === 'tiktok' && (
+        <View style={[styles.ytPip, { bottom: bottomInset + 100, right: SPACE.LG }]}>
+          <TikTokPlayer
+            startMuted
+            style={{ width: styles.ytPip.width, height: styles.ytPip.height, backgroundColor: '#000' }}
+            videoId={parentYtVideoId}
+            onChangeState={(state) => {
+              if (state === 'playing') { setPaused(false); setHasStarted(true); }
+              else if (state === 'paused') { setPaused(true); }
+              else if (state === 'ended') { setPaused(true); setProgress(0); videoRef.current?.seek(0); }
+            }}
+          />
+        </View>
+      )}
+      {sessionReady && parentYtVideoId && parentSourceType !== 'tiktok' && (() => {
         const pipH = styles.ytPip.height;
         const pipW = styles.ytPip.width;
         const coverW = Math.round(pipH * (16 / 9));

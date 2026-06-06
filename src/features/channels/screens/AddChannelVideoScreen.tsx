@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { postYouTubeToChannel } from '../../../infrastructure/supabase/queries/channels';
+import { extractTikTokId, fetchTikTokMeta } from '../../../infrastructure/tiktok/api';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 function extractVideoId(input: string): string | null {
@@ -49,19 +50,36 @@ export default function AddChannelVideoScreen({
   const [input, setInput] = useState('');
   const [videoId, setVideoId] = useState<string | null>(null);
   const [title, setTitle] = useState<string | null>(null);
+  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok'>('youtube');
+  const [thumb, setThumb] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [posting, setPosting] = useState(false);
 
   const handlePreview = useCallback(async () => {
+    // TikTok first.
+    const ttId = extractTikTokId(input);
+    if (ttId) {
+      setPreviewing(true);
+      const meta = await fetchTikTokMeta(ttId);
+      setVideoId(ttId);
+      setTitle(meta?.title ?? 'TikTok');
+      setThumb(meta?.thumbnail ?? null);
+      setSourceType('tiktok');
+      setPreviewing(false);
+      return;
+    }
+
     const id = extractVideoId(input);
     if (!id) {
-      Alert.alert('Invalid URL', 'Paste a YouTube link or video ID.');
+      Alert.alert('Invalid URL', 'Paste a YouTube or TikTok link.');
       return;
     }
     setPreviewing(true);
     const t = await fetchVideoTitle(id);
     setVideoId(id);
     setTitle(t);
+    setThumb(`https://img.youtube.com/vi/${id}/hqdefault.jpg`);
+    setSourceType('youtube');
     setPreviewing(false);
   }, [input]);
 
@@ -74,18 +92,17 @@ export default function AddChannelVideoScreen({
         userId: user.id,
         ytVideoId: videoId,
         ytVideoTitle: title,
-        ytVideoThumbnail: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        ytVideoThumbnail: thumb,
+        sourceType,
       });
       navigation.goBack();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Could not post video.');
       setPosting(false);
     }
-  }, [videoId, user?.id, channelId, title, navigation]);
+  }, [videoId, user?.id, channelId, title, thumb, sourceType, navigation]);
 
-  const thumbnail = videoId
-    ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-    : null;
+  const thumbnail = thumb;
 
   return (
     <KeyboardAvoidingView
@@ -105,13 +122,13 @@ export default function AddChannelVideoScreen({
           <View style={{ width: 52 }} />
         </View>
 
-        <Text style={styles.label}>YouTube URL or Video ID</Text>
+        <Text style={styles.label}>YouTube or TikTok URL</Text>
         <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
             value={input}
             onChangeText={v => { setInput(v); setVideoId(null); setTitle(null); }}
-            placeholder="https://youtube.com/watch?v=…"
+            placeholder="Paste a YouTube or TikTok link"
             placeholderTextColor={C.SUBTLE}
             autoCapitalize="none"
             autoCorrect={false}
