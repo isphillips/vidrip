@@ -4,6 +4,11 @@
 
 # ENV
 .env
+.env.*
+!.env.example
+
+# hot-updater generated scaffold + CLI cache
+.hot-updater/
 
 # Xcode
 #
