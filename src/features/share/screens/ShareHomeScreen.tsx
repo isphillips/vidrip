@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, FlatList, StyleSheet,
   TouchableOpacity, Image, ActivityIndicator, Alert,
   ScrollView, useWindowDimensions, Animated, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import {
@@ -13,6 +14,7 @@ import {
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import { sendThread } from '../../../infrastructure/supabase/queries/threads';
 import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
+import { fetchMembersOnlyVideos } from '../../../infrastructure/supabase/queries/channels';
 import { useAuthStore } from '../../../store/authStore';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
 
@@ -44,7 +46,7 @@ function DurationBadge({ seconds }: { seconds: number }) {
 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok' };
+type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok'; createdAt?: string };
 type Mode = 'browse' | 'paste';
 const PAGE = 50;
 const DRAWER_HEIGHT_PCT = 0.68;
@@ -60,6 +62,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [category, setCategory] = useState<Category>('all');
   const [query, setQuery]       = useState('');
   const [results, setResults]   = useState<ShortRow[]>([]);
+  const [memberVideos, setMemberVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading]   = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searching, setSearching]    = useState(false);
@@ -102,6 +105,23 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     } catch (e) { console.error('[ShareHome]', e); }
     finally { setLoading(false); setLoadingMore(false); }
   }, []);
+
+  // Members Only videos from channels the user has JOINED — refetch on focus so
+  // joining/leaving a channel elsewhere is reflected here.
+  useFocusEffect(useCallback(() => {
+    if (!user?.id) { setMemberVideos([]); return; }
+    fetchMembersOnlyVideos(user.id).then(setMemberVideos).catch(() => {});
+  }, [user?.id]));
+
+  // Grid = Members Only videos interleaved into the YouTube shorts feed by recency
+  // (newest first), rather than pinned to the top. Search results stay as-is.
+  const gridData = useMemo(() => {
+    type GridItem = VideoItem & { duration?: number; fetchedAt?: string };
+    const shorts = results.map(r => ({ ...r })) as GridItem[];
+    if (query.trim()) { return shorts; }
+    const sortTs = (it: GridItem) => it.fetchedAt ?? it.createdAt ?? '';
+    return [...memberVideos, ...shorts].sort((a, b) => sortTs(b).localeCompare(sortTs(a)));
+  }, [results, memberVideos, query]);
 
   useEffect(() => {
     if (mode !== 'browse') { return; }
@@ -296,7 +316,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
             <View style={styles.center}><ActivityIndicator color={C.ACCENT} /></View>
           ) : (
             <FlatList
-              data={results}
+              data={gridData}
               keyExtractor={item => item.videoId}
               numColumns={2}
               contentContainerStyle={styles.grid}
@@ -308,7 +328,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               renderItem={({ item }) => (
                 <TouchableOpacity style={[styles.card, { width: cardW }]} onPress={() => openPlayer(item)} activeOpacity={0.8}>
                   <Image source={{ uri: item.thumbnail }} style={[styles.cardThumb, { height: cardH }]} resizeMode="cover" />
-                  <DurationBadge seconds={item.duration} />
+                  {item.duration != null && <DurationBadge seconds={item.duration} />}
                   <View style={styles.cardInfo}>
                     <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
                     <Text style={styles.cardChannel} numberOfLines={1}>{item.channelTitle}</Text>

@@ -27,27 +27,27 @@ export default function RadioToggle({ options, value, onChange }: Props) {
   );
 }
 
+// Mirrors the Browse/Paste Link segmented toggle on the Share screen.
 const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
     backgroundColor: C.SURFACE,
-    borderRadius: RADIUS.FULL,
-    borderWidth: 1,
-    borderColor: C.BORDER,
+    borderRadius: RADIUS.MD,
     padding: 3,
-    alignSelf: 'center',
+    gap: 3,
   },
   pill: {
-    paddingHorizontal: SPACE.LG,
-    paddingVertical: SPACE.XS + 2,
-    borderRadius: RADIUS.FULL,
+    flex: 1,
+    paddingVertical: SPACE.SM,
+    alignItems: 'center',
+    borderRadius: RADIUS.SM,
   },
   pillActive: {
     backgroundColor: C.ACCENT,
   },
   label: {
     fontSize: FONT.SIZES.SM,
-    fontFamily: FONT.BODY_MEDIUM,
+    fontFamily: FONT.BODY_SEMIBOLD,
     color: C.MUTED,
   },
   labelActive: {

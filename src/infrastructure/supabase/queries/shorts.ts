@@ -7,6 +7,7 @@ export type ShortRow = {
   channelTitle: string;
   duration:     number;
   category:     string;
+  fetchedAt:    string;   // recency axis for interleaving with member videos
 };
 
 function mapRow(r: any): ShortRow {
@@ -17,6 +18,7 @@ function mapRow(r: any): ShortRow {
     channelTitle: r.channel ?? '',
     duration:     r.duration,
     category:     r.category,
+    fetchedAt:    r.fetched_at ?? '',
   };
 }
 
@@ -27,7 +29,7 @@ export async function fetchShorts(
 ): Promise<ShortRow[]> {
   let q = (supabase as any)
     .from('shorts')
-    .select('video_id, title, thumbnail, channel, duration, category')
+    .select('video_id, title, thumbnail, channel, duration, category, fetched_at')
     .order('fetched_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -43,7 +45,7 @@ export async function fetchShorts(
 export async function searchShorts(query: string, limit = 50): Promise<ShortRow[]> {
   const { data, error } = await (supabase as any)
     .from('shorts')
-    .select('video_id, title, thumbnail, channel, duration, category')
+    .select('video_id, title, thumbnail, channel, duration, category, fetched_at')
     .ilike('title', `%${query}%`)
     .order('fetched_at', { ascending: false })
     .limit(limit);

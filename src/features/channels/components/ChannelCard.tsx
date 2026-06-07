@@ -16,6 +16,9 @@ export default function ChannelCard({ channel, userId, onPress }: Props) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.body}>
+        {channel.avatar_url ? (
+          <Image source={{ uri: channel.avatar_url }} style={styles.avatar} resizeMode="cover" />
+        ) : null}
         <View style={styles.meta}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>{channel.name}</Text>
@@ -73,6 +76,21 @@ const styles = StyleSheet.create({
     gap: SPACE.MD,
   },
   meta: { flex: 1, gap: SPACE.XS },
+  avatar: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: C.SURFACE_2,
+  },
+  moBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(180,130,40,0.15)',
+    borderRadius: RADIUS.FULL,
+    paddingHorizontal: SPACE.SM, paddingVertical: 1,
+    borderWidth: 1, borderColor: 'rgba(180,130,40,0.5)',
+  },
+  moBadgeText: {
+    fontSize: 9, fontFamily: FONT.BODY_BOLD, letterSpacing: 0.8,
+    color: 'rgba(200,155,50,1)',
+  },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
   unreadDot: {
     width: 8, height: 8, borderRadius: 4,

@@ -6,6 +6,8 @@ import type { NavigationContainerRef } from '@react-navigation/native';
 import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
 import { useAuthStore } from '../../store/authStore';
+import { useOAuthStore } from '../../store/oauthStore';
+import { parseOAuthDeepLink } from '../../infrastructure/oauth/config';
 import { ensureReactionsDir } from '../../infrastructure/storage/localReactionStorage';
 import {
   bootstrapNotifications,
@@ -94,6 +96,10 @@ export default function RootNavigator() {
 
   const handleDeepLink = async (url: string) => {
     if (!url.startsWith('reaxn://')) { return; }
+
+    // OAuth account-sync redirect → hand to AccountScreen to run the sync.
+    const oauth = parseOAuthDeepLink(url);
+    if (oauth) { useOAuthStore.getState().setPending(oauth); return; }
 
     const hash = url.split('#')[1];
     if (hash) {

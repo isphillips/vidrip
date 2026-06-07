@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,30 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Switch,
+  Linking,
+  Image,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
 import { useAuthStore } from '../../../store/authStore';
+import { useOAuthStore } from '../../../store/oauthStore';
+import {
+  fetchSyncedAccounts,
+  syncOAuthCode,
+  setSyncedAccountEnabled,
+  disconnectSyncedAccount,
+  type SyncedAccount,
+} from '../../../infrastructure/supabase/queries/syncedAccounts';
+import { buildAuthUrl, type SyncProvider } from '../../../infrastructure/oauth/config';
 import type { AccountStackScreenProps } from '../../../app/navigation/types';
+
+const PROVIDERS: { key: SyncProvider; label: string }[] = [
+  { key: 'youtube', label: 'YouTube' },
+  { key: 'tiktok', label: 'TikTok' },
+];
 
 export default function AccountScreen({ navigation }: AccountStackScreenProps<'AccountHome'>) {
   const { top } = useSafeAreaInsets();
@@ -23,6 +41,63 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   const [savingPhone, setSavingPhone] = useState(false);
 
   const phoneDirty = phone.trim() !== ((profile as any)?.phone ?? '');
+
+  // ── Synced accounts ─────────────────────────────────────────────────────────
+  const [synced, setSynced] = useState<SyncedAccount[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const { pending, clearPending } = useOAuthStore();
+
+  const loadSynced = useCallback(async () => {
+    if (!user?.id) { return; }
+    try { setSynced(await fetchSyncedAccounts(user.id)); } catch { /* ignore */ }
+  }, [user?.id]);
+
+  useFocusEffect(useCallback(() => { loadSynced(); }, [loadSynced]));
+
+  // Open the provider auth in the system browser (providers block embedded WebViews).
+  const handleConnect = (provider: SyncProvider) => {
+    Linking.openURL(buildAuthUrl(provider).url).catch(() =>
+      Alert.alert('Error', 'Could not open the login page.'));
+  };
+
+  // The oauth-callback deep link lands here via the store → run the sync.
+  useEffect(() => {
+    if (!pending) { return; }
+    const { provider, code, error } = pending;
+    clearPending();
+    const label = PROVIDERS.find(p => p.key === provider)?.label ?? 'Account';
+    // Provider rejected the request (e.g. unauthorized scope) — no code came back.
+    if (error || !code) {
+      Alert.alert(
+        `Couldn't connect ${label}`,
+        error ?? 'The login was cancelled or returned no authorization code.',
+      );
+      return;
+    }
+    setSyncing(true);
+    syncOAuthCode(provider, code)
+      .then(loadSynced)
+      .catch((e: any) => Alert.alert('Sync failed', e?.message ?? 'Could not connect account.'))
+      .finally(() => setSyncing(false));
+  }, [pending, clearPending, loadSynced]);
+
+  const handleToggleEnabled = async (acct: SyncedAccount) => {
+    setSynced(prev => prev.map(a => a.id === acct.id ? { ...a, enabled: !a.enabled } : a));
+    try { await setSyncedAccountEnabled(acct.id, !acct.enabled); } catch { loadSynced(); }
+  };
+
+  const handleDisconnect = (acct: SyncedAccount) => {
+    Alert.alert('Disconnect', `Disconnect ${acct.provider === 'tiktok' ? 'TikTok' : 'YouTube'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Disconnect', style: 'destructive',
+        onPress: async () => {
+          try { await disconnectSyncedAccount(acct.id); await loadSynced(); }
+          catch { Alert.alert('Error', 'Could not disconnect.'); }
+        },
+      },
+    ]);
+  };
 
   const handleSavePhone = async () => {
     if (!user?.id || !phoneDirty) { return; }
@@ -94,6 +169,63 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         </View>
       </View>
 
+      {/* Connected accounts */}
+      <Text style={styles.sectionLabel}>Connected Accounts</Text>
+      <Text style={styles.sectionHint}>
+        Enable an account to open a public “Members Only” channel under your handle, so people can react to your videos.
+      </Text>
+      <View style={styles.section}>
+        {PROVIDERS.map(({ key, label }, i) => {
+          const acct = synced.find(a => a.provider === key);
+          return (
+            <View key={key}>
+              {i > 0 && <View style={styles.divider} />}
+              <View style={styles.row}>
+                <View style={styles.syncLeft}>
+                  {acct?.provider_avatar_url ? (
+                    <Image source={{ uri: acct.provider_avatar_url }} style={styles.syncAvatar} />
+                  ) : null}
+                  <View style={styles.syncInfo}>
+                    <Text style={styles.rowLabel}>{label}</Text>
+                    {acct ? (
+                      <Text style={styles.syncHandle} numberOfLines={1}>
+                        {acct.provider_display_name
+                          || (acct.provider_handle ? `@${acct.provider_handle}` : 'Connected')}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+                {acct ? (
+                  <View style={styles.syncRight}>
+                    <Switch
+                      value={acct.enabled}
+                      onValueChange={() => handleToggleEnabled(acct)}
+                      trackColor={{ true: C.ACCENT, false: C.BORDER }}
+                    />
+                    <TouchableOpacity onPress={() => handleDisconnect(acct)} hitSlop={8}>
+                      <Text style={styles.syncDisconnect}>Disconnect</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.connectBtn}
+                    onPress={() => handleConnect(key)}
+                    disabled={syncing}>
+                    <Text style={styles.connectBtnText}>Connect</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })}
+        {syncing && (
+          <View style={styles.syncingRow}>
+            <ActivityIndicator color={C.ACCENT} size="small" />
+            <Text style={styles.syncingText}>Syncing…</Text>
+          </View>
+        )}
+      </View>
+
       {/* Actions */}
       <View style={styles.section}>
         <TouchableOpacity
@@ -158,6 +290,23 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 1,
     marginBottom: SPACE.SM, marginLeft: SPACE.XS,
   },
+  sectionHint: {
+    fontSize: FONT.SIZES.XS, color: C.SUBTLE, fontFamily: FONT.BODY,
+    marginBottom: SPACE.SM, marginLeft: SPACE.XS, marginRight: SPACE.SM, lineHeight: 16,
+  },
+  syncLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACE.MD, flex: 1 },
+  syncAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.SURFACE_2 },
+  syncInfo: { gap: 2, flex: 1 },
+  syncHandle: { fontSize: FONT.SIZES.XS, color: C.MUTED, fontFamily: FONT.BODY },
+  syncRight: { flexDirection: 'row', alignItems: 'center', gap: SPACE.MD },
+  syncDisconnect: { fontSize: FONT.SIZES.SM, color: C.DANGER, fontFamily: FONT.BODY_MEDIUM },
+  connectBtn: {
+    backgroundColor: C.ACCENT, borderRadius: RADIUS.SM,
+    paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM,
+  },
+  connectBtnText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
+  syncingRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, padding: SPACE.LG },
+  syncingText: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY },
   phoneRow: { flexDirection: 'row', alignItems: 'center', padding: SPACE.LG, gap: SPACE.MD },
   phoneInput: { flex: 1, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.INK },
   saveBtn: {

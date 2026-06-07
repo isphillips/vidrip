@@ -11,6 +11,7 @@ import { useAuthStore } from '../../../store/authStore';
 import {
   fetchPublicChannels,
   fetchPrivateChannels,
+  fetchMembersOnlyChannels,
   type ChannelSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 import RadioToggle from '../components/RadioToggle';
@@ -28,6 +29,7 @@ export default function ChannelsHomeScreen({
 
   const [tab, setTab] = useState<Tab>('Public');
   const [publicChannels, setPublicChannels] = useState<ChannelSummary[]>([]);
+  const [membersOnly, setMembersOnly] = useState<ChannelSummary[]>([]);
   const [privateChannels, setPrivateChannels] = useState<ChannelSummary[]>([]);
   const [loadingPublic, setLoadingPublic] = useState(true);
   const [loadingPrivate, setLoadingPrivate] = useState(false);
@@ -38,7 +40,12 @@ export default function ChannelsHomeScreen({
     if (!user) { return; }
     if (!silent) { setLoadingPublic(true); }
     try {
-      setPublicChannels(await fetchPublicChannels(user.id));
+      const [pub, mo] = await Promise.all([
+        fetchPublicChannels(user.id),
+        fetchMembersOnlyChannels(user.id).catch(() => []),
+      ]);
+      setPublicChannels(pub);
+      setMembersOnly(mo);
     } catch (e) {
       console.error('[ChannelsHome] fetchPublicChannels error:', JSON.stringify(e));
     } finally {
@@ -96,7 +103,9 @@ export default function ChannelsHomeScreen({
     navigation.navigate('Channel', {
       channelId: item.id,
       channelName: item.name,
-      isPublic: item.is_public,
+      // Members Only channels are curated creator channels — give them the same
+      // public experience (video grid + react-to-reveal), not the private chat UI.
+      isPublic: item.is_public || !!item.is_members_only,
       isJoined: item.is_joined,
       isOwner: item.created_by === user?.id,
     });
@@ -131,6 +140,26 @@ export default function ChannelsHomeScreen({
               onPress={() => navigateToChannel(item)}
             />
           )}
+          ListHeaderComponent={
+            tab === 'Public' ? (
+              <Text style={styles.curatedLabel}>Curated</Text>
+            ) : null
+          }
+          ListFooterComponent={
+            tab === 'Public' && membersOnly.length > 0 ? (
+              <View style={styles.moSection}>
+                <Text style={styles.moLabel}>Members Only</Text>
+                {membersOnly.map(item => (
+                  <ChannelCard
+                    key={item.id}
+                    channel={item}
+                    userId={user?.id}
+                    onPress={() => navigateToChannel(item)}
+                  />
+                ))}
+              </View>
+            ) : null
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -156,6 +185,17 @@ export default function ChannelsHomeScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
+  moSection: {},
+  curatedLabel: {
+    fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED,
+    textTransform: 'uppercase', letterSpacing: 1,
+    paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD, paddingBottom: SPACE.SM,
+  },
+  moLabel: {
+    fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED,
+    textTransform: 'uppercase', letterSpacing: 1,
+    paddingHorizontal: SPACE.LG, paddingTop: SPACE.XL, paddingBottom: SPACE.SM,
+  },
   header: {
     paddingHorizontal: SPACE.LG,
     paddingBottom: SPACE.MD,

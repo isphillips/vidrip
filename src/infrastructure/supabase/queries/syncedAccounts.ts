@@ -1,0 +1,57 @@
+import { supabase } from '../client';
+import type { SyncProvider } from '../../oauth/config';
+
+export type SyncedAccount = {
+  id: string;
+  provider: SyncProvider;
+  provider_handle: string | null;
+  provider_display_name: string | null;
+  provider_avatar_url: string | null;
+  enabled: boolean;
+  last_synced_at: string | null;
+};
+
+export async function fetchSyncedAccounts(userId: string): Promise<SyncedAccount[]> {
+  const { data, error } = await supabase
+    .from('synced_accounts')
+    .select('id, provider, provider_handle, provider_display_name, provider_avatar_url, enabled, last_synced_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+  if (error) { throw error; }
+  return (data ?? []) as SyncedAccount[];
+}
+
+/**
+ * Hand the OAuth code to the sync-oauth edge function — it exchanges tokens,
+ * stores them server-side, ensures the Members Only channel, and imports videos.
+ */
+export async function syncOAuthCode(provider: SyncProvider, code: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('sync-oauth', {
+    body: { provider, code },
+  });
+  if (error) {
+    // FunctionsHttpError carries the Response — pull out the function's {error} body.
+    let msg = error.message;
+    try {
+      const body = await (error as any).context?.json?.();
+      if (body?.error) { msg = body.error; }
+    } catch { /* keep msg */ }
+    throw new Error(msg);
+  }
+  if (data?.error) { throw new Error(data.error); }
+}
+
+/** Enable/disable a synced account — the DB trigger reconciles channel visibility. */
+export async function setSyncedAccountEnabled(id: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('synced_accounts')
+    .update({ enabled, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) { throw error; }
+}
+
+/** Disconnect (delete) a synced account — cascades tokens; trigger hides channel if none remain. */
+export async function disconnectSyncedAccount(id: string): Promise<void> {
+  const { error } = await supabase.from('synced_accounts').delete().eq('id', id);
+  if (error) { throw error; }
+}

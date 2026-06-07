@@ -290,22 +290,24 @@ const styles = StyleSheet.create({
   },
 
   // Tab toggle
+  // Mirrors the Browse/Paste Link segmented toggle on the Share screen.
   tabRow: {
     flexDirection: 'row',
-    alignSelf: 'center',
+    marginHorizontal: SPACE.LG,
     marginVertical: SPACE.XS,
-    backgroundColor: C.SURFACE_2,
-    borderRadius: RADIUS.FULL,
+    backgroundColor: C.SURFACE,
+    borderRadius: RADIUS.MD,
     padding: 3,
+    gap: 3,
   },
   tabBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: SPACE.LG,
-    borderRadius: RADIUS.FULL,
+    flex: 1,
+    paddingVertical: SPACE.SM,
     alignItems: 'center',
+    borderRadius: RADIUS.SM,
   },
   tabBtnActive:   { backgroundColor: C.ACCENT },
-  tabLabel:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  tabLabel:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED },
   tabLabelActive: { color: C.WHITE },
 
   list:           { paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD, paddingBottom: SPACE.LG, gap: SPACE.MD },

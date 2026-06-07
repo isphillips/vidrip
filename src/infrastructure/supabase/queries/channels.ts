@@ -17,6 +17,8 @@ export type ChannelSummary = {
   is_joined: boolean;
   unread_count: number;
   last_message_at: string | null;
+  is_members_only?: boolean;
+  avatar_url?: string | null;
 };
 
 export type ChannelPost = {
@@ -109,6 +111,114 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     unread_count: joinedIds.has(c.id) ? (unreactedByChannel.get(c.id) ?? 0) : 0,
     last_message_at: null,
   }));
+}
+
+export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelSummary[]> {
+  const [channelsResult, membershipsResult] = await Promise.all([
+    (supabase as any)
+      .from('groups')
+      .select(`
+        id, name, description, is_public, created_by, member_count, avatar_url,
+        pinned_video_id, pinned_video_title, pinned_video_thumbnail,
+        owner:users!created_by(handle)
+      `)
+      .eq('is_members_only', true)
+      .eq('is_hidden', false)
+      .order('member_count', { ascending: false }),
+    (supabase as any).from('group_members').select('group_id').eq('user_id', userId),
+  ]);
+  if (channelsResult.error) { throw channelsResult.error; }
+
+  const joinedIds = new Set<string>((membershipsResult.data ?? []).map((m: any) => m.group_id));
+
+  // Unreacted source posts per joined channel → home-screen dot.
+  const unreactedByChannel = new Map<string, number>();
+  const joinedList = [...joinedIds];
+  if (joinedList.length) {
+    const [postsRes, mineRes] = await Promise.all([
+      (supabase as any).from('channel_posts')
+        .select('id, channel_id').in('channel_id', joinedList)
+        .eq('post_type', 'youtube').is('parent_post_id', null),
+      (supabase as any).from('channel_posts')
+        .select('parent_post_id').eq('poster_id', userId).not('parent_post_id', 'is', null),
+    ]);
+    const reacted = new Set<string>((mineRes.data ?? []).map((r: any) => r.parent_post_id));
+    (postsRes.data ?? []).forEach((p: any) => {
+      if (!reacted.has(p.id)) {
+        unreactedByChannel.set(p.channel_id, (unreactedByChannel.get(p.channel_id) ?? 0) + 1);
+      }
+    });
+  }
+
+  return (channelsResult.data ?? []).map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description ?? null,
+    is_public: c.is_public,
+    created_by: c.created_by,
+    owner: c.owner ?? null,
+    pinned_video_id: c.pinned_video_id ?? null,
+    pinned_video_title: c.pinned_video_title ?? null,
+    pinned_video_thumbnail: c.pinned_video_thumbnail ?? null,
+    member_count: c.member_count ?? 0,
+    is_joined: joinedIds.has(c.id),
+    unread_count: joinedIds.has(c.id) ? (unreactedByChannel.get(c.id) ?? 0) : 0,
+    last_message_at: null,
+    is_members_only: true,
+    avatar_url: c.avatar_url ?? null,
+  }));
+}
+
+export type MembersOnlyVideo = {
+  videoId: string;
+  title: string;
+  thumbnail: string;
+  channelTitle: string;
+  sourceType: 'youtube' | 'tiktok';
+  createdAt: string;   // recency axis for interleaving into the shorts feed
+};
+
+/** Recent source videos from JOINED Members Only channels, for the share browse grid. */
+export async function fetchMembersOnlyVideos(userId: string, limit = 30): Promise<MembersOnlyVideo[]> {
+  // Only surface videos from Members Only channels the user has actually joined.
+  const { data: memberships } = await (supabase as any)
+    .from('group_members')
+    .select('group_id')
+    .eq('user_id', userId);
+  const joinedIds = new Set<string>((memberships ?? []).map((m: any) => m.group_id));
+  if (!joinedIds.size) { return []; }
+
+  const { data: chans } = await (supabase as any)
+    .from('groups')
+    .select('id, owner:users!created_by(handle)')
+    .eq('is_members_only', true)
+    .eq('is_hidden', false)
+    .in('id', [...joinedIds]);
+  const ids: string[] = (chans ?? []).map((c: any) => c.id);
+  if (!ids.length) { return []; }
+  const handleById = new Map<string, string>(
+    (chans ?? []).map((c: any) => [c.id, c.owner?.handle ?? '']),
+  );
+
+  const { data: posts } = await (supabase as any)
+    .from('channel_posts')
+    .select('channel_id, yt_video_id, yt_video_title, yt_video_thumbnail, source_type, created_at')
+    .in('channel_id', ids)
+    .eq('post_type', 'youtube')
+    .is('parent_post_id', null)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  return (posts ?? [])
+    .filter((p: any) => p.yt_video_id)
+    .map((p: any) => ({
+      videoId: p.yt_video_id,
+      title: p.yt_video_title ?? '',
+      thumbnail: p.yt_video_thumbnail ?? '',
+      channelTitle: `@${handleById.get(p.channel_id) ?? ''}`,
+      sourceType: (p.source_type ?? 'youtube') as 'youtube' | 'tiktok',
+      createdAt: p.created_at ?? '',
+    }));
 }
 
 export async function fetchPrivateChannels(userId: string): Promise<ChannelSummary[]> {
