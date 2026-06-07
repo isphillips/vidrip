@@ -32,7 +32,9 @@ async function saveToken(userId: string, token: string, platform: 'ios' | 'andro
     .from('device_tokens')
     .upsert(
       { user_id: userId, token, platform, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id' },
+      // Key on (user_id, platform) so a user can have both an iOS and an Android
+      // device registered at once (needs the matching unique constraint in DB).
+      { onConflict: 'user_id,platform' },
     );
   if (error) {
     console.error('[Push] token save error:', JSON.stringify(error));

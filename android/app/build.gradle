@@ -118,3 +118,10 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Bundle react-native-vector-icons fonts into the Android build. iOS registers
+// these via Info.plist (UIAppFonts); Android needs them copied into assets at
+// build time or the glyphs render blank (e.g. the swipe favorite/delete icons).
+// Scoped to Ionicons — the only icon set the app uses.
+project.ext.vectoricons = [ iconFontNames: ['Ionicons.ttf'] ]
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
