@@ -108,6 +108,8 @@ export default function ChannelsHomeScreen({
       isPublic: item.is_public || !!item.is_members_only,
       isJoined: item.is_joined,
       isOwner: item.created_by === user?.id,
+      isMembersOnly: !!item.is_members_only,
+      ownerHandle: item.owner?.handle,
     });
   }, [navigation, user?.id]);
 

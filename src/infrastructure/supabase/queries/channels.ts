@@ -205,6 +205,7 @@ export async function fetchMembersOnlyVideos(userId: string, limit = 30): Promis
     .select('channel_id, yt_video_id, yt_video_title, yt_video_thumbnail, source_type, created_at')
     .in('channel_id', ids)
     .eq('post_type', 'youtube')
+    .eq('hidden', false)   // exclude videos from disabled creator accounts
     .is('parent_post_id', null)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -309,6 +310,7 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
       reactions:channel_posts!parent_post_id(count)
     `)
     .eq('channel_id', channelId)
+    .eq('hidden', false)   // exclude videos from disabled creator accounts
     .is('parent_post_id', null)
     .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false });

@@ -51,13 +51,29 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   // ── Creator mode ────────────────────────────────────────────────────────────
   const isCreator = !!(profile as any)?.is_creator;
   const [savingCreator, setSavingCreator] = useState(false);
-  const handleToggleCreator = async (next: boolean) => {
+  const handleToggleCreator = (next: boolean) => {
     if (!user?.id || savingCreator) { return; }
-    setSavingCreator(true);
-    const { error } = await (supabase as any).from('users').update({ is_creator: next }).eq('id', user.id);
-    setSavingCreator(false);
-    if (error) { Alert.alert('Error', 'Could not update creator mode.'); return; }
-    if (profile) { setProfile({ ...(profile as any), is_creator: next }); }
+    const apply = async () => {
+      setSavingCreator(true);
+      const { error } = await (supabase as any).from('users').update({ is_creator: next }).eq('id', user.id);
+      setSavingCreator(false);
+      if (error) { Alert.alert('Error', 'Could not update creator mode.'); return; }
+      if (profile) { setProfile({ ...(profile as any), is_creator: next }); }
+      loadSynced();
+    };
+    // Turning OFF removes the public channel — confirm first; Cancel leaves it on.
+    if (!next) {
+      Alert.alert(
+        'Turn off creator mode?',
+        'Your Members Only channel will be removed from the public Channels screen. Turn creator mode back on anytime to restore it.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Turn Off', style: 'destructive', onPress: apply },
+        ],
+      );
+      return;
+    }
+    apply();
   };
 
   // ── Synced accounts (creator connections + personal feed connections) ────────

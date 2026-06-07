@@ -171,7 +171,7 @@ export default function ChannelPostScreen({
           ) : post.yt_video_title ? (
             <Text style={styles.videoTitle} numberOfLines={2}>{post.yt_video_title}</Text>
           ) : null}
-          {isJoined && (
+          {isJoined && post.poster_id !== user?.id && (
             hasReacted ? (
               <View style={styles.reactedBadge}>
                 <Text style={styles.reactedText}>You Reacted ✓</Text>

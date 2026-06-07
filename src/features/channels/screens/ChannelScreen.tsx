@@ -35,7 +35,7 @@ export default function ChannelScreen({
   route,
   navigation,
 }: ChannelsStackScreenProps<'Channel'>) {
-  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner } = route.params;
+  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner, isMembersOnly, ownerHandle } = route.params;
   const { user } = useAuthStore();
   const { top } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -46,7 +46,10 @@ export default function ChannelScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [joined, setJoined] = useState(isJoinedParam);
-  const [title, setTitle] = useState(channelName);
+  // Members Only channels show the creator's handle as the title, not the group name.
+  const [title, setTitle] = useState(
+    isMembersOnly && ownerHandle ? `${ownerHandle}` : channelName,
+  );
   const [membersVisible, setMembersVisible] = useState(false);
   const [members, setMembers] = useState<{ userId: string; handle: string }[]>([]);
   const [joiningLeaving, setJoiningLeaving] = useState(false);
