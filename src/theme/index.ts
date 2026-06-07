@@ -23,6 +23,10 @@ export const C = {
   GRAD_START: '#C43C30',
   GRAD_END: '#8C1A14',
 
+  // Gold — the logo's leaf, for Art-Deco linework/flourishes (onboarding)
+  GOLD: '#C9A24B',
+  GOLD_DIM: 'rgba(201,162,75,0.35)',
+
   // Status
   SUCCESS: '#22C55E',
   DANGER: '#EF4444',

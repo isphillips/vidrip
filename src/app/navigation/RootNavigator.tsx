@@ -18,11 +18,16 @@ import {
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
+import OnboardingScreen from '../../features/onboarding/OnboardingScreen';
+import { useOnboarding, useOnboardingStore } from '../../features/onboarding/onboarding';
 
 const Root = createNativeStackNavigator();
 
 export default function RootNavigator() {
   const { session, isLoading, setSession, setProfile, setLoading } = useAuthStore();
+  const { ready: onbReady, seen: onboarded, complete: completeOnboarding } = useOnboarding();
+  const replaying = useOnboardingStore(s => s.replaying);
+  const endReplay = useOnboardingStore(s => s.endReplay);
   const navRef = useRef<NavigationContainerRef<any>>(null);
 
   // One-time setup
@@ -115,7 +120,8 @@ export default function RootNavigator() {
     await supabase.auth.exchangeCodeForSession(url);
   };
 
-  if (isLoading) {
+  // Wait for the onboarding flag to load too, so signed-in users don't flash the app.
+  if (isLoading || (session && !onbReady)) {
     return (
       <View style={{ flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={C.ACCENT} />
@@ -123,18 +129,31 @@ export default function RootNavigator() {
     );
   }
 
+  const showOnboarding = !!session && (!onboarded || replaying);
+
   return (
     <NavigationContainer ref={navRef}>
       <Root.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
-          <>
-            <Root.Screen name="Main" component={MainTabs} />
-            <Root.Screen
-              name="RecordReaction"
-              component={RecordReactionScreen}
-              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-            />
-          </>
+          showOnboarding ? (
+            <Root.Screen name="Onboarding">
+              {() => (
+                <OnboardingScreen
+                  mode={onboarded ? 'replay' : 'firstRun'}
+                  onDone={() => { if (!onboarded) { completeOnboarding(); } endReplay(); }}
+                />
+              )}
+            </Root.Screen>
+          ) : (
+            <>
+              <Root.Screen name="Main" component={MainTabs} />
+              <Root.Screen
+                name="RecordReaction"
+                component={RecordReactionScreen}
+                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+              />
+            </>
+          )
         ) : (
           <Root.Screen name="Auth" component={AuthStack} />
         )}

@@ -28,12 +28,13 @@ export default function ChannelCard({ channel, userId, onPress }: Props) {
         ) : null}
         <View style={styles.meta}>
           <View style={styles.nameRow}>
-            {channel.owner && (
-              <Text style={styles.name} numberOfLines={1}>{channel.owner.handle}</Text>
-            )}
+            <Text style={styles.name} numberOfLines={1}>
+              {channel.is_members_only ? (channel.owner?.handle ?? channel.name) : channel.name}
+            </Text>
             {hasUnread && <View style={styles.unreadDot} />}
           </View>
-          {channel.owner && (
+          {/* Members Only cards title with the creator handle, so no @handle subtitle. */}
+          {!channel.is_members_only && channel.owner && (
             <Text style={styles.owner}>@{channel.owner.handle}</Text>
           )}
           {channel.description ? (

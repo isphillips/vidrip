@@ -27,6 +27,7 @@ import {
 } from '../../../infrastructure/supabase/queries/syncedAccounts';
 import { refreshConnectedFeed } from '../../../infrastructure/supabase/queries/connectedFeed';
 import { buildAuthUrl, type SyncProvider, type ConnectionType } from '../../../infrastructure/oauth/config';
+import { useOnboardingStore } from '../../onboarding/onboarding';
 import type { AccountStackScreenProps } from '../../../app/navigation/types';
 
 const PROVIDERS: { key: SyncProvider; label: string }[] = [
@@ -42,6 +43,7 @@ const FEED_PROVIDERS: { key: SyncProvider; label: string }[] = [
 export default function AccountScreen({ navigation }: AccountStackScreenProps<'AccountHome'>) {
   const { top } = useSafeAreaInsets();
   const { profile, user, setProfile, signOut } = useAuthStore();
+  const startReplay = useOnboardingStore(s => s.startReplay);
   const [signingOut, setSigningOut] = useState(false);
   const [phone, setPhone] = useState((profile as any)?.phone ?? '');
   const [savingPhone, setSavingPhone] = useState(false);
@@ -346,6 +348,11 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           style={styles.row}
           onPress={() => navigation.navigate('PasswordSetup')}>
           <Text style={styles.rowLabel}>Password Login</Text>
+          <Text style={styles.rowChevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.divider} />
+        <TouchableOpacity style={styles.row} onPress={() => startReplay()}>
+          <Text style={styles.rowLabel}>How it works</Text>
           <Text style={styles.rowChevron}>›</Text>
         </TouchableOpacity>
       </View>
