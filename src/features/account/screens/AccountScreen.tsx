@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   syncInfo: { gap: 2, flex: 1 },
   syncHandle: { fontSize: FONT.SIZES.XS, color: C.MUTED, fontFamily: FONT.BODY },
   syncRight: { flexDirection: 'row', alignItems: 'center', gap: SPACE.MD },
-  syncDisconnect: { fontSize: FONT.SIZES.SM, color: C.DANGER, fontFamily: FONT.BODY_MEDIUM },
+  syncDisconnect: { fontSize: FONT.SIZES.SM, color: C.DANGER, fontFamily: FONT.BODY_MEDIUM, marginLeft: SPACE.SM },
   connectBtn: {
     backgroundColor: C.ACCENT, borderRadius: RADIUS.SM,
     paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM,

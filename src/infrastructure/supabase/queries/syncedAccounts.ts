@@ -26,8 +26,14 @@ export async function fetchSyncedAccounts(userId: string): Promise<SyncedAccount
  * stores them server-side, ensures the Members Only channel, and imports videos.
  */
 export async function syncOAuthCode(provider: SyncProvider, code: string): Promise<void> {
+  // functions.invoke doesn't reliably attach the user JWT (especially right after
+  // returning from the system-browser OAuth round-trip), and sync-oauth requires
+  // it to identify the caller — pass the current access token explicitly.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) { throw new Error('You appear to be signed out. Sign in and try again.'); }
   const { data, error } = await supabase.functions.invoke('sync-oauth', {
     body: { provider, code },
+    headers: { Authorization: `Bearer ${session.access_token}` },
   });
   if (error) {
     // FunctionsHttpError carries the Response — pull out the function's {error} body.
