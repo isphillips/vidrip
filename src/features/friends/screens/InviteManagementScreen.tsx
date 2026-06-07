@@ -35,7 +35,7 @@ export default function InviteManagementScreen() {
 
   const handleShare = async (code: string) => {
     await Share.share({
-      message: `Join me on Reaxn! Use invite code: ${code}\n\nDownload the app and enter this code to sign up.`,
+      message: `Join me on VidRip! Use invite code: ${code}\n\nDownload the app and enter this code to sign up.`,
     });
   };
 

@@ -15,6 +15,10 @@ import { fetchFriends, type Friend } from '../../../infrastructure/supabase/quer
 import { sendThread } from '../../../infrastructure/supabase/queries/threads';
 import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
 import { fetchMembersOnlyVideos } from '../../../infrastructure/supabase/queries/channels';
+import {
+  fetchConnectedFeed, refreshConnectedFeed, feedCooldownRemainingMs,
+} from '../../../infrastructure/supabase/queries/connectedFeed';
+import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/syncedAccounts';
 import { useAuthStore } from '../../../store/authStore';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
 
@@ -66,6 +70,13 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [loading, setLoading]   = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searching, setSearching]    = useState(false);
+  // For You (personal connected feed)
+  const [showForYou, setShowForYou]  = useState(false);
+  const [feedItems, setFeedItems]    = useState<VideoItem[]>([]);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedRefreshing, setFeedRefreshing] = useState(false);
+  const [hasFeedConnection, setHasFeedConnection] = useState(false);
+  const [feedLastSyncedAt, setFeedLastSyncedAt] = useState<string | null>(null);
   const offsetRef  = useRef(0);
   const hasMoreRef = useRef(true);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -106,6 +117,38 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     finally { setLoading(false); setLoadingMore(false); }
   }, []);
 
+  // ── For You (personal connected feed) ────────────────────────────────────────
+  const loadForYou = useCallback(async () => {
+    if (!user?.id) { return; }
+    setFeedLoading(true);
+    try {
+      const [items, accts] = await Promise.all([
+        fetchConnectedFeed(user.id),
+        fetchSyncedAccounts(user.id, 'feed'),
+      ]);
+      setFeedItems(items.map(it => ({
+        videoId: it.videoId, title: it.title, thumbnail: it.thumbnail,
+        channelTitle: it.channelTitle, sourceType: it.sourceType,
+        createdAt: it.publishedAt ?? undefined,
+      })));
+      const yt = accts.find(a => a.provider === 'youtube');
+      setHasFeedConnection(!!yt);
+      setFeedLastSyncedAt(yt?.last_synced_at ?? null);
+    } catch (e) { console.error('[ShareHome] forYou', e); }
+    finally { setFeedLoading(false); }
+  }, [user?.id]);
+
+  const handleRefreshFeed = useCallback(async () => {
+    if (feedRefreshing) { return; }
+    setFeedRefreshing(true);
+    try {
+      await refreshConnectedFeed('youtube');
+      await loadForYou();
+    } catch (e: any) {
+      Alert.alert('Refresh', e?.message ?? 'Could not refresh your feed.');
+    } finally { setFeedRefreshing(false); }
+  }, [feedRefreshing, loadForYou]);
+
   // Members Only videos from channels the user has JOINED — refetch on focus so
   // joining/leaving a channel elsewhere is reflected here.
   useFocusEffect(useCallback(() => {
@@ -116,15 +159,17 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // Grid = Members Only videos interleaved into the YouTube shorts feed by recency
   // (newest first), rather than pinned to the top. Search results stay as-is.
   const gridData = useMemo(() => {
+    if (showForYou) { return feedItems; }
     type GridItem = VideoItem & { duration?: number; fetchedAt?: string };
     const shorts = results.map(r => ({ ...r })) as GridItem[];
     if (query.trim()) { return shorts; }
     const sortTs = (it: GridItem) => it.fetchedAt ?? it.createdAt ?? '';
     return [...memberVideos, ...shorts].sort((a, b) => sortTs(b).localeCompare(sortTs(a)));
-  }, [results, memberVideos, query]);
+  }, [showForYou, feedItems, results, memberVideos, query]);
 
   useEffect(() => {
     if (mode !== 'browse') { return; }
+    if (showForYou) { loadForYou(); return; }
     clearTimeout(searchTimer.current);
     if (!query.trim()) { loadCategory(category); return; }
     searchTimer.current = setTimeout(async () => {
@@ -134,7 +179,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     }, 500);
     return () => clearTimeout(searchTimer.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, category, mode]);
+  }, [query, category, mode, showForYou]);
 
   const handleLoadMore = useCallback(() => {
     if (!hasMoreRef.current || loadingMore || query.trim()) { return; }
@@ -258,6 +303,9 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const playerOpacity = playerAnim;
   const playerScale   = playerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
 
+  const feedCooldownMs  = feedCooldownRemainingMs(feedLastSyncedAt);
+  const feedCooldownMin = Math.ceil(feedCooldownMs / 60000);
+
   return (
     <View style={styles.container}>
       <Text style={[styles.header, { marginTop: top }]}>Share</Text>
@@ -289,30 +337,53 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         </View>
       ) : (
         <>
-          <View style={styles.searchRow}>
-            <TextInput
-              style={styles.searchInput} value={query} onChangeText={setQuery}
-              placeholder="Search Shorts…" placeholderTextColor={C.SUBTLE}
-              autoCorrect={false} autoCapitalize="none" returnKeyType="search" clearButtonMode="while-editing"
-            />
-            {searching && <ActivityIndicator size="small" color={C.ACCENT} style={styles.searchSpinner} />}
-          </View>
+          {!showForYou && (
+            <View style={styles.searchRow}>
+              <TextInput
+                style={styles.searchInput} value={query} onChangeText={setQuery}
+                placeholder="Search Shorts…" placeholderTextColor={C.SUBTLE}
+                autoCorrect={false} autoCapitalize="none" returnKeyType="search" clearButtonMode="while-editing"
+              />
+              {searching && <ActivityIndicator size="small" color={C.ACCENT} style={styles.searchSpinner} />}
+            </View>
+          )}
 
           {!query.trim() && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {CATEGORIES.map(cat => (
-                <TouchableOpacity key={cat} style={[styles.tab, category === cat && styles.tabActive]}
-                  onPress={() => { setCategory(cat); setQuery(''); }}>
-                  <Text style={[styles.tabTxt, category === cat && styles.tabTxtActive]}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              <TouchableOpacity key="foryou" style={[styles.tab, showForYou && styles.tabActive]}
+                onPress={() => { setShowForYou(true); setQuery(''); }}>
+                <Text style={[styles.tabTxt, showForYou && styles.tabTxtActive]}>For You</Text>
+              </TouchableOpacity>
+              {CATEGORIES.map(cat => {
+                const active = !showForYou && category === cat;
+                return (
+                  <TouchableOpacity key={cat} style={[styles.tab, active && styles.tabActive]}
+                    onPress={() => { setShowForYou(false); setCategory(cat); setQuery(''); }}>
+                    <Text style={[styles.tabTxt, active && styles.tabTxtActive]}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
+          )}
+
+          {showForYou && hasFeedConnection && (
+            <View style={styles.feedBar}>
+              <Text style={styles.feedBarText}>Liked videos</Text>
+              <TouchableOpacity
+                style={[styles.feedRefreshBtn, (feedCooldownMs > 0 || feedRefreshing) && styles.feedRefreshBtnDisabled]}
+                onPress={handleRefreshFeed}
+                disabled={feedCooldownMs > 0 || feedRefreshing}>
+                {feedRefreshing
+                  ? <ActivityIndicator size="small" color={C.WHITE} />
+                  : <Text style={styles.feedRefreshText}>{feedCooldownMs > 0 ? `Refresh in ${feedCooldownMin}m` : 'Refresh'}</Text>}
+              </TouchableOpacity>
+            </View>
           )}
           <View style={{ height: SPACE.SM }} />
 
-          {loading ? (
+          {(showForYou ? feedLoading : loading) ? (
             <View style={styles.center}><ActivityIndicator color={C.ACCENT} /></View>
           ) : (
             <FlatList
@@ -321,10 +392,20 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               numColumns={2}
               contentContainerStyle={styles.grid}
               columnWrapperStyle={styles.row}
-              onEndReached={handleLoadMore}
+              onEndReached={showForYou ? undefined : handleLoadMore}
               onEndReachedThreshold={0.4}
-              ListFooterComponent={loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.XL }} /> : null}
-              ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyText}>No Shorts yet</Text></View>}
+              ListFooterComponent={!showForYou && loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.XL }} /> : null}
+              ListEmptyComponent={
+                <View style={styles.center}>
+                  <Text style={styles.emptyText}>
+                    {showForYou
+                      ? (hasFeedConnection
+                          ? 'No videos yet — tap Refresh to pull your liked videos.'
+                          : 'Connect a YouTube account in your profile to see your For You feed.')
+                      : 'No Shorts yet'}
+                  </Text>
+                </View>
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity style={[styles.card, { width: cardW }]} onPress={() => openPlayer(item)} activeOpacity={0.8}>
                   <Image source={{ uri: item.thumbnail }} style={[styles.cardThumb, { height: cardH }]} resizeMode="cover" />
@@ -513,6 +594,19 @@ const styles = StyleSheet.create({
   tabActive:    { backgroundColor: C.ACCENT, borderColor: C.ACCENT },
   tabTxt:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   tabTxtActive: { color: C.WHITE },
+
+  // For You refresh bar
+  feedBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginHorizontal: SPACE.LG, marginTop: SPACE.SM,
+  },
+  feedBarText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  feedRefreshBtn: {
+    backgroundColor: C.ACCENT, borderRadius: RADIUS.SM,
+    paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, minWidth: 96, alignItems: 'center',
+  },
+  feedRefreshBtnDisabled: { opacity: 0.45 },
+  feedRefreshText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
 
   // grid
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACE.XXXL },

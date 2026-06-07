@@ -127,10 +127,11 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
     }
 
-    const { provider, code } = await req.json();
+    const { provider, code, connectionType } = await req.json();
     if (provider !== "youtube" && provider !== "tiktok") {
       return new Response("bad provider", { status: 400, headers: cors });
     }
+    const connType = connectionType === "feed" ? "feed" : "creator";
 
     // 1. Exchange code → tokens, fetch profile + recent videos.
     const tokens = provider === "youtube" ? await youtubeExchange(code) : await tiktokExchange(code);
@@ -139,19 +140,20 @@ Deno.serve(async (req) => {
       ? await youtubeProfileAndVideos(accessToken)
       : await tiktokProfileAndVideos(accessToken);
 
-    // 2. Upsert the synced account (display data).
+    // 2. Upsert the synced account (display data). A 'feed' connection leaves
+    //    last_synced_at null so the first refresh-feed call is allowed immediately.
     const { data: acct, error: acctErr } = await admin
       .from("synced_accounts")
       .upsert({
-        user_id: userId, provider,
+        user_id: userId, provider, connection_type: connType,
         provider_account_id: profile.accountId,
         provider_handle: profile.handle,
         provider_display_name: profile.displayName,
         provider_avatar_url: profile.avatar,
         enabled: true,
-        last_synced_at: new Date().toISOString(),
+        last_synced_at: connType === "creator" ? new Date().toISOString() : null,
         updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id,provider" })
+      }, { onConflict: "user_id,provider,connection_type" })
       .select("id")
       .single();
     if (acctErr) { throw acctErr; }
@@ -166,6 +168,14 @@ Deno.serve(async (req) => {
       scopes: tokens.scope ?? null,
       updated_at: new Date().toISOString(),
     });
+
+    // A 'feed' connection has no Members Only channel and imports no posts — the
+    // For You grid is populated by the refresh-feed function. Done here.
+    if (connType === "feed") {
+      return new Response(JSON.stringify({
+        ok: true, provider, connectionType: connType, handle: profile.handle,
+      }), { headers: { ...cors, "Content-Type": "application/json" } });
+    }
 
     // 4. Ensure the creator's Members Only channel (unhide if it exists).
     let { data: channel } = await admin

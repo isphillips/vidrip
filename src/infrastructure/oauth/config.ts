@@ -3,6 +3,10 @@
 
 export type SyncProvider = 'youtube' | 'tiktok';
 
+// 'creator' = opens a Members Only channel from the account's uploads.
+// 'feed'    = pulls the user's personal feed (e.g. Liked Videos) into "For You".
+export type ConnectionType = 'creator' | 'feed';
+
 // TikTok/Google require an https redirect (custom schemes rejected). The app's
 // OAuth WebView intercepts navigation to this URL to extract the code — it
 // never actually loads, so the URL only needs to be registered, not served.
@@ -18,14 +22,18 @@ export const TIKTOK_CLIENT_KEY = 'sbawbp2z1skyo0obdt';
 const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
 const TIKTOK_SCOPE = 'user.info.basic,user.info.profile,video.list';
 
-// One redirect URL serves both providers, so the provider is carried in `state`.
-function makeState(provider: SyncProvider): string {
-  return `${provider}.${Math.abs(Date.now() % 1000000)}`;
+// One redirect URL serves both providers + connection types, so both are carried
+// in `state` as `${provider}.${type}.${nonce}`.
+function makeState(provider: SyncProvider, type: ConnectionType): string {
+  return `${provider}.${type}.${Math.abs(Date.now() % 1000000)}`;
 }
 
 /** Build the provider's authorize URL to open in the OAuth WebView. */
-export function buildAuthUrl(provider: SyncProvider): { url: string; state: string } {
-  const state = makeState(provider);
+export function buildAuthUrl(
+  provider: SyncProvider,
+  connectionType: ConnectionType = 'creator',
+): { url: string; state: string } {
+  const state = makeState(provider, connectionType);
   if (provider === 'youtube') {
     const p = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
@@ -57,7 +65,7 @@ export function buildAuthUrl(provider: SyncProvider): { url: string; state: stri
  */
 export function parseOAuthDeepLink(
   url: string,
-): { provider: SyncProvider; code: string | null; error: string | null } | null {
+): { provider: SyncProvider; connectionType: ConnectionType; code: string | null; error: string | null } | null {
   if (!url.startsWith('reaxn://oauth')) {
     return null;
   }
@@ -73,9 +81,13 @@ export function parseOAuthDeepLink(
   if (!code && !error) {
     return null;
   }
-  const provider: SyncProvider = state.startsWith('tiktok') ? 'tiktok' : 'youtube';
+  // state = `${provider}.${type}.${nonce}` (older builds: `${provider}.${nonce}`).
+  const parts = state.split('.');
+  const provider: SyncProvider = parts[0] === 'tiktok' ? 'tiktok' : 'youtube';
+  const connectionType: ConnectionType = parts[1] === 'feed' ? 'feed' : 'creator';
   return {
     provider,
+    connectionType,
     code: code ?? null,
     error: error ? (errorDescription || error) : null,
   };

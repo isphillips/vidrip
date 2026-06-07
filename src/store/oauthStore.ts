@@ -1,9 +1,14 @@
 import { create } from 'zustand';
-import type { SyncProvider } from '../infrastructure/oauth/config';
+import type { SyncProvider, ConnectionType } from '../infrastructure/oauth/config';
 
 // Bridges the OAuth deep link (caught in RootNavigator) to AccountScreen, which
 // runs the actual sync + shows progress.
-type OAuthPending = { provider: SyncProvider; code: string | null; error: string | null };
+type OAuthPending = {
+  provider: SyncProvider;
+  connectionType: ConnectionType;
+  code: string | null;
+  error: string | null;
+};
 
 interface OAuthState {
   pending: OAuthPending | null;

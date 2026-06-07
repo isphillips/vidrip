@@ -28,7 +28,9 @@ export default function ChannelCard({ channel, userId, onPress }: Props) {
         ) : null}
         <View style={styles.meta}>
           <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{channel.name}</Text>
+            {channel.owner && (
+              <Text style={styles.name} numberOfLines={1}>{channel.owner.handle}</Text>
+            )}
             {hasUnread && <View style={styles.unreadDot} />}
           </View>
           {channel.owner && (

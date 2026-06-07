@@ -25,12 +25,18 @@ import {
   disconnectSyncedAccount,
   type SyncedAccount,
 } from '../../../infrastructure/supabase/queries/syncedAccounts';
-import { buildAuthUrl, type SyncProvider } from '../../../infrastructure/oauth/config';
+import { refreshConnectedFeed } from '../../../infrastructure/supabase/queries/connectedFeed';
+import { buildAuthUrl, type SyncProvider, type ConnectionType } from '../../../infrastructure/oauth/config';
 import type { AccountStackScreenProps } from '../../../app/navigation/types';
 
 const PROVIDERS: { key: SyncProvider; label: string }[] = [
   { key: 'youtube', label: 'YouTube' },
   { key: 'tiktok', label: 'TikTok' },
+];
+
+// Personal-feed connections (powers the "For You" grid). YouTube only for now.
+const FEED_PROVIDERS: { key: SyncProvider; label: string }[] = [
+  { key: 'youtube', label: 'YouTube' },
 ];
 
 export default function AccountScreen({ navigation }: AccountStackScreenProps<'AccountHome'>) {
@@ -42,28 +48,42 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
 
   const phoneDirty = phone.trim() !== ((profile as any)?.phone ?? '');
 
-  // ── Synced accounts ─────────────────────────────────────────────────────────
-  const [synced, setSynced] = useState<SyncedAccount[]>([]);
+  // ── Creator mode ────────────────────────────────────────────────────────────
+  const isCreator = !!(profile as any)?.is_creator;
+  const [savingCreator, setSavingCreator] = useState(false);
+  const handleToggleCreator = async (next: boolean) => {
+    if (!user?.id || savingCreator) { return; }
+    setSavingCreator(true);
+    const { error } = await (supabase as any).from('users').update({ is_creator: next }).eq('id', user.id);
+    setSavingCreator(false);
+    if (error) { Alert.alert('Error', 'Could not update creator mode.'); return; }
+    if (profile) { setProfile({ ...(profile as any), is_creator: next }); }
+  };
+
+  // ── Synced accounts (creator connections + personal feed connections) ────────
+  const [synced, setSynced] = useState<SyncedAccount[]>([]);       // connection_type 'creator'
+  const [feedAccounts, setFeedAccounts] = useState<SyncedAccount[]>([]); // 'feed'
   const [syncing, setSyncing] = useState(false);
   const { pending, clearPending } = useOAuthStore();
 
   const loadSynced = useCallback(async () => {
     if (!user?.id) { return; }
-    try { setSynced(await fetchSyncedAccounts(user.id)); } catch { /* ignore */ }
+    try { setSynced(await fetchSyncedAccounts(user.id, 'creator')); } catch { /* ignore */ }
+    try { setFeedAccounts(await fetchSyncedAccounts(user.id, 'feed')); } catch { /* ignore */ }
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { loadSynced(); }, [loadSynced]));
 
   // Open the provider auth in the system browser (providers block embedded WebViews).
-  const handleConnect = (provider: SyncProvider) => {
-    Linking.openURL(buildAuthUrl(provider).url).catch(() =>
+  const handleConnect = (provider: SyncProvider, connectionType: ConnectionType = 'creator') => {
+    Linking.openURL(buildAuthUrl(provider, connectionType).url).catch(() =>
       Alert.alert('Error', 'Could not open the login page.'));
   };
 
   // The oauth-callback deep link lands here via the store → run the sync.
   useEffect(() => {
     if (!pending) { return; }
-    const { provider, code, error } = pending;
+    const { provider, connectionType, code, error } = pending;
     clearPending();
     const label = PROVIDERS.find(p => p.key === provider)?.label ?? 'Account';
     // Provider rejected the request (e.g. unauthorized scope) — no code came back.
@@ -75,8 +95,12 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
       return;
     }
     setSyncing(true);
-    syncOAuthCode(provider, code)
-      .then(loadSynced)
+    syncOAuthCode(provider, code, connectionType)
+      .then(async () => {
+        // A feed connection has no content yet — kick off the first pull now.
+        if (connectionType === 'feed') { await refreshConnectedFeed(provider).catch(() => {}); }
+        await loadSynced();
+      })
       .catch((e: any) => Alert.alert('Sync failed', e?.message ?? 'Could not connect account.'))
       .finally(() => setSyncing(false));
   }, [pending, clearPending, loadSynced]);
@@ -169,14 +193,88 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         </View>
       </View>
 
-      {/* Connected accounts */}
-      <Text style={styles.sectionLabel}>Connected Accounts</Text>
+      {/* Creator mode */}
+      <Text style={styles.sectionLabel}>Creator</Text>
+      <View style={styles.section}>
+        <View style={styles.row}>
+          <View style={styles.syncInfo}>
+            <Text style={styles.rowLabel}>Creator mode</Text>
+            <Text style={styles.syncHandle} numberOfLines={2}>
+              Open a public “Members Only” channel from your connected accounts.
+            </Text>
+          </View>
+          <Switch
+            value={isCreator}
+            onValueChange={handleToggleCreator}
+            disabled={savingCreator}
+            trackColor={{ true: C.ACCENT, false: C.BORDER }}
+          />
+        </View>
+      </View>
+
+      {/* Connected accounts (creator) — only when creator mode is on */}
+      {isCreator && (
+        <>
+          <Text style={styles.sectionLabel}>Creator Accounts</Text>
+          <Text style={styles.sectionHint}>
+            Enable an account to open a public “Members Only” channel under your handle, so people can react to your videos.
+          </Text>
+          <View style={styles.section}>
+            {PROVIDERS.map(({ key, label }, i) => {
+              const acct = synced.find(a => a.provider === key);
+              return (
+                <View key={key}>
+                  {i > 0 && <View style={styles.divider} />}
+                  <View style={styles.row}>
+                    <View style={styles.syncLeft}>
+                      {acct?.provider_avatar_url ? (
+                        <Image source={{ uri: acct.provider_avatar_url }} style={styles.syncAvatar} />
+                      ) : null}
+                      <View style={styles.syncInfo}>
+                        <Text style={styles.rowLabel}>{label}</Text>
+                        {acct ? (
+                          <Text style={styles.syncHandle} numberOfLines={1}>
+                            {acct.provider_display_name
+                              || (acct.provider_handle ? `@${acct.provider_handle}` : 'Connected')}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    {acct ? (
+                      <View style={styles.syncRight}>
+                        <Switch
+                          value={acct.enabled}
+                          onValueChange={() => handleToggleEnabled(acct)}
+                          trackColor={{ true: C.ACCENT, false: C.BORDER }}
+                        />
+                        <TouchableOpacity onPress={() => handleDisconnect(acct)} hitSlop={8}>
+                          <Text style={styles.syncDisconnect}>Disconnect</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.connectBtn}
+                        onPress={() => handleConnect(key)}
+                        disabled={syncing}>
+                        <Text style={styles.connectBtnText}>Connect</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      {/* For You sources (personal feed) */}
+      <Text style={styles.sectionLabel}>For You Sources</Text>
       <Text style={styles.sectionHint}>
-        Enable an account to open a public “Members Only” channel under your handle, so people can react to your videos.
+        Connect an account to pull your feed (e.g. YouTube Liked videos) into the “For You” tab when sharing.
       </Text>
       <View style={styles.section}>
-        {PROVIDERS.map(({ key, label }, i) => {
-          const acct = synced.find(a => a.provider === key);
+        {FEED_PROVIDERS.map(({ key, label }, i) => {
+          const acct = feedAccounts.find(a => a.provider === key);
           return (
             <View key={key}>
               {i > 0 && <View style={styles.divider} />}
@@ -196,20 +294,13 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                   </View>
                 </View>
                 {acct ? (
-                  <View style={styles.syncRight}>
-                    <Switch
-                      value={acct.enabled}
-                      onValueChange={() => handleToggleEnabled(acct)}
-                      trackColor={{ true: C.ACCENT, false: C.BORDER }}
-                    />
-                    <TouchableOpacity onPress={() => handleDisconnect(acct)} hitSlop={8}>
-                      <Text style={styles.syncDisconnect}>Disconnect</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <TouchableOpacity onPress={() => handleDisconnect(acct)} hitSlop={8}>
+                    <Text style={styles.syncDisconnect}>Disconnect</Text>
+                  </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
                     style={styles.connectBtn}
-                    onPress={() => handleConnect(key)}
+                    onPress={() => handleConnect(key, 'feed')}
                     disabled={syncing}>
                     <Text style={styles.connectBtnText}>Connect</Text>
                   </TouchableOpacity>

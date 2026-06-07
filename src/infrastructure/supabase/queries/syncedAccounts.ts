@@ -1,9 +1,10 @@
 import { supabase } from '../client';
-import type { SyncProvider } from '../../oauth/config';
+import type { SyncProvider, ConnectionType } from '../../oauth/config';
 
 export type SyncedAccount = {
   id: string;
   provider: SyncProvider;
+  connection_type: ConnectionType;
   provider_handle: string | null;
   provider_display_name: string | null;
   provider_avatar_url: string | null;
@@ -11,28 +12,37 @@ export type SyncedAccount = {
   last_synced_at: string | null;
 };
 
-export async function fetchSyncedAccounts(userId: string): Promise<SyncedAccount[]> {
+export async function fetchSyncedAccounts(
+  userId: string,
+  connectionType: ConnectionType = 'creator',
+): Promise<SyncedAccount[]> {
   const { data, error } = await supabase
     .from('synced_accounts')
-    .select('id, provider, provider_handle, provider_display_name, provider_avatar_url, enabled, last_synced_at')
+    .select('id, provider, connection_type, provider_handle, provider_display_name, provider_avatar_url, enabled, last_synced_at')
     .eq('user_id', userId)
+    .eq('connection_type', connectionType)
     .order('created_at', { ascending: true });
   if (error) { throw error; }
   return (data ?? []) as SyncedAccount[];
 }
 
 /**
- * Hand the OAuth code to the sync-oauth edge function — it exchanges tokens,
- * stores them server-side, ensures the Members Only channel, and imports videos.
+ * Hand the OAuth code to the sync-oauth edge function — it exchanges tokens and
+ * stores them server-side. For 'creator' it also ensures the Members Only channel
+ * and imports videos; for 'feed' it sets up the connection for the For You grid.
  */
-export async function syncOAuthCode(provider: SyncProvider, code: string): Promise<void> {
+export async function syncOAuthCode(
+  provider: SyncProvider,
+  code: string,
+  connectionType: ConnectionType = 'creator',
+): Promise<void> {
   // functions.invoke doesn't reliably attach the user JWT (especially right after
   // returning from the system-browser OAuth round-trip), and sync-oauth requires
   // it to identify the caller — pass the current access token explicitly.
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) { throw new Error('You appear to be signed out. Sign in and try again.'); }
   const { data, error } = await supabase.functions.invoke('sync-oauth', {
-    body: { provider, code },
+    body: { provider, code, connectionType },
     headers: { Authorization: `Bearer ${session.access_token}` },
   });
   if (error) {
