@@ -13,10 +13,17 @@ export default function ChannelCard({ channel, userId, onPress }: Props) {
   const isOwner = !!userId && channel.created_by === userId;
   // Public: unreacted YouTube posts. Private: unread messages.
   const hasUnread = channel.unread_count > 0;
+  // Members Only channels show a letter circle (matching AccountScreen) until a
+  // dedicated Vidrip profile image is added — not the provider avatar.
+  const initial = (channel.name || '?').replace(/^@/, '').charAt(0).toUpperCase() || '?';
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.body}>
-        {channel.avatar_url ? (
+        {channel.is_members_only ? (
+          <View style={styles.avatarFallback}>
+            <Text style={styles.avatarLetter}>{initial}</Text>
+          </View>
+        ) : channel.avatar_url ? (
           <Image source={{ uri: channel.avatar_url }} style={styles.avatar} resizeMode="cover" />
         ) : null}
         <View style={styles.meta}>
@@ -79,6 +86,15 @@ const styles = StyleSheet.create({
   avatar: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: C.SURFACE_2,
+  },
+  avatarFallback: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: C.ACCENT_LITE,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: C.ACCENT,
+  },
+  avatarLetter: {
+    fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.ACCENT,
   },
   moBadge: {
     alignSelf: 'flex-start',

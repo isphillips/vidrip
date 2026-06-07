@@ -4,10 +4,13 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Secrets (set via: supabase secrets set ...). SUPABASE_* are auto-injected.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") ?? "";
-const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "";
-const TIKTOK_CLIENT_KEY = Deno.env.get("TIKTOK_CLIENT_KEY") ?? "";
-const TIKTOK_CLIENT_SECRET = Deno.env.get("TIKTOK_CLIENT_SECRET") ?? "";
+// .trim() guards against stray whitespace pasted into the secret store — a
+// leading space in TIKTOK_CLIENT_KEY caused invalid_client ("Client key does not
+// match authorization record") on token exchange.
+const GOOGLE_CLIENT_ID = (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim();
+const GOOGLE_CLIENT_SECRET = (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim();
+const TIKTOK_CLIENT_KEY = (Deno.env.get("TIKTOK_CLIENT_KEY") ?? "").trim();
+const TIKTOK_CLIENT_SECRET = (Deno.env.get("TIKTOK_CLIENT_SECRET") ?? "").trim();
 
 // Must exactly match the redirect_uri used in the authorize request
 // (src/infrastructure/oauth/config.ts) and registered in each provider console.
@@ -73,14 +76,26 @@ async function tiktokExchange(code: string) {
     }),
   });
   if (!res.ok) { throw new Error(`tiktok token: ${await res.text()}`); }
-  return res.json();
+  const json = await res.json();
+  console.log("[sync-oauth] tiktok token resp:", JSON.stringify({
+    error: json.error ?? null,
+    error_description: json.error_description ?? null,
+    hasAccess: !!json.access_token,
+    scope: json.scope ?? null,
+    clientKey: TIKTOK_CLIENT_KEY,
+    secretLen: TIKTOK_CLIENT_SECRET.length,
+    redirect: REDIRECT_URI,
+  }));
+  return json;
 }
 
 async function tiktokProfileAndVideos(accessToken: string): Promise<{ profile: Profile; videos: Video[] }> {
   const h = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
   const uRes = await fetch(
     "https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,username", { headers: h });
-  const u = (await uRes.json()).data?.user ?? {};
+  const uJson = await uRes.json();
+  console.log("[sync-oauth] tiktok userinfo:", JSON.stringify(uJson).slice(0, 600));
+  const u = uJson.data?.user ?? {};
   const profile: Profile = {
     accountId: u.open_id ?? "",
     handle: u.username ?? "",
@@ -90,7 +105,9 @@ async function tiktokProfileAndVideos(accessToken: string): Promise<{ profile: P
   const vRes = await fetch("https://open.tiktokapis.com/v2/video/list/?fields=id,title,cover_image_url", {
     method: "POST", headers: h, body: JSON.stringify({ max_count: 12 }),
   });
-  const videos: Video[] = ((await vRes.json()).data?.videos ?? []).map((v: any) => ({
+  const vJson = await vRes.json();
+  console.log("[sync-oauth] tiktok videolist:", JSON.stringify(vJson).slice(0, 700));
+  const videos: Video[] = (vJson.data?.videos ?? []).map((v: any) => ({
     id: String(v.id), title: v.title ?? "", thumbnail: v.cover_image_url ?? null,
   })).filter((v: Video) => v.id);
   return { profile, videos };

@@ -379,7 +379,11 @@ export default function ChannelScreen({
                 ) : obscured ? (
                   <Text style={styles.gridTitleObscured}>React to reveal</Text>
                 ) : null}
-                <Text style={styles.gridReactionCount}>
+                <Text style={[
+                  styles.gridReactionCount,
+                  // No title/placeholder above → give the count top breathing room.
+                  !obscured && !item.yt_video_title && styles.gridReactionCountNoTitle,
+                ]}>
                   {item.reaction_count > 0
                     ? `${item.reaction_count} reaction${item.reaction_count !== 1 ? 's' : ''}`
                     : 'No reactions yet'}
@@ -618,4 +622,5 @@ const styles = StyleSheet.create({
   gridTitle: { padding: SPACE.SM, fontSize: FONT.SIZES.SM, color: C.INK, fontFamily: FONT.BODY_MEDIUM },
   gridTitleObscured: { padding: SPACE.SM, fontSize: FONT.SIZES.XS, color: C.MUTED, fontFamily: FONT.BODY, fontStyle: 'italic' },
   gridReactionCount: { paddingHorizontal: SPACE.SM, paddingBottom: SPACE.SM, fontSize: FONT.SIZES.XS, color: C.MUTED, fontFamily: FONT.BODY },
+  gridReactionCountNoTitle: { paddingTop: SPACE.SM },
 });
