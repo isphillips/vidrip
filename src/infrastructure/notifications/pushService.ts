@@ -7,10 +7,17 @@ if (Platform.OS === 'ios') {
   PushNotificationIOS = require('@react-native-community/push-notification-ios').default;
 }
 
+// Firebase Cloud Messaging — Android only (iOS uses APNs via PushNotificationIOS).
+// Modular API (RN Firebase v22+): call free functions with a messaging instance
+// rather than the deprecated namespaced `messaging().method()` form.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let messaging: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let messagingInstance: any = null;
 if (Platform.OS === 'android') {
-  messaging = require('@react-native-firebase/messaging').default;
+  const { getApp } = require('@react-native-firebase/app');
+  messaging = require('@react-native-firebase/messaging');
+  messagingInstance = messaging.getMessaging(getApp());
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,7 +64,7 @@ export async function registerPushToken(userId: string): Promise<void> {
       }
     }
 
-    const token = await messaging().getToken();
+    const token = await messaging.getToken(messagingInstance);
     if (token) {
       await saveToken(userId, token, 'android');
     }
@@ -158,18 +165,18 @@ export function bootstrapNotifications(): () => void {
 
   if (Platform.OS === 'android') {
     // Foreground messages
-    const unsubForeground = messaging().onMessage(handleAndroidNotification);
+    const unsubForeground = messaging.onMessage(messagingInstance, handleAndroidNotification);
 
     // Background/quit tap → app opened
-    messaging().onNotificationOpenedApp(handleAndroidNotification);
+    messaging.onNotificationOpenedApp(messagingInstance, handleAndroidNotification);
 
     // App opened from quit state
-    messaging().getInitialNotification().then((remoteMessage: any) => {
+    messaging.getInitialNotification(messagingInstance).then((remoteMessage: any) => {
       if (remoteMessage) { handleAndroidNotification(remoteMessage); }
     });
 
     // FCM token refresh
-    const unsubTokenRefresh = messaging().onTokenRefresh(async (token: string) => {
+    const unsubTokenRefresh = messaging.onTokenRefresh(messagingInstance, async (token: string) => {
       if (_pendingUserId) {
         await saveToken(_pendingUserId, token, 'android');
       }
