@@ -6,7 +6,7 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GOOGLE_CLIENT_ID = (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim();
 const GOOGLE_CLIENT_SECRET = (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim();
 
-const COOLDOWN_MS = 15 * 60 * 1000; // 1 refresh / 15 min, server-enforced.
+const COOLDOWN_MS = 5 * 60 * 1000; // 1 refresh / 5 min, server-enforced.
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

@@ -54,7 +54,7 @@ export async function refreshConnectedFeed(provider: SyncProvider): Promise<{ im
 }
 
 /** Minutes until the feed can be refreshed again, given the last refresh time. */
-export const FEED_REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
+export const FEED_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 export function feedCooldownRemainingMs(lastSyncedAt: string | null): number {
   if (!lastSyncedAt) { return 0; }
   const elapsed = Date.now() - new Date(lastSyncedAt).getTime();
