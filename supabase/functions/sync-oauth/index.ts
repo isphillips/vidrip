@@ -102,10 +102,27 @@ Deno.serve(async (req) => {
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // Identify the calling user from their Supabase JWT.
-    const jwt = req.headers.get("Authorization")?.replace("Bearer ", "") ?? "";
-    const { data: { user } } = await admin.auth.getUser(jwt);
-    if (!user) { return new Response("unauthorized", { status: 401, headers: cors }); }
+    // Identify the calling user from their Supabase JWT. The platform
+    // (verify_jwt=true) has ALREADY validated the token's signature + expiry
+    // before invoking us, so we trust its claims. We deliberately do NOT call
+    // auth.getUser(): that does a stateful session lookup that returns
+    // "Auth session missing" when the session was rotated/revoked even though the
+    // access token itself is still valid — which happens on devices after the
+    // OAuth system-browser round-trip.
+    const jwt = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
+    let userId = "";
+    try {
+      const payload = JSON.parse(
+        atob((jwt.split(".")[1] ?? "").replace(/-/g, "+").replace(/_/g, "/")),
+      );
+      if (payload.role === "authenticated" && typeof payload.sub === "string") {
+        userId = payload.sub;
+      }
+    } catch { /* malformed token */ }
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "unauthorized" }),
+        { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+    }
 
     const { provider, code } = await req.json();
     if (provider !== "youtube" && provider !== "tiktok") {
@@ -123,7 +140,7 @@ Deno.serve(async (req) => {
     const { data: acct, error: acctErr } = await admin
       .from("synced_accounts")
       .upsert({
-        user_id: user.id, provider,
+        user_id: userId, provider,
         provider_account_id: profile.accountId,
         provider_handle: profile.handle,
         provider_display_name: profile.displayName,
@@ -151,7 +168,7 @@ Deno.serve(async (req) => {
     let { data: channel } = await admin
       .from("groups")
       .select("id")
-      .eq("creator_id", user.id)
+      .eq("creator_id", userId)
       .eq("is_members_only", true)
       .maybeSingle();
     if (!channel) {
@@ -159,8 +176,8 @@ Deno.serve(async (req) => {
         .from("groups")
         .insert({
           name: `@${profile.handle || "creator"}`,
-          created_by: user.id,
-          creator_id: user.id,
+          created_by: userId,
+          creator_id: userId,
           is_public: false,
           is_members_only: true,
           is_hidden: false,
@@ -171,7 +188,7 @@ Deno.serve(async (req) => {
       if (chErr || !created) { throw chErr ?? new Error("failed to create channel"); }
       channel = created;
       // Creator is a member/owner of their own channel.
-      await admin.from("group_members").insert({ group_id: channel.id, user_id: user.id, role: "owner" });
+      await admin.from("group_members").insert({ group_id: channel.id, user_id: userId, role: "owner" });
     } else {
       await admin.from("groups").update({ is_hidden: false, avatar_url: profile.avatar }).eq("id", channel.id);
     }
@@ -185,7 +202,7 @@ Deno.serve(async (req) => {
         .eq("post_type", "youtube");
       const have = new Set((existing ?? []).map((r: any) => r.yt_video_id));
       const rows = videos.filter(v => !have.has(v.id)).map(v => ({
-        channel_id: channel!.id, poster_id: user.id,
+        channel_id: channel!.id, poster_id: userId,
         post_type: "youtube", source_type: provider,
         yt_video_id: v.id, yt_video_title: v.title, yt_video_thumbnail: v.thumbnail,
         is_pinned: false,

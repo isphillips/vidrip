@@ -240,6 +240,7 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
       owner:users!created_by(handle)
     `)
     .eq('is_public', false)
+    .eq('is_members_only', false)   // Members Only channels are public-style, not private DMs
     .in('id', channelIds)
     .order('created_at', { ascending: false });
 
