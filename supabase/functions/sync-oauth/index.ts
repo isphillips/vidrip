@@ -76,26 +76,14 @@ async function tiktokExchange(code: string) {
     }),
   });
   if (!res.ok) { throw new Error(`tiktok token: ${await res.text()}`); }
-  const json = await res.json();
-  console.log("[sync-oauth] tiktok token resp:", JSON.stringify({
-    error: json.error ?? null,
-    error_description: json.error_description ?? null,
-    hasAccess: !!json.access_token,
-    scope: json.scope ?? null,
-    clientKey: TIKTOK_CLIENT_KEY,
-    secretLen: TIKTOK_CLIENT_SECRET.length,
-    redirect: REDIRECT_URI,
-  }));
-  return json;
+  return res.json();
 }
 
 async function tiktokProfileAndVideos(accessToken: string): Promise<{ profile: Profile; videos: Video[] }> {
   const h = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
   const uRes = await fetch(
     "https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,username", { headers: h });
-  const uJson = await uRes.json();
-  console.log("[sync-oauth] tiktok userinfo:", JSON.stringify(uJson).slice(0, 600));
-  const u = uJson.data?.user ?? {};
+  const u = (await uRes.json()).data?.user ?? {};
   const profile: Profile = {
     accountId: u.open_id ?? "",
     handle: u.username ?? "",
@@ -105,9 +93,7 @@ async function tiktokProfileAndVideos(accessToken: string): Promise<{ profile: P
   const vRes = await fetch("https://open.tiktokapis.com/v2/video/list/?fields=id,title,cover_image_url", {
     method: "POST", headers: h, body: JSON.stringify({ max_count: 12 }),
   });
-  const vJson = await vRes.json();
-  console.log("[sync-oauth] tiktok videolist:", JSON.stringify(vJson).slice(0, 700));
-  const videos: Video[] = (vJson.data?.videos ?? []).map((v: any) => ({
+  const videos: Video[] = ((await vRes.json()).data?.videos ?? []).map((v: any) => ({
     id: String(v.id), title: v.title ?? "", thumbnail: v.cover_image_url ?? null,
   })).filter((v: Video) => v.id);
   return { profile, videos };
