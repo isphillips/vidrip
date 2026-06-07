@@ -247,6 +247,7 @@ export default function WatchChannelClipScreen({
       resizeMode="contain"
       paused={paused}
       mixWithOthers="mix"
+      disableFocus={Platform.OS === 'android'}
       onLoad={(d: any) => {
         setDuration(d.duration);
         configureForMixedPlayback().then(() => setSessionReady(true)).catch(() => setSessionReady(true));
