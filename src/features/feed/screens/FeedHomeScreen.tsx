@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -17,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import { useFeedStore } from '../../../store/feedStore';
 import { fetchFeedThreads, type FeedThread } from '../../../infrastructure/supabase/queries/threads';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
@@ -25,6 +27,16 @@ const HIDDEN_KEY = 'vidrip_hidden_threads';
 const ACTION_WIDTH = 120; // 2 × 60
 
 type Tab = 'feed' | 'favorites';
+type Filter = 'all' | 'toreact' | 'reactions' | 'requests';
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'toreact', label: 'To React' },
+  { key: 'reactions', label: 'My Reactions' },
+  { key: 'requests', label: 'My Requests' },
+];
+// A thread "needs your reaction" if a friend sent it and you haven't reacted.
+const needsReaction = (t: FeedThread, uid?: string) =>
+  t.sender_id !== uid && t.my_status !== 'reacted';
 
 // ── Action button: scale bounce + white→red (or red→white for remove) ────────
 function ActionBtn({
@@ -66,6 +78,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab]             = useState<Tab>('feed');
+  const [filter, setFilter]       = useState<Filter>('all');
   const [favs, setFavs]           = useState<Map<string, number>>(new Map()); // id → addedAt ms
   const [hidden, setHidden]       = useState<Set<string>>(new Set());
 
@@ -119,6 +132,10 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   // ── Computed list ────────────────────────────────────────────────────────────
   const displayed = useMemo(() => {
     let list = threads.filter(t => !hidden.has(t.id));
+    // Sub-filter pills: My Reactions = ones I reacted to; My Requests = ones I sent.
+    if (filter === 'toreact') { list = list.filter(t => needsReaction(t, user?.id)); }
+    else if (filter === 'reactions') { list = list.filter(t => t.my_status === 'reacted'); }
+    else if (filter === 'requests') { list = list.filter(t => t.sender_id === user?.id); }
     if (tab === 'favorites') {
       list = list.filter(t => favs.has(t.id));
       list.sort((a, b) => (favs.get(b.id) ?? 0) - (favs.get(a.id) ?? 0));
@@ -135,7 +152,20 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         .map(({ t }) => t);
     }
     return list;
-  }, [threads, hidden, favs, tab, user?.id]);
+  }, [threads, hidden, favs, tab, filter, user?.id]);
+
+  // Pill counts (over non-hidden threads) + drive the Feed tab-bar badge.
+  const counts = useMemo(() => {
+    const visible = threads.filter(t => !hidden.has(t.id));
+    return {
+      toreact: visible.filter(t => needsReaction(t, user?.id)).length,
+      reactions: visible.filter(t => t.my_status === 'reacted').length,
+      requests: visible.filter(t => t.sender_id === user?.id).length,
+    } as Record<Filter, number>;
+  }, [threads, hidden, user?.id]);
+
+  const setToReactCount = useFeedStore(s => s.setToReactCount);
+  useEffect(() => { setToReactCount(counts.toreact); }, [counts.toreact, setToReactCount]);
 
   // ── Swipe actions ────────────────────────────────────────────────────────────
   const renderRightActions = (
@@ -190,6 +220,30 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             <Text style={[styles.tabLabel, tab === 'favorites' && styles.tabLabelActive]}>Favorites</Text>
           </TouchableOpacity>
         </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}>
+          {FILTERS.map(f => {
+            const active = filter === f.key;
+            const n = f.key === 'all' ? 0 : counts[f.key];
+            return (
+              <TouchableOpacity
+                key={f.key}
+                style={[styles.pill, active && styles.pillActive]}
+                onPress={() => setFilter(f.key)}
+                activeOpacity={0.8}>
+                <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
+                {n > 0 && (
+                  <View style={[styles.pillCount, active && styles.pillCountActive]}>
+                    <Text style={styles.pillCountTxt}>{n}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -309,6 +363,21 @@ const styles = StyleSheet.create({
   tabBtnActive:   { backgroundColor: C.ACCENT },
   tabLabel:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED },
   tabLabelActive: { color: C.WHITE },
+  filterRow: { gap: SPACE.SM, paddingHorizontal: SPACE.LG, marginTop: SPACE.SM, marginBottom: SPACE.XS, alignItems: 'center' },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
+    backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER,
+  },
+  pillActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
+  pillTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  pillTxtActive: { color: C.ACCENT_HOT },
+  pillCount: {
+    minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5,
+    backgroundColor: C.ACCENT, alignItems: 'center', justifyContent: 'center',
+  },
+  pillCountActive: { backgroundColor: C.ACCENT_HOT },
+  pillCountTxt: { fontSize: 11, fontFamily: FONT.BODY_BOLD, color: C.WHITE, marginTop: -2 },
 
   list:           { paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD, paddingBottom: SPACE.LG, gap: SPACE.MD },
   emptyContainer: { flex: 1, justifyContent: 'center' },

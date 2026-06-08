@@ -230,7 +230,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
               )}
               {status === 'unavailable' && (
                 <Text style={styles.reactionStatusText}>
-                  {r.storage_mode === 'local' ? 'Not shared yet' : 'Unavailable'}
+                  {r.storage_mode === 'local' ? 'Expired' : 'Unavailable'}
                 </Text>
               )}
             </View>

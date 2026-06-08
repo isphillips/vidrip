@@ -80,7 +80,9 @@ export async function saveReaction({
     return { reactionId: data.id, localPath: null, cloudUrl, storageMode: 'cloud' };
   }
 
-  // ─── Local mode ─────────────────────────────────────────────────────────
+  // ─── Local (ephemeral relay) mode ───────────────────────────────────────
+  // The recorder keeps a permanent local copy; a relay copy is ALSO uploaded so
+  // recipients can download it. A TTL cleanup job removes the cloud relay later.
   // 1. Insert DB row first to get the UUID (video_url nullable in Phase 1 migration)
   const { data, error: insertError } = await (supabase as any)
     .from('reactions')
@@ -102,14 +104,26 @@ export async function saveReaction({
   // 2. Move temp file to permanent local location keyed by the reaction UUID
   const localPath = await moveToReactionsDir(filePath, reactionId);
 
-  // 3. Mark thread member as reacted
+  // 3. Upload the relay copy so recipients can fetch it (best-effort; the local
+  //    copy is the source of truth for the recorder). Path is deterministic so
+  //    the TTL cleanup can find and delete it.
+  let cloudUrl: string | null = null;
+  try {
+    const uploadPath = `${userId}/${threadId}/${reactionId}.mp4`;
+    cloudUrl = await uploadToCloud(localPath, uploadPath);
+    await (supabase as any).from('reactions').update({ video_url: cloudUrl }).eq('id', reactionId);
+  } catch (e) {
+    console.error('[saveReaction] relay upload failed:', JSON.stringify(e));
+  }
+
+  // 4. Mark thread member as reacted
   await (supabase as any)
     .from('thread_members')
     .update({ status: 'reacted' })
     .eq('thread_id', threadId)
     .eq('user_id', userId);
 
-  return { reactionId, localPath, cloudUrl: null, storageMode: 'local' };
+  return { reactionId, localPath, cloudUrl, storageMode: 'local' };
 }
 
 // ─── Playback resolution ──────────────────────────────────────────────────

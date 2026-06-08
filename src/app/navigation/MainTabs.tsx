@@ -13,6 +13,7 @@ import type {
 import ChannelsNavigator from './ChannelsStack';
 
 import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
+import { useFeedStore } from '../../store/feedStore';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
 import WatchReactionScreen from '../../features/threads/screens/WatchReactionScreen';
 import FriendsHomeScreen from '../../features/friends/screens/FriendsHomeScreen';
@@ -88,6 +89,7 @@ function AccountNavigator() {
 }
 
 export default function MainTabs() {
+  const toReact = useFeedStore(s => s.toReactCount);
   return (
     <Tab.Navigator
       screenOptions={{
@@ -102,7 +104,11 @@ export default function MainTabs() {
         tabBarShowLabel: true,
       }}>
       <Tab.Screen name="Feed" component={FeedNavigator}
-        options={{ tabBarIcon: tabIcon(require('../../assets/icon-feed.png')), tabBarLabel: 'Feed' }} />
+        options={{
+          tabBarIcon: tabIcon(require('../../assets/icon-feed.png')),
+          tabBarLabel: 'Feed',
+          tabBarBadge: toReact > 0 ? toReact : undefined,
+        }} />
       <Tab.Screen name="Channels" component={ChannelsNavigator}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Channels' }} />
       <Tab.Screen name="Share" component={ShareNavigator}

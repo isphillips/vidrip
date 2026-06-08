@@ -68,29 +68,42 @@ async function buildApnsJwt(): Promise<string> {
 
 async function sendApns(deviceToken: string, title: string, body: string, data: object): Promise<boolean> {
   const jwt = await buildApnsJwt();
-  const host = APNS_ENV === 'production'
-    ? 'api.push.apple.com'
-    : 'api.sandbox.push.apple.com';
-
-  const res = await fetch(`https://${host}/3/device/${deviceToken}`, {
-    method: 'POST',
-    headers: {
-      'apns-topic': APNS_BUNDLE_ID,
-      'apns-push-type': 'alert',
-      'apns-priority': '10',
-      'authorization': `bearer ${jwt}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      aps: { alert: { title, body }, sound: 'default', badge: 1 },
-      ...data,
-    }),
+  const body0 = JSON.stringify({
+    aps: { alert: { title, body }, sound: 'default', badge: 1 },
+    ...data,
   });
 
-  if (!res.ok) {
-    console.error(`APNs error ${res.status}:`, await res.text());
+  // A device token is valid for exactly ONE environment (sandbox for debug
+  // builds, production for TestFlight/App Store). We don't know which a given
+  // token is, so try the configured env first and fall back to the other on
+  // BadDeviceToken — self-heals across build types.
+  const hosts = APNS_ENV === 'production'
+    ? ['api.push.apple.com', 'api.sandbox.push.apple.com']
+    : ['api.sandbox.push.apple.com', 'api.push.apple.com'];
+
+  for (let i = 0; i < hosts.length; i++) {
+    const host = hosts[i];
+    const res = await fetch(`https://${host}/3/device/${deviceToken}`, {
+      method: 'POST',
+      headers: {
+        'apns-topic': APNS_BUNDLE_ID,
+        'apns-push-type': 'alert',
+        'apns-priority': '10',
+        'authorization': `bearer ${jwt}`,
+        'content-type': 'application/json',
+      },
+      body: body0,
+    });
+    if (res.ok) { return true; }
+    const text = await res.text();
+    if (res.status === 400 && text.includes('BadDeviceToken') && i < hosts.length - 1) {
+      console.log(`[send-push] APNs BadDeviceToken on ${host}; retrying other environment`);
+      continue;
+    }
+    console.error(`APNs error ${res.status} (${host}):`, text);
+    return false;
   }
-  return res.ok;
+  return false;
 }
 
 // ── FCM (Android) ──────────────────────────────────────────────────────────────
