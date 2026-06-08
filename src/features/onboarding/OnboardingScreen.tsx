@@ -109,7 +109,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <Text style={styles.h1}>Welcome to Vidrip</Text>
               <DecoDivider />
               <Text style={styles.body}>
-                You've been let in. Pour yourself something — this is where friends trade clips and react, just for each other.
+                You've been let in. Pour yourself something. This is where friends trade clips and react, just for each other.
               </Text>
               <Text style={styles.whisper}>Tell 'em {handle} sent you.</Text>
             </View>
@@ -123,7 +123,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <ForYouMock />
               <Text style={styles.body}>
                 Bring your YouTube <Text style={styles.em}>Liked videos</Text> to the table. They show up in your private{' '}
-                <Text style={styles.em}>For You</Text> shelf when you go to share — so you always have something good on hand.
+                <Text style={styles.em}>For You</Text> shelf when you go to share, so you always have something good on hand.
               </Text>
               {connected ? (
                 <View style={styles.connectedRow}>
@@ -159,7 +159,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <Text style={styles.h1}>The night is yours</Text>
               <DecoDivider />
               <Text style={[styles.body, { color: C.WHITE}]}>
-                That's the whole show — share what you love, react to what they send. Welcome to the club.
+                That's the whole show. Share what you love, react to what they send. Welcome to the club.
               </Text>
             </View>
           )}
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, textAlign: 'center' },
   body: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', lineHeight: 24, maxWidth: 320 },
   em: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD },
-  whisper: { fontSize: FONT.SIZES.SM, fontFamily: FONT.DISPLAY_ITALIC, fontStyle: 'italic', color: C.SUBTLE, textAlign: 'center', marginTop: SPACE.SM },
+  whisper: { fontSize: FONT.SIZES.MD, fontFamily: FONT.DISPLAY_ITALIC, fontStyle: 'italic', color: C.GOLD, textAlign: 'center', marginTop: SPACE.SM },
 
   connectedRow: { marginTop: SPACE.SM, borderWidth: 1, borderColor: C.GOLD, borderRadius: RADIUS.FULL, paddingHorizontal: SPACE.LG, paddingVertical: SPACE.XS },
   connectedText: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
