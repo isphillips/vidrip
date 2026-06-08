@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
@@ -50,7 +51,7 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
     try {
       await acceptFriendRequest(req.friendshipId);
       setPending((p) => p.filter((r) => r.friendshipId !== req.friendshipId));
-      setFriends((f) => [...f, { friendshipId: req.friendshipId, userId: req.userId, handle: req.handle, displayName: req.displayName }]);
+      setFriends((f) => [...f, { friendshipId: req.friendshipId, userId: req.userId, handle: req.handle, displayName: req.displayName, avatarUrl: req.avatarUrl }]);
     } catch {
       Alert.alert('Error', 'Could not accept request. Try again.');
     }
@@ -89,9 +90,15 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
           <Text style={styles.sectionLabel}>Requests</Text>
           {pending.map((req) => (
             <View key={req.friendshipId} style={styles.requestRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{req.displayName[0]?.toUpperCase()}</Text>
-              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: req.userId })} activeOpacity={0.8}>
+                {req.avatarUrl ? (
+                  <Image source={{ uri: req.avatarUrl }} style={styles.avatar} />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{req.displayName[0]?.toUpperCase()}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
               <View style={styles.rowInfo}>
                 <Text style={styles.name}>{req.displayName}</Text>
                 <Text style={styles.handle}>@{req.handle}</Text>
@@ -122,9 +129,15 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <View style={styles.row}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{item.displayName[0]?.toUpperCase()}</Text>
-              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.userId })} activeOpacity={0.8}>
+                {item.avatarUrl ? (
+                  <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
+                ) : (
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{item.displayName[0]?.toUpperCase()}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
               <View>
                 <Text style={styles.name}>{item.displayName}</Text>
                 <Text style={styles.handle}>@{item.handle}</Text>

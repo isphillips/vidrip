@@ -48,6 +48,8 @@
 	<string/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Reaxn captures your audio while recording reactions.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vidrip lets you choose a photo from your library for your profile picture.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Raleway-BoldItalic.ttf</string>

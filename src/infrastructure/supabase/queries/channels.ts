@@ -9,7 +9,7 @@ export type ChannelSummary = {
   description: string | null;
   is_public: boolean;
   created_by: string;
-  owner: { handle: string } | null;
+  owner: { handle: string; avatar_url?: string | null } | null;
   pinned_video_id: string | null;
   pinned_video_title: string | null;
   pinned_video_thumbnail: string | null;
@@ -53,7 +53,7 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
       .select(`
         id, name, description, is_public, created_by, member_count,
         pinned_video_id, pinned_video_title, pinned_video_thumbnail,
-        owner:users!created_by(handle)
+        owner:users!created_by(handle, avatar_url)
       `)
       .eq('is_public', true)
       .order('member_count', { ascending: false }),
@@ -120,7 +120,7 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
       .select(`
         id, name, description, is_public, created_by, member_count, avatar_url,
         pinned_video_id, pinned_video_title, pinned_video_thumbnail,
-        owner:users!created_by(handle)
+        owner:users!created_by(handle, avatar_url)
       `)
       .eq('is_members_only', true)
       .eq('is_hidden', false)
@@ -190,7 +190,7 @@ export async function fetchMembersOnlyVideos(userId: string, limit = 30): Promis
 
   const { data: chans } = await (supabase as any)
     .from('groups')
-    .select('id, owner:users!created_by(handle)')
+    .select('id, owner:users!created_by(handle, avatar_url)')
     .eq('is_members_only', true)
     .eq('is_hidden', false)
     .in('id', [...joinedIds]);
@@ -238,7 +238,7 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
     .from('groups')
     .select(`
       id, name, description, is_public, created_by, member_count,
-      owner:users!created_by(handle)
+      owner:users!created_by(handle, avatar_url)
     `)
     .eq('is_public', false)
     .eq('is_members_only', false)   // Members Only channels are public-style, not private DMs

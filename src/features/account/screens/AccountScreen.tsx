@@ -176,17 +176,28 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: top + SPACE.LG }]}>
-      {/* Avatar */}
-      <View style={styles.avatarWrap}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initial}</Text>
-        </View>
+      {/* Avatar — tap to edit profile */}
+      <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.85} onPress={() => navigation.navigate('EditProfile')}>
+        {(profile as any)?.avatar_url ? (
+          <Image source={{ uri: (profile as any).avatar_url }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initial}</Text>
+          </View>
+        )}
         <Text style={styles.displayName}>{profile?.display_name ?? '—'}</Text>
         <Text style={styles.handle}>@{profile?.handle ?? '—'}</Text>
+        {!!(profile as any)?.bio && (
+          <Text style={styles.bio} numberOfLines={2}>{(profile as any).bio}</Text>
+        )}
+        {!!(profile as any)?.location && (
+          <Text style={styles.location}>📍 {(profile as any).location}</Text>
+        )}
         {memberSince && (
           <Text style={styles.since}>Member since {memberSince}</Text>
         )}
-      </View>
+        <Text style={styles.editLink}>Edit profile</Text>
+      </TouchableOpacity>
 
       {/* Phone (optional) */}
       <Text style={styles.sectionLabel}>Phone (optional)</Text>
@@ -390,6 +401,9 @@ const styles = StyleSheet.create({
   displayName: { fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
   handle: { fontSize: FONT.SIZES.MD, color: C.MUTED, fontFamily: FONT.BODY },
   since: { fontSize: FONT.SIZES.SM, color: C.SUBTLE, fontFamily: FONT.BODY },
+  bio: { fontSize: FONT.SIZES.SM, color: C.INK, fontFamily: FONT.BODY, textAlign: 'center', marginTop: SPACE.XS, marginHorizontal: SPACE.LG, lineHeight: 19 },
+  location: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY },
+  editLink: { fontSize: FONT.SIZES.SM, color: C.ACCENT_HOT, fontFamily: FONT.BODY_SEMIBOLD, marginTop: SPACE.SM },
   section: {
     backgroundColor: C.SURFACE,
     borderRadius: RADIUS.MD,

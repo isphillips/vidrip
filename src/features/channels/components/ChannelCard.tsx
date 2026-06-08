@@ -20,9 +20,13 @@ export default function ChannelCard({ channel, userId, onPress }: Props) {
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.body}>
         {channel.is_members_only ? (
-          <View style={styles.avatarFallback}>
-            <Text style={styles.avatarLetter}>{initial}</Text>
-          </View>
+          channel.owner?.avatar_url ? (
+            <Image source={{ uri: channel.owner.avatar_url }} style={styles.avatar} resizeMode="cover" />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarLetter}>{initial}</Text>
+            </View>
+          )
         ) : channel.avatar_url ? (
           <Image source={{ uri: channel.avatar_url }} style={styles.avatar} resizeMode="cover" />
         ) : null}

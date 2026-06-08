@@ -5,6 +5,7 @@ export type Friend = {
   userId: string;
   handle: string;
   displayName: string;
+  avatarUrl: string | null;
 };
 
 export type PendingRequest = {
@@ -12,6 +13,7 @@ export type PendingRequest = {
   userId: string;
   handle: string;
   displayName: string;
+  avatarUrl: string | null;
 };
 
 export async function fetchFriends(userId: string): Promise<Friend[]> {
@@ -29,14 +31,14 @@ export async function fetchFriends(userId: string): Promise<Friend[]> {
 
   const { data: users } = await supabase
     .from('users')
-    .select('id, handle, display_name')
+    .select('id, handle, display_name, avatar_url')
     .in('id', pairs.map((p) => p.otherId));
 
   const userMap = new Map((users ?? []).map((u: any) => [u.id, u]));
 
   return pairs.map(({ friendshipId, otherId }) => {
     const u: any = userMap.get(otherId);
-    return { friendshipId, userId: otherId, handle: u?.handle ?? '?', displayName: u?.display_name ?? '?' };
+    return { friendshipId, userId: otherId, handle: u?.handle ?? '?', displayName: u?.display_name ?? '?', avatarUrl: u?.avatar_url ?? null };
   });
 }
 
@@ -52,14 +54,14 @@ export async function fetchPendingRequests(userId: string): Promise<PendingReque
 
   const { data: users } = await supabase
     .from('users')
-    .select('id, handle, display_name')
+    .select('id, handle, display_name, avatar_url')
     .in('id', data.map((f) => f.user_a));
 
   const userMap = new Map((users ?? []).map((u: any) => [u.id, u]));
 
   return data.map((f) => {
     const u: any = userMap.get(f.user_a);
-    return { friendshipId: f.id, userId: f.user_a, handle: u?.handle ?? '?', displayName: u?.display_name ?? '?' };
+    return { friendshipId: f.id, userId: f.user_a, handle: u?.handle ?? '?', displayName: u?.display_name ?? '?', avatarUrl: u?.avatar_url ?? null };
   });
 }
 

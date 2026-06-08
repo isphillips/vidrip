@@ -35,6 +35,7 @@ export type ChannelsStackScreenProps<T extends keyof ChannelsStackParamList> =
 
 export type AccountStackParamList = {
   AccountHome: undefined;
+  EditProfile: undefined;
   InviteManagement: undefined;
   PasswordSetup: undefined;
 };
@@ -51,6 +52,7 @@ export type FriendsStackParamList = {
   FriendsHome: undefined;
   AddFriend: undefined;
   InviteManagement: undefined;
+  Profile: { userId: string };
 };
 
 // Share stack

@@ -16,10 +16,12 @@ import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
 import WatchReactionScreen from '../../features/threads/screens/WatchReactionScreen';
 import FriendsHomeScreen from '../../features/friends/screens/FriendsHomeScreen';
+import UserProfileScreen from '../../features/friends/screens/UserProfileScreen';
 import AddFriendScreen from '../../features/friends/screens/AddFriendScreen';
 import InviteManagementScreen from '../../features/friends/screens/InviteManagementScreen';
 import ShareHomeScreen from '../../features/share/screens/ShareHomeScreen';
 import AccountScreen from '../../features/account/screens/AccountScreen';
+import EditProfileScreen from '../../features/account/screens/EditProfileScreen';
 import PasswordSetupScreen from '../../features/account/screens/PasswordSetupScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -60,6 +62,7 @@ function FriendsNavigator() {
     <FriendsStack.Navigator screenOptions={NAV_OPTS}>
       <FriendsStack.Screen name="FriendsHome" component={FriendsHomeScreen} options={{ headerShown: false }} />
       <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
+      <FriendsStack.Screen name="Profile" component={UserProfileScreen} options={{ title: 'Profile', headerBackTitle: 'Friends' }} />
       <FriendsStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
     </FriendsStack.Navigator>
   );
@@ -77,6 +80,7 @@ function AccountNavigator() {
   return (
     <AccountStack.Navigator screenOptions={NAV_OPTS}>
       <AccountStack.Screen name="AccountHome" component={AccountScreen} options={{ headerShown: false }} />
+      <AccountStack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="PasswordSetup" component={PasswordSetupScreen} options={{ title: 'Password Login', headerBackTitle: 'Account' }} />
     </AccountStack.Navigator>
