@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Linking, Alert, ScrollView,
+  View, Text, StyleSheet, Linking, Alert, ScrollView, TouchableOpacity, Image,
 } from 'react-native';
-import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing } from 'react-native-reanimated';
+import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming, withDelay, withRepeat, interpolate, Extrapolation, Easing, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
@@ -13,6 +13,8 @@ import { refreshConnectedFeed } from '../../infrastructure/supabase/queries/conn
 import { DecoDivider, Kicker, Pips, DecoButton } from './components';
 
 const STEPS = 5;
+const LOGO_W = 96;
+const LOGO_H = 104;
 
 export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'replay'; onDone: () => void }) {
   const { top, bottom } = useSafeAreaInsets();
@@ -21,6 +23,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
 
   const [step, setStep] = useState(0);
   const next = () => setStep(s => Math.min(s + 1, STEPS - 1));
+  const back = () => setStep(s => Math.max(0, s - 1));
 
   // ── For You connect (feed OAuth) ────────────────────────────────────────────
   const { pending, clearPending } = useOAuthStore();
@@ -54,25 +57,54 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
     });
   };
 
-  // Wax-seal stamp for the splash logo.
+  // Wax-seal stamp entrance + a continuous 3D rock so the coin catches the light.
   const stamp = useSharedValue(0);
-  useEffect(() => { stamp.value = withDelay(120, withTiming(1, { duration: 600, easing: Easing.out(Easing.back(1.6)) })); }, [stamp]);
-  const stampStyle = useAnimatedStyle(() => ({
-    opacity: stamp.value,
-    transform: [{ scale: 0.7 + stamp.value * 0.3 }, { rotate: `${(1 - stamp.value) * -8}deg` }],
-  }));
+  const tilt = useSharedValue(0);
+  const bob = useSharedValue(0);
+  useEffect(() => {
+    stamp.value = withDelay(120, withTiming(1, { duration: 600, easing: Easing.out(Easing.back(1.6)) }));
+    tilt.value = withRepeat(withTiming(1, { duration: 3600, easing: Easing.linear }), -1, false);
+    bob.value = withRepeat(withTiming(1, { duration: 1500, easing: Easing.linear }), -1, false);
+  }, [stamp, tilt, bob]);
+  const logoStyle = useAnimatedStyle(() => {
+    const wobble = Math.sin(tilt.value * Math.PI * 2); // -1..1, seamless loop
+    const hop = Math.sin(bob.value * Math.PI);          // 0..1..0, one arc per loop
+    return {
+      opacity: stamp.value,
+      transform: [
+        { perspective: 700 },
+        { translateY: -hop * 14 },                        // bounce up and back down
+        { scale: 0.7 + stamp.value * 0.3 },
+        { scaleY: 1 - hop * 0.04 },                       // subtle stretch at the top
+        { rotateY: `${wobble * 16}deg` },                 // 3D side-to-side tilt
+        { rotateZ: `${(1 - stamp.value) * -8 + wobble * 2}deg` },
+      ],
+    };
+  });
 
   return (
     <View style={[styles.container, { paddingTop: top }]}>
+      {step === 4 && <StageCurtains />}
+      {step > 0 && (
+        <TouchableOpacity style={[styles.backBtn, { top: top + SPACE.SM }]} onPress={back} hitSlop={12}>
+          <Text style={styles.backText}>‹ Back</Text>
+        </TouchableOpacity>
+      )}
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Animated.View key={step} entering={FadeIn.duration(350)} style={styles.stepWrap}>
           {step === 0 && (
             <View style={styles.center}>
-              <Animated.Image
-                source={require('../../assets/goldlogo.png')}
-                style={[styles.logo, stampStyle]}
-                resizeMode="contain"
-              />
+              <Animated.View style={[styles.logoWrap, logoStyle]}>
+                <Animated.Image
+                  source={require('../../assets/goldlogo.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+                <Sparkle x={LOGO_W * 0.1} y={LOGO_H * 0.20} size={16} delay={0} />
+                <Sparkle x={LOGO_W * 0.74} y={LOGO_H * 0.30} size={11} delay={450} />
+                <Sparkle x={LOGO_W * 0.60} y={LOGO_H * 0.8} size={13} delay={900} />
+                <Sparkle x={LOGO_W * 0.30} y={LOGO_H * 0.58} size={9} delay={1350} />
+              </Animated.View>
               <Kicker>Members Only</Kicker>
               <Text style={styles.h1}>Welcome to Vidrip</Text>
               <DecoDivider />
@@ -88,6 +120,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <Kicker>Step One</Kicker>
               <Text style={styles.h2}>Your “For You”</Text>
               <DecoDivider />
+              <ForYouMock />
               <Text style={styles.body}>
                 Bring your YouTube <Text style={styles.em}>Liked videos</Text> to the table. They show up in your private{' '}
                 <Text style={styles.em}>For You</Text> shelf when you go to share — so you always have something good on hand.
@@ -105,10 +138,9 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
           {step === 2 && (
             <View style={styles.center}>
               <Kicker>Step Two</Kicker>
-              <Text style={styles.h2}>Pass a clip</Text>
+              <Text style={styles.h2}>Share a clip</Text>
               <DecoDivider />
               <ShareMock />
-              <Steps items={['Browse or paste a clip', 'Pick a friend', 'Send it over']} />
             </View>
           )}
 
@@ -118,7 +150,6 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <Text style={styles.h2}>React back</Text>
               <DecoDivider />
               <ReactMock />
-              <Steps items={['Open a clip a friend sent', 'Tap “Record Your Reaction”', 'They watch you watch it']} />
             </View>
           )}
 
@@ -127,7 +158,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <Kicker>You're set</Kicker>
               <Text style={styles.h1}>The night is yours</Text>
               <DecoDivider />
-              <Text style={styles.body}>
+              <Text style={[styles.body, { color: C.WHITE}]}>
                 That's the whole show — share what you love, react to what they send. Welcome to the club.
               </Text>
             </View>
@@ -159,61 +190,256 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
   );
 }
 
-// ── Stylized mock UI for the how-to steps ──────────────────────────────────────
-function ShareMock() {
+// Curtain photo backdrop for the final step (with a scrim for text legibility).
+function StageCurtains() {
   return (
-    <View style={styles.mockRow}>
-      <View style={styles.mockCard}>
-        <View style={styles.mockThumb}><Text style={styles.mockGlyph}>▶</Text></View>
-        <View style={styles.mockLine} />
-        <View style={[styles.mockLine, { width: '60%' }]} />
-      </View>
-      <Text style={styles.mockArrow}>→</Text>
-      <View style={styles.mockChip}>
-        <View style={styles.mockAvatar}><Text style={styles.mockAvatarText}>A</Text></View>
-        <View style={[styles.mockLine, { width: 36, marginTop: SPACE.XS }]} />
-        <View style={styles.mockSend}><Text style={styles.mockSendText}>Send</Text></View>
-      </View>
-    </View>
+    <Animated.View pointerEvents="none" entering={FadeIn.duration(500)} style={styles.curtains}>
+      <Image source={require('../../assets/curtain.jpg')} style={styles.curtainImg} resizeMode="cover" />
+      <View style={styles.curtainScrim} />
+    </Animated.View>
   );
 }
 
-function ReactMock() {
+// A twinkling sparkle that pops on a loop (scale + opacity + slow spin).
+function Sparkle({ x, y, size, delay }: { x: number; y: number; size: number; delay: number }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withDelay(delay, withRepeat(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }), -1, false));
+  }, [t, delay]);
+  const style = useAnimatedStyle(() => {
+    const p = Math.sin(t.value * Math.PI); // 0 → 1 → 0 twinkle
+    return { opacity: p, transform: [{ scale: 0.3 + p * 0.9 }, { rotate: `${t.value * 90}deg` }] };
+  });
   return (
-    <View style={styles.mockRow}>
-      <View style={styles.mockCard}>
-        <View style={styles.mockThumb}><Text style={styles.mockGlyph}>▶</Text></View>
-        <View style={styles.mockReactBtn}><Text style={styles.mockReactText}>Record Your Reaction</Text></View>
-      </View>
-      <Text style={styles.mockArrow}>→</Text>
-      <View style={styles.mockBubble}>
-        <View style={styles.mockFace}><Text style={styles.mockGlyph}>☺</Text></View>
-        <Text style={styles.mockBubbleText}>😂 🔥</Text>
-      </View>
-    </View>
+    <Animated.Text style={[styles.sparkle, { left: x, top: y, fontSize: size }, style]}>
+      ✦
+    </Animated.Text>
   );
 }
 
-function Steps({ items }: { items: string[] }) {
+// ── Animated how-to demos (loop forever) ───────────────────────────────────────
+const CLAMP = Extrapolation.CLAMP;
+
+// One thumbnail that pops into the For You grid at its turn.
+function GridTile({ p, start }: { p: SharedValue<number>; start: number }) {
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [start, start + 0.08], [0, 1], CLAMP),
+    transform: [{ scale: interpolate(p.value, [start, start + 0.1], [0.3, 1], CLAMP) }],
+  }));
   return (
-    <View style={styles.stepsList}>
-      {items.map((t, i) => (
-        <View key={i} style={styles.stepLine}>
-          <View style={styles.stepNum}><Text style={styles.stepNumText}>{i + 1}</Text></View>
-          <Text style={styles.stepText}>{t}</Text>
+    <Animated.View style={[styles.fyTile, style]}>
+      <Text style={styles.fyTileGlyph}>▶</Text>
+    </Animated.View>
+  );
+}
+
+// For You: a liked clip → its videos fill a private grid. Loops.
+function ForYouMock() {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(withTiming(1, { duration: 4200, easing: Easing.inOut(Easing.ease) }), -1, false);
+  }, [p]);
+
+  const play = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0, 0.05, 0.3], [0.5, 1, 0.6], CLAMP),
+  }));
+  const heart = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0, 0.05, 0.85, 0.95], [0, 1, 1, 0], CLAMP),
+    transform: [{ scale: interpolate(p.value, [0.05, 0.14, 0.24], [0.5, 1.35, 1], CLAMP) }],
+  }));
+  const arrow = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0.3, 0.4, 0.86, 0.94], [0, 1, 1, 0.2], CLAMP),
+    transform: [
+      { translateX: interpolate(p.value, [0.3, 0.42], [-12, 0], CLAMP) },
+      { scale: interpolate(p.value, [0.3, 0.42], [0.5, 1], CLAMP) },
+    ],
+  }));
+
+  return (
+    <View style={styles.demo}>
+      <View style={styles.demoCard}>
+        <View style={styles.demoThumb}>
+          <Animated.Text style={[styles.demoPlay, play]}>▶</Animated.Text>
         </View>
-      ))}
+        <Animated.Text style={[styles.fyHeart, heart]}>♥</Animated.Text>
+      </View>
+      <Animated.Text style={[styles.demoArrow, styles.fyArrow, arrow]}>➜</Animated.Text>
+      <View style={styles.fyGrid}>
+        <GridTile p={p} start={0.42} />
+        <GridTile p={p} start={0.52} />
+        <GridTile p={p} start={0.62} />
+        <GridTile p={p} start={0.72} />
+      </View>
     </View>
+  );
+}
+
+// Share: clip plays → a copy flies to a friend → "Sent ✓". Loops.
+function ShareMock() {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(withTiming(1, { duration: 4200, easing: Easing.inOut(Easing.ease) }), -1, false);
+  }, [p]);
+
+  const progress = useAnimatedStyle(() => ({
+    width: `${interpolate(p.value, [0, 0.32, 0.9, 1], [4, 100, 100, 4], CLAMP)}%`,
+  }));
+  const play = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0, 0.04, 0.3, 0.38], [0.5, 1, 1, 0], CLAMP),
+  }));
+  const packet = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0.36, 0.42, 0.6, 0.66], [0, 1, 1, 0], CLAMP),
+    transform: [
+      { translateX: interpolate(p.value, [0.4, 0.64], [0, 132], CLAMP) },
+      { translateY: interpolate(p.value, [0.4, 0.52, 0.64], [0, -22, 0], CLAMP) },
+      { scale: interpolate(p.value, [0.4, 0.64], [1, 0.45], CLAMP) },
+    ],
+  }));
+  const friend = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(p.value, [0.58, 0.68, 0.8], [1, 1.28, 1], CLAMP) }],
+  }));
+  const sent = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0.66, 0.74, 0.92, 1], [0, 1, 1, 0], CLAMP),
+  }));
+  const arrow = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0.3, 0.42, 0.66, 0.74], [0.2, 1, 1, 0.2], CLAMP),
+  }));
+
+  return (
+    <View style={styles.demoWrap}>
+      <View style={styles.demo}>
+        <View style={styles.demoCard}>
+          <View style={styles.demoThumb}>
+            <Animated.Text style={[styles.demoPlay, play]}>▶</Animated.Text>
+            <View style={styles.progressTrack}><Animated.View style={[styles.progressFill, progress]} /></View>
+          </View>
+        </View>
+        <Animated.Text style={[styles.demoArrow, arrow]}>➜</Animated.Text>
+        <Animated.View style={[styles.packet, packet]} />
+        <View style={styles.demoFriend}>
+          <Animated.View style={[styles.demoAvatar, friend]}><Text style={styles.demoAvatarText}>A</Text></Animated.View>
+          <Animated.Text style={[styles.demoSent, sent]}>Sent ✓</Animated.Text>
+        </View>
+      </View>
+      <View style={styles.dSteps}>
+        <DemoStep p={p} index={1} range={[0, 0.34]} label="Browse or paste a clip" />
+        <DemoStep p={p} index={2} range={[0.34, 0.6]} label="Pick a friend" />
+        <DemoStep p={p} index={3} range={[0.6, 0.97]} label="Send it over" />
+      </View>
+    </View>
+  );
+}
+
+// React: clip plays → record (blinking dot) → reaction face + emojis pop. Loops.
+function ReactMock() {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(withTiming(1, { duration: 4600, easing: Easing.inOut(Easing.ease) }), -1, false);
+  }, [p]);
+
+  // The preview starts centered, then slides to the left.
+  const CENTER = 70; // (demo 264 - card 124) / 2
+  const card = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(p.value, [0, 0.2, 0.42, 1], [CENTER, CENTER, 0, 0], CLAMP) }],
+  }));
+  const play = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0, 0.05, 0.16, 0.22], [0.5, 1, 1, 0.3], CLAMP),
+  }));
+  const recBtn = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(p.value, [0.05, 0.13, 0.22], [1, 1.12, 1], CLAMP) }],
+  }));
+  // Blinking record dot while "recording" (during the centered phase).
+  const recDot = useAnimatedStyle(() => {
+    const on = p.value > 0.05 && p.value < 0.4;
+    return { opacity: on ? (Math.sin(p.value * Math.PI * 22) > 0 ? 1 : 0.2) : 0 };
+  });
+  // Arrow emerges from the card as it slides left (hidden until then).
+  const arrow = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0.34, 0.46, 0.78, 0.86], [0, 1, 1, 0.2], CLAMP),
+    transform: [
+      { translateX: interpolate(p.value, [0.34, 0.48], [-16, 0], CLAMP) },
+      { scale: interpolate(p.value, [0.34, 0.48], [0.5, 1], CLAMP) },
+    ],
+  }));
+  const face = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0.5, 0.62], [0, 1], CLAMP),
+    transform: [{ scale: interpolate(p.value, [0.5, 0.66, 0.76], [0.4, 1.1, 1], CLAMP) }],
+  }));
+  const emojis = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0.66, 0.74, 0.94, 1], [0, 1, 1, 0], CLAMP),
+    transform: [
+      { translateY: interpolate(p.value, [0.66, 0.82], [6, -10], CLAMP) },
+      { scale: interpolate(p.value, [0.66, 0.76], [0.5, 1], CLAMP) },
+    ],
+  }));
+
+  return (
+    <View style={styles.demoWrap}>
+      <View style={styles.demo}>
+        <Animated.View style={[styles.demoCard, card]}>
+          <View style={styles.demoThumb}>
+            <Animated.Text style={[styles.demoPlay, play]}>▶</Animated.Text>
+          </View>
+          <Animated.View style={[styles.recBtn, recBtn]}>
+            <Animated.View style={[styles.recDot, recDot]} />
+            <Text style={styles.recText}>Record</Text>
+          </Animated.View>
+        </Animated.View>
+        <Animated.Text style={[styles.demoArrow, arrow]}>➜</Animated.Text>
+        <View style={styles.demoFriend}>
+          <Animated.View style={[styles.demoFace, face]}><Text style={styles.demoFaceGlyph}>☺</Text></Animated.View>
+          <Animated.Text style={[styles.demoEmojis, emojis]}>😂 🔥</Animated.Text>
+        </View>
+      </View>
+      <View style={styles.dSteps}>
+        <DemoStep p={p} index={1} range={[0, 0.2]} label="Open a clip a friend sent" />
+        <DemoStep p={p} index={2} range={[0.2, 0.5]} label="Tap “Record Your Reaction”" />
+        <DemoStep p={p} index={3} range={[0.5, 0.98]} label="They watch you watch it" />
+      </View>
+    </View>
+  );
+}
+
+// One numbered step that highlights while its phase is active in the demo loop.
+function DemoStep({ p, index, range, label }: { p: SharedValue<number>; index: number; range: [number, number]; label: string }) {
+  const rowStyle = useAnimatedStyle(() => {
+    const on = p.value >= range[0] && p.value <= range[1];
+    return { opacity: withTiming(on ? 1 : 0.4), transform: [{ scale: withTiming(on ? 1.05 : 1) }] };
+  });
+  const numStyle = useAnimatedStyle(() => ({
+    backgroundColor: (p.value >= range[0] && p.value <= range[1]) ? C.GOLD : 'transparent',
+  }));
+  const numTextStyle = useAnimatedStyle(() => ({
+    color: (p.value >= range[0] && p.value <= range[1]) ? C.BG : C.GOLD,
+  }));
+  return (
+    <Animated.View style={[styles.dStepLine, rowStyle]}>
+      <Animated.View style={[styles.dStepNum, numStyle]}>
+        <Animated.Text style={[styles.dStepNumText, numTextStyle]}>{index}</Animated.Text>
+      </Animated.View>
+      <Text style={styles.dStepText}>{label}</Text>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
+
+  // Curtain photo backdrop (final step)
+  curtains: { ...StyleSheet.absoluteFillObject, marginLeft: -35 },
+  curtainImg: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined },
+  curtainScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(12,10,9,0.35)' },
+
+  backBtn: { position: 'absolute', left: SPACE.LG, zIndex: 10, paddingVertical: SPACE.XS, paddingRight: SPACE.MD },
+  backText: { color: C.MUTED, fontFamily: FONT.BODY_MEDIUM, fontSize: FONT.SIZES.MD },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: SPACE.XL },
   stepWrap: { flex: 1, justifyContent: 'center' },
   center: { alignItems: 'center', gap: SPACE.MD },
 
-  logo: { width: 96, height: 104, marginBottom: SPACE.SM },
+  logoWrap: { width: LOGO_W, height: LOGO_H, marginBottom: SPACE.SM },
+  logo: { width: LOGO_W, height: LOGO_H },
+  // Twinkling sparkles over the coin.
+  sparkle: { position: 'absolute', color: '#FFF8E1', textShadowColor: C.GOLD, textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } },
   h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, textAlign: 'center' },
   h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, textAlign: 'center' },
   body: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', lineHeight: 24, maxWidth: 320 },
@@ -226,28 +452,37 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: SPACE.XL, paddingTop: SPACE.LG, gap: SPACE.LG, borderTopWidth: 1, borderTopColor: C.BORDER },
   ctaCol: { gap: SPACE.SM },
 
-  // mock UI
-  mockRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.MD, marginVertical: SPACE.MD },
-  mockCard: { width: 116, backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, padding: SPACE.SM, gap: SPACE.XS },
-  mockThumb: { height: 70, borderRadius: RADIUS.SM, backgroundColor: C.SURFACE_2, alignItems: 'center', justifyContent: 'center' },
-  mockGlyph: { color: C.GOLD_DIM, fontSize: 22 },
-  mockLine: { height: 6, borderRadius: 3, backgroundColor: C.BORDER_STRONG, width: '90%' },
-  mockArrow: { color: C.GOLD, fontSize: 24, fontFamily: FONT.BODY_BOLD },
-  mockChip: { alignItems: 'center', gap: SPACE.XS },
-  mockAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.ACCENT, alignItems: 'center', justifyContent: 'center' },
-  mockAvatarText: { color: C.ACCENT_HOT, fontFamily: FONT.DISPLAY_BOLD, fontSize: FONT.SIZES.LG },
-  mockSend: { marginTop: SPACE.XS, backgroundColor: C.GOLD, borderRadius: RADIUS.SM, paddingHorizontal: SPACE.MD, paddingVertical: 4 },
-  mockSendText: { color: C.BG, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.XS },
-  mockReactBtn: { backgroundColor: C.ACCENT, borderRadius: RADIUS.SM, paddingVertical: 6, alignItems: 'center' },
-  mockReactText: { color: C.WHITE, fontFamily: FONT.BODY_BOLD, fontSize: 10 },
-  mockBubble: { alignItems: 'center', gap: SPACE.XS },
-  mockFace: { width: 56, height: 56, borderRadius: 28, backgroundColor: C.SURFACE_2, borderWidth: 1, borderColor: C.GOLD_DIM, alignItems: 'center', justifyContent: 'center' },
-  mockBubbleText: { fontSize: FONT.SIZES.MD },
+  // animated how-to demos
+  demoWrap: { alignItems: 'center', gap: SPACE.SM },
+  demo: { width: 264, height: 96, alignSelf: 'center', marginVertical: SPACE.MD },
+  demoArrow: { position: 'absolute', left: 158, top: 28, color: C.GOLD, fontSize: 24, fontFamily: FONT.BODY_BOLD },
+  demoCard: { position: 'absolute', left: 0, top: 8, width: 124, backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, padding: SPACE.SM, gap: SPACE.XS },
+  demoThumb: { height: 60, borderRadius: RADIUS.SM, backgroundColor: C.SURFACE_2, alignItems: 'center', justifyContent: 'center' },
+  demoPlay: { color: C.GOLD, fontSize: 20 },
+  progressTrack: { position: 'absolute', left: 6, right: 6, bottom: 6, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)' },
+  progressFill: { height: 3, borderRadius: 2, backgroundColor: C.GOLD },
+  packet: { position: 'absolute', left: 96, top: 28, width: 30, height: 24, borderRadius: 4, backgroundColor: C.GOLD_DIM, borderWidth: 1, borderColor: C.GOLD },
+  demoFriend: { position: 'absolute', right: 0, top: 14, width: 64, alignItems: 'center', gap: SPACE.XS },
+  // For You demo: heart on the source clip + a grid the videos pop into.
+  fyHeart: { position: 'absolute', top: 7, right: 8, color: C.ACCENT_HOT, fontSize: 22 },
+  fyArrow: { left: 147, top: 32 },
+  fyGrid: { position: 'absolute', right: 0, top: 18, width: 74, flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  fyTile: { width: 34, height: 26, borderRadius: 4, backgroundColor: C.BLACK, borderWidth: 1, borderColor: C.GOLD_DIM, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  fyTileGlyph: { color: 'rgba(255,255,255,0.55)', fontSize: 12 },
+  demoAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.ACCENT, alignItems: 'center', justifyContent: 'center' },
+  demoAvatarText: { color: C.ACCENT_HOT, fontFamily: FONT.DISPLAY_BOLD, fontSize: FONT.SIZES.LG },
+  demoSent: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.XS },
+  recBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.ACCENT, borderRadius: RADIUS.SM, paddingVertical: 6 },
+  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.WHITE },
+  recText: { color: C.WHITE, fontFamily: FONT.BODY_BOLD, fontSize: 11 },
+  demoFace: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.SURFACE_2, borderWidth: 1, borderColor: C.GOLD_DIM, alignItems: 'center', justifyContent: 'center' },
+  demoFaceGlyph: { color: C.GOLD, fontSize: 24 },
+  demoEmojis: { fontSize: FONT.SIZES.MD },
 
-  // numbered steps
-  stepsList: { gap: SPACE.SM, marginTop: SPACE.MD, alignSelf: 'stretch', maxWidth: 320 },
-  stepLine: { flexDirection: 'row', alignItems: 'center', gap: SPACE.MD },
-  stepNum: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: C.GOLD, alignItems: 'center', justifyContent: 'center' },
-  stepNumText: { color: C.GOLD, fontFamily: FONT.DISPLAY_BOLD, fontSize: FONT.SIZES.SM },
-  stepText: { flex: 1, color: C.INK, fontFamily: FONT.BODY, fontSize: FONT.SIZES.MD },
+  // animated numbered steps (highlight in sync with the demo)
+  dSteps: { gap: SPACE.MD, marginTop: SPACE.SM, alignSelf: 'stretch', maxWidth: 320 },
+  dStepLine: { flexDirection: 'row', alignItems: 'center', gap: SPACE.MD },
+  dStepNum: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: C.GOLD, alignItems: 'center', justifyContent: 'center' },
+  dStepNumText: { color: C.GOLD, fontFamily: FONT.BODY_MEDIUM, fontSize: FONT.SIZES.LG, marginTop: -2 },
+  dStepText: { flex: 1, color: C.INK, fontFamily: FONT.BODY_MEDIUM, fontSize: FONT.SIZES.LG },
 });

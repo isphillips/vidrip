@@ -68,11 +68,13 @@ const s = StyleSheet.create({
   },
 
   pips: { flexDirection: 'row', gap: SPACE.SM, alignSelf: 'center' },
+  // All pips are solid (same visual weight); the active one is just brighter.
+  // (A hollow/outlined active pip read as larger than the filled ones.)
   pip: {
     width: 6, height: 6, transform: [{ rotate: '45deg' }],
-    borderWidth: 1, borderColor: C.GOLD_DIM, backgroundColor: C.TRANSPARENT,
+    backgroundColor: C.GOLD_DIM,
   },
-  pipActive: { backgroundColor: C.GOLD, borderColor: C.GOLD },
+  pipActive: { backgroundColor: C.GOLD },
 
   btn: {
     minHeight: 52, borderRadius: RADIUS.SM, alignItems: 'center', justifyContent: 'center',
