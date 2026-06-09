@@ -7,9 +7,11 @@ type Props = {
   channel: ChannelSummary;
   userId: string | undefined;
   onPress: () => void;
+  onAcceptInvite?: () => void;
+  onDeclineInvite?: () => void;
 };
 
-export default function ChannelCard({ channel, userId, onPress }: Props) {
+export default function ChannelCard({ channel, userId, onPress, onAcceptInvite, onDeclineInvite }: Props) {
   const isOwner = !!userId && channel.created_by === userId;
   // Public: unreacted YouTube posts. Private: unread messages.
   const hasUnread = channel.unread_count > 0;
@@ -57,6 +59,19 @@ export default function ChannelCard({ channel, userId, onPress }: Props) {
             ) : channel.is_joined ? (
               <View style={styles.joinedPill}>
                 <Text style={styles.joinedText}>Joined</Text>
+              </View>
+            ) : channel.invite_only && channel.invite_status === 'pending' ? (
+              <View style={styles.inviteActions}>
+                <TouchableOpacity style={styles.declineBtn} onPress={onDeclineInvite} hitSlop={6} activeOpacity={0.8}>
+                  <Text style={styles.declineText}>Decline</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.acceptBtn} onPress={onAcceptInvite} activeOpacity={0.8}>
+                  <Text style={styles.acceptText}>Accept</Text>
+                </TouchableOpacity>
+              </View>
+            ) : channel.invite_only ? (
+              <View style={styles.lockPill}>
+                <Text style={styles.lockText}>🔒 Invite only</Text>
               </View>
             ) : null}
           </View>
@@ -168,6 +183,21 @@ const styles = StyleSheet.create({
   ownerText: {
     color: 'rgba(200,155,50,1)',
   },
+  inviteActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
+  acceptBtn: {
+    backgroundColor: C.ACCENT, borderRadius: RADIUS.FULL,
+    paddingHorizontal: SPACE.MD, paddingVertical: 3,
+  },
+  acceptText: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_BOLD, color: C.WHITE },
+  declineBtn: { paddingHorizontal: SPACE.SM, paddingVertical: 3 },
+  declineText: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  lockPill: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.SURFACE_2, borderRadius: RADIUS.FULL,
+    paddingHorizontal: SPACE.SM, paddingVertical: 2,
+    borderWidth: 1, borderColor: C.BORDER,
+  },
+  lockText: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   thumbnail: {
     width: 72,
     height: 54,

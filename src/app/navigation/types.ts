@@ -21,7 +21,8 @@ export type MainTabParamList = {
 // Channels stack
 export type ChannelsStackParamList = {
   ChannelsHome: undefined;
-  Channel: { channelId: string; channelName: string; isPublic: boolean; isJoined: boolean; isOwner: boolean; isMembersOnly?: boolean; ownerHandle?: string };
+  Channel: { channelId: string; channelName: string; isPublic: boolean; isJoined: boolean; isOwner: boolean; isMembersOnly?: boolean; inviteOnly?: boolean; ownerHandle?: string };
+  InviteToChannel: { channelId: string; channelName: string };
   ChannelPost: { postId: string; channelId: string; isJoined: boolean };
   WatchYouTubePost: { postId: string; channelId: string };
   WatchChannelClip: { postId: string };

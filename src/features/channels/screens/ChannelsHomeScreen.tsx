@@ -12,6 +12,8 @@ import {
   fetchPublicChannels,
   fetchPrivateChannels,
   fetchMembersOnlyChannels,
+  acceptChannelInvite,
+  declineChannelInvite,
   type ChannelSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 import RadioToggle from '../components/RadioToggle';
@@ -109,12 +111,25 @@ export default function ChannelsHomeScreen({
       isJoined: item.is_joined,
       isOwner: item.created_by === user?.id,
       isMembersOnly: !!item.is_members_only,
+      inviteOnly: !!item.invite_only,
       ownerHandle: item.owner?.handle,
     });
   }, [navigation, user?.id]);
 
+  const handleAcceptInvite = useCallback(async (item: ChannelSummary) => {
+    try { await acceptChannelInvite(item.id); } catch { /* ignore */ }
+    loadPublic(true);
+  }, [loadPublic]);
+
+  const handleDeclineInvite = useCallback(async (item: ChannelSummary) => {
+    try { await declineChannelInvite(item.id); } catch { /* ignore */ }
+    loadPublic(true);
+  }, [loadPublic]);
+
   const channels = tab === 'Public' ? publicChannels : privateChannels;
   const loading = tab === 'Public' ? loadingPublic : loadingPrivate;
+  const membersOpen = membersOnly.filter(m => !m.invite_only);
+  const membersInvite = membersOnly.filter(m => m.invite_only);
 
   return (
     <View style={[styles.container, { paddingTop: top }]}>
@@ -148,18 +163,29 @@ export default function ChannelsHomeScreen({
             ) : null
           }
           ListFooterComponent={
-            tab === 'Public' && membersOnly.length > 0 ? (
-              <View style={styles.moSection}>
-                <Text style={styles.moLabel}>Members Only</Text>
-                {membersOnly.map(item => (
-                  <ChannelCard
-                    key={item.id}
-                    channel={item}
-                    userId={user?.id}
-                    onPress={() => navigateToChannel(item)}
-                  />
-                ))}
-              </View>
+            tab === 'Public' ? (
+              <>
+                {membersOpen.length > 0 && (
+                  <View style={styles.moSection}>
+                    <Text style={styles.moLabel}>Members (Open)</Text>
+                    {membersOpen.map(item => (
+                      <ChannelCard key={item.id} channel={item} userId={user?.id}
+                        onPress={() => navigateToChannel(item)} />
+                    ))}
+                  </View>
+                )}
+                {membersInvite.length > 0 && (
+                  <View style={styles.moSection}>
+                    <Text style={styles.moLabel}>Members (Invite Only)</Text>
+                    {membersInvite.map(item => (
+                      <ChannelCard key={item.id} channel={item} userId={user?.id}
+                        onPress={() => navigateToChannel(item)}
+                        onAcceptInvite={() => handleAcceptInvite(item)}
+                        onDeclineInvite={() => handleDeclineInvite(item)} />
+                    ))}
+                  </View>
+                )}
+              </>
             ) : null
           }
           refreshControl={

@@ -19,6 +19,9 @@ export type ChannelSummary = {
   unread_count: number;
   last_message_at: string | null;
   is_members_only?: boolean;
+  invite_only?: boolean;
+  // For the current user, on invite-only channels: their relationship to the room.
+  invite_status?: 'owner' | 'member' | 'pending' | 'none';
   avatar_url?: string | null;
 };
 
@@ -137,11 +140,11 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
 }
 
 export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelSummary[]> {
-  const [channelsResult, membershipsResult] = await Promise.all([
+  const [channelsResult, membershipsResult, invitesResult] = await Promise.all([
     (supabase as any)
       .from('groups')
       .select(`
-        id, name, display_name, description, is_public, created_by, member_count, avatar_url,
+        id, name, display_name, description, is_public, created_by, member_count, avatar_url, invite_only,
         pinned_video_id, pinned_video_title, pinned_video_thumbnail,
         owner:users!created_by(handle, avatar_url)
       `)
@@ -149,10 +152,12 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
       .eq('is_hidden', false)
       .order('member_count', { ascending: false }),
     (supabase as any).from('group_members').select('group_id').eq('user_id', userId),
+    (supabase as any).from('channel_invites').select('channel_id').eq('invitee_id', userId).eq('status', 'pending'),
   ]);
   if (channelsResult.error) { throw channelsResult.error; }
 
   const joinedIds = new Set<string>((membershipsResult.data ?? []).map((m: any) => m.group_id));
+  const pendingInviteIds = new Set<string>((invitesResult.data ?? []).map((i: any) => i.channel_id));
 
   // Unreacted source posts per joined channel → home-screen dot.
   const unreactedByChannel = new Map<string, number>();
@@ -189,6 +194,13 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
     unread_count: joinedIds.has(c.id) ? (unreactedByChannel.get(c.id) ?? 0) : 0,
     last_message_at: null,
     is_members_only: true,
+    invite_only: !!c.invite_only,
+    invite_status: (
+      c.created_by === userId ? 'owner'
+      : joinedIds.has(c.id) ? 'member'
+      : pendingInviteIds.has(c.id) ? 'pending'
+      : 'none'
+    ) as ChannelSummary['invite_status'],
     avatar_url: c.avatar_url ?? null,
   }));
 }
@@ -934,20 +946,74 @@ export async function hasReviewedPost(postId: string, userId: string): Promise<b
   return !!data;
 }
 
-/** Channel review settings + owner, for gating the tabs/pills/inbox. */
+/** Channel settings + owner, for gating tabs/pills/inbox and invite-only access. */
 export async function fetchChannelReviewSettings(
   channelId: string,
-): Promise<{ reviewsAllowed: boolean; reviewsEnabled: boolean; ownerId: string | null }> {
+): Promise<{ reviewsAllowed: boolean; reviewsEnabled: boolean; inviteOnly: boolean; ownerId: string | null }> {
   const { data } = await (supabase as any)
     .from('groups')
-    .select('reviews_allowed, reviews_enabled, created_by')
+    .select('reviews_allowed, reviews_enabled, invite_only, created_by')
     .eq('id', channelId)
     .single();
   return {
     reviewsAllowed: data?.reviews_allowed ?? true,
     reviewsEnabled: !!data?.reviews_enabled,
+    inviteOnly: !!data?.invite_only,
     ownerId: data?.created_by ?? null,
   };
+}
+
+export async function setChannelInviteOnly(channelId: string, inviteOnly: boolean): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('groups').update({ invite_only: inviteOnly }).eq('id', channelId);
+  if (error) { throw error; }
+}
+
+// ── Channel invites ─────────────────────────────────────────────────────────
+
+export type UserHit = { id: string; handle: string; displayName: string; avatarUrl: string | null };
+
+/** Search users by handle/name for the invite picker. */
+export async function searchUsersByHandle(query: string, excludeId?: string): Promise<UserHit[]> {
+  const q = query.trim().replace(/^@/, '');
+  if (!q) { return []; }
+  const { data } = await (supabase as any)
+    .from('users')
+    .select('id, handle, display_name, avatar_url')
+    .or(`handle.ilike.%${q}%,display_name.ilike.%${q}%`)
+    .limit(20);
+  return (data ?? [])
+    .filter((u: any) => u.id !== excludeId)
+    .map((u: any) => ({ id: u.id, handle: u.handle, displayName: u.display_name ?? u.handle, avatarUrl: u.avatar_url ?? null }));
+}
+
+/** Statuses for who's already a member / pending invite on a channel. */
+export async function fetchChannelInviteStates(
+  channelId: string,
+): Promise<Record<string, 'member' | 'pending'>> {
+  const [membersRes, invitesRes] = await Promise.all([
+    (supabase as any).from('group_members').select('user_id').eq('group_id', channelId),
+    (supabase as any).from('channel_invites').select('invitee_id, status').eq('channel_id', channelId).eq('status', 'pending'),
+  ]);
+  const out: Record<string, 'member' | 'pending'> = {};
+  (invitesRes.data ?? []).forEach((i: any) => { out[i.invitee_id] = 'pending'; });
+  (membersRes.data ?? []).forEach((m: any) => { out[m.user_id] = 'member'; });
+  return out;
+}
+
+export async function inviteToChannel(channelId: string, userId: string): Promise<void> {
+  const { error } = await (supabase as any).rpc('invite_to_channel', { p_channel_id: channelId, p_user_id: userId });
+  if (error) { throw error; }
+}
+
+export async function acceptChannelInvite(channelId: string): Promise<void> {
+  const { error } = await (supabase as any).rpc('accept_channel_invite', { p_channel_id: channelId });
+  if (error) { throw error; }
+}
+
+export async function declineChannelInvite(channelId: string): Promise<void> {
+  const { error } = await (supabase as any).rpc('decline_channel_invite', { p_channel_id: channelId });
+  if (error) { throw error; }
 }
 
 export async function setChannelReviewsEnabled(channelId: string, enabled: boolean): Promise<void> {

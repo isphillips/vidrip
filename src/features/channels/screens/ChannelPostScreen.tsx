@@ -44,6 +44,7 @@ export default function ChannelPostScreen({
   const [reviews, setReviews] = useState<ChannelReview[]>([]);
   const [reviewsAllowed, setReviewsAllowed] = useState(true);
   const [reviewsEnabled, setReviewsEnabled] = useState(false);
+  const [inviteOnly, setInviteOnly] = useState(false);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [tab, setTab] = useState<'reactions' | 'reviews'>('reactions');
   // Height of the tabs/section block below the thumbnail — measured so the
@@ -72,6 +73,7 @@ export default function ChannelPostScreen({
       setReactions(r);
       setReviewsAllowed(settings.reviewsAllowed);
       setReviewsEnabled(settings.reviewsEnabled);
+      setInviteOnly(settings.inviteOnly);
       setOwnerId(settings.ownerId);
       setReviews(revs);
     } finally {
@@ -174,6 +176,18 @@ export default function ChannelPostScreen({
 
   if (!post) {
     return <View style={styles.center}><Text style={styles.muted}>Post not found</Text></View>;
+  }
+
+  // Invite-only room and you're not the owner or a member → no access.
+  if (inviteOnly && ownerId !== user?.id && !isJoined) {
+    return (
+      <View style={[styles.center, { gap: SPACE.MD }]}>
+        <Text style={styles.muted}>🔒 This room is invite only.</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.handle}>Go back</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   const thumbnail = post.source_type === 'tiktok'

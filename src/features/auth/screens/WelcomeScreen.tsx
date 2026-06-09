@@ -1,58 +1,16 @@
 import React from 'react';
 import { View, Image, StyleSheet, TouchableOpacity, Text } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, SPACE, RADIUS } from '../../../theme';
+import { FONT, SPACE, RADIUS, C } from '../../../theme';
+import CurtainStage from '../../../components/CurtainStage';
 import type { AuthStackScreenProps } from '../../../app/navigation/types';
 
 const logo = require('../../../assets/logo.png');
 
-// Old leather book palette
-const LEATHER = {
-  BASE:    '#1C0B06',   // deep mahogany — darkest base
-  MID:     '#2E1208',   // warm mid-leather
-  WARM:    '#3D1A0C',   // lighter leather highlight
-  CREASE:  '#140804',   // shadow crease near-black
-  AMBER:   '#5C2A10',   // faint amber warmth at centre
-};
-
 export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welcome'>) {
   const { top } = useSafeAreaInsets();
   return (
-    // Layer 1 — diagonal base gradient (simulates leather grain direction)
-    <LinearGradient
-      colors={[LEATHER.CREASE, LEATHER.MID, LEATHER.WARM, LEATHER.MID, LEATHER.CREASE]}
-      start={{ x: 0.1, y: 0 }}
-      end={{ x: 0.9, y: 1 }}
-      style={styles.root}>
-
-      {/* Layer 2 — top-to-bottom vignette, subtle darkening at edges */}
-      <LinearGradient
-        colors={[`${LEATHER.CREASE}99`, 'transparent', 'transparent', `${LEATHER.CREASE}99`]}
-        locations={[0, 0.3, 0.7, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-
-      {/* Layer 3 — faint warm amber bloom at centre-left (worn leather highlight) */}
-      <LinearGradient
-        colors={[`${LEATHER.AMBER}30`, 'transparent']}
-        start={{ x: 0, y: 0.4 }}
-        end={{ x: 0.7, y: 0.6 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-
-      {/* Layer 4 — horizontal edge vignette */}
-      <LinearGradient
-        colors={[`${LEATHER.CREASE}80`, 'transparent', 'transparent', `${LEATHER.CREASE}80`]}
-        locations={[0, 0.2, 0.8, 1]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-
+    <CurtainStage>
       <View style={[styles.content, { paddingTop: top + SPACE.LG }]}>
         <View style={styles.hero}>
           <Image source={logo} style={styles.logo} resizeMode="contain" />
@@ -71,25 +29,28 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
           <Text style={styles.signInText}>Already have an account? Sign In</Text>
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+    </CurtainStage>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: '#140804',
+    marginLeft: -3,
   },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,6,5,0.55)' },
   content: {
     flex: 1,
     justifyContent: 'space-between',
     padding: SPACE.XL,
-    paddingBottom: SPACE.XXXL,
+    paddingBottom: 300,
   },
   hero: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: SPACE.XL,
+    gap: SPACE.MD,
   },
   logo: {
     width: 240,
@@ -98,19 +59,22 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: FONT.SIZES.XL,
     fontFamily: FONT.DISPLAY_SEMIBOLD,
-    color: '#C4A882',   // warm parchment — reads well on dark leather
+    color: '#C4A882',
     textAlign: 'center',
     lineHeight: 30,
     letterSpacing: 0.5,
   },
   button: {
-    backgroundColor: '#8C1A14',
+    backgroundColor: C.GOLD,
     borderRadius: RADIUS.MD,
     padding: SPACE.LG,
     alignItems: 'center',
     marginBottom: SPACE.MD,
     borderWidth: 1,
     borderColor: '#C43C30',
+    marginTop: -30,
+    width: '90%',
+    alignSelf: 'center',
   },
   buttonText: {
     color: '#F5EDE0',
@@ -124,7 +88,7 @@ const styles = StyleSheet.create({
     padding: SPACE.SM,
   },
   signInText: {
-    color: '#7A5A44',
+    color: '#F5EDE0',
     fontSize: FONT.SIZES.MD,
     fontFamily: FONT.BODY,
   },

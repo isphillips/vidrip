@@ -14,6 +14,7 @@ import ChannelReviewsScreen from '../../features/channels/screens/ChannelReviews
 import ChannelVideoRecordScreen from '../../features/channels/screens/ChannelVideoRecordScreen';
 import AddChannelVideoScreen from '../../features/channels/screens/AddChannelVideoScreen';
 import AddChannelMembersScreen from '../../features/channels/screens/AddChannelMembersScreen';
+import InviteToChannelScreen from '../../features/channels/screens/InviteToChannelScreen';
 
 const Stack = createNativeStackNavigator<ChannelsStackParamList>();
 
@@ -81,6 +82,11 @@ export default function ChannelsNavigator() {
       <Stack.Screen
         name="AddChannelMembers"
         component={AddChannelMembersScreen}
+        options={{ headerShown: false, presentation: 'modal' }}
+      />
+      <Stack.Screen
+        name="InviteToChannel"
+        component={InviteToChannelScreen}
         options={{ headerShown: false, presentation: 'modal' }}
       />
     </Stack.Navigator>

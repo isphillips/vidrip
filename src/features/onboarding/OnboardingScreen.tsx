@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, Linking, Alert, ScrollView, TouchableOpacity, Image,
+  View, Text, StyleSheet, Linking, Alert, ScrollView, TouchableOpacity,
 } from 'react-native';
 import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming, withDelay, withRepeat, interpolate, Extrapolation, Easing, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { buildAuthUrl } from '../../infrastructure/oauth/config';
 import { syncOAuthCode } from '../../infrastructure/supabase/queries/syncedAccounts';
 import { refreshConnectedFeed } from '../../infrastructure/supabase/queries/connectedFeed';
 import { DecoDivider, Kicker, Pips, DecoButton } from './components';
+import CurtainStage from '../../components/CurtainStage';
 
 const STEPS = 5;
 const LOGO_W = 96;
@@ -24,6 +25,21 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
   const [step, setStep] = useState(0);
   const next = () => setStep(s => Math.min(s + 1, STEPS - 1));
   const back = () => setStep(s => Math.max(0, s - 1));
+
+  // Plain black backdrop until the final step, where the curtain stage is unveiled
+  // (black fades out) and the back curtain then raises to reveal the room.
+  const cover = useSharedValue(step === STEPS - 1 ? 0 : 1);
+  const [reveal, setReveal] = useState(step === STEPS - 1);
+  useEffect(() => {
+    const last = step === STEPS - 1;
+    cover.value = withTiming(last ? 0 : 1, { duration: 600, easing: Easing.inOut(Easing.ease) });
+    if (last) {
+      const id = setTimeout(() => setReveal(true), 600);
+      return () => clearTimeout(id);
+    }
+    setReveal(false);
+  }, [step, cover]);
+  const coverStyle = useAnimatedStyle(() => ({ opacity: cover.value }));
 
   // ── For You connect (feed OAuth) ────────────────────────────────────────────
   const { pending, clearPending } = useOAuthStore();
@@ -83,8 +99,8 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
   });
 
   return (
-    <View style={[styles.container, { paddingTop: top }]}>
-      {step === 4 && <StageCurtains />}
+    <CurtainStage raised={reveal} style={{ paddingTop: top }}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.cover, coverStyle]} />
       {step > 0 && (
         <TouchableOpacity style={[styles.backBtn, { top: top + SPACE.SM }]} onPress={back} hitSlop={12}>
           <Text style={styles.backText}>‹ Back</Text>
@@ -187,17 +203,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
           {step === 4 && <DecoButton label="ENTER" variant="solid" onPress={onDone} />}
         </View>
       </View>
-    </View>
-  );
-}
-
-// Curtain photo backdrop for the final step (with a scrim for text legibility).
-function StageCurtains() {
-  return (
-    <Animated.View pointerEvents="none" entering={FadeIn.duration(500)} style={styles.curtains}>
-      <Image source={require('../../assets/curtain.jpg')} style={styles.curtainImg} resizeMode="cover" />
-      <View style={styles.curtainScrim} />
-    </Animated.View>
+    </CurtainStage>
   );
 }
 
@@ -425,6 +431,8 @@ function DemoStep({ p, index, range, label }: { p: SharedValue<number>; index: n
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
+  // Opaque black backdrop covering the curtain stage until the final step.
+  cover: { backgroundColor: C.BG },
 
   // Curtain photo backdrop (final step)
   curtains: { ...StyleSheet.absoluteFillObject, marginLeft: -35 },

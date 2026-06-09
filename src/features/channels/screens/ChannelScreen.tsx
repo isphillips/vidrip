@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity, Modal, FlatList,
-  useWindowDimensions, Linking, Animated, Easing,
+  useWindowDimensions, Linking, Animated, Easing, Switch,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
@@ -25,6 +26,7 @@ import {
   fetchChannelReactions,
   fetchChannelReviews,
   setChannelName,
+  setChannelInviteOnly,
   fetchChannelDisplayName,
   type ChannelPost,
   type ChannelClipTile,
@@ -52,7 +54,7 @@ export default function ChannelhamburderScreen({
   route,
   navigation,
 }: ChannelsStackScreenProps<'Channel'>) {
-  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner, isMembersOnly, ownerHandle } = route.params;
+  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner, isMembersOnly, inviteOnly: inviteOnlyParam, ownerHandle } = route.params;
   const { user } = useAuthStore();
   const { top } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -64,6 +66,7 @@ export default function ChannelhamburderScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [joined, setJoined] = useState(isJoinedParam);
   const [reviewsEnabled, setReviewsEnabled] = useState(false);
+  const [inviteOnly, setInviteOnly] = useState(!!inviteOnlyParam);
   const [filter, setFilter] = useState<GridFilter>('all');
   const [reactionTiles, setReactionTiles] = useState<ChannelClipTile[]>([]);
   const [reviewTiles, setReviewTiles] = useState<ChannelReview[]>([]);
@@ -106,7 +109,7 @@ export default function ChannelhamburderScreen({
       const data = await fetchChannelPosts(channelId, user?.id);
       if (mountedRef.current) { setPosts(data); }
       fetchChannelReviewSettings(channelId)
-        .then(s => { if (mountedRef.current) { setReviewsEnabled(s.reviewsEnabled); } })
+        .then(s => { if (mountedRef.current) { setReviewsEnabled(s.reviewsEnabled); setInviteOnly(s.inviteOnly); } })
         .catch(() => {});
     } catch { /* swallow */ } finally {
       if (mountedRef.current) { setLoading(false); setRefreshing(false); }
@@ -173,6 +176,17 @@ export default function ChannelhamburderScreen({
       title,
     );
   }, [channelId, title]);
+
+  const handleToggleInviteOnly = useCallback(async () => {
+    const next = !inviteOnly;
+    setInviteOnly(next); // optimistic
+    try {
+      await setChannelInviteOnly(channelId, next);
+    } catch {
+      setInviteOnly(!next);
+      Alert.alert('Error', 'Could not update the room.');
+    }
+  }, [inviteOnly, channelId]);
 
   useEffect(() => {
     load().then(() => {
@@ -337,9 +351,12 @@ export default function ChannelhamburderScreen({
     meta: string;
     obscured: boolean;
     isPinned: boolean;
+    locked: boolean;         // invite-only room, viewer not invited → 🔒, no entry
     badge: string | null;    // '▶' reaction · '★' review
     onPress: () => void;
   };
+  // Invite-only rooms lock their videos for anyone who isn't the owner or a member.
+  const inviteLocked = inviteOnly && !isOwner && !joined;
   // TikTok: ignore the stored (expired) URL — use the freshly resolved one.
   const ytThumb = (videoId: string | null, source: 'youtube' | 'tiktok', stored: string | null) =>
     source === 'tiktok'
@@ -356,6 +373,7 @@ export default function ChannelhamburderScreen({
         meta: c.duration ? `${c.duration}s reaction` : 'Reaction',
         obscured: false,
         isPinned: false,
+        locked: false,
         badge: '▶',
         onPress: () => navigation.navigate('WatchChannelClip', { postId: c.id }),
       }));
@@ -369,26 +387,32 @@ export default function ChannelhamburderScreen({
         meta: r.duration ? `${r.duration}s review` : 'Review',
         obscured: false,
         isPinned: false,
+        locked: false,
         badge: '★',
         onPress: () => navigation.navigate('WatchReview', { reviewId: r.id }),
       }));
     }
     return gridPosts.map(item => {
       const isOwnerOrPoster = isOwner || item.poster_id === user?.id;
-      const obscured = !isOwnerOrPoster && !item.has_my_reaction;
+      const obscured = !inviteLocked && !isOwnerOrPoster && !item.has_my_reaction;
       return {
         key: item.id,
-        thumbnail: ytThumb(item.yt_video_id, item.source_type, item.yt_video_thumbnail),
+        thumbnail: inviteLocked ? null : ytThumb(item.yt_video_id, item.source_type, item.yt_video_thumbnail),
         handle: null,
-        title: obscured ? null : item.yt_video_title,
-        meta: item.reaction_count > 0
-          ? `${item.reaction_count} reaction${item.reaction_count !== 1 ? 's' : ''}`
-          : 'No reactions yet',
+        title: inviteLocked ? null : (obscured ? null : item.yt_video_title),
+        meta: inviteLocked
+          ? 'Invite only'
+          : item.reaction_count > 0
+            ? `${item.reaction_count} reaction${item.reaction_count !== 1 ? 's' : ''}`
+            : 'No reactions yet',
         obscured,
         isPinned: item.is_pinned,
+        locked: inviteLocked,
         badge: null,
         onPress: () => {
-          if (item.post_type === 'youtube') {
+          if (inviteLocked) {
+            Alert.alert('Invite only', 'Ask the channel owner for an invite to watch and react.');
+          } else if (item.post_type === 'youtube') {
             navigation.navigate('ChannelPost', { postId: item.id, channelId, isJoined: joined });
           } else {
             navigation.navigate('WatchChannelClip', { postId: item.id });
@@ -397,7 +421,7 @@ export default function ChannelhamburderScreen({
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, reactionTiles, reviewTiles, gridPosts, isOwner, user?.id, channelId, joined, navigation, ttThumbs]);
+  }, [filter, reactionTiles, reviewTiles, gridPosts, isOwner, user?.id, channelId, joined, navigation, ttThumbs, inviteLocked]);
 
   // ── Audio recording handlers ──────────────────────────────────────────────
   const handleMicPressIn = useCallback(async () => {
@@ -470,6 +494,11 @@ export default function ChannelhamburderScreen({
               transform: [{ rotate: cogAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
             }]}>⚙</Animated.Text>
           </TouchableOpacity>
+        ) : isPublic && inviteOnly && !joined ? (
+          // Invite-only room, not a member — can't self-join.
+          <View style={styles.lockedHeaderPill}>
+            <Text style={styles.lockedHeaderText}>🔒 Invite only</Text>
+          </View>
         ) : isPublic ? (
           <TouchableOpacity
             style={[styles.joinBtn, joined && styles.joinBtnActive]}
@@ -549,7 +578,11 @@ export default function ChannelhamburderScreen({
               activeOpacity={0.8}
               onPress={item.onPress}>
               <View style={[styles.gridThumb, { height: cardH }]}>
-                {item.obscured ? (
+                {item.locked ? (
+                  <View style={styles.gridThumbBlind}>
+                    <Text style={styles.gridThumbBlindIcon}>🔒</Text>
+                  </View>
+                ) : item.obscured ? (
                   <View style={styles.gridThumbBlind}>
                     <Text style={styles.gridThumbBlindIcon}>?</Text>
                   </View>
@@ -700,6 +733,34 @@ export default function ChannelhamburderScreen({
               </View>
             </TouchableOpacity>
 
+            {/* Invite Only toggle + invite people */}
+            <View style={styles.menuRow}>
+              <Ionicons name="lock-closed" size={18} color={C.ACCENT_HOT} style={styles.menuRowIcon} />
+              <View style={styles.menuRowText}>
+                <Text style={styles.menuRowLabel}>Invite Only</Text>
+                <Text style={styles.menuRowSub}>
+                  {inviteOnly ? 'Only invited people can watch & react' : 'Anyone can join and react'}
+                </Text>
+              </View>
+              <Switch
+                value={inviteOnly}
+                onValueChange={handleToggleInviteOnly}
+                trackColor={{ true: C.ACCENT, false: C.SURFACE_2 }}
+                thumbColor={C.WHITE}
+              />
+            </View>
+
+            {inviteOnly && (
+              <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
+                onPress={() => { setMenuVisible(false); navigation.navigate('InviteToChannel', { channelId, channelName: title }); }}>
+                <Text style={styles.menuRowIcon}>＋</Text>
+                <View style={styles.menuRowText}>
+                  <Text style={styles.menuRowLabel}>Invite People</Text>
+                  <Text style={styles.menuRowSub}>Send invites by @handle</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
               onPress={() => {
                 setMenuVisible(false);
@@ -770,6 +831,12 @@ const styles = StyleSheet.create({
   },
   menuBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   menuIcon: { fontSize: 22, color: C.INK, lineHeight: 26 },
+  lockedHeaderPill: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS + 1,
+    borderRadius: RADIUS.FULL, borderWidth: 1, borderColor: C.BORDER, backgroundColor: C.SURFACE,
+  },
+  lockedHeaderText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   menuRow: {
     flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
     paddingVertical: SPACE.MD,
