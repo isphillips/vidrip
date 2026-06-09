@@ -71,6 +71,11 @@ export default function ReactionRecorder({
   const { width, height } = useWindowDimensions();
   const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
 
+  // With a source video (feed / channel-post reactions) the source's own play /
+  // pause / end drives recording — no manual buttons. Without one (private channel
+  // clips, reviews) the user records with the manual controls.
+  const sourceDriven = !!videoId;
+
   const device = useCameraDevice('front');
   const { hasPermission: hasCam, requestPermission: requestCam } = useCameraPermission();
   const { hasPermission: hasMic, requestPermission: requestMic } = useMicrophonePermission();
@@ -202,10 +207,18 @@ export default function ReactionRecorder({
       beginRecording();
     } else if (state === 'paused') {
       setYtPlaying(false);
-      if (skipNextPausedRef.current) { skipNextPausedRef.current = false; }
+      // Source drives the reaction: a genuine pause finishes & saves it. The first
+      // paused event right after play is spurious (buffering fires 'buffering', not
+      // 'paused', so this is safe), so skip it once.
+      if (skipNextPausedRef.current) {
+        skipNextPausedRef.current = false;
+      } else if (hasStartedRef.current) {
+        handleStopRef.current();
+      }
     } else if (state === 'ended') {
       setYtPlaying(false);
       skipNextPausedRef.current = false;
+      if (hasStartedRef.current) { handleStopRef.current(); }
     }
   }, [beginRecording]);
 
@@ -263,9 +276,12 @@ export default function ReactionRecorder({
         );
       })() : <View style={styles.ytCover} />}
 
-      {/* Camera PIP — bottom right */}
+      {/* Camera — PIP corner when a source video drives the screen, otherwise
+          full-screen (private channel clips, reviews). */}
       {ready && device && (
-        <View style={[styles.pip, { bottom: bottomInset + 100, right: SPACE.LG }]}>
+        <View style={sourceDriven
+          ? [styles.pip, { bottom: bottomInset + 100, right: SPACE.LG }]
+          : StyleSheet.absoluteFill}>
           <Camera
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
@@ -274,7 +290,7 @@ export default function ReactionRecorder({
             video={true}
             audio={true}
           />
-          {isRecording && <View style={styles.pipRecDot} />}
+          {isRecording && sourceDriven && <View style={styles.pipRecDot} />}
         </View>
       )}
 
@@ -298,8 +314,8 @@ export default function ReactionRecorder({
         </View>
       )}
 
-      {/* Controls */}
-      {!uploading && (
+      {/* Controls — manual only when there's no source video to drive recording */}
+      {!uploading && !sourceDriven && (
         <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
           {isRecording ? (
             <>

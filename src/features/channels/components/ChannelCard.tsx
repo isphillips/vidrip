@@ -33,12 +33,14 @@ export default function ChannelCard({ channel, userId, onPress }: Props) {
         <View style={styles.meta}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>
-              {channel.is_members_only ? (channel.owner?.handle ?? channel.name) : channel.name}
+              {channel.display_name
+                ?? (channel.is_members_only ? (channel.owner?.handle ?? channel.name) : channel.name)}
             </Text>
             {hasUnread && <View style={styles.unreadDot} />}
           </View>
-          {/* Members Only cards title with the creator handle, so no @handle subtitle. */}
-          {!channel.is_members_only && channel.owner && (
+          {/* Show the @handle subtitle for curated channels, and for Members Only
+              channels once a custom name replaces the handle in the title. */}
+          {channel.owner && (!channel.is_members_only || !!channel.display_name) && (
             <Text style={styles.owner}>@{channel.owner.handle}</Text>
           )}
           {channel.description ? (

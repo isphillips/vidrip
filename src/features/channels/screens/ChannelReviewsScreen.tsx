@@ -10,6 +10,7 @@ import {
   fetchChannelReviews,
   fetchChannelReviewSettings,
   setChannelReviewsEnabled,
+  setChannelReviewsAllowed,
   type ChannelReview,
 } from '../../../infrastructure/supabase/queries/channels';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
@@ -23,8 +24,9 @@ export default function ChannelReviewsScreen({
   const { top } = useSafeAreaInsets();
 
   const [reviews, setReviews] = useState<ChannelReview[]>([]);
+  const [allowed, setAllowed] = useState(true);
   const [visible, setVisible] = useState(false);
-  const [savingVisible, setSavingVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -36,6 +38,7 @@ export default function ChannelReviewsScreen({
         fetchChannelReviewSettings(channelId),
       ]);
       setReviews(data);
+      setAllowed(settings.reviewsAllowed);
       setVisible(settings.reviewsEnabled);
     } catch { /* swallow */ } finally {
       setLoading(false);
@@ -43,15 +46,29 @@ export default function ChannelReviewsScreen({
     }
   }, [channelId]);
 
+  // Master switch — turning reviews off also forces visibility off.
+  const toggleAllowed = useCallback(async (next: boolean) => {
+    setAllowed(next);
+    if (!next) { setVisible(false); }
+    setSaving(true);
+    try {
+      await setChannelReviewsAllowed(channelId, next);
+    } catch {
+      setAllowed(!next);
+    } finally {
+      setSaving(false);
+    }
+  }, [channelId]);
+
   const toggleVisible = useCallback(async (next: boolean) => {
     setVisible(next);            // optimistic
-    setSavingVisible(true);
+    setSaving(true);
     try {
       await setChannelReviewsEnabled(channelId, next);
     } catch {
       setVisible(!next);         // revert
     } finally {
-      setSavingVisible(false);
+      setSaving(false);
     }
   }, [channelId]);
 
@@ -74,20 +91,39 @@ export default function ChannelReviewsScreen({
         <View style={styles.backBtn} />
       </View>
 
-      {/* Visibility toggle — off keeps reviews in this private inbox only */}
+      {/* Master switch — whether fans can leave reviews on this channel at all */}
       <View style={styles.toggleRow}>
+        <View style={styles.toggleInfo}>
+          <Text style={styles.toggleLabel}>Allow reviews</Text>
+          <Text style={styles.toggleSub}>
+            {allowed
+              ? 'Fans can record a 60s review after reacting.'
+              : 'Reviews are turned off for this channel.'}
+          </Text>
+        </View>
+        <Switch
+          value={allowed}
+          onValueChange={toggleAllowed}
+          disabled={saving}
+          trackColor={{ true: C.ACCENT, false: C.SURFACE_2 }}
+          thumbColor={C.WHITE}
+        />
+      </View>
+
+      {/* Visibility toggle — off keeps reviews in this private inbox only */}
+      <View style={[styles.toggleRow, !allowed && styles.toggleRowDisabled]}>
         <View style={styles.toggleInfo}>
           <Text style={styles.toggleLabel}>Show reviews to the channel</Text>
           <Text style={styles.toggleSub}>
             {visible
               ? 'Members can see a Reviews tab on each post.'
-              : 'Reviews are private to you until turned on.'}
+              : 'Reviews stay private to you until turned on.'}
           </Text>
         </View>
         <Switch
           value={visible}
           onValueChange={toggleVisible}
-          disabled={savingVisible}
+          disabled={saving || !allowed}
           trackColor={{ true: C.ACCENT, false: C.SURFACE_2 }}
           thumbColor={C.WHITE}
         />
@@ -156,6 +192,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD,
     borderBottomWidth: 1, borderBottomColor: C.BORDER,
   },
+  toggleRowDisabled: { opacity: 0.45 },
   toggleInfo: { flex: 1, gap: 2 },
   toggleLabel: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM, color: C.INK },
   toggleSub: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.MUTED },

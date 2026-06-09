@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity, Modal, FlatList,
-  useWindowDimensions, Linking,
+  useWindowDimensions, Linking, Animated, Easing,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,13 +22,20 @@ import {
   leaveChannel,
   postChannelAudio,
   fetchChannelReviewSettings,
+  fetchChannelReactions,
+  fetchChannelReviews,
+  setChannelName,
+  fetchChannelDisplayName,
   type ChannelPost,
+  type ChannelClipTile,
+  type ChannelReview,
 } from '../../../infrastructure/supabase/queries/channels';
 import {
   startAudioRecording,
   stopAudioRecording,
   cancelAudioRecording,
 } from '../../../infrastructure/native/audioRecorder';
+import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import ChannelMessageBubble from '../components/ChannelMessageBubble';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
@@ -36,12 +43,12 @@ const CREATOR_STUDIO_URL = 'https://www.vidrip.app/dashboard';
 
 type GridFilter = 'all' | 'reactions' | 'reviews';
 const GRID_FILTERS: { key: GridFilter; label: string }[] = [
-  { key: 'all', label: 'All' },
+  { key: 'all', label: 'Posts' },
   { key: 'reactions', label: 'Reactions' },
   { key: 'reviews', label: 'Reviews' },
 ];
 
-export default function ChannelScreen({
+export default function ChannelhamburderScreen({
   route,
   navigation,
 }: ChannelsStackScreenProps<'Channel'>) {
@@ -58,6 +65,10 @@ export default function ChannelScreen({
   const [joined, setJoined] = useState(isJoinedParam);
   const [reviewsEnabled, setReviewsEnabled] = useState(false);
   const [filter, setFilter] = useState<GridFilter>('all');
+  const [reactionTiles, setReactionTiles] = useState<ChannelClipTile[]>([]);
+  const [reviewTiles, setReviewTiles] = useState<ChannelReview[]>([]);
+  // Fresh TikTok thumbnails resolved by video id (stored ones expire — see api.ts).
+  const [ttThumbs, setTtThumbs] = useState<Record<string, string>>({});
   // Members Only channels show the creator's handle as the title, not the group name.
   const [title, setTitle] = useState(
     isMembersOnly && ownerHandle ? `${ownerHandle}` : channelName,
@@ -72,11 +83,22 @@ export default function ChannelScreen({
   const audioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pendingAudio, setPendingAudio] = useState<{ path: string; duration: number } | null>(null);
   const [sendingAudio, setSendingAudio] = useState(false);
+  const cogAnim = useRef(new Animated.Value(0)).current;  // 0 idle → 1 active (spin + red)
   const mountedRef = useRef(true);
   const scrollViewRef = useRef<ScrollView>(null);
   const postsRef = useRef<ChannelPost[]>([]);   // always-current snapshot for handlers
 
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
+  // Cog spins + reddens when the menu opens, reverses when it closes.
+  useEffect(() => {
+    Animated.timing(cogAnim, {
+      toValue: menuVisible ? 1 : 0,
+      duration: menuVisible ? 450 : 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false, // color interpolation isn't native-driver compatible
+    }).start();
+  }, [menuVisible, cogAnim]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) { setLoading(true); }
@@ -101,6 +123,11 @@ export default function ChannelScreen({
     }
   }, [channelId, isPublic]);
 
+  // A creator-set display name overrides the default title (handle / group name).
+  useEffect(() => {
+    fetchChannelDisplayName(channelId).then(n => { if (n && mountedRef.current) { setTitle(n); } });
+  }, [channelId]);
+
   // Realtime: update title when groups.name changes (DB trigger fires on member add/leave)
   useEffect(() => {
     if (isPublic) { return; }
@@ -119,6 +146,33 @@ export default function ChannelScreen({
       setMembersVisible(true);
     } catch { /* ignore */ }
   }, [channelId]);
+
+  const handleRename = useCallback(() => {
+    Alert.prompt(
+      'Rename Channel',
+      'Enter a new channel name',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save',
+          onPress: async (text?: string) => {
+            const name = (text ?? '').trim();
+            if (!name || name === title) { return; }
+            const prev = title;
+            setTitle(name); // optimistic
+            try {
+              await setChannelName(channelId, name);
+            } catch {
+              setTitle(prev);
+              Alert.alert('Error', 'Could not rename the channel.');
+            }
+          },
+        },
+      ],
+      'plain-text',
+      title,
+    );
+  }, [channelId, title]);
 
   useEffect(() => {
     load().then(() => {
@@ -156,6 +210,8 @@ export default function ChannelScreen({
       }, async (payload: any) => {
         const newPost = await fetchChannelPost(payload.new.id);
         if (!newPost || !mountedRef.current) { return; }
+        // Members Only channels are a video grid — status posts don't belong.
+        if (isMembersOnly && newPost.post_type === 'status') { return; }
         setPosts(prev => {
           const pinned = prev.filter(p => p.is_pinned);
           const rest = prev.filter(p => !p.is_pinned);
@@ -170,7 +226,7 @@ export default function ChannelScreen({
       .subscribe();
 
     return () => { channel.unsubscribe(); };
-  }, [channelId, isPublic]);
+  }, [channelId, isPublic, isMembersOnly]);
 
   const handleJoinLeave = useCallback(async () => {
     if (!user?.id || joiningLeaving || isOwner) { return; }
@@ -228,7 +284,32 @@ export default function ChannelScreen({
     try { await deleteChannelPost(postId); } catch { load(true); }
   }, [load]);
 
-  // Public grid: unseen (unreacted) videos bubble to top, pinned stays first.
+  // The Reactions / Reviews filters show the actual clips (not source posts), so
+  // load them when their pill is active. Refetch on switch to stay fresh.
+  useEffect(() => {
+    if (filter === 'reactions') {
+      fetchChannelReactions(channelId).then(d => { if (mountedRef.current) { setReactionTiles(d); } }).catch(() => {});
+    } else if (filter === 'reviews') {
+      fetchChannelReviews(channelId).then(d => { if (mountedRef.current) { setReviewTiles(d); } }).catch(() => {});
+    }
+  }, [filter, channelId]);
+
+  // Resolve fresh TikTok thumbnails for any visible TikTok video (posts + clip tiles).
+  useEffect(() => {
+    const ids = new Set<string>();
+    posts.forEach(p => { if (p.source_type === 'tiktok' && p.yt_video_id) { ids.add(p.yt_video_id); } });
+    reactionTiles.forEach(c => { if (c.parent_source_type === 'tiktok' && c.parent_yt_video_id) { ids.add(c.parent_yt_video_id); } });
+    reviewTiles.forEach(r => { if (r.post_source_type === 'tiktok' && r.post_yt_video_id) { ids.add(r.post_yt_video_id); } });
+    ids.forEach(id => {
+      if (ttThumbs[id]) { return; }
+      resolveTikTokThumbnail(id).then(url => {
+        if (url && mountedRef.current) { setTtThumbs(prev => (prev[id] ? prev : { ...prev, [id]: url })); }
+      }).catch(() => {});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts, reactionTiles, reviewTiles]);
+
+  // Public grid (All): unseen (unreacted) videos bubble to top, pinned stays first.
   // Stable within each group — preserves the query's pinned-then-recency order.
   const gridPosts = useMemo(() => {
     const rank = (p: ChannelPost) => {
@@ -236,19 +317,87 @@ export default function ChannelScreen({
       const seen = isOwner || p.poster_id === user?.id || p.has_my_reaction;
       return seen ? 2 : 1;
     };
-    const filtered = filter === 'reactions'
-      ? posts.filter(p => p.reaction_count > 0)
-      : filter === 'reviews'
-        ? posts.filter(p => p.review_count > 0)
-        : posts;
-    return filtered
+    // Members Only channels are a video grid — status posts don't belong.
+    return posts
+      .filter(p => !(isMembersOnly && p.post_type === 'status'))
       .map((p, i) => ({ p, i }))
       .sort((a, b) => {
         const ra = rank(a.p), rb = rank(b.p);
         return ra !== rb ? ra - rb : a.i - b.i;
       })
       .map(({ p }) => p);
-  }, [posts, isOwner, user?.id, filter]);
+  }, [posts, isOwner, user?.id, isMembersOnly]);
+
+  // Normalized tiles for the grid — posts, reaction clips, or review clips.
+  type GridTile = {
+    key: string;
+    thumbnail: string | null;
+    handle: string | null;   // shown as a chip over reaction/review clips
+    title: string | null;
+    meta: string;
+    obscured: boolean;
+    isPinned: boolean;
+    badge: string | null;    // '▶' reaction · '★' review
+    onPress: () => void;
+  };
+  // TikTok: ignore the stored (expired) URL — use the freshly resolved one.
+  const ytThumb = (videoId: string | null, source: 'youtube' | 'tiktok', stored: string | null) =>
+    source === 'tiktok'
+      ? (videoId ? ttThumbs[videoId] ?? null : null)
+      : (stored ?? (videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null));
+
+  const gridTiles = useMemo<GridTile[]>(() => {
+    if (filter === 'reactions') {
+      return reactionTiles.map(c => ({
+        key: c.id,
+        thumbnail: ytThumb(c.parent_yt_video_id, c.parent_source_type, c.parent_yt_video_thumbnail),
+        handle: c.handle,
+        title: c.parent_yt_video_title,
+        meta: c.duration ? `${c.duration}s reaction` : 'Reaction',
+        obscured: false,
+        isPinned: false,
+        badge: '▶',
+        onPress: () => navigation.navigate('WatchChannelClip', { postId: c.id }),
+      }));
+    }
+    if (filter === 'reviews') {
+      return reviewTiles.map(r => ({
+        key: r.id,
+        thumbnail: ytThumb(r.post_yt_video_id, r.post_source_type, r.post_yt_video_thumbnail),
+        handle: r.reviewer?.handle ?? null,
+        title: r.post_yt_video_title,
+        meta: r.duration ? `${r.duration}s review` : 'Review',
+        obscured: false,
+        isPinned: false,
+        badge: '★',
+        onPress: () => navigation.navigate('WatchReview', { reviewId: r.id }),
+      }));
+    }
+    return gridPosts.map(item => {
+      const isOwnerOrPoster = isOwner || item.poster_id === user?.id;
+      const obscured = !isOwnerOrPoster && !item.has_my_reaction;
+      return {
+        key: item.id,
+        thumbnail: ytThumb(item.yt_video_id, item.source_type, item.yt_video_thumbnail),
+        handle: null,
+        title: obscured ? null : item.yt_video_title,
+        meta: item.reaction_count > 0
+          ? `${item.reaction_count} reaction${item.reaction_count !== 1 ? 's' : ''}`
+          : 'No reactions yet',
+        obscured,
+        isPinned: item.is_pinned,
+        badge: null,
+        onPress: () => {
+          if (item.post_type === 'youtube') {
+            navigation.navigate('ChannelPost', { postId: item.id, channelId, isJoined: joined });
+          } else {
+            navigation.navigate('WatchChannelClip', { postId: item.id });
+          }
+        },
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, reactionTiles, reviewTiles, gridPosts, isOwner, user?.id, channelId, joined, navigation, ttThumbs]);
 
   // ── Audio recording handlers ──────────────────────────────────────────────
   const handleMicPressIn = useCallback(async () => {
@@ -316,7 +465,10 @@ export default function ChannelScreen({
         {isOwner && isPublic ? (
           <TouchableOpacity style={styles.menuBtn} hitSlop={8} activeOpacity={0.7}
             onPress={() => setMenuVisible(true)}>
-            <Text style={styles.menuIcon}>☰</Text>
+            <Animated.Text style={[styles.menuIcon, {
+              color: cogAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [C.INK, C.ACCENT_HOT, C.ACCENT_HOT] }),
+              transform: [{ rotate: cogAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
+            }]}>⚙</Animated.Text>
           </TouchableOpacity>
         ) : isPublic ? (
           <TouchableOpacity
@@ -376,60 +528,64 @@ export default function ChannelScreen({
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
       ) : isPublic ? (
         <FlatList
-          data={gridPosts}
-          keyExtractor={item => item.id}
+          data={gridTiles}
+          keyExtractor={item => item.key}
           numColumns={2}
-          contentContainerStyle={gridPosts.length === 0 ? styles.emptyContainer : styles.grid}
+          contentContainerStyle={gridTiles.length === 0 ? styles.emptyContainer : styles.grid}
           columnWrapperStyle={styles.gridRow}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}
-          ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyText}>No posts yet</Text></View>}
-          renderItem={({ item }) => {
-            const isOwnerOrPoster = isOwner || item.poster_id === user?.id;
-            const obscured = !isOwnerOrPoster && !item.has_my_reaction;
-            return (
-              <TouchableOpacity
-                style={[styles.gridCard, { width: cardW }]}
-                activeOpacity={0.8}
-                onPress={() => {
-                  if (item.post_type === 'youtube') {
-                    navigation.navigate('ChannelPost', { postId: item.id, channelId, isJoined: joined });
-                  } else {
-                    navigation.navigate('WatchChannelClip', { postId: item.id });
-                  }
-                }}>
-                <View style={[styles.gridThumb, { height: cardH }]}>
-                  {obscured ? (
-                    <View style={styles.gridThumbBlind}>
-                      <Text style={styles.gridThumbBlindIcon}>?</Text>
-                    </View>
-                  ) : item.yt_video_thumbnail ? (
-                    <Image source={{ uri: item.yt_video_thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  ) : (
-                    <View style={[styles.gridThumbBlind, { backgroundColor: C.SURFACE_2 }]}>
-                      <Text style={styles.gridThumbBlindIcon}>▶</Text>
-                    </View>
-                  )}
-                  {item.is_pinned && (
-                    <View style={styles.pinBadge}><Text style={styles.pinBadgeText}>📌</Text></View>
-                  )}
-                </View>
-                {!obscured && item.yt_video_title ? (
-                  <Text style={styles.gridTitle} numberOfLines={2}>{item.yt_video_title}</Text>
-                ) : obscured ? (
-                  <Text style={styles.gridTitleObscured}>React to reveal</Text>
-                ) : null}
-                <Text style={[
-                  styles.gridReactionCount,
-                  // No title/placeholder above → give the count top breathing room.
-                  !obscured && !item.yt_video_title && styles.gridReactionCountNoTitle,
-                ]}>
-                  {item.reaction_count > 0
-                    ? `${item.reaction_count} reaction${item.reaction_count !== 1 ? 's' : ''}`
-                    : 'No reactions yet'}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Text style={styles.emptyText}>
+                {filter === 'reactions' ? 'No reactions yet'
+                  : filter === 'reviews' ? 'No reviews yet'
+                  : 'No posts yet'}
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.gridCard, { width: cardW }]}
+              activeOpacity={0.8}
+              onPress={item.onPress}>
+              <View style={[styles.gridThumb, { height: cardH }]}>
+                {item.obscured ? (
+                  <View style={styles.gridThumbBlind}>
+                    <Text style={styles.gridThumbBlindIcon}>?</Text>
+                  </View>
+                ) : item.thumbnail ? (
+                  <Image source={{ uri: item.thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.gridThumbBlind, { backgroundColor: C.SURFACE_2 }]}>
+                    <Text style={styles.gridThumbBlindIcon}>▶</Text>
+                  </View>
+                )}
+                {item.isPinned && (
+                  <View style={styles.pinBadge}><Text style={styles.pinBadgeText}>📌</Text></View>
+                )}
+                {/* Clip tiles: play scrim + reactor/reviewer chip */}
+                {item.badge && !item.obscured && (
+                  <View style={styles.tilePlay}><Text style={styles.tilePlayIcon}>{item.badge}</Text></View>
+                )}
+                {item.handle && (
+                  <View style={styles.tileHandle}>
+                    <Text style={styles.tileHandleTxt} numberOfLines={1}>@{item.handle}</Text>
+                  </View>
+                )}
+              </View>
+              {item.obscured ? (
+                <Text style={styles.gridTitleObscured}>React to reveal</Text>
+              ) : item.title ? (
+                <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
+              ) : null}
+              <Text style={[
+                styles.gridReactionCount,
+                !item.obscured && !item.title && styles.gridReactionCountNoTitle,
+              ]}>
+                {item.meta}
+              </Text>
+            </TouchableOpacity>
+          )}
         />
       ) : (
         <ScrollView
@@ -527,11 +683,20 @@ export default function ChannelScreen({
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
+              onPress={() => { setMenuVisible(false); handleRename(); }}>
+              <Text style={styles.menuRowIcon}>✎</Text>
+              <View style={styles.menuRowText}>
+                <Text style={styles.menuRowLabel}>Rename Channel</Text>
+                <Text style={styles.menuRowSub}>Change the channel's display name</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
               onPress={() => { setMenuVisible(false); navigation.navigate('ChannelReviews', { channelId, channelName: title }); }}>
               <Text style={styles.menuRowIcon}>★</Text>
               <View style={styles.menuRowText}>
                 <Text style={styles.menuRowLabel}>Reviews</Text>
-                <Text style={styles.menuRowSub}>Watch reviews fans sent you · toggle visibility</Text>
+                <Text style={styles.menuRowSub}>Watch reviews fans sent you · settings</Text>
               </View>
             </TouchableOpacity>
 
@@ -730,6 +895,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.SM,
     paddingHorizontal: 4, paddingVertical: 2,
   },
+  tilePlay: {
+    position: 'absolute', top: '50%', left: '50%',
+    width: 44, height: 44, marginTop: -22, marginLeft: -22,
+    borderRadius: RADIUS.FULL, backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tilePlayIcon: { color: C.WHITE, fontSize: 18 },
+  tileHandle: {
+    position: 'absolute', bottom: SPACE.XS, left: SPACE.XS, right: SPACE.XS,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.SM,
+    paddingHorizontal: 6, paddingVertical: 3,
+  },
+  tileHandleTxt: { color: C.WHITE, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_SEMIBOLD },
   pinBadgeText: { fontSize: 11 },
   gridTitle: { padding: SPACE.SM, fontSize: FONT.SIZES.SM, color: C.INK, fontFamily: FONT.BODY_MEDIUM },
   gridTitleObscured: { padding: SPACE.SM, fontSize: FONT.SIZES.XS, color: C.MUTED, fontFamily: FONT.BODY, fontStyle: 'italic' },

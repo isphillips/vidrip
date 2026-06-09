@@ -20,7 +20,10 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { useFeedStore } from '../../../store/feedStore';
 import { fetchFeedThreads, type FeedThread } from '../../../infrastructure/supabase/queries/threads';
-import { fetchMyReviews, type ChannelReview } from '../../../infrastructure/supabase/queries/channels';
+import {
+  fetchMyReviews, fetchChannelsToReact,
+  type ChannelReview, type ChannelToReact,
+} from '../../../infrastructure/supabase/queries/channels';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 const FAVS_KEY = 'vidrip_favorites';
@@ -28,9 +31,10 @@ const HIDDEN_KEY = 'vidrip_hidden_threads';
 const ACTION_WIDTH = 120; // 2 × 60
 
 type Tab = 'feed' | 'favorites';
-type Filter = 'all' | 'toreact' | 'reactions' | 'requests' | 'reviews';
+type Filter = 'all' | 'toreact' | 'channels' | 'reactions' | 'requests' | 'reviews';
 const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'toreact', label: 'To React' },
+  { key: 'toreact', label: 'Friend Drops' },
+  { key: 'channels', label: 'Channel Drops' },
   { key: 'reactions', label: 'My Reactions' },
   { key: 'requests', label: 'My Requests' },
   { key: 'reviews', label: 'My Reviews' },
@@ -79,11 +83,12 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab]             = useState<Tab>('feed');
-  const [filter, setFilter]       = useState<Filter>('all');
+  const [filter, setFilter]       = useState<Filter>('toreact'); // default to Friend Drops
   const [favs, setFavs]           = useState<Map<string, number>>(new Map()); // id → addedAt ms
   const [hidden, setHidden]       = useState<Set<string>>(new Set());
   const [myReviews, setMyReviews] = useState<ChannelReview[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [channelTiles, setChannelTiles] = useState<ChannelToReact[]>([]);
 
   const swipeRefs = useRef<Map<string, Swipeable | null>>(new Map());
 
@@ -111,10 +116,13 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     finally { setLoading(false); setRefreshing(false); }
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Unreacted videos from joined channels — loaded eagerly so the pill count shows.
+  const loadChannels = useCallback(async () => {
+    if (!user) return;
+    try { setChannelTiles(await fetchChannelsToReact(user.id)); } catch { /* swallow */ }
+  }, [user]);
 
-  // Lazily load the user's submitted reviews when the My Reviews pill is active.
+  // The user's submitted reviews — loaded eagerly so the My Reviews pill count shows.
   const loadReviews = useCallback(async () => {
     if (!user) return;
     setReviewsLoading(true);
@@ -123,7 +131,8 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     finally { setReviewsLoading(false); }
   }, [user]);
 
-  useEffect(() => { if (filter === 'reviews') { loadReviews(); } }, [filter, loadReviews]);
+  useEffect(() => { load(); loadChannels(); loadReviews(); }, [load, loadChannels, loadReviews]);
+  useFocusEffect(useCallback(() => { load(); loadChannels(); loadReviews(); }, [load, loadChannels, loadReviews]));
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   const addFav = (id: string) => {
@@ -241,7 +250,8 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           contentContainerStyle={styles.filterRow}>
           {FILTERS.map(f => {
             const active = filter === f.key;
-            const n = f.key === 'reviews' ? myReviews.length
+            const n = f.key === 'channels' ? channelTiles.length
+              : f.key === 'reviews' ? myReviews.length
               : f.key === 'all' ? 0 : counts[f.key];
             return (
               <TouchableOpacity
@@ -261,8 +271,46 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         </ScrollView>
       </View>
 
-      {filter === 'reviews' ? (
+      {filter === 'channels' ? (
         <FlatList
+          style={styles.fill}
+          data={channelTiles}
+          keyExtractor={item => item.postId}
+          contentContainerStyle={channelTiles.length === 0 ? styles.emptyContainer : styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadChannels().finally(() => setRefreshing(false)); }} tintColor={C.ACCENT} />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>All caught up</Text>
+              <Text style={styles.emptySubtitle}>
+                No new videos to react to from your channels.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            // Unreacted channel videos stay blind until you react (react-to-reveal).
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.8}
+              onPress={() => (navigation as any).navigate('Channels', {
+                screen: 'ChannelPost',
+                params: { postId: item.postId, channelId: item.channelId, isJoined: true },
+              })}>
+              <View style={styles.thumbnail}>
+                <View style={styles.thumbnailBlind}>
+                  <Text style={styles.thumbnailBlindIcon}>?</Text>
+                </View>
+              </View>
+              <View style={styles.info}>
+                <Text style={styles.sender} numberOfLines={1}>{item.channelName || 'Channel'}</Text>
+                <Text style={styles.title} numberOfLines={2}>React to reveal this video</Text>
+                <Text style={styles.meta}>👀 Tap to react</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      ) : filter === 'reviews' ? (
+        <FlatList
+          style={styles.fill}
           data={myReviews}
           keyExtractor={item => item.id}
           contentContainerStyle={myReviews.length === 0 ? styles.emptyContainer : styles.list}
@@ -307,6 +355,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         />
       ) : (
       <FlatList
+        style={styles.fill}
         data={displayed}
         keyExtractor={item => item.id}
         contentContainerStyle={displayed.length === 0 ? styles.emptyContainer : styles.list}
@@ -314,11 +363,17 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>
-              {tab === 'favorites' ? 'No favorites yet' : 'Nothing here yet'}
+              {tab === 'favorites' ? 'No favorites yet'
+                : filter === 'toreact' ? 'All caught up'
+                : filter === 'reactions' ? 'No reactions yet'
+                : filter === 'requests' ? 'No requests yet'
+                : 'Nothing here yet'}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {tab === 'favorites'
-                ? 'Swipe left on any thread to favorite it'
+              {tab === 'favorites' ? 'Swipe left on any thread to favorite it'
+                : filter === 'toreact' ? 'No friend videos waiting for your reaction'
+                : filter === 'reactions' ? 'React to a friend’s video and it shows up here'
+                : filter === 'requests' ? 'Shorts you send friends to react to show up here'
                 : 'Share a Short with a friend to get started'}
             </Text>
           </View>
@@ -386,6 +441,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
 
 const styles = StyleSheet.create({
   container:  { flex: 1, backgroundColor: C.BG },
+  fill:       { flex: 1 },
   center:     { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' },
 
   header: {
@@ -438,10 +494,13 @@ const styles = StyleSheet.create({
     backgroundColor: C.ACCENT, alignItems: 'center', justifyContent: 'center',
   },
   pillCountActive: { backgroundColor: C.ACCENT_HOT },
-  pillCountTxt: { fontSize: 11, fontFamily: FONT.BODY_BOLD, color: C.WHITE, marginTop: -2 },
+  pillCountTxt: {
+    fontSize: 11, fontFamily: FONT.BODY_BOLD, color: C.WHITE,
+    textAlign: 'center', includeFontPadding: false, marginTop: -4,
+  },
 
   list:           { paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD, paddingBottom: SPACE.LG, gap: SPACE.MD },
-  emptyContainer: { flex: 1, justifyContent: 'center' },
+  emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   empty:          { alignItems: 'center', padding: SPACE.XL, gap: SPACE.SM },
   emptyTitle:     { fontSize: FONT.SIZES.LG, fontWeight: '700', color: C.INK },
   emptySubtitle:  { fontSize: FONT.SIZES.MD, color: C.MUTED, textAlign: 'center' },

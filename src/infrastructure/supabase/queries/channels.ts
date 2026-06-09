@@ -6,6 +6,7 @@ import { supabase } from '../client';
 export type ChannelSummary = {
   id: string;
   name: string;
+  display_name?: string | null;
   description: string | null;
   is_public: boolean;
   created_by: string;
@@ -72,7 +73,7 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     (supabase as any)
       .from('groups')
       .select(`
-        id, name, description, is_public, created_by, member_count,
+        id, name, display_name, description, is_public, created_by, member_count,
         pinned_video_id, pinned_video_title, pinned_video_thumbnail,
         owner:users!created_by(handle, avatar_url)
       `)
@@ -120,6 +121,7 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
   return (channelsResult.data ?? []).map((c: any) => ({
     id: c.id,
     name: c.name,
+    display_name: c.display_name ?? null,
     description: c.description ?? null,
     is_public: c.is_public,
     created_by: c.created_by,
@@ -139,7 +141,7 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
     (supabase as any)
       .from('groups')
       .select(`
-        id, name, description, is_public, created_by, member_count, avatar_url,
+        id, name, display_name, description, is_public, created_by, member_count, avatar_url,
         pinned_video_id, pinned_video_title, pinned_video_thumbnail,
         owner:users!created_by(handle, avatar_url)
       `)
@@ -174,6 +176,7 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
   return (channelsResult.data ?? []).map((c: any) => ({
     id: c.id,
     name: c.name,
+    display_name: c.display_name ?? null,
     description: c.description ?? null,
     is_public: c.is_public,
     created_by: c.created_by,
@@ -441,6 +444,118 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
   }));
 }
 
+// A reaction/review clip flattened for the channel grid, with the source video it
+// hangs off for the thumbnail.
+export type ChannelClipTile = {
+  id: string;
+  handle: string | null;
+  duration: number | null;
+  created_at: string;
+  parent_yt_video_id: string | null;
+  parent_yt_video_title: string | null;
+  parent_yt_video_thumbnail: string | null;
+  parent_source_type: 'youtube' | 'tiktok';
+};
+
+// An unreacted source video from a channel the user has joined.
+export type ChannelToReact = {
+  postId: string;
+  channelId: string;
+  channelName: string;
+  title: string | null;
+  videoId: string | null;
+  thumbnail: string | null;        // stored (TikTok ones may be expired — resolve at render)
+  sourceType: 'youtube' | 'tiktok';
+  createdAt: string;
+};
+
+/** Source videos from JOINED channels the user hasn't reacted to yet, newest first. */
+export async function fetchChannelsToReact(userId: string): Promise<ChannelToReact[]> {
+  const { data: memberships } = await (supabase as any)
+    .from('group_members').select('group_id').eq('user_id', userId);
+  const channelIds: string[] = (memberships ?? []).map((m: any) => m.group_id);
+  if (!channelIds.length) { return []; }
+
+  const [postsRes, mineRes, groupsRes] = await Promise.all([
+    (supabase as any)
+      .from('channel_posts')
+      .select('id, channel_id, poster_id, yt_video_id, yt_video_title, yt_video_thumbnail, source_type, created_at')
+      .in('channel_id', channelIds)
+      .eq('post_type', 'youtube')
+      .eq('hidden', false)
+      .is('parent_post_id', null)
+      .order('created_at', { ascending: false }),
+    (supabase as any)
+      .from('channel_posts')
+      .select('parent_post_id')
+      .eq('poster_id', userId)
+      .not('parent_post_id', 'is', null),
+    (supabase as any)
+      .from('groups')
+      .select('id, name, display_name, is_members_only, owner:users!created_by(handle)')
+      .in('id', channelIds),
+  ]);
+
+  const reacted = new Set<string>((mineRes.data ?? []).map((r: any) => r.parent_post_id));
+  const nameById = new Map<string, string>();
+  (groupsRes.data ?? []).forEach((g: any) => {
+    const fallback = g.is_members_only ? (g.owner?.handle ? `@${g.owner.handle}` : (g.name ?? '')) : (g.name ?? '');
+    nameById.set(g.id, g.display_name ?? fallback);
+  });
+
+  return (postsRes.data ?? [])
+    .filter((p: any) => !reacted.has(p.id) && p.poster_id !== userId)
+    .map((p: any) => ({
+      postId: p.id,
+      channelId: p.channel_id,
+      channelName: nameById.get(p.channel_id) ?? '',
+      title: p.yt_video_title ?? null,
+      videoId: p.yt_video_id ?? null,
+      thumbnail: p.yt_video_thumbnail ?? null,
+      sourceType: (p.source_type ?? 'youtube') as 'youtube' | 'tiktok',
+      createdAt: p.created_at ?? '',
+    }));
+}
+
+/** Every reaction clip in a channel (children of source posts), newest first. */
+export async function fetchChannelReactions(channelId: string): Promise<ChannelClipTile[]> {
+  // Two queries on purpose: a self-referential PostgREST embed
+  // (channel_posts!parent_post_id) is ambiguous with the children embed and
+  // doesn't reliably return the parent — fetch parents explicitly and stitch.
+  const { data, error } = await (supabase as any)
+    .from('channel_posts')
+    .select('id, duration, created_at, parent_post_id, poster:users!poster_id(handle)')
+    .eq('channel_id', channelId)
+    .not('parent_post_id', 'is', null)
+    .order('created_at', { ascending: false });
+  if (error) { throw error; }
+  const rows = data ?? [];
+
+  const parentIds = [...new Set(rows.map((r: any) => r.parent_post_id).filter(Boolean))];
+  const parents = new Map<string, any>();
+  if (parentIds.length) {
+    const { data: pdata } = await (supabase as any)
+      .from('channel_posts')
+      .select('id, yt_video_id, yt_video_title, yt_video_thumbnail, source_type')
+      .in('id', parentIds);
+    (pdata ?? []).forEach((p: any) => parents.set(p.id, p));
+  }
+
+  return rows.map((p: any) => {
+    const par = parents.get(p.parent_post_id);
+    return {
+    id: p.id,
+    handle: p.poster?.handle ?? null,
+    duration: p.duration ?? null,
+    created_at: p.created_at,
+    parent_yt_video_id: par?.yt_video_id ?? null,
+    parent_yt_video_title: par?.yt_video_title ?? null,
+    parent_yt_video_thumbnail: par?.yt_video_thumbnail ?? null,
+    parent_source_type: par?.source_type ?? 'youtube',
+    };
+  });
+}
+
 export async function fetchChannelPost(postId: string): Promise<ChannelPost | null> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
@@ -548,6 +663,22 @@ export async function addChannelPostEmojiReaction(
   return data.id;
 }
 
+async function uploadClipToCloud(localPath: string, uploadPath: string): Promise<string> {
+  const bare = localPath.replace(/^file:\/\//, '');
+  const base64 = await RNFS.readFile(bare, 'base64');
+  const binaryStr = atob(base64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) { bytes[i] = binaryStr.charCodeAt(i); }
+
+  const { error } = await supabase.storage
+    .from('channel-clips')
+    .upload(uploadPath, bytes, { contentType: 'video/mp4', upsert: true });
+  if (error) { throw error; }
+
+  const { data: { publicUrl } } = supabase.storage.from('channel-clips').getPublicUrl(uploadPath);
+  return publicUrl;
+}
+
 export async function postChannelClip({
   channelId,
   userId,
@@ -561,7 +692,7 @@ export async function postChannelClip({
   duration: number;
   parentPostId?: string;
 }): Promise<string> {
-  // Insert first to get a stable ID — stored locally, not uploaded to cloud.
+  // Insert first to get a stable ID (video_url filled after upload).
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .insert({
@@ -569,7 +700,7 @@ export async function postChannelClip({
       poster_id: userId,
       post_type: 'clip',
       video_url: null,
-      storage_mode: 'local',
+      storage_mode: 'cloud',
       duration: Math.round(duration),
       ...(parentPostId ? { parent_post_id: parentPostId } : {}),
     })
@@ -579,13 +710,36 @@ export async function postChannelClip({
   if (error) { throw error; }
   const postId = data.id as string;
 
-  // Move the temp recording to the permanent local clips dir.
+  // Upload to the channel-clips bucket so OTHER devices/members can download it.
+  // Best-effort: the local copy below still works on this device if upload fails.
+  try {
+    const cloudUrl = await uploadClipToCloud(filePath, `${userId}/${postId}.mp4`);
+    await (supabase as any).from('channel_posts').update({ video_url: cloudUrl }).eq('id', postId);
+  } catch (e) {
+    console.error('[postChannelClip] cloud upload failed:', JSON.stringify(e));
+  }
+
+  // Keep a local copy for instant playback on this device.
   // WatchChannelClipScreen uses localPathForClip(postId) to find this file.
   const dir = `${RNFS.DocumentDirectoryPath}/channel-clips`;
   if (!(await RNFS.exists(dir))) { await RNFS.mkdir(dir); }
   await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), `${dir}/${postId}.mp4`);
 
   return postId;
+}
+
+/** Recover an older local-only clip: if this device has the file but the row has
+ *  no cloud URL, upload it so other devices can download it. No-op otherwise. */
+export async function backfillChannelClipUpload(
+  postId: string,
+  userId: string,
+  localPath: string,
+): Promise<void> {
+  const cloudUrl = await uploadClipToCloud(localPath, `${userId}/${postId}.mp4`);
+  await (supabase as any)
+    .from('channel_posts')
+    .update({ video_url: cloudUrl, storage_mode: 'cloud' })
+    .eq('id', postId);
 }
 
 export async function postChannelAudio({
@@ -783,13 +937,17 @@ export async function hasReviewedPost(postId: string, userId: string): Promise<b
 /** Channel review settings + owner, for gating the tabs/pills/inbox. */
 export async function fetchChannelReviewSettings(
   channelId: string,
-): Promise<{ reviewsEnabled: boolean; ownerId: string | null }> {
+): Promise<{ reviewsAllowed: boolean; reviewsEnabled: boolean; ownerId: string | null }> {
   const { data } = await (supabase as any)
     .from('groups')
-    .select('reviews_enabled, created_by')
+    .select('reviews_allowed, reviews_enabled, created_by')
     .eq('id', channelId)
     .single();
-  return { reviewsEnabled: !!data?.reviews_enabled, ownerId: data?.created_by ?? null };
+  return {
+    reviewsAllowed: data?.reviews_allowed ?? true,
+    reviewsEnabled: !!data?.reviews_enabled,
+    ownerId: data?.created_by ?? null,
+  };
 }
 
 export async function setChannelReviewsEnabled(channelId: string, enabled: boolean): Promise<void> {
@@ -798,4 +956,30 @@ export async function setChannelReviewsEnabled(channelId: string, enabled: boole
     .update({ reviews_enabled: enabled })
     .eq('id', channelId);
   if (error) { throw error; }
+}
+
+/** Master switch. Turning reviews off also forces visibility off. */
+export async function setChannelReviewsAllowed(channelId: string, allowed: boolean): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('groups')
+    .update(allowed ? { reviews_allowed: true } : { reviews_allowed: false, reviews_enabled: false })
+    .eq('id', channelId);
+  if (error) { throw error; }
+}
+
+// Writes display_name (not name): for Members Only / private channels `name` is
+// auto-managed by a DB trigger, so display_name is the durable user-set title.
+export async function setChannelName(channelId: string, name: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('groups')
+    .update({ display_name: name })
+    .eq('id', channelId);
+  if (error) { throw error; }
+}
+
+/** The creator-set display name override, if any. */
+export async function fetchChannelDisplayName(channelId: string): Promise<string | null> {
+  const { data } = await (supabase as any)
+    .from('groups').select('display_name').eq('id', channelId).single();
+  return data?.display_name ?? null;
 }

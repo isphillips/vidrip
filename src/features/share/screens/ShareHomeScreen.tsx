@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, FlatList, StyleSheet,
-  TouchableOpacity, Image, ActivityIndicator, Alert,
+  TouchableOpacity, Image, ActivityIndicator, Alert, RefreshControl,
   ScrollView, useWindowDimensions, Animated, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -69,6 +69,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [memberVideos, setMemberVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading]   = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching]    = useState(false);
   // For You (personal connected feed)
   const [showForYou, setShowForYou]  = useState(false);
@@ -106,8 +107,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const cardH   = Math.round(cardW * (16 / 9));
 
   // ── Browse data ─────────────────────────────────────────────────────────────
-  const loadCategory = useCallback(async (cat: Category, reset = true) => {
-    if (reset) { setLoading(true); offsetRef.current = 0; hasMoreRef.current = true; }
+  const loadCategory = useCallback(async (cat: Category, reset = true, silent = false) => {
+    if (reset) { if (!silent) { setLoading(true); } offsetRef.current = 0; hasMoreRef.current = true; }
     try {
       const data = await fetchShorts(cat, PAGE, reset ? 0 : offsetRef.current);
       setResults(prev => reset ? data : [...prev, ...data]);
@@ -148,6 +149,13 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       Alert.alert('Refresh', e?.message ?? 'Could not refresh your feed.');
     } finally { setFeedRefreshing(false); }
   }, [feedRefreshing, loadForYou]);
+
+  // Pull-to-refresh on the category grids (not For You — it has its own Refresh).
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await loadCategory(category, true, true); }
+    finally { setRefreshing(false); }
+  }, [loadCategory, category]);
 
   // Members Only videos from channels the user has JOINED — refetch on focus so
   // joining/leaving a channel elsewhere is reflected here.
@@ -383,41 +391,50 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
           )}
           <View style={{ height: SPACE.SM }} />
 
-          {(showForYou ? feedLoading : loading) ? (
-            <View style={styles.center}><ActivityIndicator color={C.ACCENT} /></View>
-          ) : (
-            <FlatList
-              data={gridData}
-              keyExtractor={item => item.videoId}
-              numColumns={2}
-              contentContainerStyle={styles.grid}
-              columnWrapperStyle={styles.row}
-              onEndReached={showForYou ? undefined : handleLoadMore}
-              onEndReachedThreshold={0.4}
-              ListFooterComponent={!showForYou && loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.XL }} /> : null}
-              ListEmptyComponent={
-                <View style={styles.center}>
-                  <Text style={styles.emptyText}>
-                    {showForYou
-                      ? (hasFeedConnection
-                          ? 'No videos yet — tap Refresh to pull your liked videos.'
-                          : 'Connect a YouTube account in your profile to see your For You feed.')
-                      : 'No Shorts yet'}
-                  </Text>
-                </View>
-              }
-              renderItem={({ item }) => (
-                <TouchableOpacity style={[styles.card, { width: cardW }]} onPress={() => openPlayer(item)} activeOpacity={0.8}>
-                  <Image source={{ uri: item.thumbnail }} style={[styles.cardThumb, { height: cardH }]} resizeMode="cover" />
-                  {item.duration != null && <DurationBadge seconds={item.duration} />}
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-                    <Text style={styles.cardChannel} numberOfLines={1}>{item.channelTitle}</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-          )}
+          {(() => {
+            const gridLoading = showForYou ? feedLoading : loading;
+            const data: typeof gridData = gridLoading ? [] : gridData;
+            const isEmpty = data.length === 0;
+            return (
+              <FlatList
+                style={isEmpty ? styles.fill : undefined}
+                data={data}
+                keyExtractor={item => item.videoId}
+                numColumns={2}
+                contentContainerStyle={isEmpty ? styles.gridCenter : styles.grid}
+                columnWrapperStyle={styles.row}
+                refreshControl={showForYou ? undefined : (
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.ACCENT} />
+                )}
+                onEndReached={(showForYou || isEmpty) ? undefined : handleLoadMore}
+                onEndReachedThreshold={0.4}
+                ListFooterComponent={!showForYou && loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.XL }} /> : null}
+                ListEmptyComponent={
+                  gridLoading ? (
+                    <ActivityIndicator color={C.ACCENT} style={styles.gridSpinner} />
+                  ) : (
+                    <Text style={[styles.emptyText, styles.emptyTextCenter]}>
+                      {showForYou
+                        ? (hasFeedConnection
+                            ? 'No videos yet — tap Refresh to pull your liked videos.'
+                            : 'Connect a YouTube account in your profile to see your For You feed.')
+                        : 'No Shorts yet'}
+                    </Text>
+                  )
+                }
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={[styles.card, { width: cardW }]} onPress={() => openPlayer(item)} activeOpacity={0.8}>
+                    <Image source={{ uri: item.thumbnail }} style={[styles.cardThumb, { height: cardH }]} resizeMode="cover" />
+                    {item.duration != null && <DurationBadge seconds={item.duration} />}
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                      <Text style={styles.cardChannel} numberOfLines={1}>{item.channelTitle}</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
+            );
+          })()}
         </>
       )}
 
@@ -589,6 +606,7 @@ const styles = StyleSheet.create({
   },
   searchInput:   { flex: 1, paddingVertical: SPACE.MD, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   searchSpinner: { marginLeft: SPACE.SM },
+  gridSpinner: { position: 'absolute', top: '50%' },
   tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingBottom: SPACE.LG },
   tab:     { paddingHorizontal: SPACE.LG, justifyContent: 'center', height: 36, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
   tabActive:    { backgroundColor: C.ACCENT, borderColor: C.ACCENT },
@@ -610,6 +628,9 @@ const styles = StyleSheet.create({
 
   // grid
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACE.XXXL },
+  fill:          { flex: 1 },
+  gridCenter:    { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyTextCenter: { textAlign: 'center', paddingHorizontal: SPACE.XL },
   grid:          { paddingHorizontal: SPACE.LG, paddingBottom: SPACE.XXXL },
   row:           { gap: SPACE.MD, marginBottom: SPACE.MD },
   card:          { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, overflow: 'hidden' },

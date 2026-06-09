@@ -4,6 +4,7 @@ import {
   TouchableOpacity, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
@@ -14,13 +15,16 @@ import {
   removeChannelPostEmojiReaction,
   fetchPostReviews,
   fetchChannelReviewSettings,
+  backfillChannelClipUpload,
   type ChannelPost,
   type ChannelReview,
 } from '../../../infrastructure/supabase/queries/channels';
 import {
   hasLocalClip,
+  localPathForClip,
   downloadChannelClip,
 } from '../../../infrastructure/storage/localChannelClipStorage';
+import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import EmojiChips from '../../../components/EmojiChips';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
@@ -32,14 +36,20 @@ export default function ChannelPostScreen({
   const { postId, channelId, isJoined } = route.params;
   const { user } = useAuthStore();
   const { top } = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const { height } = useWindowDimensions();
 
   const [post, setPost] = useState<ChannelPost | null>(null);
   const [reactions, setReactions] = useState<ChannelPost[]>([]);
   const [reviews, setReviews] = useState<ChannelReview[]>([]);
+  const [reviewsAllowed, setReviewsAllowed] = useState(true);
   const [reviewsEnabled, setReviewsEnabled] = useState(false);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [tab, setTab] = useState<'reactions' | 'reviews'>('reactions');
+  // Height of the tabs/section block below the thumbnail — measured so the
+  // thumbnail shrinks to land the poster/button overlay + tabs at the bottom.
+  const [belowH, setBelowH] = useState(56);
+  const [ttThumb, setTtThumb] = useState<string | null>(null);  // fresh TikTok thumb
   const [loading, setLoading] = useState(true);
   const [dlState, setDlState] = useState<Record<string, DlState>>({});
   const [dlPct, setDlPct] = useState<Record<string, number>>({});
@@ -60,6 +70,7 @@ export default function ChannelPostScreen({
       if (!mountedRef.current) { return; }
       setPost(p);
       setReactions(r);
+      setReviewsAllowed(settings.reviewsAllowed);
       setReviewsEnabled(settings.reviewsEnabled);
       setOwnerId(settings.ownerId);
       setReviews(revs);
@@ -70,6 +81,15 @@ export default function ChannelPostScreen({
 
   useEffect(() => { load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // TikTok thumbnails expire — resolve a fresh one by video id.
+  useEffect(() => {
+    if (post?.source_type === 'tiktok' && post.yt_video_id) {
+      resolveTikTokThumbnail(post.yt_video_id)
+        .then(u => { if (u && mountedRef.current) { setTtThumb(u); } })
+        .catch(() => {});
+    }
+  }, [post?.source_type, post?.yt_video_id]);
 
   // Kick off downloads for reactions that aren't cached yet
   useEffect(() => {
@@ -86,6 +106,11 @@ export default function ChannelPostScreen({
         if (!mountedRef.current) { return; }
         if (cached) {
           setDlState(prev => ({ ...prev, [r.id]: 'local' }));
+          // Recover older local-only clips: if this is my clip with no cloud URL,
+          // upload it now so other devices/members can download it.
+          if (r.poster_id === user?.id && !r.video_url) {
+            backfillChannelClipUpload(r.id, user.id, `file://${localPathForClip(r.id)}`).catch(() => {});
+          }
           return;
         }
         // No local copy — try cloud URL if available
@@ -151,21 +176,24 @@ export default function ChannelPostScreen({
     return <View style={styles.center}><Text style={styles.muted}>Post not found</Text></View>;
   }
 
-  const thumbnail = post.yt_video_thumbnail ??
-    (post.source_type === 'youtube' && post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null);
+  const thumbnail = post.source_type === 'tiktok'
+    ? ttThumb  // stored TikTok URL is expired; use the freshly resolved one
+    : (post.yt_video_thumbnail ??
+      (post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null));
   const hasReacted = reactions.some(r => r.poster_id === user?.id);
   const obscured = !hasReacted && post.poster_id !== user?.id;
   const isOwner = !!ownerId && ownerId === user?.id;
   const showReviewsTab = reviewsEnabled || isOwner;
   const hasReviewed = reviews.some(r => r.reviewer_id === user?.id);
-  // You can review a post once you've reacted to it (and it isn't your own post).
-  const canReview = isJoined && hasReacted && post.poster_id !== user?.id && !hasReviewed;
+  // You can review a post once you've reacted to it (and it isn't your own post),
+  // and only if the creator allows reviews on this channel.
+  const canReview = reviewsAllowed && isJoined && hasReacted && post.poster_id !== user?.id && !hasReviewed;
 
   return (
     <View style={styles.container}>
     <ScrollView bounces={false}>
       {/* Thumbnail / blind */}
-      <View style={[styles.thumbWrap, { height: height - 113, width: '100%', marginTop: 0 }]}>
+      <View style={[styles.thumbWrap, { height: Math.max(240, height - belowH - tabBarHeight), width: '100%', marginTop: 0 }]}>
         {obscured ? (
           <View style={styles.thumbBlind}>
             <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
@@ -182,6 +210,7 @@ export default function ChannelPostScreen({
         <View style={styles.blindOverlay}>
           <Text style={styles.posterHandle}>
             Posted by <Text style={styles.handle}>@{post.poster?.handle ?? '?'}</Text>
+            {' · via '}{post.source_type === 'tiktok' ? 'TikTok' : 'YouTube'}
           </Text>
           {obscured ? (
             <Text style={styles.videoTitleObscured}>React to reveal this video</Text>
@@ -215,29 +244,32 @@ export default function ChannelPostScreen({
         </View>
       </View>
 
-      {/* Reactions / Reviews */}
-      {showReviewsTab ? (
-        <View style={styles.tabBar}>
-          <TouchableOpacity style={[styles.tab, tab === 'reactions' && styles.tabActive]}
-            onPress={() => setTab('reactions')} activeOpacity={0.8}>
-            <Text style={[styles.tabTxt, tab === 'reactions' && styles.tabTxtActive]}>
-              Reactions{reactions.length ? ` ${reactions.length}` : ''}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, tab === 'reviews' && styles.tabActive]}
-            onPress={() => setTab('reviews')} activeOpacity={0.8}>
-            <Text style={[styles.tabTxt, tab === 'reviews' && styles.tabTxtActive]}>
-              Reviews{reviews.length ? ` ${reviews.length}` : ''}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <Text style={styles.sectionTitle}>
-          {reactions.length === 0
-            ? 'No reactions yet'
-            : `${reactions.length} reaction${reactions.length !== 1 ? 's' : ''}`}
-        </Text>
-      )}
+      {/* Reactions / Reviews — measured so the thumbnail above sizes to land this
+          block (and the overlay button) at the bottom on first render. */}
+      <View onLayout={e => setBelowH(e.nativeEvent.layout.height)}>
+        {showReviewsTab ? (
+          <View style={styles.tabBar}>
+            <TouchableOpacity style={[styles.tab, tab === 'reactions' && styles.tabActive]}
+              onPress={() => setTab('reactions')} activeOpacity={0.8}>
+              <Text style={[styles.tabTxt, tab === 'reactions' && styles.tabTxtActive]}>
+                Reactions{reactions.length ? ` ${reactions.length}` : ''}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, tab === 'reviews' && styles.tabActive]}
+              onPress={() => setTab('reviews')} activeOpacity={0.8}>
+              <Text style={[styles.tabTxt, tab === 'reviews' && styles.tabTxtActive]}>
+                Reviews{reviews.length ? ` ${reviews.length}` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={styles.sectionTitle}>
+            {reactions.length === 0
+              ? 'No reactions yet'
+              : `${reactions.length} reaction${reactions.length !== 1 ? 's' : ''}`}
+          </Text>
+        )}
+      </View>
 
       {tab === 'reviews' && showReviewsTab ? (
         reviews.length === 0 ? (
@@ -257,6 +289,8 @@ export default function ChannelPostScreen({
             </View>
           </TouchableOpacity>
         ))
+      ) : reactions.length === 0 && showReviewsTab ? (
+        <Text style={styles.emptyTabText}>No reactions yet</Text>
       ) : (
       reactions.map(r => {
         const state = dlState[r.id] ?? 'unavailable';
@@ -352,7 +386,7 @@ const styles = StyleSheet.create({
   reviewBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD },
   reviewBtnSub: { color: 'rgba(255,255,255,0.8)', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY },
   tabBar: {
-    flexDirection: 'row', gap: SPACE.SM,
+    flexDirection: 'row', gap: SPACE.SM, marginTop: SPACE.LG,
     paddingHorizontal: SPACE.LG, paddingBottom: SPACE.SM,
   },
   tab: {

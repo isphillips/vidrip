@@ -73,6 +73,18 @@ export async function fetchTikTokMeta(
   }
 }
 
+// TikTok oEmbed thumbnails are signed CDN URLs with an `x-expires` token — once
+// expired they 403, so a URL stored at post time goes dead. Resolve a fresh one by
+// video id at render time instead, cached in-memory for the session.
+const ttThumbCache = new Map<string, string>();
+
+export async function resolveTikTokThumbnail(videoId: string): Promise<string | null> {
+  if (ttThumbCache.has(videoId)) { return ttThumbCache.get(videoId)!; }
+  const meta = await fetchTikTokMeta(videoId);
+  if (meta?.thumbnail) { ttThumbCache.set(videoId, meta.thumbnail); return meta.thumbnail; }
+  return null;
+}
+
 /** The embed Player API iframe URL for a given post id. */
 export function tikTokPlayerUrl(
   postId: string,
