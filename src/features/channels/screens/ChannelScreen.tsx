@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity, Modal, FlatList,
-  useWindowDimensions,
+  useWindowDimensions, Linking,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import {
   joinChannel,
   leaveChannel,
   postChannelAudio,
+  fetchChannelReviewSettings,
   type ChannelPost,
 } from '../../../infrastructure/supabase/queries/channels';
 import {
@@ -30,6 +31,15 @@ import {
 } from '../../../infrastructure/native/audioRecorder';
 import ChannelMessageBubble from '../components/ChannelMessageBubble';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
+
+const CREATOR_STUDIO_URL = 'https://www.vidrip.app/dashboard';
+
+type GridFilter = 'all' | 'reactions' | 'reviews';
+const GRID_FILTERS: { key: GridFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'reactions', label: 'Reactions' },
+  { key: 'reviews', label: 'Reviews' },
+];
 
 export default function ChannelScreen({
   route,
@@ -46,11 +56,14 @@ export default function ChannelScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [joined, setJoined] = useState(isJoinedParam);
+  const [reviewsEnabled, setReviewsEnabled] = useState(false);
+  const [filter, setFilter] = useState<GridFilter>('all');
   // Members Only channels show the creator's handle as the title, not the group name.
   const [title, setTitle] = useState(
     isMembersOnly && ownerHandle ? `${ownerHandle}` : channelName,
   );
   const [membersVisible, setMembersVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const [members, setMembers] = useState<{ userId: string; handle: string }[]>([]);
   const [joiningLeaving, setJoiningLeaving] = useState(false);
   const [processing, setProcessing] = useState<Set<string>>(new Set());
@@ -70,6 +83,9 @@ export default function ChannelScreen({
     try {
       const data = await fetchChannelPosts(channelId, user?.id);
       if (mountedRef.current) { setPosts(data); }
+      fetchChannelReviewSettings(channelId)
+        .then(s => { if (mountedRef.current) { setReviewsEnabled(s.reviewsEnabled); } })
+        .catch(() => {});
     } catch { /* swallow */ } finally {
       if (mountedRef.current) { setLoading(false); setRefreshing(false); }
     }
@@ -220,14 +236,19 @@ export default function ChannelScreen({
       const seen = isOwner || p.poster_id === user?.id || p.has_my_reaction;
       return seen ? 2 : 1;
     };
-    return posts
+    const filtered = filter === 'reactions'
+      ? posts.filter(p => p.reaction_count > 0)
+      : filter === 'reviews'
+        ? posts.filter(p => p.review_count > 0)
+        : posts;
+    return filtered
       .map((p, i) => ({ p, i }))
       .sort((a, b) => {
         const ra = rank(a.p), rb = rank(b.p);
         return ra !== rb ? ra - rb : a.i - b.i;
       })
       .map(({ p }) => p);
-  }, [posts, isOwner, user?.id]);
+  }, [posts, isOwner, user?.id, filter]);
 
   // ── Audio recording handlers ──────────────────────────────────────────────
   const handleMicPressIn = useCallback(async () => {
@@ -293,9 +314,9 @@ export default function ChannelScreen({
         </TouchableOpacity>
 
         {isOwner && isPublic ? (
-          <TouchableOpacity style={styles.postVideoBtn} activeOpacity={0.8}
-            onPress={() => navigation.navigate('AddChannelVideo', { channelId })}>
-            <Text style={styles.postVideoBtnText}>+ Video</Text>
+          <TouchableOpacity style={styles.menuBtn} hitSlop={8} activeOpacity={0.7}
+            onPress={() => setMenuVisible(true)}>
+            <Text style={styles.menuIcon}>☰</Text>
           </TouchableOpacity>
         ) : isPublic ? (
           <TouchableOpacity
@@ -333,6 +354,21 @@ export default function ChannelScreen({
           <Text style={styles.recordingText}>
             Recording… {String(Math.floor(audioElapsed / 60)).padStart(2, '0')}:{String(audioElapsed % 60).padStart(2, '0')}
           </Text>
+        </View>
+      )}
+
+      {/* Reviews filter pills — public grid only, when the creator enabled reviews */}
+      {isPublic && reviewsEnabled && !loading && (
+        <View style={styles.filterRow}>
+          {GRID_FILTERS.map(f => {
+            const active = filter === f.key;
+            return (
+              <TouchableOpacity key={f.key} style={[styles.pill, active && styles.pillActive]}
+                onPress={() => setFilter(f.key)} activeOpacity={0.8}>
+                <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -474,6 +510,50 @@ export default function ChannelScreen({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Creator menu (hamburger) */}
+      <Modal visible={menuVisible} transparent animationType="slide" onRequestClose={() => setMenuVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Channel</Text>
+
+            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
+              onPress={() => { setMenuVisible(false); navigation.navigate('AddChannelVideo', { channelId }); }}>
+              <Text style={styles.menuRowIcon}>＋</Text>
+              <View style={styles.menuRowText}>
+                <Text style={styles.menuRowLabel}>Post a Video</Text>
+                <Text style={styles.menuRowSub}>Add a YouTube or TikTok video for fans to react to</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
+              onPress={() => { setMenuVisible(false); navigation.navigate('ChannelReviews', { channelId, channelName: title }); }}>
+              <Text style={styles.menuRowIcon}>★</Text>
+              <View style={styles.menuRowText}>
+                <Text style={styles.menuRowLabel}>Reviews</Text>
+                <Text style={styles.menuRowSub}>Watch reviews fans sent you · toggle visibility</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
+              onPress={() => {
+                setMenuVisible(false);
+                Linking.openURL(CREATOR_STUDIO_URL).catch(() =>
+                  Alert.alert('Could not open', 'Unable to open Creator Studio right now.'));
+              }}>
+              <Text style={styles.menuRowIcon}>↗</Text>
+              <View style={styles.menuRowText}>
+                <Text style={styles.menuRowLabel}>Creator Studio</Text>
+                <Text style={styles.menuRowSub}>Open your dashboard on the web</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.modalClose} onPress={() => setMenuVisible(false)}>
+              <Text style={styles.modalCloseTxt}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -523,6 +603,35 @@ const styles = StyleSheet.create({
   joinBtnTextActive: {
     color: C.MUTED,
   },
+  menuBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  menuIcon: { fontSize: 22, color: C.INK, lineHeight: 26 },
+  menuRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
+    paddingVertical: SPACE.MD,
+    borderBottomWidth: 1, borderBottomColor: C.BORDER,
+  },
+  menuRowIcon: { fontSize: 20, color: C.ACCENT_HOT, width: 28, textAlign: 'center' },
+  menuRowText: { flex: 1, gap: 2 },
+  menuRowLabel: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
+  menuRowSub: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.MUTED },
+  filterRow: {
+    flexDirection: 'row',
+    gap: SPACE.SM,
+    paddingHorizontal: SPACE.LG,
+    paddingVertical: SPACE.SM,
+    alignItems: 'center',
+  },
+  pill: {
+    paddingHorizontal: SPACE.MD,
+    paddingVertical: SPACE.XS + 1,
+    borderRadius: RADIUS.FULL,
+    borderWidth: 1,
+    borderColor: C.BORDER,
+    backgroundColor: C.SURFACE,
+  },
+  pillActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
+  pillTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  pillTxtActive: { color: C.ACCENT_HOT },
   postVideoBtn: {
     paddingHorizontal: SPACE.MD,
     paddingVertical: SPACE.XS + 1,

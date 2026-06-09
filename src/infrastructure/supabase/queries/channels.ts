@@ -39,9 +39,30 @@ export type ChannelPost = {
   emoji_reactions: { emoji: string; user_id: string }[];
   reaction_count: number;
   has_my_reaction: boolean;
+  review_count: number;
+  has_my_review: boolean;
   parent_post_id: string | null;
   parent_yt_video_id: string | null;
   parent_source_type: 'youtube' | 'tiktok';
+};
+
+// A 60s review clip submitted to a creator after reacting. Lives in its own
+// table (channel_reviews) so visibility can be gated by groups.reviews_enabled.
+export type ChannelReview = {
+  id: string;
+  channel_id: string;
+  post_id: string;
+  reviewer_id: string;
+  reviewer: { handle: string } | null;
+  video_url: string | null;
+  duration: number | null;
+  created_at: string;
+  // Parent source-post context (populated by the inbox / my-reviews queries).
+  post_yt_video_id: string | null;
+  post_yt_video_title: string | null;
+  post_yt_video_thumbnail: string | null;
+  post_source_type: 'youtube' | 'tiktok';
+  channel_name: string | null;
 };
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -328,6 +349,19 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
     if (mine) { reactedIds = new Set((mine as any[]).map(r => r.parent_post_id)); }
   }
 
+  // Review counts per source post. RLS gates which review rows are visible, so a
+  // non-creator with reviews disabled only ever counts their own.
+  const reviewCount = new Map<string, number>();
+  const myReviewed = new Set<string>();
+  const { data: revs } = await (supabase as any)
+    .from('channel_reviews')
+    .select('post_id, reviewer_id')
+    .eq('channel_id', channelId);
+  (revs ?? []).forEach((r: any) => {
+    reviewCount.set(r.post_id, (reviewCount.get(r.post_id) ?? 0) + 1);
+    if (userId && r.reviewer_id === userId) { myReviewed.add(r.post_id); }
+  });
+
   return (data ?? []).map((p: any) => ({
     id: p.id,
     channel_id: p.channel_id,
@@ -346,6 +380,8 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
     emoji_reactions: p.emoji_reactions ?? [],
     reaction_count: Array.isArray(p.reactions) ? (p.reactions[0]?.count ?? 0) : 0,
     has_my_reaction: reactedIds.has(p.id),
+    review_count: reviewCount.get(p.id) ?? 0,
+    has_my_review: myReviewed.has(p.id),
     parent_post_id: p.parent_post_id ?? null,
     parent_yt_video_id: null,
     parent_source_type: 'youtube',
@@ -397,6 +433,8 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
     emoji_reactions: p.emoji_reactions ?? [],
     reaction_count: 0,
     has_my_reaction: false,
+    review_count: 0,
+    has_my_review: false,
     parent_post_id: p.parent_post_id ?? null,
     parent_yt_video_id: null,
     parent_source_type: 'youtube',
@@ -427,6 +465,8 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
     emoji_reactions: data.emoji_reactions ?? [],
     reaction_count: 0,
     has_my_reaction: false,
+    review_count: 0,
+    has_my_review: false,
     parent_post_id: data.parent_post_id ?? null,
     parent_yt_video_id: (data.parent as any)?.yt_video_id ?? null,
     parent_source_type: (data.parent as any)?.source_type ?? 'youtube',
@@ -587,5 +627,175 @@ export async function removeChannelPostEmojiReaction(
     .eq('post_id', postId)
     .eq('user_id', userId)
     .eq('emoji', emoji);
+  if (error) { throw error; }
+}
+
+// ── Reviews ("Side B") ──────────────────────────────────────────────────────
+
+async function uploadReviewToCloud(localPath: string, uploadPath: string): Promise<string> {
+  const bare = localPath.replace(/^file:\/\//, '');
+  const base64 = await RNFS.readFile(bare, 'base64');
+  const binaryStr = atob(base64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) { bytes[i] = binaryStr.charCodeAt(i); }
+
+  const { error } = await supabase.storage
+    .from('reviews')
+    .upload(uploadPath, bytes, { contentType: 'video/mp4', upsert: true });
+  if (error) { throw error; }
+
+  const { data: { publicUrl } } = supabase.storage.from('reviews').getPublicUrl(uploadPath);
+  return publicUrl;
+}
+
+/** Submit a review clip for a source post. Always cloud-uploaded so the creator
+ *  can watch it even when the reviewer is offline. Keeps a local copy too so the
+ *  reviewer's own playback is instant. Returns the review id. */
+export async function postReview({
+  channelId, postId, reviewerId, filePath, duration,
+}: {
+  channelId: string;
+  postId: string;
+  reviewerId: string;
+  filePath: string;
+  duration: number;
+}): Promise<string> {
+  // Insert first to get a stable id (video_url set after upload).
+  const { data, error } = await (supabase as any)
+    .from('channel_reviews')
+    .insert({
+      channel_id: channelId,
+      post_id: postId,
+      reviewer_id: reviewerId,
+      video_url: null,
+      storage_mode: 'cloud',
+      duration: Math.round(duration),
+    })
+    .select('id')
+    .single();
+  if (error) { throw error; }
+  const reviewId = data.id as string;
+
+  // Upload to the reviews bucket: reviews/<reviewerId>/<postId>/<reviewId>.mp4
+  const uploadPath = `${reviewerId}/${postId}/${reviewId}.mp4`;
+  const cloudUrl = await uploadReviewToCloud(filePath, uploadPath);
+  await (supabase as any).from('channel_reviews').update({ video_url: cloudUrl }).eq('id', reviewId);
+
+  // Cache locally (channel-clips dir, keyed by review id) for instant replay.
+  try {
+    const dir = `${RNFS.DocumentDirectoryPath}/channel-clips`;
+    if (!(await RNFS.exists(dir))) { await RNFS.mkdir(dir); }
+    await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), `${dir}/${reviewId}.mp4`);
+  } catch { /* local cache is best-effort */ }
+
+  return reviewId;
+}
+
+function mapReview(r: any): ChannelReview {
+  return {
+    id: r.id,
+    channel_id: r.channel_id,
+    post_id: r.post_id,
+    reviewer_id: r.reviewer_id,
+    reviewer: r.reviewer ?? null,
+    video_url: r.video_url ?? null,
+    duration: r.duration ?? null,
+    created_at: r.created_at,
+    post_yt_video_id: r.post?.yt_video_id ?? null,
+    post_yt_video_title: r.post?.yt_video_title ?? null,
+    post_yt_video_thumbnail: r.post?.yt_video_thumbnail ?? null,
+    post_source_type: r.post?.source_type ?? 'youtube',
+    channel_name: r.channel?.name ?? null,
+  };
+}
+
+/** Reviews on a single source post (visibility gated by RLS). */
+export async function fetchPostReviews(postId: string): Promise<ChannelReview[]> {
+  const { data, error } = await (supabase as any)
+    .from('channel_reviews')
+    .select(`
+      id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
+      reviewer:users!reviewer_id(handle)
+    `)
+    .eq('post_id', postId)
+    .order('created_at', { ascending: false });
+  if (error) { throw error; }
+  return (data ?? []).map(mapReview);
+}
+
+/** Every review across a channel, newest first — the creator's inbox. RLS limits
+ *  non-creators to their own rows, so this doubles as a "my reviews" list. */
+export async function fetchChannelReviews(channelId: string): Promise<ChannelReview[]> {
+  const { data, error } = await (supabase as any)
+    .from('channel_reviews')
+    .select(`
+      id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
+      reviewer:users!reviewer_id(handle),
+      post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type)
+    `)
+    .eq('channel_id', channelId)
+    .order('created_at', { ascending: false });
+  if (error) { throw error; }
+  return (data ?? []).map(mapReview);
+}
+
+/** Every review the user has submitted, across all channels, newest first. */
+export async function fetchMyReviews(userId: string): Promise<ChannelReview[]> {
+  const { data, error } = await (supabase as any)
+    .from('channel_reviews')
+    .select(`
+      id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
+      reviewer:users!reviewer_id(handle),
+      post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type),
+      channel:groups!channel_id(name)
+    `)
+    .eq('reviewer_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) { throw error; }
+  return (data ?? []).map(mapReview);
+}
+
+export async function fetchChannelReview(reviewId: string): Promise<ChannelReview | null> {
+  const { data, error } = await (supabase as any)
+    .from('channel_reviews')
+    .select(`
+      id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
+      reviewer:users!reviewer_id(handle),
+      post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type)
+    `)
+    .eq('id', reviewId)
+    .single();
+  if (error) { return null; }
+  return mapReview(data);
+}
+
+/** Whether the current user has already reviewed a given post. */
+export async function hasReviewedPost(postId: string, userId: string): Promise<boolean> {
+  const { data } = await (supabase as any)
+    .from('channel_reviews')
+    .select('id')
+    .eq('post_id', postId)
+    .eq('reviewer_id', userId)
+    .maybeSingle();
+  return !!data;
+}
+
+/** Channel review settings + owner, for gating the tabs/pills/inbox. */
+export async function fetchChannelReviewSettings(
+  channelId: string,
+): Promise<{ reviewsEnabled: boolean; ownerId: string | null }> {
+  const { data } = await (supabase as any)
+    .from('groups')
+    .select('reviews_enabled, created_by')
+    .eq('id', channelId)
+    .single();
+  return { reviewsEnabled: !!data?.reviews_enabled, ownerId: data?.created_by ?? null };
+}
+
+export async function setChannelReviewsEnabled(channelId: string, enabled: boolean): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('groups')
+    .update({ reviews_enabled: enabled })
+    .eq('id', channelId);
   if (error) { throw error; }
 }

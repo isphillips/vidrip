@@ -51,6 +51,8 @@ export interface ReactionRecorderProps {
   onSave: (filePath: string, duration: number, ytStartOffset: number) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
+  /** Hard cap in seconds — recording auto-stops when reached (e.g. 60s reviews). */
+  maxDuration?: number;
 }
 
 const YT_PARAMS = { rel: false as const, controls: true as const };
@@ -64,6 +66,7 @@ export default function ReactionRecorder({
   onSave,
   onBack,
   uploadingText = 'Saving…',
+  maxDuration,
 }: ReactionRecorderProps) {
   const { width, height } = useWindowDimensions();
   const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
@@ -91,6 +94,7 @@ export default function ReactionRecorder({
   const ytStartOffsetRef = useRef(0);
   const recordingCallbackRef = useRef<((v: VideoFile) => void) | null>(null);
   const speakerOverrideRef = useRef(false);
+  const handleStopRef = useRef<() => void>(() => {});
   const [ytKey, setYtKey] = useState(0);
 
   useEffect(() => {
@@ -116,8 +120,11 @@ export default function ReactionRecorder({
     timerRef.current = setInterval(() => {
       elapsedRef.current += 1;
       setElapsed(elapsedRef.current);
+      if (maxDuration && elapsedRef.current >= maxDuration) {
+        handleStopRef.current();   // hard cap reached → finish automatically
+      }
     }, 1000);
-  }, []);
+  }, [maxDuration]);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -170,6 +177,9 @@ export default function ReactionRecorder({
       setUploading(false);
     }
   }, [isRecording, stopTimer, onSave, onBack]);
+
+  // Keep the timer's auto-stop pointed at the current handleStop.
+  useEffect(() => { handleStopRef.current = handleStop; }, [handleStop]);
 
   const handleRestart = useCallback(async () => {
     stopTimer();
@@ -284,7 +294,7 @@ export default function ReactionRecorder({
       {isRecording && (
         <View style={[styles.recBadge, { top: topInset + SPACE.SM }]}>
           <View style={styles.recDot} />
-          <Text style={styles.recText}>{fmt(elapsed)}</Text>
+          <Text style={styles.recText}>{fmt(elapsed)}{maxDuration ? ` / ${fmt(maxDuration)}` : ''}</Text>
         </View>
       )}
 

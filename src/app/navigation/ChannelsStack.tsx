@@ -8,6 +8,9 @@ import ChannelScreen from '../../features/channels/screens/ChannelScreen';
 import ChannelPostScreen from '../../features/channels/screens/ChannelPostScreen';
 import WatchYouTubePostScreen from '../../features/channels/screens/WatchYouTubePostScreen';
 import WatchChannelClipScreen from '../../features/channels/screens/WatchChannelClipScreen';
+import RecordReviewScreen from '../../features/channels/screens/RecordReviewScreen';
+import WatchReviewScreen from '../../features/channels/screens/WatchReviewScreen';
+import ChannelReviewsScreen from '../../features/channels/screens/ChannelReviewsScreen';
 import ChannelVideoRecordScreen from '../../features/channels/screens/ChannelVideoRecordScreen';
 import AddChannelVideoScreen from '../../features/channels/screens/AddChannelVideoScreen';
 import AddChannelMembersScreen from '../../features/channels/screens/AddChannelMembersScreen';
@@ -49,6 +52,21 @@ export default function ChannelsNavigator() {
         name="WatchChannelClip"
         component={WatchChannelClipScreen}
         options={{ headerShown: false, presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name="RecordReview"
+        component={RecordReviewScreen}
+        options={{ headerShown: false, presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name="WatchReview"
+        component={WatchReviewScreen}
+        options={{ headerShown: false, presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name="ChannelReviews"
+        component={ChannelReviewsScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ChannelVideoRecord"

@@ -20,6 +20,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { useFeedStore } from '../../../store/feedStore';
 import { fetchFeedThreads, type FeedThread } from '../../../infrastructure/supabase/queries/threads';
+import { fetchMyReviews, type ChannelReview } from '../../../infrastructure/supabase/queries/channels';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 const FAVS_KEY = 'vidrip_favorites';
@@ -27,12 +28,12 @@ const HIDDEN_KEY = 'vidrip_hidden_threads';
 const ACTION_WIDTH = 120; // 2 × 60
 
 type Tab = 'feed' | 'favorites';
-type Filter = 'all' | 'toreact' | 'reactions' | 'requests';
+type Filter = 'all' | 'toreact' | 'reactions' | 'requests' | 'reviews';
 const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'All' },
   { key: 'toreact', label: 'To React' },
   { key: 'reactions', label: 'My Reactions' },
   { key: 'requests', label: 'My Requests' },
+  { key: 'reviews', label: 'My Reviews' },
 ];
 // A thread "needs your reaction" if a friend sent it and you haven't reacted.
 const needsReaction = (t: FeedThread, uid?: string) =>
@@ -81,6 +82,8 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   const [filter, setFilter]       = useState<Filter>('all');
   const [favs, setFavs]           = useState<Map<string, number>>(new Map()); // id → addedAt ms
   const [hidden, setHidden]       = useState<Set<string>>(new Set());
+  const [myReviews, setMyReviews] = useState<ChannelReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   const swipeRefs = useRef<Map<string, Swipeable | null>>(new Map());
 
@@ -110,6 +113,17 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
 
   useEffect(() => { load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Lazily load the user's submitted reviews when the My Reviews pill is active.
+  const loadReviews = useCallback(async () => {
+    if (!user) return;
+    setReviewsLoading(true);
+    try { setMyReviews(await fetchMyReviews(user.id)); }
+    catch { /* swallow */ }
+    finally { setReviewsLoading(false); }
+  }, [user]);
+
+  useEffect(() => { if (filter === 'reviews') { loadReviews(); } }, [filter, loadReviews]);
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   const addFav = (id: string) => {
@@ -227,7 +241,8 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           contentContainerStyle={styles.filterRow}>
           {FILTERS.map(f => {
             const active = filter === f.key;
-            const n = f.key === 'all' ? 0 : counts[f.key];
+            const n = f.key === 'reviews' ? myReviews.length
+              : f.key === 'all' ? 0 : counts[f.key];
             return (
               <TouchableOpacity
                 key={f.key}
@@ -246,6 +261,51 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         </ScrollView>
       </View>
 
+      {filter === 'reviews' ? (
+        <FlatList
+          data={myReviews}
+          keyExtractor={item => item.id}
+          contentContainerStyle={myReviews.length === 0 ? styles.emptyContainer : styles.list}
+          refreshControl={<RefreshControl refreshing={reviewsLoading} onRefresh={loadReviews} tintColor={C.ACCENT} />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No reviews yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Record a review after reacting to a channel post — they show up here.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const thumb = item.post_yt_video_thumbnail
+              ?? (item.post_source_type === 'youtube' && item.post_yt_video_id
+                ? `https://img.youtube.com/vi/${item.post_yt_video_id}/hqdefault.jpg`
+                : null);
+            return (
+              <TouchableOpacity
+                style={styles.card}
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('WatchReview', { reviewId: item.id })}>
+                <View style={styles.thumbnail}>
+                  {thumb ? (
+                    <Image source={{ uri: thumb }} style={styles.thumbnailImage} />
+                  ) : (
+                    <Text style={styles.thumbnailIcon}>★</Text>
+                  )}
+                </View>
+                <View style={styles.info}>
+                  <Text style={styles.sender} numberOfLines={1}>{item.channel_name ?? 'Channel'}</Text>
+                  <Text style={styles.title} numberOfLines={2}>
+                    {item.post_yt_video_title ?? 'Video'}
+                  </Text>
+                  <Text style={styles.meta}>
+                    ★ {item.duration ? `${item.duration}s review` : 'Review'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      ) : (
       <FlatList
         data={displayed}
         keyExtractor={item => item.id}
@@ -319,6 +379,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           );
         }}
       />
+      )}
     </View>
   );
 }

@@ -159,8 +159,9 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <Text style={styles.h1}>The night is yours</Text>
               <DecoDivider />
               <Text style={[styles.body, { color: C.WHITE}]}>
-                That's the whole show. Share what you love, react to what they send. Welcome to the club.
+                That's the whole show. Share what you love. React to what they send.
               </Text>
+              <Text style={styles.whisper}>Welcome to the club.</Text>
             </View>
           )}
         </Animated.View>

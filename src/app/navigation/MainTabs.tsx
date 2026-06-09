@@ -16,6 +16,7 @@ import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
 import { useFeedStore } from '../../store/feedStore';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
 import WatchReactionScreen from '../../features/threads/screens/WatchReactionScreen';
+import WatchReviewScreen from '../../features/channels/screens/WatchReviewScreen';
 import FriendsHomeScreen from '../../features/friends/screens/FriendsHomeScreen';
 import UserProfileScreen from '../../features/friends/screens/UserProfileScreen';
 import AddFriendScreen from '../../features/friends/screens/AddFriendScreen';
@@ -54,6 +55,7 @@ function FeedNavigator() {
       <FeedStack.Screen name="FeedHome" component={FeedHomeScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <FeedStack.Screen name="WatchReview" component={WatchReviewScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </FeedStack.Navigator>
   );
 }

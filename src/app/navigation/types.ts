@@ -25,6 +25,9 @@ export type ChannelsStackParamList = {
   ChannelPost: { postId: string; channelId: string; isJoined: boolean };
   WatchYouTubePost: { postId: string; channelId: string };
   WatchChannelClip: { postId: string };
+  RecordReview: { postId: string; channelId: string };
+  WatchReview: { reviewId: string };
+  ChannelReviews: { channelId: string; channelName: string };
   ChannelVideoRecord: { channelId: string };
   AddChannelVideo: { channelId: string };
   AddChannelMembers: { channelId: string };
@@ -45,6 +48,7 @@ export type FeedStackParamList = {
   FeedHome: undefined;
   Thread: { threadId: string };
   WatchReaction: { reactionId: string };
+  WatchReview: { reviewId: string };
 };
 
 // Friends stack

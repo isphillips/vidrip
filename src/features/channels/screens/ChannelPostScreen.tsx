@@ -12,7 +12,10 @@ import {
   fetchChannelPostReactions,
   addChannelPostEmojiReaction,
   removeChannelPostEmojiReaction,
+  fetchPostReviews,
+  fetchChannelReviewSettings,
   type ChannelPost,
+  type ChannelReview,
 } from '../../../infrastructure/supabase/queries/channels';
 import {
   hasLocalClip,
@@ -33,6 +36,10 @@ export default function ChannelPostScreen({
 
   const [post, setPost] = useState<ChannelPost | null>(null);
   const [reactions, setReactions] = useState<ChannelPost[]>([]);
+  const [reviews, setReviews] = useState<ChannelReview[]>([]);
+  const [reviewsEnabled, setReviewsEnabled] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'reactions' | 'reviews'>('reactions');
   const [loading, setLoading] = useState(true);
   const [dlState, setDlState] = useState<Record<string, DlState>>({});
   const [dlPct, setDlPct] = useState<Record<string, number>>({});
@@ -44,17 +51,22 @@ export default function ChannelPostScreen({
 
   const load = useCallback(async () => {
     try {
-      const [p, r] = await Promise.all([
+      const [p, r, settings, revs] = await Promise.all([
         fetchChannelPost(postId),
         fetchChannelPostReactions(postId),
+        fetchChannelReviewSettings(channelId),
+        fetchPostReviews(postId),
       ]);
       if (!mountedRef.current) { return; }
       setPost(p);
       setReactions(r);
+      setReviewsEnabled(settings.reviewsEnabled);
+      setOwnerId(settings.ownerId);
+      setReviews(revs);
     } finally {
       if (mountedRef.current) { setLoading(false); }
     }
-  }, [postId]);
+  }, [postId, channelId]);
 
   useEffect(() => { load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -143,6 +155,11 @@ export default function ChannelPostScreen({
     (post.source_type === 'youtube' && post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null);
   const hasReacted = reactions.some(r => r.poster_id === user?.id);
   const obscured = !hasReacted && post.poster_id !== user?.id;
+  const isOwner = !!ownerId && ownerId === user?.id;
+  const showReviewsTab = reviewsEnabled || isOwner;
+  const hasReviewed = reviews.some(r => r.reviewer_id === user?.id);
+  // You can review a post once you've reacted to it (and it isn't your own post).
+  const canReview = isJoined && hasReacted && post.poster_id !== user?.id && !hasReviewed;
 
   return (
     <View style={styles.container}>
@@ -173,9 +190,21 @@ export default function ChannelPostScreen({
           ) : null}
           {isJoined && post.poster_id !== user?.id && (
             hasReacted ? (
-              <View style={styles.reactedBadge}>
-                <Text style={styles.reactedText}>You Reacted ✓</Text>
-              </View>
+              canReview ? (
+                <TouchableOpacity style={styles.reviewBtn} activeOpacity={0.85}
+                  onPress={() => navigation.navigate('RecordReview', { postId, channelId })}>
+                  <Text style={styles.reviewBtnText}>★ Leave a Review</Text>
+                  <Text style={styles.reviewBtnSub}>
+                    A 60s clip sent straight to @{post.poster?.handle ?? 'the creator'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.reactedBadge}>
+                  <Text style={styles.reactedText}>
+                    {hasReviewed ? 'Reacted ✓  ·  Review sent ★' : 'You Reacted ✓'}
+                  </Text>
+                </View>
+              )
             ) : (
               <TouchableOpacity style={styles.reactBtn} activeOpacity={0.85}
                 onPress={() => navigation.navigate('WatchYouTubePost', { postId, channelId })}>
@@ -186,14 +215,50 @@ export default function ChannelPostScreen({
         </View>
       </View>
 
-      {/* Reactions list */}
-      <Text style={styles.sectionTitle}>
-        {reactions.length === 0
-          ? 'No reactions yet'
-          : `${reactions.length} reaction${reactions.length !== 1 ? 's' : ''}`}
-      </Text>
+      {/* Reactions / Reviews */}
+      {showReviewsTab ? (
+        <View style={styles.tabBar}>
+          <TouchableOpacity style={[styles.tab, tab === 'reactions' && styles.tabActive]}
+            onPress={() => setTab('reactions')} activeOpacity={0.8}>
+            <Text style={[styles.tabTxt, tab === 'reactions' && styles.tabTxtActive]}>
+              Reactions{reactions.length ? ` ${reactions.length}` : ''}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tab, tab === 'reviews' && styles.tabActive]}
+            onPress={() => setTab('reviews')} activeOpacity={0.8}>
+            <Text style={[styles.tabTxt, tab === 'reviews' && styles.tabTxtActive]}>
+              Reviews{reviews.length ? ` ${reviews.length}` : ''}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <Text style={styles.sectionTitle}>
+          {reactions.length === 0
+            ? 'No reactions yet'
+            : `${reactions.length} reaction${reactions.length !== 1 ? 's' : ''}`}
+        </Text>
+      )}
 
-      {reactions.map(r => {
+      {tab === 'reviews' && showReviewsTab ? (
+        reviews.length === 0 ? (
+          <Text style={styles.emptyTabText}>No reviews yet</Text>
+        ) : reviews.map(rv => (
+          <TouchableOpacity
+            key={rv.id}
+            style={styles.reactionCard}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('WatchReview', { reviewId: rv.id })}>
+            <View style={styles.reactionThumb}>
+              <Text style={styles.thumbPlayIcon}>★</Text>
+            </View>
+            <View style={styles.reactionInfo}>
+              <Text style={styles.reactionHandle}>@{rv.reviewer?.handle ?? '?'}</Text>
+              {rv.duration ? <Text style={styles.reactionDuration}>{rv.duration}s review</Text> : null}
+            </View>
+          </TouchableOpacity>
+        ))
+      ) : (
+      reactions.map(r => {
         const state = dlState[r.id] ?? 'unavailable';
         const pct = dlPct[r.id] ?? 0;
         const canWatch = state === 'local';
@@ -230,7 +295,8 @@ export default function ChannelPostScreen({
             />
           </TouchableOpacity>
         );
-      })}
+      })
+      )}
 
       <View style={{ height: SPACE.XXXL }} />
     </ScrollView>
@@ -274,6 +340,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   reactedText: { color: C.MUTED, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
+  reviewBtn: {
+    backgroundColor: C.ACCENT,
+    borderRadius: RADIUS.MD,
+    marginBottom: SPACE.LG,
+    paddingVertical: SPACE.MD,
+    paddingHorizontal: SPACE.LG,
+    alignItems: 'center',
+    gap: 2,
+  },
+  reviewBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD },
+  reviewBtnSub: { color: 'rgba(255,255,255,0.8)', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY },
+  tabBar: {
+    flexDirection: 'row', gap: SPACE.SM,
+    paddingHorizontal: SPACE.LG, paddingBottom: SPACE.SM,
+  },
+  tab: {
+    paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS + 1,
+    borderRadius: RADIUS.FULL, borderWidth: 1, borderColor: C.BORDER,
+    backgroundColor: C.SURFACE,
+  },
+  tabActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
+  tabTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  tabTxtActive: { color: C.ACCENT_HOT },
+  emptyTabText: {
+    color: C.MUTED, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY,
+    paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD,
+  },
   sectionTitle: {
     fontSize: FONT.SIZES.SM, color: C.MUTED,
     textTransform: 'uppercase', letterSpacing: 1,
