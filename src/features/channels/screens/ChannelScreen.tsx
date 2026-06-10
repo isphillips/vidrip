@@ -2,10 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity, Modal, FlatList,
-  useWindowDimensions, Linking, Animated, Easing, Switch,
+  useWindowDimensions, Animated, Easing,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
@@ -25,8 +24,6 @@ import {
   fetchChannelReviewSettings,
   fetchChannelReactions,
   fetchChannelReviews,
-  setChannelName,
-  setChannelInviteOnly,
   fetchChannelDisplayName,
   type ChannelPost,
   type ChannelClipTile,
@@ -39,9 +36,8 @@ import {
 } from '../../../infrastructure/native/audioRecorder';
 import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import ChannelMessageBubble from '../components/ChannelMessageBubble';
+import ChannelSettingsSheet from '../components/ChannelSettingsSheet';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
-
-const CREATOR_STUDIO_URL = 'https://www.vidrip.app/dashboard';
 
 type GridFilter = 'all' | 'reactions' | 'reviews';
 const GRID_FILTERS: { key: GridFilter; label: string }[] = [
@@ -67,6 +63,7 @@ export default function ChannelhamburderScreen({
   const [joined, setJoined] = useState(isJoinedParam);
   const [reviewsEnabled, setReviewsEnabled] = useState(false);
   const [inviteOnly, setInviteOnly] = useState(!!inviteOnlyParam);
+  const [isListed, setIsListed] = useState(false); // groups.is_public — public visibility
   const [filter, setFilter] = useState<GridFilter>('all');
   const [reactionTiles, setReactionTiles] = useState<ChannelClipTile[]>([]);
   const [reviewTiles, setReviewTiles] = useState<ChannelReview[]>([]);
@@ -109,7 +106,7 @@ export default function ChannelhamburderScreen({
       const data = await fetchChannelPosts(channelId, user?.id);
       if (mountedRef.current) { setPosts(data); }
       fetchChannelReviewSettings(channelId)
-        .then(s => { if (mountedRef.current) { setReviewsEnabled(s.reviewsEnabled); setInviteOnly(s.inviteOnly); } })
+        .then(s => { if (mountedRef.current) { setReviewsEnabled(s.reviewsEnabled); setInviteOnly(s.inviteOnly); setIsListed(s.isListed); } })
         .catch(() => {});
     } catch { /* swallow */ } finally {
       if (mountedRef.current) { setLoading(false); setRefreshing(false); }
@@ -149,44 +146,6 @@ export default function ChannelhamburderScreen({
       setMembersVisible(true);
     } catch { /* ignore */ }
   }, [channelId]);
-
-  const handleRename = useCallback(() => {
-    Alert.prompt(
-      'Rename Channel',
-      'Enter a new channel name',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Save',
-          onPress: async (text?: string) => {
-            const name = (text ?? '').trim();
-            if (!name || name === title) { return; }
-            const prev = title;
-            setTitle(name); // optimistic
-            try {
-              await setChannelName(channelId, name);
-            } catch {
-              setTitle(prev);
-              Alert.alert('Error', 'Could not rename the channel.');
-            }
-          },
-        },
-      ],
-      'plain-text',
-      title,
-    );
-  }, [channelId, title]);
-
-  const handleToggleInviteOnly = useCallback(async () => {
-    const next = !inviteOnly;
-    setInviteOnly(next); // optimistic
-    try {
-      await setChannelInviteOnly(channelId, next);
-    } catch {
-      setInviteOnly(!next);
-      Alert.alert('Error', 'Could not update the room.');
-    }
-  }, [inviteOnly, channelId]);
 
   useEffect(() => {
     load().then(() => {
@@ -700,86 +659,21 @@ export default function ChannelhamburderScreen({
         </TouchableOpacity>
       </Modal>
 
-      {/* Creator menu (hamburger) */}
-      <Modal visible={menuVisible} transparent animationType="slide" onRequestClose={() => setMenuVisible(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Channel</Text>
-
-            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
-              onPress={() => { setMenuVisible(false); navigation.navigate('AddChannelVideo', { channelId }); }}>
-              <Text style={styles.menuRowIcon}>＋</Text>
-              <View style={styles.menuRowText}>
-                <Text style={styles.menuRowLabel}>Post a Video</Text>
-                <Text style={styles.menuRowSub}>Add a YouTube or TikTok video for fans to react to</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
-              onPress={() => { setMenuVisible(false); handleRename(); }}>
-              <Text style={styles.menuRowIcon}>✎</Text>
-              <View style={styles.menuRowText}>
-                <Text style={styles.menuRowLabel}>Rename Channel</Text>
-                <Text style={styles.menuRowSub}>Change the channel's display name</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
-              onPress={() => { setMenuVisible(false); navigation.navigate('ChannelReviews', { channelId, channelName: title }); }}>
-              <Text style={styles.menuRowIcon}>★</Text>
-              <View style={styles.menuRowText}>
-                <Text style={styles.menuRowLabel}>Reviews</Text>
-                <Text style={styles.menuRowSub}>Watch reviews fans sent you · settings</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Invite Only toggle + invite people */}
-            <View style={styles.menuRow}>
-              <Ionicons name="lock-closed" size={18} color={C.ACCENT_HOT} style={styles.menuRowIcon} />
-              <View style={styles.menuRowText}>
-                <Text style={styles.menuRowLabel}>Invite Only</Text>
-                <Text style={styles.menuRowSub}>
-                  {inviteOnly ? 'Only invited people can watch & react' : 'Anyone can join and react'}
-                </Text>
-              </View>
-              <Switch
-                value={inviteOnly}
-                onValueChange={handleToggleInviteOnly}
-                trackColor={{ true: C.ACCENT, false: C.SURFACE_2 }}
-                thumbColor={C.WHITE}
-              />
-            </View>
-
-            {inviteOnly && (
-              <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
-                onPress={() => { setMenuVisible(false); navigation.navigate('InviteToChannel', { channelId, channelName: title }); }}>
-                <Text style={styles.menuRowIcon}>＋</Text>
-                <View style={styles.menuRowText}>
-                  <Text style={styles.menuRowLabel}>Invite People</Text>
-                  <Text style={styles.menuRowSub}>Send invites by @handle</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
-              onPress={() => {
-                setMenuVisible(false);
-                Linking.openURL(CREATOR_STUDIO_URL).catch(() =>
-                  Alert.alert('Could not open', 'Unable to open Creator Studio right now.'));
-              }}>
-              <Text style={styles.menuRowIcon}>↗</Text>
-              <View style={styles.menuRowText}>
-                <Text style={styles.menuRowLabel}>Creator Studio</Text>
-                <Text style={styles.menuRowSub}>Open your dashboard on the web</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalClose} onPress={() => setMenuVisible(false)}>
-              <Text style={styles.modalCloseTxt}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {/* Creator settings drawer (shared with the Account screen) */}
+      <ChannelSettingsSheet
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        channelId={channelId}
+        title={title}
+        inviteOnly={inviteOnly}
+        isListed={isListed}
+        onInviteOnlyChange={setInviteOnly}
+        onListedChange={setIsListed}
+        onTitleChange={setTitle}
+        onPostVideo={() => navigation.navigate('AddChannelVideo', { channelId })}
+        onReviews={() => navigation.navigate('ChannelReviews', { channelId, channelName: title })}
+        onInvitePeople={() => navigation.navigate('InviteToChannel', { channelId, channelName: title })}
+      />
     </View>
   );
 }
@@ -837,15 +731,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.FULL, borderWidth: 1, borderColor: C.BORDER, backgroundColor: C.SURFACE,
   },
   lockedHeaderText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
-  menuRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
-    paddingVertical: SPACE.MD,
-    borderBottomWidth: 1, borderBottomColor: C.BORDER,
-  },
-  menuRowIcon: { fontSize: 20, color: C.ACCENT_HOT, width: 28, textAlign: 'center' },
-  menuRowText: { flex: 1, gap: 2 },
-  menuRowLabel: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
-  menuRowSub: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.MUTED },
   filterRow: {
     flexDirection: 'row',
     gap: SPACE.SM,

@@ -9,10 +9,20 @@ type Props = {
   onPress: () => void;
   onAcceptInvite?: () => void;
   onDeclineInvite?: () => void;
+  // When both are supplied (owner's "My Channels"), tappable status/visibility
+  // badges are shown so the owner can flip them inline.
+  onToggleListed?: () => void;
+  onToggleInviteOnly?: () => void;
 };
 
-export default function ChannelCard({ channel, userId, onPress, onAcceptInvite, onDeclineInvite }: Props) {
+export default function ChannelCard({
+  channel, userId, onPress, onAcceptInvite, onDeclineInvite,
+  onToggleListed, onToggleInviteOnly,
+}: Props) {
   const isOwner = !!userId && channel.created_by === userId;
+  const showOwnerControls = !!onToggleListed && !!onToggleInviteOnly;
+  const listed = channel.is_listed ?? channel.is_public;
+  const inviteOnly = !!channel.invite_only;
   // Public: unreacted YouTube posts. Private: unread messages.
   const hasUnread = channel.unread_count > 0;
   // Members Only channels show a letter circle (matching AccountScreen) until a
@@ -74,6 +84,25 @@ export default function ChannelCard({ channel, userId, onPress, onAcceptInvite, 
                 <Text style={styles.lockText}>🔒 Invite only</Text>
               </View>
             ) : null}
+
+            {showOwnerControls && (
+              <>
+                <TouchableOpacity
+                  style={[styles.statusBadge, listed ? styles.statusOn : styles.statusOff]}
+                  onPress={onToggleListed} activeOpacity={0.8}>
+                  <Text style={[styles.statusBadgeText, listed ? styles.statusTextOn : styles.statusTextOff]}>
+                    {listed ? 'Public' : 'Private'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.statusBadge, inviteOnly ? styles.statusOff : styles.statusOn]}
+                  onPress={onToggleInviteOnly} activeOpacity={0.8}>
+                  <Text style={[styles.statusBadgeText, inviteOnly ? styles.statusTextOff : styles.statusTextOn]}>
+                    {inviteOnly ? 'Invite Only' : 'Open'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
 
@@ -155,6 +184,7 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: SPACE.SM,
     marginTop: SPACE.XS,
   },
@@ -198,6 +228,16 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: C.BORDER,
   },
   lockText: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  statusBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: RADIUS.FULL, paddingHorizontal: SPACE.SM, paddingVertical: 3,
+    borderWidth: 1,
+  },
+  statusOn: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
+  statusOff: { backgroundColor: C.SURFACE_2, borderColor: C.BORDER },
+  statusBadgeText: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_MEDIUM },
+  statusTextOn: { color: C.ACCENT_HOT },
+  statusTextOff: { color: C.MUTED },
   thumbnail: {
     width: 72,
     height: 54,

@@ -29,6 +29,8 @@ import { refreshConnectedFeed } from '../../../infrastructure/supabase/queries/c
 import { buildAuthUrl, type SyncProvider, type ConnectionType } from '../../../infrastructure/oauth/config';
 import { useOnboardingStore } from '../../onboarding/onboarding';
 import type { AccountStackScreenProps } from '../../../app/navigation/types';
+import ChannelSettingsSheet from '../../channels/components/ChannelSettingsSheet';
+import { fetchMyCreatorChannel, type MyCreatorChannel } from '../../../infrastructure/supabase/queries/channels';
 
 const PROVIDERS: { key: SyncProvider; label: string }[] = [
   { key: 'youtube', label: 'YouTube' },
@@ -53,6 +55,8 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   // ── Creator mode ────────────────────────────────────────────────────────────
   const isCreator = !!(profile as any)?.is_creator;
   const [savingCreator, setSavingCreator] = useState(false);
+  const [creatorChannel, setCreatorChannel] = useState<MyCreatorChannel | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const handleToggleCreator = (next: boolean) => {
     if (!user?.id || savingCreator) { return; }
     const apply = async () => {
@@ -88,6 +92,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     if (!user?.id) { return; }
     try { setSynced(await fetchSyncedAccounts(user.id, 'creator')); } catch { /* ignore */ }
     try { setFeedAccounts(await fetchSyncedAccounts(user.id, 'feed')); } catch { /* ignore */ }
+    try { setCreatorChannel(await fetchMyCreatorChannel(user.id)); } catch { /* ignore */ }
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { loadSynced(); }, [loadSynced]));
@@ -239,6 +244,21 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
             trackColor={{ true: C.ACCENT, false: C.BORDER }}
           />
         </View>
+
+        {isCreator && creatorChannel && (
+          <>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.row} activeOpacity={0.7} onPress={() => setSettingsOpen(true)}>
+              <View style={styles.syncInfo}>
+                <Text style={styles.rowLabel}>Channel Settings</Text>
+                <Text style={styles.syncHandle} numberOfLines={2}>
+                  Public visibility, invite-only, rename and more.
+                </Text>
+              </View>
+              <Text style={styles.settingsCog}>⚙</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* Connected accounts (creator) — only when creator mode is on */}
@@ -378,6 +398,23 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           </Text>
         </TouchableOpacity>
       </View>
+
+      {creatorChannel && (
+        <ChannelSettingsSheet
+          visible={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          channelId={creatorChannel.id}
+          title={creatorChannel.title}
+          inviteOnly={creatorChannel.inviteOnly}
+          isListed={creatorChannel.isListed}
+          onInviteOnlyChange={v => setCreatorChannel(c => (c ? { ...c, inviteOnly: v } : c))}
+          onListedChange={v => setCreatorChannel(c => (c ? { ...c, isListed: v } : c))}
+          onTitleChange={t => setCreatorChannel(c => (c ? { ...c, title: t } : c))}
+          onPostVideo={() => (navigation as any).navigate('Channels', { screen: 'AddChannelVideo', params: { channelId: creatorChannel.id } })}
+          onReviews={() => (navigation as any).navigate('Channels', { screen: 'ChannelReviews', params: { channelId: creatorChannel.id, channelName: creatorChannel.title } })}
+          onInvitePeople={() => (navigation as any).navigate('Channels', { screen: 'InviteToChannel', params: { channelId: creatorChannel.id, channelName: creatorChannel.title } })}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -413,6 +450,7 @@ const styles = StyleSheet.create({
     borderColor: C.BORDER,
   },
   divider: { height: 1, backgroundColor: C.BORDER, marginHorizontal: SPACE.LG },
+  settingsCog: { fontSize: 22, color: C.MUTED },
   sectionLabel: {
     fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD,
     textTransform: 'uppercase', letterSpacing: 1,

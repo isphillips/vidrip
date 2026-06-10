@@ -20,6 +20,11 @@ export type ChannelSummary = {
   last_message_at: string | null;
   is_members_only?: boolean;
   invite_only?: boolean;
+  // True public visibility (groups.is_public). Distinct from is_public above, which
+  // is forced true for Members Only channels so they get the public-style UI. An
+  // owner's private/unlisted channel has is_listed=false and is hidden from the
+  // public Members sections (it still shows under "My Channels").
+  is_listed?: boolean;
   // For the current user, on invite-only channels: their relationship to the room.
   invite_status?: 'owner' | 'member' | 'pending' | 'none';
   avatar_url?: string | null;
@@ -82,6 +87,9 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
         owner:users!created_by(handle, avatar_url)
       `)
       .eq('is_public', true)
+      // Members Only (creator) channels have their own sections — keep them out of
+      // the Curated list even though they're now is_public=true for discovery.
+      .eq('is_members_only', false)
       .order('member_count', { ascending: false }),
     (supabase as any)
       .from('group_members')
@@ -102,7 +110,7 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     const [postsRes, mineRes] = await Promise.all([
       (supabase as any)
         .from('channel_posts')
-        .select('id, channel_id')
+        .select('id, channel_id, poster_id')
         .in('channel_id', joinedList)
         .eq('post_type', 'youtube')
         .is('parent_post_id', null),
@@ -116,7 +124,9 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
       (mineRes.data ?? []).map((r: any) => r.parent_post_id),
     );
     (postsRes.data ?? []).forEach((p: any) => {
-      if (!reacted.has(p.id)) {
+      // Don't nag the user to react to their own posts (keeps an owner's own
+      // channel from showing a permanent unread dot).
+      if (p.poster_id !== userId && !reacted.has(p.id)) {
         unreactedByChannel.set(p.channel_id, (unreactedByChannel.get(p.channel_id) ?? 0) + 1);
       }
     });
@@ -151,6 +161,9 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
       `)
       .eq('is_members_only', true)
       .eq('is_hidden', false)
+      // Public visibility gate: only listed channels are discoverable, but an owner
+      // always sees their own channel here even while it's private/unlisted.
+      .or(`is_public.eq.true,created_by.eq.${userId}`)
       .order('member_count', { ascending: false }),
     (supabase as any).from('group_members').select('group_id').eq('user_id', userId),
     (supabase as any).from('channel_invites').select('channel_id').eq('invitee_id', userId).eq('status', 'pending'),
@@ -166,14 +179,16 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
   if (joinedList.length) {
     const [postsRes, mineRes] = await Promise.all([
       (supabase as any).from('channel_posts')
-        .select('id, channel_id').in('channel_id', joinedList)
+        .select('id, channel_id, poster_id').in('channel_id', joinedList)
         .eq('post_type', 'youtube').is('parent_post_id', null),
       (supabase as any).from('channel_posts')
         .select('parent_post_id').eq('poster_id', userId).not('parent_post_id', 'is', null),
     ]);
     const reacted = new Set<string>((mineRes.data ?? []).map((r: any) => r.parent_post_id));
     (postsRes.data ?? []).forEach((p: any) => {
-      if (!reacted.has(p.id)) {
+      // Skip the user's own posts — you don't react to your own videos, so they
+      // shouldn't keep an owner's channel perpetually marked unread.
+      if (p.poster_id !== userId && !reacted.has(p.id)) {
         unreactedByChannel.set(p.channel_id, (unreactedByChannel.get(p.channel_id) ?? 0) + 1);
       }
     });
@@ -196,6 +211,7 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
     last_message_at: null,
     is_members_only: true,
     invite_only: !!c.invite_only,
+    is_listed: !!c.is_public,
     invite_status: (
       c.created_by === userId ? 'owner'
       : joinedIds.has(c.id) ? 'member'
@@ -953,16 +969,17 @@ export async function hasReviewedPost(postId: string, userId: string): Promise<b
 /** Channel settings + owner, for gating tabs/pills/inbox and invite-only access. */
 export async function fetchChannelReviewSettings(
   channelId: string,
-): Promise<{ reviewsAllowed: boolean; reviewsEnabled: boolean; inviteOnly: boolean; ownerId: string | null }> {
+): Promise<{ reviewsAllowed: boolean; reviewsEnabled: boolean; inviteOnly: boolean; isListed: boolean; ownerId: string | null }> {
   const { data } = await (supabase as any)
     .from('groups')
-    .select('reviews_allowed, reviews_enabled, invite_only, created_by')
+    .select('reviews_allowed, reviews_enabled, invite_only, is_public, created_by')
     .eq('id', channelId)
     .single();
   return {
     reviewsAllowed: data?.reviews_allowed ?? true,
     reviewsEnabled: !!data?.reviews_enabled,
     inviteOnly: !!data?.invite_only,
+    isListed: !!data?.is_public,
     ownerId: data?.created_by ?? null,
   };
 }
@@ -971,6 +988,37 @@ export async function setChannelInviteOnly(channelId: string, inviteOnly: boolea
   const { error } = await (supabase as any)
     .from('groups').update({ invite_only: inviteOnly }).eq('id', channelId);
   if (error) { throw error; }
+}
+
+/** Public visibility — whether the channel is listed/discoverable on the Channels screen. */
+export async function setChannelPublic(channelId: string, isPublic: boolean): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('groups').update({ is_public: isPublic }).eq('id', channelId);
+  if (error) { throw error; }
+}
+
+export type MyCreatorChannel = {
+  id: string;
+  title: string;          // display_name ?? name
+  inviteOnly: boolean;
+  isListed: boolean;      // groups.is_public
+};
+
+/** The signed-in creator's own Members Only channel (created on account connect), or null. */
+export async function fetchMyCreatorChannel(userId: string): Promise<MyCreatorChannel | null> {
+  const { data } = await (supabase as any)
+    .from('groups')
+    .select('id, name, display_name, invite_only, is_public')
+    .eq('creator_id', userId)
+    .eq('is_members_only', true)
+    .maybeSingle();
+  if (!data) { return null; }
+  return {
+    id: data.id,
+    title: data.display_name ?? data.name ?? 'Your Channel',
+    inviteOnly: !!data.invite_only,
+    isListed: !!data.is_public,
+  };
 }
 
 // ── Channel invites ─────────────────────────────────────────────────────────

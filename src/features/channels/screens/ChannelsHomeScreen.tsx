@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList,
+  View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../infrastructure/supabase/client';
-import { C, FONT, SPACE } from '../../../theme';
+import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
   fetchPublicChannels,
@@ -14,6 +14,8 @@ import {
   fetchMembersOnlyChannels,
   acceptChannelInvite,
   declineChannelInvite,
+  setChannelPublic,
+  setChannelInviteOnly,
   type ChannelSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 import RadioToggle from '../components/RadioToggle';
@@ -23,6 +25,15 @@ import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 const TABS = ['Public', 'Private'] as const;
 type Tab = typeof TABS[number];
 
+// Sub-filters within the Public tab.
+const FILTERS = [
+  { key: 'mine', label: 'My Channels' },
+  { key: 'curated', label: 'Curated' },
+  { key: 'open', label: 'Members (Open)' },
+  { key: 'invite', label: 'Members (Invite Only)' },
+] as const;
+type Filter = typeof FILTERS[number]['key'];
+
 export default function ChannelsHomeScreen({
   navigation,
 }: ChannelsStackScreenProps<'ChannelsHome'>) {
@@ -30,52 +41,36 @@ export default function ChannelsHomeScreen({
   const { top } = useSafeAreaInsets();
 
   const [tab, setTab] = useState<Tab>('Public');
+  const [filter, setFilter] = useState<Filter>('curated');
   const [publicChannels, setPublicChannels] = useState<ChannelSummary[]>([]);
   const [membersOnly, setMembersOnly] = useState<ChannelSummary[]>([]);
   const [privateChannels, setPrivateChannels] = useState<ChannelSummary[]>([]);
-  const [loadingPublic, setLoadingPublic] = useState(true);
-  const [loadingPrivate, setLoadingPrivate] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const privateLoadedRef = useRef(false);
 
-  const loadPublic = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false) => {
     if (!user) { return; }
-    if (!silent) { setLoadingPublic(true); }
+    if (!silent) { setLoading(true); }
     try {
-      const [pub, mo] = await Promise.all([
-        fetchPublicChannels(user.id),
+      const [pub, mo, priv] = await Promise.all([
+        fetchPublicChannels(user.id).catch(() => []),
         fetchMembersOnlyChannels(user.id).catch(() => []),
+        fetchPrivateChannels(user.id).catch(() => []),
       ]);
       setPublicChannels(pub);
       setMembersOnly(mo);
+      setPrivateChannels(priv);
     } catch (e) {
-      console.error('[ChannelsHome] fetchPublicChannels error:', JSON.stringify(e));
+      console.error('[ChannelsHome] load error:', JSON.stringify(e));
     } finally {
-      setLoadingPublic(false);
+      setLoading(false);
       setRefreshing(false);
     }
   }, [user]);
 
-  const loadPrivate = useCallback(async (silent = false) => {
-    if (!user) { return; }
-    if (!silent) { setLoadingPrivate(true); }
-    try {
-      setPrivateChannels(await fetchPrivateChannels(user.id));
-      privateLoadedRef.current = true;
-    } catch (e) {
-      console.error('[ChannelsHome] fetchPrivateChannels error:', JSON.stringify(e));
-    } finally {
-      setLoadingPrivate(false);
-      setRefreshing(false);
-    }
-  }, [user]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  useFocusEffect(useCallback(() => {
-    loadPublic();
-    if (privateLoadedRef.current) { loadPrivate(true); }
-  }, [loadPublic, loadPrivate]));
-
-  // Realtime: auto-show channel when someone adds this user
+  // Realtime: auto-refresh when someone adds this user to a channel.
   useEffect(() => {
     if (!user) { return; }
     const sub = (supabase as any)
@@ -83,23 +78,15 @@ export default function ChannelsHomeScreen({
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'group_members',
         filter: `user_id=eq.${user.id}`,
-      }, () => { loadPrivate(true); privateLoadedRef.current = true; })
+      }, () => { load(true); })
       .subscribe();
     return () => { sub.unsubscribe(); };
-  }, [user?.id, user, loadPrivate]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleTabChange = useCallback((t: string) => {
-    setTab(t as Tab);
-    if (t === 'Private' && !privateLoadedRef.current) {
-      loadPrivate();
-    }
-  }, [loadPrivate]);
+  }, [user?.id, user, load]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    if (tab === 'Public') { loadPublic(true); }
-    else { loadPrivate(true); }
-  }, [tab, loadPublic, loadPrivate]);
+    load(true);
+  }, [load]);
 
   const navigateToChannel = useCallback((item: ChannelSummary) => {
     navigation.navigate('Channel', {
@@ -118,28 +105,95 @@ export default function ChannelsHomeScreen({
 
   const handleAcceptInvite = useCallback(async (item: ChannelSummary) => {
     try { await acceptChannelInvite(item.id); } catch { /* ignore */ }
-    loadPublic(true);
-  }, [loadPublic]);
+    load(true);
+  }, [load]);
 
   const handleDeclineInvite = useCallback(async (item: ChannelSummary) => {
     try { await declineChannelInvite(item.id); } catch { /* ignore */ }
-    loadPublic(true);
-  }, [loadPublic]);
+    load(true);
+  }, [load]);
 
-  const channels = tab === 'Public' ? publicChannels : privateChannels;
-  const loading = tab === 'Public' ? loadingPublic : loadingPrivate;
-  const membersOpen = membersOnly.filter(m => !m.invite_only);
-  const membersInvite = membersOnly.filter(m => m.invite_only);
+  // Inline owner toggles from a "My Channels" card. Optimistic, then reconcile on error.
+  const patchChannel = useCallback((id: string, patch: Partial<ChannelSummary>) => {
+    const upd = (arr: ChannelSummary[]) => arr.map(c => (c.id === id ? { ...c, ...patch } : c));
+    setPublicChannels(upd);
+    setMembersOnly(upd);
+  }, []);
+
+  const handleToggleListed = useCallback(async (item: ChannelSummary) => {
+    const next = !(item.is_listed ?? item.is_public);
+    patchChannel(item.id, { is_listed: next });
+    try { await setChannelPublic(item.id, next); } catch { load(true); }
+  }, [patchChannel, load]);
+
+  const handleToggleInviteOnly = useCallback(async (item: ChannelSummary) => {
+    const next = !item.invite_only;
+    patchChannel(item.id, { invite_only: next });
+    try { await setChannelInviteOnly(item.id, next); } catch { load(true); }
+  }, [patchChannel, load]);
+
+  // Public-tab sub-lists. Only listed (is_listed) channels appear in the public
+  // Members sections; an owner's private/unlisted channel shows under My Channels only.
+  const membersOpen = membersOnly.filter(m => m.is_listed && !m.invite_only);
+  const membersInvite = membersOnly.filter(m => m.is_listed && m.invite_only);
+  // "My Channels" = the public-side channels I own (created), curated + members.
+  const myChannels = [...publicChannels, ...membersOnly]
+    .filter(c => c.created_by === user?.id);
+
+  const countFor = (k: Filter) =>
+    k === 'mine' ? myChannels.length
+    : k === 'curated' ? publicChannels.length
+    : k === 'open' ? membersOpen.length
+    : membersInvite.length;
+
+  const publicData =
+    filter === 'mine' ? myChannels
+    : filter === 'curated' ? publicChannels
+    : filter === 'open' ? membersOpen
+    : membersInvite;
+
+  const data = tab === 'Private' ? privateChannels : publicData;
+
+  const emptyText =
+    tab === 'Private' ? 'Share a video with a friend to start a private channel'
+    : filter === 'mine' ? "You don't own any channels yet"
+    : filter === 'curated' ? 'No curated channels yet'
+    : filter === 'open' ? 'No open Members channels yet'
+    : 'No invite-only Members channels yet';
 
   return (
     <View style={[styles.container, { paddingTop: top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Channels</Text>
-        <RadioToggle
-          options={['Public', 'Private']}
-          value={tab}
-          onChange={handleTabChange}
-        />
+        <View style={styles.toggleWrap}>
+          <RadioToggle options={['Public', 'Private']} value={tab} onChange={t => setTab(t as Tab)} />
+        </View>
+
+        {tab === 'Public' && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}>
+            {FILTERS.map(f => {
+              const active = filter === f.key;
+              const n = countFor(f.key);
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[styles.pill, active && styles.pillActive]}
+                  onPress={() => setFilter(f.key)}
+                  activeOpacity={0.8}>
+                  <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
+                  {n > 0 && (
+                    <View style={[styles.pillCount, active && styles.pillCountActive]}>
+                      <Text style={styles.pillCountTxt}>{n}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
       </View>
 
       {loading ? (
@@ -148,46 +202,23 @@ export default function ChannelsHomeScreen({
         </View>
       ) : (
         <FlatList
-          data={channels}
+          data={data}
           keyExtractor={c => c.id}
           renderItem={({ item }) => (
             <ChannelCard
               channel={item}
               userId={user?.id}
               onPress={() => navigateToChannel(item)}
+              {...(tab === 'Public' && filter === 'invite' ? {
+                onAcceptInvite: () => handleAcceptInvite(item),
+                onDeclineInvite: () => handleDeclineInvite(item),
+              } : {})}
+              {...(tab === 'Public' && filter === 'mine' ? {
+                onToggleListed: () => handleToggleListed(item),
+                onToggleInviteOnly: () => handleToggleInviteOnly(item),
+              } : {})}
             />
           )}
-          ListHeaderComponent={
-            tab === 'Public' ? (
-              <Text style={styles.curatedLabel}>Curated</Text>
-            ) : null
-          }
-          ListFooterComponent={
-            tab === 'Public' ? (
-              <>
-                {membersOpen.length > 0 && (
-                  <View style={styles.moSection}>
-                    <Text style={styles.moLabel}>Members (Open)</Text>
-                    {membersOpen.map(item => (
-                      <ChannelCard key={item.id} channel={item} userId={user?.id}
-                        onPress={() => navigateToChannel(item)} />
-                    ))}
-                  </View>
-                )}
-                {membersInvite.length > 0 && (
-                  <View style={styles.moSection}>
-                    <Text style={styles.moLabel}>Members (Invite Only)</Text>
-                    {membersInvite.map(item => (
-                      <ChannelCard key={item.id} channel={item} userId={user?.id}
-                        onPress={() => navigateToChannel(item)}
-                        onAcceptInvite={() => handleAcceptInvite(item)}
-                        onDeclineInvite={() => handleDeclineInvite(item)} />
-                    ))}
-                  </View>
-                )}
-              </>
-            ) : null
-          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -197,14 +228,10 @@ export default function ChannelsHomeScreen({
           }
           ListEmptyComponent={
             <View style={styles.center}>
-              <Text style={styles.emptyText}>
-                {tab === 'Public'
-                  ? 'No public channels yet'
-                  : 'Share a video with a friend to start a private channel'}
-              </Text>
+              <Text style={styles.emptyText}>{emptyText}</Text>
             </View>
           }
-          contentContainerStyle={channels.length === 0 && styles.emptyContainer}
+          contentContainerStyle={data.length === 0 ? styles.emptyContainer : styles.listContent}
         />
       )}
     </View>
@@ -213,19 +240,7 @@ export default function ChannelsHomeScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
-  moSection: {},
-  curatedLabel: {
-    fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED,
-    textTransform: 'uppercase', letterSpacing: 1,
-    paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD, paddingBottom: SPACE.SM,
-  },
-  moLabel: {
-    fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED,
-    textTransform: 'uppercase', letterSpacing: 1,
-    paddingHorizontal: SPACE.LG, paddingTop: SPACE.XL, paddingBottom: SPACE.SM,
-  },
   header: {
-    paddingHorizontal: SPACE.LG,
     paddingBottom: SPACE.MD,
     paddingTop: SPACE.SM,
     gap: SPACE.MD,
@@ -237,9 +252,30 @@ const styles = StyleSheet.create({
     fontFamily: FONT.DISPLAY_BOLD,
     color: C.INK,
     marginTop: SPACE.SM,
+    paddingHorizontal: SPACE.LG,
   },
+  toggleWrap: { paddingHorizontal: SPACE.LG },
+  filterRow: { gap: SPACE.SM, paddingHorizontal: SPACE.LG, alignItems: 'center' },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
+    backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER,
+  },
+  pillActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
+  pillTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  pillTxtActive: { color: C.ACCENT_HOT },
+  pillCount: {
+    minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5,
+    backgroundColor: C.ACCENT, alignItems: 'center', justifyContent: 'center',
+  },
+  pillCountActive: { backgroundColor: C.ACCENT_HOT },
+  pillCountTxt: {
+    fontSize: 11, fontFamily: FONT.BODY_BOLD, color: C.WHITE,
+    textAlign: 'center', includeFontPadding: false, marginTop: -4,
+  },
+  listContent: { paddingTop: SPACE.SM },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACE.XL },
-  emptyContainer: { flex: 1 },
+  emptyContainer: { flexGrow: 1 },
   emptyText: {
     color: C.MUTED,
     fontSize: FONT.SIZES.MD,
