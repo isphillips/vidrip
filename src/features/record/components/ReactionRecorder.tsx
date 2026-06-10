@@ -18,7 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import {
   checkHeadphonesConnected,
-  routeAudioToSpeaker,
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
 
@@ -49,7 +48,7 @@ const floatStyles = StyleSheet.create({
 export interface ReactionRecorderProps {
   videoId?: string;
   sourceType?: 'youtube' | 'tiktok';
-  onSave: (filePath: string, duration: number, ytStartOffset: number) => Promise<void>;
+  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
   /** Hard cap in seconds — recording auto-stops when reached (e.g. 60s reviews). */
@@ -110,7 +109,13 @@ export default function ReactionRecorder({
   const ytStartOffsetRef = useRef(0);
   const recordingCallbackRef = useRef<((v: VideoFile) => void) | null>(null);
   const speakerOverrideRef = useRef(false);
+  // Whether headphones were connected at record time. Headphones → the source plays
+  // in the ears, so the mic captures voice ONLY → play the live source on playback.
+  // No headphones → mic captures the speaker (bleed) → mute the live source instead.
+  const recordedWithHeadphonesRef = useRef(false);
   const handleStopRef = useRef<() => void>(() => {});
+  // Receding cap bar (1 = full → 0 = time's up) when there's a hard duration limit.
+  const capAnim = useRef(new Animated.Value(1)).current;
   const [ytKey, setYtKey] = useState(0);
 
   useEffect(() => {
@@ -151,15 +156,18 @@ export default function ReactionRecorder({
     hasStartedRef.current = true;
     ytStartOffsetRef.current = 0;
 
+    // Detect headphones to decide the playback audio model (see ref comment). With
+    // headphones we leave the source in the ears so the mic captures voice only;
+    // without, we let it play out the speaker (captured as bleed) and nudge the user
+    // toward headphones for cleaner separation.
     try {
       const headphones = await checkHeadphonesConnected();
-      if (headphones) {
-        await routeAudioToSpeaker();
-        speakerOverrideRef.current = true;
+      recordedWithHeadphonesRef.current = headphones;
+      if (!headphones) {
         setSpeakerToast(true);
         setTimeout(() => setSpeakerToast(false), 3000);
       }
-    } catch { /* proceed */ }
+    } catch { recordedWithHeadphonesRef.current = false; }
 
     cameraRef.current?.startRecording({
       fileType: 'mp4',
@@ -170,11 +178,16 @@ export default function ReactionRecorder({
     setIsRecording(true);
     StatusBar.setHidden(true, 'fade');
     startTimer();
-  }, [startTimer, stopTimer]);
+    if (maxDuration) {
+      capAnim.setValue(1);
+      Animated.timing(capAnim, { toValue: 0, duration: maxDuration * 1000, useNativeDriver: false }).start();
+    }
+  }, [startTimer, stopTimer, maxDuration, capAnim]);
 
   const handleStop = useCallback(async () => {
     if (!isRecording) { return; }
     stopTimer();
+    capAnim.stopAnimation();
     setIsRecording(false);
     StatusBar.setHidden(false, 'fade');
     setUploading(true);
@@ -186,7 +199,7 @@ export default function ReactionRecorder({
         recordingCallbackRef.current = resolve;
         cameraRef.current?.stopRecording().catch(reject);
       });
-      await onSave(video.path, elapsedRef.current, ytStartOffsetRef.current);
+      await onSave(video.path, elapsedRef.current, ytStartOffsetRef.current, recordedWithHeadphonesRef.current);
       onBack();
     } catch (e: any) {
       Alert.alert('Upload Failed', e?.message ?? 'Could not save. Please try again.');
@@ -197,8 +210,24 @@ export default function ReactionRecorder({
   // Keep the timer's auto-stop pointed at the current handleStop.
   useEffect(() => { handleStopRef.current = handleStop; }, [handleStop]);
 
+  // Exit without saving — discards the in-progress recording.
+  const handleExit = useCallback(async () => {
+    if (isRecording) {
+      stopTimer();
+      capAnim.stopAnimation();
+      setIsRecording(false);
+      StatusBar.setHidden(false, 'fade');
+      if (speakerOverrideRef.current) { restoreAudioRoute().catch(() => {}); speakerOverrideRef.current = false; }
+      recordingCallbackRef.current = null;   // drop the result → discard
+      await cameraRef.current?.stopRecording().catch(() => {});
+    }
+    onBack();
+  }, [isRecording, stopTimer, onBack, capAnim]);
+
   const handleRestart = useCallback(async () => {
     stopTimer();
+    capAnim.stopAnimation();
+    capAnim.setValue(1);
     elapsedRef.current = 0;
     setElapsed(0);
     hasStartedRef.current = false;
@@ -316,20 +345,39 @@ export default function ReactionRecorder({
       {/* Speaker toast */}
       {speakerToast && (
         <View style={[styles.toast, { top: topInset + SPACE.XL }]}>
-          <Text style={styles.toastText}>🔊 Playing through speaker for recording</Text>
+          <Text style={styles.toastText}>🎧 Use headphones for cleaner audio</Text>
         </View>
       )}
 
-      {/* Recording timer badge */}
+      {/* Receding cap bar — gold, flaring red as the 60s limit approaches */}
+      {isRecording && maxDuration ? (
+        <View style={[styles.capTrack, { top: topInset }]} pointerEvents="none">
+          <Animated.View
+            style={[styles.capFill, {
+              width: capAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+              backgroundColor: capAnim.interpolate({
+                inputRange: [0, 0.18, 1],
+                outputRange: [C.ACCENT_HOT, C.GOLD, C.GOLD],
+              }),
+            }]}
+          />
+        </View>
+      ) : null}
+
+      {/* Recording timer badge — counts down to the cap when one is set */}
       {isRecording && (
         <View style={[styles.recBadge, { top: topInset + SPACE.SM }]}>
           <View style={styles.recDot} />
-          <Text style={styles.recText}>{fmt(elapsed)}{maxDuration ? ` / ${fmt(maxDuration)}` : ''}</Text>
+          <Text style={styles.recText}>
+            {maxDuration ? fmt(Math.max(0, maxDuration - elapsed)) : fmt(elapsed)}
+          </Text>
         </View>
       )}
 
-      {/* Controls — manual only when there's no source video to drive recording */}
-      {!uploading && !sourceDriven && (
+      {/* Controls. Source-driven (reactions): start is driven by the source video,
+          but once recording you can restart or stop manually. Otherwise (private
+          clips / reviews) the manual record button starts it. */}
+      {!uploading && (!sourceDriven || isRecording) && (
         <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
           {isRecording ? (
             <>
@@ -356,10 +404,21 @@ export default function ReactionRecorder({
         </View>
       )}
 
-      {/* Close */}
-      {!isRecording && !uploading && (
-        <TouchableOpacity style={[styles.closeBtn, { top: topInset + SPACE.SM }]} onPress={onBack}>
+      {/* Exit — available any time (discards an in-progress recording) */}
+      {!uploading && (
+        <TouchableOpacity style={[styles.closeBtn, { top: topInset + SPACE.SM }]} onPress={handleExit}>
           <Text style={styles.closeTxt}>✕</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* DEV: start recording manually when the source video won't play
+          (e.g. TikTok in the simulator), so the cap bar/auto-stop can be tested. */}
+      {__DEV__ && sourceDriven && !isRecording && !uploading && (
+        <TouchableOpacity
+          style={[styles.devStart, { bottom: bottomInset + SPACE.XL }]}
+          onPress={beginRecording}
+          activeOpacity={0.8}>
+          <Text style={styles.devStartTxt}>DEV ▶ rec</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -368,6 +427,12 @@ export default function ReactionRecorder({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BLACK },
+  devStart: {
+    position: 'absolute', alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: RADIUS.FULL,
+    paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM,
+  },
+  devStartTxt: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
   ytCover: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   ytCoverInner: { position: 'absolute' },
   center: { flex: 1, backgroundColor: C.BLACK, alignItems: 'center', justifyContent: 'center', gap: SPACE.LG, padding: SPACE.XL },
@@ -378,6 +443,8 @@ const styles = StyleSheet.create({
   pipRecDot: { position: 'absolute', top: SPACE.XS, right: SPACE.XS, width: 8, height: 8, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_HOT },
   toast: { position: 'absolute', alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS, borderRadius: RADIUS.FULL },
   toastText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
+  capTrack: { position: 'absolute', left: 0, right: 0, height: 4, backgroundColor: 'rgba(0,0,0,0.4)' },
+  capFill: { height: 4, borderRadius: RADIUS.FULL },
   recBadge: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: SPACE.XS, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS, borderRadius: RADIUS.FULL },
   recDot: { width: 8, height: 8, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_HOT },
   recText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },

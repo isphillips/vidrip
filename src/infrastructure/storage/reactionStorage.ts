@@ -12,6 +12,7 @@ export interface SaveReactionParams {
   ytVideoId?: string;
   ytStartOffset?: number;
   sourceType?: 'youtube' | 'tiktok';
+  recordedWithHeadphones?: boolean;
 }
 
 export interface SaveReactionResult {
@@ -50,6 +51,7 @@ export async function saveReaction({
   ytVideoId,
   ytStartOffset = 0,
   sourceType = 'youtube',
+  recordedWithHeadphones = false,
 }: SaveReactionParams): Promise<SaveReactionResult> {
 
   if (mode === 'cloud') {
@@ -65,6 +67,7 @@ export async function saveReaction({
         duration: Math.round(duration),
         storage_mode: 'cloud',
         source_type: sourceType,
+        recorded_with_headphones: recordedWithHeadphones,
         ...(ytVideoId ? { yt_video_id: ytVideoId, yt_start_offset: ytStartOffset } : {}),
       })
       .select('id')
@@ -93,6 +96,7 @@ export async function saveReaction({
       duration: Math.round(duration),
       storage_mode: 'local',
       source_type: sourceType,
+      recorded_with_headphones: recordedWithHeadphones,
       ...(ytVideoId ? { yt_video_id: ytVideoId, yt_start_offset: ytStartOffset } : {}),
     })
     .select('id')

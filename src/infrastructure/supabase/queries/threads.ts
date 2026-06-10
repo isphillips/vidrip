@@ -29,6 +29,7 @@ export type ThreadDetail = {
 
 export type ReactionItem = {
   id: string;
+  thread_id?: string;
   video_url: string | null;
   storage_mode: 'local' | 'cloud' | 'deleted';
   duration: number;
@@ -38,6 +39,7 @@ export type ReactionItem = {
   yt_video_id: string | null;
   yt_start_offset: number;
   source_type: 'youtube' | 'tiktok';
+  recorded_with_headphones?: boolean;
   // Resolved at fetch time by resolveReactionUri
   resolvedUri: string | null;
   needsDownload: boolean;         // true = cloud URL available but not yet local
@@ -123,7 +125,7 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
   const { data, error } = await supabase
     .from('reactions')
     .select(`
-      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type,
+      id, thread_id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type, recorded_with_headphones,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id)
     `)

@@ -12,7 +12,7 @@ export default function RecordReactionScreen({
   const { user } = useAuthStore();
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
-  const onSave = useCallback(async (filePath: string, duration: number, ytStartOffset: number) => {
+  const onSave = useCallback(async (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => {
     await saveReaction({
       userId: user!.id,
       threadId,
@@ -22,6 +22,7 @@ export default function RecordReactionScreen({
       ytVideoId: videoId,
       ytStartOffset,
       sourceType,
+      recordedWithHeadphones,
     });
   }, [user, threadId, videoId, sourceType]);
 
@@ -32,6 +33,7 @@ export default function RecordReactionScreen({
       onBack={onBack}
       uploadingText="Saving reaction…"
       onSave={onSave}
+      maxDuration={60}
     />
   );
 }

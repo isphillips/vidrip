@@ -90,15 +90,24 @@ export function tikTokPlayerUrl(
   postId: string,
   opts: { controls?: boolean; autoplay?: boolean } = {},
 ): string {
+  // Player v1 only lets you hide chrome via these params (the iframe is
+  // cross-origin, so it can't be styled). Strip everything optional; keep just a
+  // play button when interactive controls are requested.
+  const wantControls = opts.controls !== false;
   const params = new URLSearchParams({
-    controls: opts.controls === false ? '0' : '1',
     autoplay: opts.autoplay ? '1' : '0',
     loop: '0',
-    rel: '0',
-    music_info: '0',
-    description: '0',
-    native_context_menu: '0',
+    rel: '0',                       // no "related videos" at the end
+    music_info: '0',                // hide the spinning music disc + track
+    description: '0',               // hide caption/description
     closed_caption: '0',
+    native_context_menu: '0',
+    progress_bar: '0',
+    volume_control: '0',
+    fullscreen_button: '0',
+    timestamp: '0',
+    controls: wantControls ? '1' : '0',
+    play_button: wantControls ? '1' : '0',
   });
   return `https://www.tiktok.com/player/v1/${postId}?${params.toString()}`;
 }

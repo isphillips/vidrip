@@ -4,12 +4,15 @@ import {
   ActivityIndicator, useWindowDimensions, Platform,
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import TikTokPlayer from '../../../components/TikTokPlayer';
+import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
 import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import Animated, {
   useSharedValue, useAnimatedStyle,
-  withSequence, withSpring,
+  withSequence, withSpring, withTiming, interpolate, Easing,
 } from 'react-native-reanimated';
+
+// Height of the source player when shrunk into the corner (screen-aspect mini).
+const PIP_H = 184;
 import { Pressable } from 'react-native';
 import Video from 'react-native-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +21,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { supabase } from '../../../infrastructure/supabase/client';
 import {
   fetchChannelPost,
+  fetchChannelPostReactions,
   addChannelPostEmojiReaction,
   removeChannelPostEmojiReaction,
   type ChannelPost,
@@ -89,6 +93,16 @@ export default function WatchChannelClipScreen({
 
   const videoRef = useRef<any>(null);
   const ytRef = useRef<any>(null);
+  const ttRef = useRef<TikTokPlayerHandle>(null);
+  // True while we're force-stopping at the end — ignore the source's auto "playing"
+  // (seekTo resumes YouTube, which would otherwise loop the source).
+  const stoppingRef = useRef(false);
+  // Defer the YouTube rewind until it reports 'paused', so seekTo doesn't resume it.
+  const pendingYtSeekRef = useRef(false);
+  // Ordered ids of sibling reaction clips (same parent) — drives auto-advance.
+  const siblingIdsRef = useRef<string[]>([]);
+  // Latest reaction playhead (seconds) — read by the source-sync loop without re-running it.
+  const progressRef = useRef(0);
 
   useEffect(() => {
     (async () => {
@@ -96,7 +110,7 @@ export default function WatchChannelClipScreen({
       if (!p) { setLoadState('unavailable'); return; }
       setPost(p);
 
-      // Fetch parent post's YouTube video ID for PIP
+      // Fetch parent post's YouTube video ID for PIP + sibling reactions for auto-advance
       if (p.parent_post_id) {
         fetchChannelPost(p.parent_post_id)
           .then(parent => {
@@ -105,6 +119,9 @@ export default function WatchChannelClipScreen({
               setParentSourceType(parent.source_type ?? 'youtube');
             }
           })
+          .catch(() => {});
+        fetchChannelPostReactions(p.parent_post_id)
+          .then(list => { siblingIdsRef.current = list.map(x => x.id); })
           .catch(() => {});
       }
 
@@ -165,6 +182,72 @@ export default function WatchChannelClipScreen({
       .subscribe();
     return () => { channel.unsubscribe(); };
   }, [postId, post?.id]);
+
+  // Source player: full-screen until playback starts, then shrinks to the corner
+  // (uniform scale of the whole screen, so no distortion) revealing the reaction.
+  const pip = useSharedValue(0);
+  useEffect(() => {
+    pip.value = withTiming(hasStarted ? 1 : 0, { duration: 650, easing: Easing.inOut(Easing.cubic) });
+  }, [hasStarted, pip]);
+  const srcStyle = useAnimatedStyle(() => {
+    const sFinal = PIP_H / height;
+    const s = interpolate(pip.value, [0, 1], [1, sFinal]);
+    const tx = interpolate(pip.value, [0, 1], [0, (width * (1 - sFinal)) / 2 - SPACE.LG]);
+    const ty = interpolate(pip.value, [0, 1], [0, (height * (1 - sFinal)) / 2 - (bottomInset + 100)]);
+    return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] };
+  });
+  // Full-screen YouTube uses a cover crop (16:9 scaled to fill height), centered.
+  const ytCoverW = Math.round(height * (16 / 9));
+  const ytOffsetX = -Math.round((ytCoverW - width) / 2);
+
+  // TikTok has no `play` prop, so push our paused state into it.
+  useEffect(() => {
+    if (parentSourceType !== 'tiktok') { return; }
+    if (paused) { ttRef.current?.pause(); } else { ttRef.current?.play(); }
+  }, [paused, parentSourceType]);
+
+  // Keep the parent YouTube source locked to the reaction clip's clock. The clip is
+  // the master; the source (which plays from 0) should sit at the same playhead.
+  // Without this they drift (YouTube load latency on start, clock skew over the clip).
+  // Nudge YouTube back only on meaningful drift to avoid constant seeks. (TikTok
+  // exposes no current-time, so it can't be corrected this way.)
+  useEffect(() => {
+    if (paused || parentSourceType !== 'youtube' || !parentYtVideoId) { return; }
+    const id = setInterval(async () => {
+      if (stoppingRef.current) { return; }
+      try {
+        const ytTime = await ytRef.current?.getCurrentTime?.();
+        if (typeof ytTime !== 'number') { return; }
+        const target = progressRef.current;
+        if (Math.abs(ytTime - target) > 0.5) { ytRef.current?.seekTo?.(target, true); }
+      } catch { /* player not ready */ }
+    }, 1200);
+    return () => clearInterval(id);
+  }, [paused, parentSourceType, parentYtVideoId]);
+
+  // When the reaction clip ends: halt the source, then auto-advance to the next
+  // reaction in the sequence — or dismiss back (card pop) when it's the last.
+  const handleReactionEnd = useCallback(() => {
+    stoppingRef.current = true;
+    setPaused(true);
+    ttRef.current?.pause();
+
+    // Standalone clip (no parent) has no reaction sequence — rewind and hold.
+    if (!post?.parent_post_id) {
+      setProgress(0);
+      videoRef.current?.seek(0);
+      return;
+    }
+
+    const ids = siblingIdsRef.current;
+    const idx = ids.indexOf(postId);
+    const nextId = idx >= 0 ? ids[idx + 1] : undefined;
+    if (nextId) {
+      navigation.replace('WatchChannelClip', { postId: nextId });
+    } else {
+      navigation.goBack();
+    }
+  }, [post?.parent_post_id, postId, navigation]);
 
   const handleEmojiPress = useCallback(async (emoji: string) => {
     if (!post || !user?.id || processing.has(emoji)) { return; }
@@ -252,8 +335,8 @@ export default function WatchChannelClipScreen({
         setDuration(d.duration);
         configureForMixedPlayback().then(() => setSessionReady(true)).catch(() => setSessionReady(true));
       }}
-      onProgress={(d: any) => setProgress(d.currentTime)}
-      onEnd={() => { setPaused(true); setProgress(0); videoRef.current?.seek(0); }}
+      onProgress={(d: any) => { progressRef.current = d.currentTime; setProgress(d.currentTime); }}
+      onEnd={handleReactionEnd}
       repeat={false}
     />
   );
@@ -282,65 +365,62 @@ export default function WatchChannelClipScreen({
         </View>
       )}
 
-      {/* Source-video PIP — its controls drive reaction playback */}
-      {sessionReady && parentYtVideoId && parentSourceType === 'tiktok' && (
-        <View style={[styles.ytPip, { bottom: bottomInset + 100, right: SPACE.LG }]}>
-          <TikTokPlayer
-            startMuted
-            style={{ width: styles.ytPip.width, height: styles.ytPip.height, backgroundColor: '#000' }}
-            videoId={parentYtVideoId}
-            onChangeState={(state) => {
-              if (state === 'playing') { setPaused(false); setHasStarted(true); }
-              else if (state === 'paused') { setPaused(true); }
-              else if (state === 'ended') { setPaused(true); setProgress(0); videoRef.current?.seek(0); }
-            }}
-          />
-        </View>
-      )}
-      {sessionReady && parentYtVideoId && parentSourceType !== 'tiktok' && (() => {
-        const pipH = styles.ytPip.height;
-        const pipW = styles.ytPip.width;
-        const coverW = Math.round(pipH * (16 / 9));
-        const offsetX = -Math.round((coverW - pipW) / 2);
-        return (
-          <View style={[styles.ytPip, { bottom: bottomInset + 100, right: SPACE.LG }]}>
-            <View style={[styles.ytPipInner, { left: offsetX }]}>
-              <YoutubePlayer
-                ref={ytRef}
-                height={pipH}
-                width={coverW}
-                videoId={parentYtVideoId}
-                mute={true}
-                onChangeState={(state) => {
-                  // Video has mixWithOthers="mix" so it never interrupts the WebView —
-                  // YouTube play/pause maps directly to the reaction video.
-                  if (state === 'playing') {
-                    setPaused(false);
-                    setHasStarted(true);
-                  } else if (state === 'paused') {
-                    setPaused(true);
-                  } else if (state === 'ended') {
-                    setPaused(true);
-                    setProgress(0);
-                    videoRef.current?.seek(0);
-                  }
-                }}
-                initialPlayerParams={{ controls: true, rel: false, mute: 1 } as any}
-                webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
-                webViewStyle={{ backgroundColor: '#000' }}
-              />
+      {/* Source player — full-screen, then animates into the corner on play. */}
+      {sessionReady && parentYtVideoId && (
+        <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
+          {parentSourceType === 'tiktok' ? (
+            <TikTokPlayer
+              ref={ttRef}
+              startMuted={!post?.recorded_with_headphones}
+              style={{ width, height, backgroundColor: '#000' }}
+              videoId={parentYtVideoId}
+              onChangeState={(state) => {
+                if (state === 'playing') {
+                  if (stoppingRef.current) { setPaused(true); return; }
+                  setPaused(false); setHasStarted(true);
+                }
+                else if (state === 'paused') { setPaused(true); }
+                // 'ended' (source finished first): ignore — the reaction's own onEnd
+                // drives auto-advance; rewinding it here would loop it.
+              }}
+            />
+          ) : (
+            <View style={{ width, height, overflow: 'hidden' }}>
+              <View style={{ position: 'absolute', left: ytOffsetX }}>
+                <YoutubePlayer
+                  ref={ytRef}
+                  height={height}
+                  width={ytCoverW}
+                  videoId={parentYtVideoId}
+                  mute={!post?.recorded_with_headphones}
+                  play={Platform.OS === 'ios' ? !paused : undefined}
+                  onChangeState={(state) => {
+                    // Video has mixWithOthers="mix" so it never interrupts the WebView —
+                    // YouTube play/pause maps directly to the reaction video.
+                    if (state === 'playing') {
+                      if (stoppingRef.current) { return; }   // stray resume during stop → ignore
+                      setPaused(false); setHasStarted(true);
+                    }
+                    else if (state === 'paused') {
+                      setPaused(true);
+                      if (pendingYtSeekRef.current) {
+                        pendingYtSeekRef.current = false;
+                        ytRef.current?.seekTo?.(0, true);   // confirmed paused → stays at 0
+                        setTimeout(() => { stoppingRef.current = false; }, 300);
+                      }
+                    }
+                    // 'ended' (source finished first): ignore — the reaction's own
+                    // onEnd drives auto-advance; rewinding it here would loop it.
+                  }}
+                  initialPlayerParams={{ controls: true, rel: false, mute: 1 } as any}
+                  webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
+                  webViewStyle={{ backgroundColor: '#000' }}
+                />
+              </View>
             </View>
-          </View>
-        );
-      })()}
-
-      {/* Start prompt — until YouTube is tapped */}
-      {sessionReady && parentYtVideoId && !hasStarted && (
-        <View style={styles.startPrompt} pointerEvents="none">
-          <Text style={styles.startPromptText}>Tap ▶ on the video to play</Text>
-        </View>
+          )}
+        </Animated.View>
       )}
-
 
       {/* Info bar */}
       <View style={[styles.infoBar, { top: topInset + SPACE.SM }]} pointerEvents="none">
@@ -383,12 +463,27 @@ export default function WatchChannelClipScreen({
         onPress={() => navigation.goBack()}>
         <Text style={styles.closeTxt}>✕</Text>
       </TouchableOpacity>
+
+      {/* DEV: trigger the dock animation when the source won't play (e.g. TikTok in sim) */}
+      {__DEV__ && parentYtVideoId && (
+        <TouchableOpacity
+          style={[styles.devDock, { top: topInset + SPACE.SM }]}
+          onPress={() => { setHasStarted(s => !s); setPaused(false); }}>
+          <Text style={styles.devDockTxt}>{hasStarted ? 'undock' : 'dock'}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BLACK },
+  devDock: {
+    position: 'absolute', left: SPACE.LG,
+    backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: RADIUS.FULL,
+    paddingHorizontal: SPACE.MD, paddingVertical: 6,
+  },
+  devDockTxt: { color: C.WHITE, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_BOLD },
   center: {
     flex: 1, backgroundColor: C.BLACK,
     alignItems: 'center', justifyContent: 'center', gap: SPACE.MD,
@@ -416,7 +511,7 @@ const styles = StyleSheet.create({
   playIcon: { color: C.WHITE, fontSize: 26, marginLeft: 5 },
   infoBar: {
     position: 'absolute', left: SPACE.LG, right: SPACE.LG,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center',
   },
   handle: {
     color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD,

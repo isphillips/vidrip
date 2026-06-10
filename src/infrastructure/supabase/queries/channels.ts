@@ -48,6 +48,7 @@ export type ChannelPost = {
   parent_post_id: string | null;
   parent_yt_video_id: string | null;
   parent_source_type: 'youtube' | 'tiktok';
+  recorded_with_headphones?: boolean;
 };
 
 // A 60s review clip submitted to a creator after reacting. Lives in its own
@@ -574,7 +575,7 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
     .select(`
       id, channel_id, poster_id, post_type, source_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
-      video_url, duration, is_pinned, created_at,
+      video_url, duration, is_pinned, created_at, recorded_with_headphones,
       parent_post_id,
       parent:channel_posts!parent_post_id(yt_video_id, source_type),
       poster:users!poster_id(handle),
@@ -697,12 +698,14 @@ export async function postChannelClip({
   filePath,
   duration,
   parentPostId,
+  recordedWithHeadphones = false,
 }: {
   channelId: string;
   userId: string;
   filePath: string;
   duration: number;
   parentPostId?: string;
+  recordedWithHeadphones?: boolean;
 }): Promise<string> {
   // Insert first to get a stable ID (video_url filled after upload).
   const { data, error } = await (supabase as any)
@@ -714,6 +717,7 @@ export async function postChannelClip({
       video_url: null,
       storage_mode: 'cloud',
       duration: Math.round(duration),
+      recorded_with_headphones: recordedWithHeadphones,
       ...(parentPostId ? { parent_post_id: parentPostId } : {}),
     })
     .select('id')

@@ -52,7 +52,7 @@ export default function ChannelsNavigator() {
       <Stack.Screen
         name="WatchChannelClip"
         component={WatchChannelClipScreen}
-        options={{ headerShown: false, presentation: 'fullScreenModal' }}
+        options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }}
       />
       <Stack.Screen
         name="RecordReview"

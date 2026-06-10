@@ -62,6 +62,6 @@ export default function CurtainStage({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#140804' },
+  root: { flex: 1 },
   layer: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined },
 });

@@ -22,8 +22,8 @@ export default function WatchYouTubePostScreen({
   }, [postId]);
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
-  const onSave = useCallback(async (filePath: string, duration: number) => {
-    await postChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId });
+  const onSave = useCallback(async (filePath: string, duration: number, _ytStartOffset: number, recordedWithHeadphones: boolean) => {
+    await postChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones });
   }, [channelId, postId, user]);
 
   if (!videoId) {
@@ -41,6 +41,7 @@ export default function WatchYouTubePostScreen({
       onBack={onBack}
       uploadingText="Posting reaction…"
       onSave={onSave}
+      maxDuration={60}
     />
   );
 }

@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACE.XXXL },
   fill:          { flex: 1 },
   gridCenter:    { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyTextCenter: { textAlign: 'center', paddingHorizontal: SPACE.XL },
+  emptyTextCenter: { textAlign: 'center', paddingHorizontal: SPACE.XL, height: '100%' },
   grid:          { paddingHorizontal: SPACE.LG, paddingBottom: SPACE.XXXL },
   row:           { gap: SPACE.MD, marginBottom: SPACE.MD },
   card:          { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, overflow: 'hidden' },

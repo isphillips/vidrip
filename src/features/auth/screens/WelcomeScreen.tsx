@@ -10,7 +10,7 @@ const logo = require('../../../assets/logo.png');
 export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welcome'>) {
   const { top } = useSafeAreaInsets();
   return (
-    <CurtainStage>
+    <CurtainStage scrim={0.35}>
       <View style={[styles.content, { paddingTop: top + SPACE.LG }]}>
         <View style={styles.hero}>
           <Image source={logo} style={styles.logo} resizeMode="contain" />
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#140804',
     marginLeft: -3,
   },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,6,5,0.55)' },
+  scrim: { ...StyleSheet.absoluteFillObject },
   content: {
     flex: 1,
     justifyContent: 'space-between',
