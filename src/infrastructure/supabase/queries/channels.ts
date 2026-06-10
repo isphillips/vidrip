@@ -693,16 +693,30 @@ export async function addChannelPostEmojiReaction(
 }
 
 async function uploadClipToCloud(localPath: string, uploadPath: string): Promise<string> {
-  const bare = localPath.replace(/^file:\/\//, '');
-  const base64 = await RNFS.readFile(bare, 'base64');
-  const binaryStr = atob(base64);
-  const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) { bytes[i] = binaryStr.charCodeAt(i); }
+  const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
 
-  const { error } = await supabase.storage
-    .from('channel-clips')
-    .upload(uploadPath, bytes, { contentType: 'video/mp4', upsert: true });
-  if (error) { throw error; }
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) { throw new Error('Not authenticated'); }
+
+  const formData = new FormData();
+  (formData as any).append('file', { uri: fileUri, type: 'video/mp4', name: 'video.mp4' });
+
+  const uploadUrl = `https://ltpscwticavqutbzrrjb.supabase.co/storage/v1/object/channel-clips/${uploadPath}`;
+  const response = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0cHNjd3RpY2F2cXV0YnpycmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMDEwMTEsImV4cCI6MjA5NTc3NzAxMX0.wHXV1IFLk7UbRWOrJWZN-sjsw8Kau0Rn6OKs29debKo',
+      'x-upsert': 'true',
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Upload failed (${response.status}): ${body}`);
+  }
 
   const { data: { publicUrl } } = supabase.storage.from('channel-clips').getPublicUrl(uploadPath);
   return publicUrl;
@@ -819,16 +833,30 @@ export async function removeChannelPostEmojiReaction(
 // ── Reviews ("Side B") ──────────────────────────────────────────────────────
 
 async function uploadReviewToCloud(localPath: string, uploadPath: string): Promise<string> {
-  const bare = localPath.replace(/^file:\/\//, '');
-  const base64 = await RNFS.readFile(bare, 'base64');
-  const binaryStr = atob(base64);
-  const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) { bytes[i] = binaryStr.charCodeAt(i); }
+  const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
 
-  const { error } = await supabase.storage
-    .from('reviews')
-    .upload(uploadPath, bytes, { contentType: 'video/mp4', upsert: true });
-  if (error) { throw error; }
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) { throw new Error('Not authenticated'); }
+
+  const formData = new FormData();
+  (formData as any).append('file', { uri: fileUri, type: 'video/mp4', name: 'video.mp4' });
+
+  const uploadUrl = `https://ltpscwticavqutbzrrjb.supabase.co/storage/v1/object/reviews/${uploadPath}`;
+  const response = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0cHNjd3RpY2F2cXV0YnpycmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMDEwMTEsImV4cCI6MjA5NTc3NzAxMX0.wHXV1IFLk7UbRWOrJWZN-sjsw8Kau0Rn6OKs29debKo',
+      'x-upsert': 'true',
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Upload failed (${response.status}): ${body}`);
+  }
 
   const { data: { publicUrl } } = supabase.storage.from('reviews').getPublicUrl(uploadPath);
   return publicUrl;

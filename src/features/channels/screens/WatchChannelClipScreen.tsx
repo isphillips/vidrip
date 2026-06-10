@@ -282,6 +282,11 @@ export default function WatchChannelClipScreen({
     return (
       <View style={styles.center}>
         <ActivityIndicator color={C.ACCENT_HOT} size="large" />
+        <TouchableOpacity
+          style={[styles.closeBtn, { top: topInset + SPACE.SM }]}
+          onPress={() => navigation.goBack()}>
+          <Text style={styles.closeTxt}>✕</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -297,6 +302,11 @@ export default function WatchChannelClipScreen({
           </View>
         )}
         {downloadPct > 0 && <Text style={styles.downloadPct}>{downloadPct}%</Text>}
+        <TouchableOpacity
+          style={[styles.closeBtn, { top: topInset + SPACE.SM }]}
+          onPress={() => navigation.goBack()}>
+          <Text style={styles.closeTxt}>✕</Text>
+        </TouchableOpacity>
       </View>
     );
   }

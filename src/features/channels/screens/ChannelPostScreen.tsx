@@ -171,7 +171,17 @@ export default function ChannelPostScreen({
   }, [user?.id, reactions, processing, load]);
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={C.ACCENT_HOT} />
+        <TouchableOpacity
+          style={[styles.backBtn, { top: top + SPACE.SM }]}
+          onPress={() => navigation.goBack()}
+          hitSlop={8}>
+          <Text style={styles.backIcon}>‹</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   if (!post) {

@@ -3,4 +3,4 @@
 // 'cloud'  — video uploads automatically and streams from Supabase Storage
 export type StorageMode = 'local' | 'cloud';
 
-export const STORAGE_MODE: StorageMode = 'local';
+export const STORAGE_MODE: StorageMode = 'cloud';

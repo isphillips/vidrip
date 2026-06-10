@@ -194,14 +194,19 @@ export default function ReactionRecorder({
     if (speakerOverrideRef.current) { restoreAudioRoute().catch(() => {}); speakerOverrideRef.current = false; }
 
     try {
-      const video = await new Promise<VideoFile>((resolve, reject) => {
-        recordingCallbackRef.current = resolve;
-        cameraRef.current?.stopRecording().catch(reject);
-      });
+      const video = await Promise.race([
+        new Promise<VideoFile>((resolve, reject) => {
+          recordingCallbackRef.current = resolve;
+          cameraRef.current?.stopRecording().catch(reject);
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Recording timed out — please try again.')), 15000)
+        ),
+      ]);
       await onSave(video.path, elapsedRef.current, ytStartOffsetRef.current, recordedWithHeadphonesRef.current);
       onBack();
     } catch (e: any) {
-      Alert.alert('Upload Failed', e?.message ?? 'Could not save. Please try again.');
+      Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
       setUploading(false);
     }
   }, [isRecording, stopTimer, onSave, onBack]);
