@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuthStore } from '../../../store/authStore';
+import { useUploadStore } from '../../../store/uploadStore';
 import { fetchChannelPost, postChannelClip } from '../../../infrastructure/supabase/queries/channels';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
 import { C } from '../../../theme';
@@ -11,6 +12,7 @@ export default function WatchYouTubePostScreen({
 }: ChannelsStackScreenProps<'WatchYouTubePost'>) {
   const { postId, channelId } = route.params;
   const { user } = useAuthStore();
+  const enqueue = useUploadStore(s => s.enqueue);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState<'youtube' | 'tiktok'>('youtube');
 
@@ -23,8 +25,8 @@ export default function WatchYouTubePostScreen({
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
   const onSave = useCallback(async (filePath: string, duration: number, _ytStartOffset: number, recordedWithHeadphones: boolean) => {
-    await postChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones });
-  }, [channelId, postId, user]);
+    enqueue('Posting reaction…', () => postChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones }));
+  }, [channelId, postId, user, enqueue]);
 
   if (!videoId) {
     return (

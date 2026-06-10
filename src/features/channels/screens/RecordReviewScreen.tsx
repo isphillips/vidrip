@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { useAuthStore } from '../../../store/authStore';
+import { useUploadStore } from '../../../store/uploadStore';
 import { postReview } from '../../../infrastructure/supabase/queries/channels';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
@@ -13,11 +14,12 @@ export default function RecordReviewScreen({
 }: ChannelsStackScreenProps<'RecordReview'>) {
   const { postId, channelId } = route.params;
   const { user } = useAuthStore();
+  const enqueue = useUploadStore(s => s.enqueue);
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
   const onSave = useCallback(async (filePath: string, duration: number) => {
-    await postReview({ channelId, postId, reviewerId: user!.id, filePath, duration });
-  }, [channelId, postId, user]);
+    enqueue('Sending review…', () => postReview({ channelId, postId, reviewerId: user!.id, filePath, duration }));
+  }, [channelId, postId, user, enqueue]);
 
   return (
     <ReactionRecorder

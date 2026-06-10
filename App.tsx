@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HotUpdater } from '@hot-updater/react-native';
 import RootNavigator from './src/app/navigation/RootNavigator';
+import UploadToast from './src/components/UploadToast';
 import { SUPABASE_ANON_KEY } from './src/infrastructure/supabase/client';
 import { C, FONT } from './src/theme';
 
@@ -13,6 +14,7 @@ function App() {
       <SafeAreaProvider>
         <StatusBar barStyle="light-content" backgroundColor={C.BG} />
         <RootNavigator />
+        <UploadToast />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

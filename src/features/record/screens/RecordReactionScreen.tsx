@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { useAuthStore } from '../../../store/authStore';
+import { useUploadStore } from '../../../store/uploadStore';
 import { saveReaction } from '../../../infrastructure/storage/reactionStorage';
 import { STORAGE_MODE } from '../../../infrastructure/storage/config';
 import ReactionRecorder from '../components/ReactionRecorder';
@@ -10,10 +11,11 @@ export default function RecordReactionScreen({
 }: RecordStackScreenProps<'RecordReaction'>) {
   const { threadId, videoId, sourceType = 'youtube' } = route.params;
   const { user } = useAuthStore();
+  const enqueue = useUploadStore(s => s.enqueue);
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
   const onSave = useCallback(async (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => {
-    await saveReaction({
+    enqueue('Saving reaction…', () => saveReaction({
       userId: user!.id,
       threadId,
       filePath,
@@ -23,8 +25,8 @@ export default function RecordReactionScreen({
       ytStartOffset,
       sourceType,
       recordedWithHeadphones,
-    });
-  }, [user, threadId, videoId, sourceType]);
+    }));
+  }, [user, threadId, videoId, sourceType, enqueue]);
 
   return (
     <ReactionRecorder
