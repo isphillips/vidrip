@@ -77,16 +77,15 @@ export default function ReactionRecorder({
   const sourceDriven = !!videoId;
 
   const device = useCameraDevice('front');
-  // Cap the reaction to 720p so files stay well under the storage upload limit
-  // (uncapped, the front camera records at its max and 60s clips exceed 50 MB,
-  // which fails the relay upload so recipients can't watch). Request 48fps but
-  // clamp to what the chosen format supports — fps outside the format's range
-  // throws. File size is governed by videoBitRate (below), not fps.
+  // Cap the reaction to 720p/30fps so files stay under the 50MB storage upload
+  // limit (uncapped, the front camera records at its max and clips exceed 50MB,
+  // failing the relay upload so recipients can't watch). Clamp fps to what the
+  // chosen format supports — fps outside the format's range throws.
   const format = useCameraFormat(device, [
     { videoResolution: { width: 1280, height: 720 } },
-    { fps: 48 },
+    { fps: 30 },
   ]);
-  const targetFps = format ? Math.min(48, format.maxFps) : 30;
+  const targetFps = format ? Math.min(30, format.maxFps) : 30;
   const { hasPermission: hasCam, requestPermission: requestCam } = useCameraPermission();
   const { hasPermission: hasMic, requestPermission: requestMic } = useMicrophonePermission();
 
@@ -328,7 +327,9 @@ export default function ReactionRecorder({
             device={device}
             format={format}
             fps={targetFps}
-            videoBitRate={3}
+            // 2 Mbps video (+~0.13 audio) keeps a 180s reaction/review at ~48MB,
+            // under the 50MB Supabase storage upload limit (60s ≈ 16MB).
+            videoBitRate={2}
             isActive={true}
             video={true}
             audio={true}
