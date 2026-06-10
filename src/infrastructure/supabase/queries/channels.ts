@@ -875,7 +875,7 @@ function mapReview(r: any): ChannelReview {
     post_yt_video_title: r.post?.yt_video_title ?? null,
     post_yt_video_thumbnail: r.post?.yt_video_thumbnail ?? null,
     post_source_type: r.post?.source_type ?? 'youtube',
-    channel_name: r.channel?.name ?? null,
+    channel_name: r.channel?.display_name ?? r.channel?.name ?? null,
   };
 }
 
@@ -917,7 +917,7 @@ export async function fetchMyReviews(userId: string): Promise<ChannelReview[]> {
       id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
       reviewer:users!reviewer_id(handle),
       post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type),
-      channel:groups!channel_id(name)
+      channel:groups!channel_id(name, display_name)
     `)
     .eq('reviewer_id', userId)
     .order('created_at', { ascending: false });
