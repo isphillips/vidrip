@@ -20,7 +20,7 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
           style={styles.button}
           activeOpacity={0.85}
           onPress={() => navigation.navigate('EnterInviteCode')}>
-          <Text style={styles.buttonText}>Enter Invite Code</Text>
+          <Text style={styles.buttonText}>Enter Invitation Code</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.signInLink}
@@ -77,7 +77,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   buttonText: {
-    color: '#F5EDE0',
     fontSize: FONT.SIZES.LG,
     fontFamily: FONT.BODY_BOLD,
     fontWeight: '700',
@@ -88,7 +87,7 @@ const styles = StyleSheet.create({
     padding: SPACE.SM,
   },
   signInText: {
-    color: '#F5EDE0',
+    color: '#C4A882',
     fontSize: FONT.SIZES.MD,
     fontFamily: FONT.BODY,
   },
