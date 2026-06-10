@@ -9,6 +9,7 @@ import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTo
 import {
   Camera,
   useCameraDevice,
+  useCameraFormat,
   useCameraPermission,
   useMicrophonePermission,
   type VideoFile,
@@ -77,6 +78,16 @@ export default function ReactionRecorder({
   const sourceDriven = !!videoId;
 
   const device = useCameraDevice('front');
+  // Cap the reaction to 720p so files stay well under the storage upload limit
+  // (uncapped, the front camera records at its max and 60s clips exceed 50 MB,
+  // which fails the relay upload so recipients can't watch). Request 48fps but
+  // clamp to what the chosen format supports — fps outside the format's range
+  // throws. File size is governed by videoBitRate (below), not fps.
+  const format = useCameraFormat(device, [
+    { videoResolution: { width: 1280, height: 720 } },
+    { fps: 48 },
+  ]);
+  const targetFps = format ? Math.min(48, format.maxFps) : 30;
   const { hasPermission: hasCam, requestPermission: requestCam } = useCameraPermission();
   const { hasPermission: hasMic, requestPermission: requestMic } = useMicrophonePermission();
 
@@ -286,6 +297,9 @@ export default function ReactionRecorder({
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
             device={device}
+            format={format}
+            fps={targetFps}
+            videoBitRate={3}
             isActive={true}
             video={true}
             audio={true}
