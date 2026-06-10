@@ -384,11 +384,6 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           const unreacted  = !isSender && item.my_status !== 'reacted';
           const isFav      = favs.has(item.id);
           const label      = isSender ? 'you' : (item.sender?.handle ?? '?');
-          // For threads I sent, show who I sent it to (comma list, one line, "+N More").
-          const recipients     = item.recipient_handles ?? [];
-          const shownRecips    = recipients.slice(0, 3);
-          const recipientNames = shownRecips.join(', ');
-          const recipientExtra = recipients.length - shownRecips.length;
 
           return (
             <Swipeable
@@ -421,18 +416,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
                   )}
                 </View>
                 <View style={styles.info}>
-                  {isSender ? (
-                    <View style={styles.senderRow}>
-                      <Text style={[styles.sender, styles.senderFlex]} numberOfLines={1}>
-                        {recipientNames || 'you'}
-                      </Text>
-                      {recipientExtra > 0 && (
-                        <Text style={styles.sender}> +{recipientExtra} More</Text>
-                      )}
-                    </View>
-                  ) : (
-                    <Text style={styles.sender}>{label}</Text>
-                  )}
+                  <Text style={styles.sender}>{label}</Text>
                   <Text style={styles.title} numberOfLines={2}>
                     {unreacted
                       ? `${item.sender?.handle ?? 'Someone'} requested your reaction`
@@ -553,8 +537,6 @@ const styles = StyleSheet.create({
 
   info:   { flex: 1 },
   sender: { fontSize: FONT.SIZES.SM, color: C.MUTED, marginBottom: 2 },
-  senderRow: { flexDirection: 'row', alignItems: 'center' },
-  senderFlex: { flexShrink: 1 },
   title:  { fontSize: FONT.SIZES.MD, fontWeight: '600', color: C.INK, marginBottom: 4 },
   meta:   { fontSize: FONT.SIZES.SM, color: C.MUTED },
   dot:    { width: 10, height: 10, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT },

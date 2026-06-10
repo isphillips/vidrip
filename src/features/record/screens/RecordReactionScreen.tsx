@@ -33,7 +33,7 @@ export default function RecordReactionScreen({
       onBack={onBack}
       uploadingText="Saving reaction…"
       onSave={onSave}
-      maxDuration={60}
+      maxDuration={180}
     />
   );
 }

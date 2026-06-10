@@ -349,7 +349,7 @@ export default function ReactionRecorder({
         </View>
       )}
 
-      {/* Receding cap bar — gold, flaring red as the 60s limit approaches */}
+      {/* Receding cap bar — gold, flaring red as the duration limit approaches */}
       {isRecording && maxDuration ? (
         <View style={[styles.capTrack, { top: topInset }]} pointerEvents="none">
           <Animated.View

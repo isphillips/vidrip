@@ -41,7 +41,7 @@ export default function WatchYouTubePostScreen({
       onBack={onBack}
       uploadingText="Posting reaction…"
       onSave={onSave}
-      maxDuration={60}
+      maxDuration={180}
     />
   );
 }
