@@ -244,8 +244,6 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE.MD,
     paddingTop: SPACE.SM,
     gap: SPACE.MD,
-    borderBottomWidth: 1,
-    borderBottomColor: C.BORDER,
   },
   title: {
     fontSize: FONT.SIZES.XXL,
