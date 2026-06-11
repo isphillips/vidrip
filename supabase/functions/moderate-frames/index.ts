@@ -11,6 +11,7 @@ const OPENAI_API_KEY = (Deno.env.get("OPENAI_API_KEY") ?? "").trim();
 const THRESHOLDS: Record<string, number> = {
   "sexual": 0.75,
   "sexual/minors": 0.2,
+  "violence/graphic": 0.8,
 };
 
 // User-facing rejection copy. Deliberately vague for the minors case.
@@ -18,7 +19,10 @@ function rejectionMessage(tripped: string[]): string {
   if (tripped.includes("sexual/minors")) {
     return "This video can't be posted.";
   }
-  return "This video can't be posted because it appears to contain nudity or sexually explicit content.";
+  if (tripped.includes("sexual")) {
+    return "This video can't be posted because it appears to contain nudity or sexually explicit content.";
+  }
+  return "This video can't be posted because it appears to contain graphic or violent content.";
 }
 
 const BATCH = 16;       // images per OpenAI moderation request (chunk large clips).
