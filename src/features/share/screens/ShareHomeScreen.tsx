@@ -14,6 +14,7 @@ import {
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import { sendThread } from '../../../infrastructure/supabase/queries/threads';
 import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
+import { fetchYouTubeDurationSeconds, MAX_VIDEO_SECONDS } from '../../../infrastructure/youtube/api';
 import { fetchMembersOnlyVideos } from '../../../infrastructure/supabase/queries/channels';
 import {
   fetchConnectedFeed, refreshConnectedFeed, feedCooldownRemainingMs,
@@ -85,6 +86,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // paste state
   const [url, setUrl]         = useState('');
   const [pasting, setPasting] = useState(false);
+  // Reactive link check: gate Preview & Share on the pasted link being valid AND
+  // (for YouTube) within the 3-min limit. TikTok can't be length-checked → 'ok'.
+  const [linkStatus, setLinkStatus] =
+    useState<'idle' | 'checking' | 'ok' | 'tooLong' | 'invalid'>('idle');
 
   // player overlay
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
@@ -260,6 +265,26 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     }
   };
 
+  // ── Reactive link validation (runs as the user pastes/types) ─────────────────
+  useEffect(() => {
+    if (mode !== 'paste') { return; }
+    const trimmed = url.trim();
+    if (!trimmed) { setLinkStatus('idle'); return; }
+    // TikTok: can't fetch duration from the public API → allow through.
+    if (extractTikTokId(trimmed)) { setLinkStatus('ok'); return; }
+    const ytId = extractYouTubeId(trimmed);
+    if (!ytId) { setLinkStatus('invalid'); return; }
+    setLinkStatus('checking');
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const seconds = await fetchYouTubeDurationSeconds(ytId);
+      if (cancelled) { return; }
+      // null = unknown length → allow rather than false-block.
+      setLinkStatus(seconds != null && seconds > MAX_VIDEO_SECONDS ? 'tooLong' : 'ok');
+    }, 450);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [url, mode]);
+
   // ── Paste flow ──────────────────────────────────────────────────────────────
   const handlePastePreview = async () => {
     // TikTok first — if it parses as a TikTok URL, treat as TikTok.
@@ -337,11 +362,22 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
             placeholder="Paste a YouTube Shorts or TikTok link" placeholderTextColor={C.SUBTLE}
             autoCapitalize="none" autoCorrect={false} keyboardType="url" autoFocus
           />
-          <TouchableOpacity
-            style={[styles.pasteBtn, (!url.trim() || pasting) && styles.pasteBtnDisabled]}
-            onPress={handlePastePreview} disabled={!url.trim() || pasting}>
-            {pasting ? <ActivityIndicator color={C.WHITE} /> : <Text style={styles.pasteBtnText}>Preview & Share →</Text>}
-          </TouchableOpacity>
+          {linkStatus === 'tooLong' ? (
+            <View style={styles.tooLongBox}>
+              <Text style={styles.tooLongTitle}>Video too long</Text>
+              <Text style={styles.tooLongText}>
+                We only allow videos up to 3 minutes (180 seconds). Please find a shorter video to share.
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.pasteBtn, (linkStatus !== 'ok' || pasting) && styles.pasteBtnDisabled]}
+              onPress={handlePastePreview} disabled={linkStatus !== 'ok' || pasting}>
+              {(pasting || linkStatus === 'checking')
+                ? <ActivityIndicator color={C.WHITE} />
+                : <Text style={styles.pasteBtnText}>Preview & Share →</Text>}
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <>
@@ -596,6 +632,9 @@ const styles = StyleSheet.create({
   pasteBtn:         { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, padding: SPACE.LG, alignItems: 'center' },
   pasteBtnDisabled: { opacity: 0.4 },
   pasteBtnText:     { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
+  tooLongBox:   { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.ACCENT_HOT, padding: SPACE.LG, gap: SPACE.XS },
+  tooLongTitle: { color: C.ACCENT_HOT, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD, textAlign: 'center' },
+  tooLongText:  { color: C.MUTED, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, textAlign: 'center' },
 
   // search / tabs
   searchRow: {

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
   Image, ActivityIndicator, Alert, KeyboardAvoidingView,
@@ -9,6 +9,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { postYouTubeToChannel } from '../../../infrastructure/supabase/queries/channels';
 import { extractTikTokId, fetchTikTokMeta } from '../../../infrastructure/tiktok/api';
+import { fetchYouTubeDurationSeconds, MAX_VIDEO_SECONDS } from '../../../infrastructure/youtube/api';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 function extractVideoId(input: string): string | null {
@@ -54,6 +55,26 @@ export default function AddChannelVideoScreen({
   const [thumb, setThumb] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [posting, setPosting] = useState(false);
+  // Reactive link check: gate Preview on a valid link within the 3-min limit
+  // (YouTube only — TikTok duration isn't available via the public API → 'ok').
+  const [linkStatus, setLinkStatus] =
+    useState<'idle' | 'checking' | 'ok' | 'tooLong' | 'invalid'>('idle');
+
+  useEffect(() => {
+    const trimmed = input.trim();
+    if (!trimmed) { setLinkStatus('idle'); return; }
+    if (extractTikTokId(trimmed)) { setLinkStatus('ok'); return; }
+    const id = extractVideoId(trimmed);
+    if (!id) { setLinkStatus('invalid'); return; }
+    setLinkStatus('checking');
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const seconds = await fetchYouTubeDurationSeconds(id);
+      if (cancelled) { return; }
+      setLinkStatus(seconds != null && seconds > MAX_VIDEO_SECONDS ? 'tooLong' : 'ok');
+    }, 450);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [input]);
 
   const handlePreview = useCallback(async () => {
     // TikTok first.
@@ -135,17 +156,29 @@ export default function AddChannelVideoScreen({
             returnKeyType="done"
             onSubmitEditing={handlePreview}
           />
-          <TouchableOpacity
-            style={[styles.previewBtn, !input && styles.previewBtnDisabled]}
-            onPress={handlePreview}
-            disabled={!input || previewing}
-            activeOpacity={0.8}>
-            {previewing
-              ? <ActivityIndicator color={C.WHITE} size="small" />
-              : <Text style={styles.previewBtnText}>Preview</Text>
-            }
-          </TouchableOpacity>
+          {linkStatus !== 'tooLong' && (
+            <TouchableOpacity
+              style={[styles.previewBtn, (linkStatus !== 'ok' || previewing) && styles.previewBtnDisabled]}
+              onPress={handlePreview}
+              disabled={linkStatus !== 'ok' || previewing}
+              activeOpacity={0.8}>
+              {(previewing || linkStatus === 'checking')
+                ? <ActivityIndicator color={C.WHITE} size="small" />
+                : <Text style={styles.previewBtnText}>Preview</Text>
+              }
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Too-long message replaces the Preview action */}
+        {linkStatus === 'tooLong' && (
+          <View style={styles.tooLongBox}>
+            <Text style={styles.tooLongTitle}>Video too long</Text>
+            <Text style={styles.tooLongText}>
+              We only allow videos up to 3 minutes (180 seconds). Please find a shorter video.
+            </Text>
+          </View>
+        )}
 
         {/* Preview */}
         {thumbnail && (
@@ -202,6 +235,9 @@ const styles = StyleSheet.create({
   },
   previewBtnDisabled: { opacity: 0.4 },
   previewBtnText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
+  tooLongBox:   { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.ACCENT_HOT, padding: SPACE.MD, gap: SPACE.XS },
+  tooLongTitle: { color: C.ACCENT_HOT, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD },
+  tooLongText:  { color: C.MUTED, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
   preview: { gap: SPACE.SM },
   previewThumb: {
     width: '100%', aspectRatio: 16 / 9,
