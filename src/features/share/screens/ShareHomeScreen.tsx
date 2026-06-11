@@ -5,7 +5,9 @@ import {
   ScrollView, useWindowDimensions, Animated, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { useFocusEffect } from '@react-navigation/native';
+import Video from 'react-native-video';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import {
@@ -53,7 +55,7 @@ function DurationBadge({ seconds }: { seconds: number }) {
 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok' | 'instagram'; createdAt?: string };
+type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok' | 'instagram'; videoUrl?: string | null; duration?: number; createdAt?: string };
 type Mode = 'browse' | 'paste';
 const PAGE = 50;
 const DRAWER_HEIGHT_PCT = 0.68;
@@ -61,6 +63,7 @@ const DRAWER_HEIGHT_PCT = 0.68;
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenProps<'ShareHome'>) {
   const { top, bottom } = useSafeAreaInsets();
+  const isFocused = useIsFocused();   // pause the instagram preview when leaving the tab
   const { width, height } = useWindowDimensions();
   const { user } = useAuthStore();
 
@@ -178,9 +181,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     type GridItem = VideoItem & { duration?: number; fetchedAt?: string };
     const shorts = results.map(r => ({ ...r })) as GridItem[];
     if (query.trim()) { return shorts; }
+    // Members Only content only surfaces in the Latest tab for now.
+    if (category !== 'latest') { return shorts; }
     const sortTs = (it: GridItem) => it.fetchedAt ?? it.createdAt ?? '';
     return [...memberVideos, ...shorts].sort((a, b) => sortTs(b).localeCompare(sortTs(a)));
-  }, [showForYou, feedItems, results, memberVideos, query]);
+  }, [showForYou, feedItems, results, memberVideos, query, category]);
 
   useEffect(() => {
     if (mode !== 'browse') { return; }
@@ -489,6 +494,18 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       {/* ── Player overlay ─────────────────────────────────────────────────── */}
       {selectedVideo && (
         <Animated.View style={[styles.playerOverlay, { opacity: playerOpacity, transform: [{ scale: playerScale }] }]}>
+          {selectedVideo.sourceType === 'instagram' && selectedVideo.videoUrl ? (
+            <Video
+              source={{ uri: selectedVideo.videoUrl }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="contain"
+              controls
+              paused={!isFocused}
+              playInBackground={false}
+              playWhenInactive={false}
+              repeat
+            />
+          ) : (
           <WebView
             style={StyleSheet.absoluteFill}
             source={selectedVideo.sourceType === 'tiktok'
@@ -499,6 +516,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
             allowsFullscreenVideo={false}
             javaScriptEnabled
           />
+          )}
 
           {/* Close */}
           <TouchableOpacity style={[styles.overlayClose, { top: top + SPACE.MD }]} onPress={closePlayer} activeOpacity={0.8}>
@@ -522,9 +540,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 activeOpacity={0.85}
                 onPress={() => selectedVideo && shareTextNative(
                   selectedVideo.title || 'Check out this video',
-                  sourceVideoUrl(selectedVideo.videoId, selectedVideo.sourceType ?? 'youtube'),
+                  selectedVideo.sourceType === 'instagram'
+                    ? (selectedVideo.videoUrl ?? '')   // instagram: share the re-hosted file URL
+                    : sourceVideoUrl(selectedVideo.videoId, selectedVideo.sourceType ?? 'youtube'),
                 )}>
-                <Text style={styles.nativeShareIcon}>↗</Text>
+                <Ionicons name="share-outline" size={24} color={C.WHITE} />
               </TouchableOpacity>
             </View>
             {!!toastMsg && (

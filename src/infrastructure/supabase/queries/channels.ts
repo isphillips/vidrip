@@ -228,7 +228,8 @@ export type MembersOnlyVideo = {
   thumbnail: string;
   channelTitle: string;
   sourceType: 'youtube' | 'tiktok' | 'instagram';
-  createdAt: string;   // recency axis for interleaving into the shorts feed
+  videoUrl?: string | null;   // instagram plays from the re-hosted file (no embed)
+  createdAt: string;          // recency axis for interleaving into the shorts feed
 };
 
 /** Recent source videos from JOINED Members Only channels, for the share browse grid. */
@@ -255,7 +256,7 @@ export async function fetchMembersOnlyVideos(userId: string, limit = 30): Promis
 
   const { data: posts } = await (supabase as any)
     .from('channel_posts')
-    .select('channel_id, yt_video_id, yt_video_title, yt_video_thumbnail, source_type, created_at')
+    .select('channel_id, yt_video_id, yt_video_title, yt_video_thumbnail, source_type, video_url, created_at')
     .in('channel_id', ids)
     .eq('post_type', 'youtube')
     .eq('hidden', false)   // exclude videos from disabled creator accounts
@@ -271,6 +272,7 @@ export async function fetchMembersOnlyVideos(userId: string, limit = 30): Promis
       thumbnail: p.yt_video_thumbnail ?? '',
       channelTitle: `@${handleById.get(p.channel_id) ?? ''}`,
       sourceType: (p.source_type ?? 'youtube') as 'youtube' | 'tiktok' | 'instagram',
+      videoUrl: p.video_url ?? null,
       createdAt: p.created_at ?? '',
     }));
 }

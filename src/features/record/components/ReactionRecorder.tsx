@@ -284,7 +284,9 @@ export default function ReactionRecorder({
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  if (!ready || !device) {
+  // In __DEV__ (iOS Simulator has no camera device) fall through so the source
+  // player + recording controls (Stop/Restart/Exit) are still testable.
+  if ((!ready || !device) && !__DEV__) {
     return (
       <View style={styles.center}>
         <Text style={styles.infoText}>Camera and microphone access required</Text>
@@ -301,6 +303,7 @@ export default function ReactionRecorder({
       {igSource ? (
         <View style={styles.ytCover}>
           <InstagramPlayer
+            key={ytKey}
             ref={igRef}
             uri={sourceUri as string}
             style={{ width, height }}
@@ -319,6 +322,7 @@ export default function ReactionRecorder({
       ) : videoId && sourceType === 'tiktok' ? (
         <View style={styles.ytCover}>
           <TikTokPlayer
+            key={ytKey}
             ref={ttRef}
             style={{ width, height, backgroundColor: '#000' }}
             videoId={videoId}
@@ -349,7 +353,7 @@ export default function ReactionRecorder({
 
       {/* Camera — PIP corner when a source video drives the screen, otherwise
           full-screen (private channel clips, reviews). */}
-      {ready && device && (
+      {ready && device ? (
         <View style={sourceDriven
           ? [styles.pip, { bottom: bottomInset + 100, right: SPACE.LG }]
           : StyleSheet.absoluteFill}>
@@ -368,7 +372,14 @@ export default function ReactionRecorder({
           />
           {isRecording && sourceDriven && <View style={styles.pipRecDot} />}
         </View>
-      )}
+      ) : __DEV__ ? (
+        // Simulator placeholder so the source player + controls are still visible.
+        <View style={sourceDriven
+          ? [styles.pip, styles.devCam, { bottom: bottomInset + 100, right: SPACE.LG }]
+          : [StyleSheet.absoluteFill, styles.devCam]}>
+          <Text style={styles.devCamTxt}>DEV cam{isRecording ? ' ●' : ''}</Text>
+        </View>
+      ) : null}
 
       {/* Floating emojis */}
       {floating.map(f => (
@@ -466,6 +477,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM,
   },
   devStartTxt: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
+  devCam: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  devCamTxt: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
   ytCover: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   ytCoverInner: { position: 'absolute' },
   igPlayOverlay: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
