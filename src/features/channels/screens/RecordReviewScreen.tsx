@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { postReview } from '../../../infrastructure/supabase/queries/channels';
+import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
@@ -18,7 +19,10 @@ export default function RecordReviewScreen({
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
   const onSave = useCallback(async (filePath: string, duration: number) => {
-    enqueue('Sending review…', () => postReview({ channelId, postId, reviewerId: user!.id, filePath, duration }));
+    enqueue('Sending review…', async () => {
+      await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'review' });
+      await postReview({ channelId, postId, reviewerId: user!.id, filePath, duration });
+    });
   }, [channelId, postId, user, enqueue]);
 
   return (

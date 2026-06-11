@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { fetchChannelPost, commitChannelClip, uploadChannelClipRelay } from '../../../infrastructure/supabase/queries/channels';
+import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
 import { C } from '../../../theme';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
@@ -29,10 +30,13 @@ export default function WatchYouTubePostScreen({
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
   const onSave = useCallback(async (filePath: string, duration: number, _ytStartOffset: number, recordedWithHeadphones: boolean) => {
-    // Commit (row + local copy) before returning so the reaction is watchable
-    // immediately; upload the cloud copy in the background for other members.
-    const newPostId = await commitChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones });
-    enqueue('Posting reaction…', () => uploadChannelClipRelay(newPostId, user!.id));
+    // Moderate, then commit (row + local copy) and upload the cloud copy — all in
+    // the background queue so a flagged clip is never inserted or published.
+    enqueue('Posting reaction…', async () => {
+      await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'channel_clip' });
+      const newPostId = await commitChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones });
+      await uploadChannelClipRelay(newPostId, user!.id);
+    });
   }, [channelId, postId, user, enqueue]);
 
   const ready = sourceType === 'instagram' ? !!sourceUri : !!videoId;
