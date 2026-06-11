@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, TextInput, FlatList, StyleSheet,
   TouchableOpacity, Image, ActivityIndicator, Alert, RefreshControl,
-  ScrollView, useWindowDimensions, Animated, KeyboardAvoidingView, Platform,
+  ScrollView, useWindowDimensions, Animated, KeyboardAvoidingView, Platform, BackHandler,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Video from 'react-native-video';
@@ -173,6 +173,16 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     if (!user?.id) { setMemberVideos([]); return; }
     fetchMembersOnlyVideos(user.id).then(setMemberVideos).catch(() => {});
   }, [user?.id]));
+
+  // Android back button: close drawer or player overlay before letting navigation pop.
+  useFocusEffect(useCallback(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (drawerOpen) { closeDrawer(); return true; }
+      if (selectedVideo) { closePlayer(); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [drawerOpen, selectedVideo, closeDrawer, closePlayer]));
 
   // Grid = Members Only videos interleaved into the YouTube shorts feed by recency
   // (newest first), rather than pinned to the top. Search results stay as-is.
