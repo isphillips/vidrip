@@ -1,24 +1,39 @@
 import { supabase } from '../client';
 import type { FeedItem } from './connectedFeed';
 
-/** The user's cached "Recommended" videos (short-form from relevant subscriptions). */
-export async function fetchRecommended(userId: string, limit = 60): Promise<FeedItem[]> {
+// Server enforces 1 refresh / 15 min (fetch-recommended COOLDOWN_MS) — mirror it
+// client-side so the button can show a live countdown.
+export const RECOMMENDED_COOLDOWN_MS = 15 * 60 * 1000;
+export function recommendedCooldownRemainingMs(lastFetchedAt: string | null): number {
+  if (!lastFetchedAt) { return 0; }
+  return Math.max(0, RECOMMENDED_COOLDOWN_MS - (Date.now() - new Date(lastFetchedAt).getTime()));
+}
+
+/** The user's cached "Recommended" videos + when they were last refreshed. */
+export async function fetchRecommended(
+  userId: string, limit = 60,
+): Promise<{ items: FeedItem[]; lastFetchedAt: string | null }> {
   const { data, error } = await (supabase as any)
     .from('recommended_items')
-    .select('video_id, title, thumbnail, channel_title, source_type, published_at')
+    .select('video_id, title, thumbnail, channel_title, source_type, published_at, fetched_at')
     .eq('user_id', userId)
     .order('published_at', { ascending: false, nullsFirst: false })
     .order('fetched_at', { ascending: false })
     .limit(limit);
   if (error) { throw error; }
-  return (data ?? []).map((r: any) => ({
-    videoId: r.video_id,
-    title: r.title ?? '',
-    thumbnail: r.thumbnail ?? '',
-    channelTitle: r.channel_title ?? '',
-    sourceType: (r.source_type ?? 'youtube') as 'youtube' | 'tiktok' | 'instagram',
-    publishedAt: r.published_at ?? null,
-  }));
+  const rows = data ?? [];
+  return {
+    items: rows.map((r: any) => ({
+      videoId: r.video_id,
+      title: r.title ?? '',
+      thumbnail: r.thumbnail ?? '',
+      channelTitle: r.channel_title ?? '',
+      sourceType: (r.source_type ?? 'youtube') as 'youtube' | 'tiktok' | 'instagram',
+      publishedAt: r.published_at ?? null,
+    })),
+    // All rows from one refresh share the same fetched_at.
+    lastFetchedAt: rows[0]?.fetched_at ?? null,
+  };
 }
 
 /**

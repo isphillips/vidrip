@@ -21,12 +21,15 @@ import { useShareIntentStore } from '../../../store/shareIntentStore';
 import { shareTextNative, sourceVideoUrl } from '../../../infrastructure/share/nativeShare';
 import { fetchMembersOnlyVideos } from '../../../infrastructure/supabase/queries/channels';
 import {
-  fetchConnectedFeed, refreshConnectedFeed, feedCooldownRemainingMs,
+  fetchConnectedFeed, refreshConnectedFeed, FEED_REFRESH_COOLDOWN_MS,
 } from '../../../infrastructure/supabase/queries/connectedFeed';
 import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/syncedAccounts';
-import { fetchRecommended, refreshRecommended } from '../../../infrastructure/supabase/queries/recommended';
+import { fetchRecommended, refreshRecommended, RECOMMENDED_COOLDOWN_MS } from '../../../infrastructure/supabase/queries/recommended';
 import { useAuthStore } from '../../../store/authStore';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
+
+// Natural height of the expanding search row (input padding + line + border).
+const SEARCH_ROW_HEIGHT = 56;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function extractYouTubeId(url: string): string | null {
@@ -45,6 +48,33 @@ function extractYouTubeId(url: string): string | null {
 function extractInstagramId(url: string): string | null {
   const m = url.match(/instagram\.com\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
   return m ? m[1] : null;
+}
+
+// Refresh button with a live MM:SS countdown while on cooldown. Self-ticking so it
+// re-renders every second without re-rendering the whole share screen. The spinner
+// is scaled down to the text size so the button doesn't change size when pressed.
+function RefreshButton({ lastFetchedAt, cooldownMs, refreshing, onPress }: {
+  lastFetchedAt: string | null; cooldownMs: number; refreshing: boolean; onPress: () => void;
+}) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => force(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const remaining = lastFetchedAt
+    ? Math.max(0, cooldownMs - (Date.now() - new Date(lastFetchedAt).getTime())) : 0;
+  const onCooldown = remaining > 0;
+  const s = Math.ceil(remaining / 1000);
+  const label = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return (
+    <TouchableOpacity
+      style={[styles.feedRefreshBtn, (onCooldown || refreshing) && styles.feedRefreshBtnDisabled]}
+      onPress={onPress} disabled={onCooldown || refreshing}>
+      {refreshing
+        ? <ActivityIndicator size="small" color={C.WHITE} style={styles.feedRefreshSpinner} />
+        : <Text style={styles.feedRefreshText}>{onCooldown ? `Refresh in ${label}` : 'Refresh'}</Text>}
+    </TouchableOpacity>
+  );
 }
 
 function DurationBadge({ seconds }: { seconds: number }) {
@@ -83,6 +113,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching]    = useState(false);
+  const [searchOpen, setSearchOpen]  = useState(false);   // header search icon → expanding input
   // For You (personal connected feed)
   const [showForYou, setShowForYou]  = useState(false);
   const [feedItems, setFeedItems]    = useState<VideoItem[]>([]);
@@ -95,6 +126,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [recItems, setRecItems] = useState<VideoItem[]>([]);
   const [recLoading, setRecLoading] = useState(false);
   const [recRefreshing, setRecRefreshing] = useState(false);
+  const [recLastFetchedAt, setRecLastFetchedAt] = useState<string | null>(null);
   const offsetRef  = useRef(0);
   const hasMoreRef = useRef(true);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -110,6 +142,19 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // player overlay
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const playerAnim = useRef(new Animated.Value(0)).current;
+
+  // header search — animate the expanding input row open/closed
+  const searchAnim = useRef(new Animated.Value(0)).current;
+  const searchInputRef = useRef<TextInput>(null);
+  useEffect(() => {
+    Animated.timing(searchAnim, {
+      toValue: searchOpen ? 1 : 0, duration: 200, useNativeDriver: false,
+    }).start();
+    if (searchOpen) {
+      const t = setTimeout(() => searchInputRef.current?.focus(), 80);
+      return () => clearTimeout(t);
+    }
+  }, [searchOpen, searchAnim]);
 
   // share drawer
   const [drawerOpen, setDrawerOpen]   = useState(false);
@@ -178,19 +223,24 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     if (!user?.id) { return; }
     setRecLoading(true);
     try {
-      const items = await fetchRecommended(user.id);
+      const { items, lastFetchedAt } = await fetchRecommended(user.id);
       setRecItems(items.map(it => ({
         videoId: it.videoId, title: it.title, thumbnail: it.thumbnail,
         channelTitle: it.channelTitle, sourceType: it.sourceType,
         createdAt: it.publishedAt ?? undefined,
       })));
+      setRecLastFetchedAt(lastFetchedAt);
     } catch (e) { console.error('[ShareHome] recommended', e); }
     finally { setRecLoading(false); }
   }, [user?.id]);
 
   const handleRefreshRecommended = useCallback(async () => {
     setRecRefreshing(true);
-    try { await refreshRecommended(); await loadRecommended(); }
+    try {
+      await refreshRecommended();
+      setRecLastFetchedAt(new Date().toISOString());   // start the cooldown clock now
+      await loadRecommended();
+    }
     catch (e: any) { Alert.alert('Recommended', e?.message ?? 'Could not refresh recommendations.'); }
     finally { setRecRefreshing(false); }
   }, [loadRecommended]);
@@ -233,29 +283,33 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // Grid = Members Only videos interleaved into the YouTube shorts feed by recency
   // (newest first), rather than pinned to the top. Search results stay as-is.
   const gridData = useMemo(() => {
-    if (showRecommended) { return recItems; }
-    if (showForYou) { return feedItems; }
     type GridItem = VideoItem & { duration?: number; fetchedAt?: string };
     const shorts = results.map(r => ({ ...r })) as GridItem[];
+    // Active search overrides whatever tab you're on (search runs against Shorts).
     if (query.trim()) { return shorts; }
+    if (showRecommended) { return recItems; }
+    if (showForYou) { return feedItems; }
     // Members Only content only surfaces in the Latest tab for now.
     if (category !== 'latest') { return shorts; }
     const sortTs = (it: GridItem) => it.fetchedAt ?? it.createdAt ?? '';
     return [...memberVideos, ...shorts].sort((a, b) => sortTs(b).localeCompare(sortTs(a)));
-  }, [showRecommended, recItems, showForYou, feedItems, results, memberVideos, query, category]);
+  }, [query, results, showRecommended, recItems, showForYou, feedItems, memberVideos, category]);
 
   useEffect(() => {
     if (mode !== 'browse') { return; }
+    clearTimeout(searchTimer.current);
+    // Searching takes priority over the active tab (works from For You / Recommended too).
+    if (query.trim()) {
+      searchTimer.current = setTimeout(async () => {
+        setSearching(true);
+        try { setResults(await searchShorts(query.trim())); } catch { /* keep */ }
+        setSearching(false);
+      }, 500);
+      return () => clearTimeout(searchTimer.current);
+    }
     if (showRecommended) { loadRecommended(); return; }
     if (showForYou) { loadForYou(); return; }
-    clearTimeout(searchTimer.current);
-    if (!query.trim()) { loadCategory(category); return; }
-    searchTimer.current = setTimeout(async () => {
-      setSearching(true);
-      try { setResults(await searchShorts(query.trim())); } catch { /* keep */ }
-      setSearching(false);
-    }, 500);
-    return () => clearTimeout(searchTimer.current);
+    loadCategory(category);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, category, mode, showForYou, showRecommended]);
 
@@ -418,12 +472,20 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const playerOpacity = playerAnim;
   const playerScale   = playerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
 
-  const feedCooldownMs  = feedCooldownRemainingMs(feedLastSyncedAt);
-  const feedCooldownMin = Math.ceil(feedCooldownMs / 60000);
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.header, { marginTop: top }]}>Share</Text>
+      <View style={[styles.headerRow, { marginTop: top }]}>
+        <Text style={styles.headerTitle}>Share</Text>
+        {mode === 'browse' && (
+          <TouchableOpacity
+            style={styles.searchToggle}
+            hitSlop={10}
+            onPress={() => { const next = !searchOpen; setSearchOpen(next); if (!next) { setQuery(''); } }}>
+            <Ionicons name={searchOpen ? 'close' : 'search'} size={22} color={C.INK} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Mode toggle */}
       <View style={styles.toggle}>
@@ -463,19 +525,26 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         </View>
       ) : (
         <>
-          {!showForYou && !showRecommended && (
+          <Animated.View
+            pointerEvents={searchOpen ? 'auto' : 'none'}
+            style={{
+              opacity: searchAnim,
+              height: searchAnim.interpolate({ inputRange: [0, 1], outputRange: [0, SEARCH_ROW_HEIGHT] }),
+              overflow: 'hidden',
+            }}>
             <View style={styles.searchRow}>
               <TextInput
+                ref={searchInputRef}
                 style={styles.searchInput} value={query} onChangeText={setQuery}
                 placeholder="Search Shorts…" placeholderTextColor={C.SUBTLE}
                 autoCorrect={false} autoCapitalize="none" returnKeyType="search" clearButtonMode="while-editing"
               />
               {searching && <ActivityIndicator size="small" color={C.ACCENT} style={styles.searchSpinner} />}
             </View>
-          )}
+          </Animated.View>
 
           {!query.trim() && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
               <TouchableOpacity key="foryou" style={[styles.tab, showForYou && styles.tabActive]}
                 onPress={() => { setShowForYou(true); setShowRecommended(false); setQuery(''); }}>
                 <Text style={[styles.tabTxt, showForYou && styles.tabTxtActive]}>For You</Text>
@@ -503,36 +572,35 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
           {showForYou && hasFeedConnection && (
             <View style={styles.feedBar}>
               <Text style={styles.feedBarText}>Liked videos</Text>
-              <TouchableOpacity
-                style={[styles.feedRefreshBtn, (feedCooldownMs > 0 || feedRefreshing) && styles.feedRefreshBtnDisabled]}
+              <RefreshButton
+                lastFetchedAt={feedLastSyncedAt}
+                cooldownMs={FEED_REFRESH_COOLDOWN_MS}
+                refreshing={feedRefreshing}
                 onPress={handleRefreshFeed}
-                disabled={feedCooldownMs > 0 || feedRefreshing}>
-                {feedRefreshing
-                  ? <ActivityIndicator size="small" color={C.WHITE} />
-                  : <Text style={styles.feedRefreshText}>{feedCooldownMs > 0 ? `Refresh in ${feedCooldownMin}m` : 'Refresh'}</Text>}
-              </TouchableOpacity>
+              />
             </View>
           )}
 
           {showRecommended && (
             <View style={styles.feedBar}>
               <Text style={styles.feedBarText}>From your subscriptions</Text>
-              <TouchableOpacity
-                style={[styles.feedRefreshBtn, recRefreshing && styles.feedRefreshBtnDisabled]}
+              <RefreshButton
+                lastFetchedAt={recLastFetchedAt}
+                cooldownMs={RECOMMENDED_COOLDOWN_MS}
+                refreshing={recRefreshing}
                 onPress={handleRefreshRecommended}
-                disabled={recRefreshing}>
-                {recRefreshing
-                  ? <ActivityIndicator size="small" color={C.WHITE} />
-                  : <Text style={styles.feedRefreshText}>Refresh</Text>}
-              </TouchableOpacity>
+              />
             </View>
           )}
           <View style={{ height: SPACE.SM }} />
 
           {(() => {
-            const special = showForYou || showRecommended;
+            const special = (showForYou || showRecommended) && !query.trim();
             const gridLoading = showRecommended ? recLoading : showForYou ? feedLoading : loading;
-            const data: typeof gridData = gridLoading ? [] : gridData;
+            // Keep the current items on screen while any tab reloads — the old
+            // category's results linger in state until the new ones land, so there's
+            // no blank flash or layout jump. Only truly-empty tabs show a spinner.
+            const data = gridData;
             const isEmpty = data.length === 0;
             return (
               <FlatList
@@ -553,7 +621,9 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                     <ActivityIndicator color={C.ACCENT} style={styles.gridSpinner} />
                   ) : (
                     <Text style={[styles.emptyText, special ? styles.emptyTextTop : styles.emptyTextCenter]}>
-                      {showRecommended
+                      {query.trim()
+                        ? `No results for "${query.trim()}"`
+                        : showRecommended
                         ? 'No recommendations yet — tap Refresh to pull from your subscriptions.'
                         : showForYou
                         ? (hasFeedConnection
@@ -750,14 +820,19 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
 
-  header: {
-    fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD,
-    color: C.INK, letterSpacing: -1, padding: SPACE.LG, paddingBottom: 0,
+  headerRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SPACE.LG, paddingTop: SPACE.LG,
   },
+  headerTitle: {
+    fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD,
+    color: C.INK, letterSpacing: -1,
+  },
+  searchToggle: { padding: SPACE.XS },
 
   // mode toggle
   toggle: {
-    flexDirection: 'row', margin: SPACE.LG, marginTop: SPACE.MD,
+    flexDirection: 'row', marginHorizontal: SPACE.LG, marginTop: SPACE.MD, marginBottom: SPACE.MD,
     backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, padding: 3, gap: 3,
   },
   toggleBtn:       { flex: 1, paddingVertical: SPACE.SM, alignItems: 'center', borderRadius: RADIUS.SM },
@@ -786,8 +861,9 @@ const styles = StyleSheet.create({
   searchInput:   { flex: 1, paddingVertical: SPACE.MD, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   searchSpinner: { marginLeft: SPACE.SM },
   gridSpinner: { position: 'absolute', top: '50%' },
-  tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingBottom: SPACE.LG },
-  tab:     { paddingHorizontal: SPACE.LG, justifyContent: 'center', height: 36, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
+  tabsScroll: {  height: 50, marginBottom: SPACE.LG },
+  tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, alignItems: 'center' },
+  tab:     { alignItems: 'center', justifyContent: 'center', height: 30, paddingHorizontal: SPACE.MD, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
   tabActive:    { backgroundColor: C.ACCENT, borderColor: C.ACCENT },
   tabTxt:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   tabTxtActive: { color: C.WHITE },
@@ -804,6 +880,7 @@ const styles = StyleSheet.create({
   },
   feedRefreshBtnDisabled: { opacity: 0.45 },
   feedRefreshText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
+  feedRefreshSpinner: { transform: [{ scale: 0.7 }] },   // match text height so the button doesn't grow
 
   // grid
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACE.XXXL },

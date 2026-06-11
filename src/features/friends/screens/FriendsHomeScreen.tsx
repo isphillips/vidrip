@@ -181,6 +181,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACE.XS,
     borderWidth: 1,
     borderColor: C.BORDER,
+    marginRight: SPACE.LG,
   },
   addButtonText: { color: C.INK, fontSize: FONT.SIZES.SM },
   sectionLabel: {
