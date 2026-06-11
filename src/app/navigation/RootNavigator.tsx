@@ -7,6 +7,7 @@ import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
 import { useAuthStore } from '../../store/authStore';
 import { useOAuthStore } from '../../store/oauthStore';
+import { useShareIntentStore } from '../../store/shareIntentStore';
 import { parseOAuthDeepLink } from '../../infrastructure/oauth/config';
 import { ensureReactionsDir } from '../../infrastructure/storage/localReactionStorage';
 import {
@@ -101,6 +102,20 @@ export default function RootNavigator() {
 
   const handleDeepLink = async (url: string) => {
     if (!url.startsWith('reaxn://')) { return; }
+
+    // OS "Share to Vidrip" (Android ACTION_SEND rewritten to reaxn://share, or the
+    // iOS Share Extension) → pull the link out and drop it into the paste flow.
+    if (url.startsWith('reaxn://share')) {
+      const query = url.split('?')[1] ?? '';
+      const text = new URLSearchParams(query).get('text');
+      if (text) {
+        // Shared text may be "Check this out https://…"; grab the URL if present.
+        const link = text.match(/https?:\/\/\S+/)?.[0] ?? text;
+        useShareIntentStore.getState().setPendingUrl(link);
+        navRef.current?.navigate('Main', { screen: 'Share', params: { screen: 'ShareHome' } });
+      }
+      return;
+    }
 
     // OAuth account-sync redirect → hand to AccountScreen to run the sync.
     const oauth = parseOAuthDeepLink(url);

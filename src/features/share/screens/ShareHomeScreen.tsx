@@ -15,6 +15,8 @@ import { fetchFriends, type Friend } from '../../../infrastructure/supabase/quer
 import { sendThread } from '../../../infrastructure/supabase/queries/threads';
 import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
 import { fetchYouTubeDurationSeconds, MAX_VIDEO_SECONDS } from '../../../infrastructure/youtube/api';
+import { useShareIntentStore } from '../../../store/shareIntentStore';
+import { shareTextNative, sourceVideoUrl } from '../../../infrastructure/share/nativeShare';
 import { fetchMembersOnlyVideos } from '../../../infrastructure/supabase/queries/channels';
 import {
   fetchConnectedFeed, refreshConnectedFeed, feedCooldownRemainingMs,
@@ -265,6 +267,16 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     }
   };
 
+  // ── Inbound OS share ("Share to Vidrip") → prefill the paste field ───────────
+  const pendingShareUrl = useShareIntentStore(s => s.pendingUrl);
+  const clearPendingShareUrl = useShareIntentStore(s => s.setPendingUrl);
+  useEffect(() => {
+    if (!pendingShareUrl) { return; }
+    setMode('paste');
+    setUrl(pendingShareUrl);
+    clearPendingShareUrl(null);
+  }, [pendingShareUrl, clearPendingShareUrl]);
+
   // ── Reactive link validation (runs as the user pastes/types) ─────────────────
   useEffect(() => {
     if (mode !== 'paste') { return; }
@@ -501,9 +513,20 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 <Text style={styles.overlayChannel}>{selectedVideo.channelTitle}</Text>
               )}
             </View>
-            <TouchableOpacity style={styles.shareBtn} onPress={openDrawer} activeOpacity={0.85}>
-              <Text style={styles.shareBtnText}>Share with Friend</Text>
-            </TouchableOpacity>
+            <View style={styles.shareRow}>
+              <TouchableOpacity style={[styles.shareBtn, styles.shareBtnFlex]} onPress={openDrawer} activeOpacity={0.85}>
+                <Text style={styles.shareBtnText}>Share with Friend</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.nativeShareBtn}
+                activeOpacity={0.85}
+                onPress={() => selectedVideo && shareTextNative(
+                  selectedVideo.title || 'Check out this video',
+                  sourceVideoUrl(selectedVideo.videoId, selectedVideo.sourceType ?? 'youtube'),
+                )}>
+                <Text style={styles.nativeShareIcon}>↗</Text>
+              </TouchableOpacity>
+            </View>
             {!!toastMsg && (
               <View style={styles.toast}><Text style={styles.toastText}>{toastMsg}</Text></View>
             )}
@@ -705,8 +728,12 @@ const styles = StyleSheet.create({
   overlayInfo:    { gap: 2 },
   overlayTitle:   { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   overlayChannel: { color: 'rgba(255,255,255,0.7)', fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
-  shareBtn:     { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.LG, alignItems: 'center' },
+  shareRow:     { flexDirection: 'row', gap: SPACE.SM, alignItems: 'stretch' },
+  shareBtn:     { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.LG, alignItems: 'center', justifyContent: 'center' },
+  shareBtnFlex: { flex: 1 },
   shareBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
+  nativeShareBtn:  { width: 56, borderRadius: RADIUS.MD, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
+  nativeShareIcon: { color: C.WHITE, fontSize: 24, fontFamily: FONT.BODY_BOLD },
   toast: { backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: RADIUS.MD, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG, alignSelf: 'center' },
   toastText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
 

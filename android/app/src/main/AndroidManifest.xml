@@ -32,6 +32,14 @@
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="reaxn" />
         </intent-filter>
+        <!-- "Share to Vidrip": appear in the OS share sheet for shared links/text
+             (e.g. YouTube → Share). MainActivity rewrites the ACTION_SEND text into
+             a reaxn://share deep link handled in RootNavigator. -->
+        <intent-filter>
+            <action android:name="android.intent.action.SEND" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <data android:mimeType="text/plain" />
+        </intent-filter>
       </activity>
       <service
         android:name=".ScreenRecordService"
