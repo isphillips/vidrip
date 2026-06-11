@@ -54,5 +54,5 @@ export async function searchShorts(query: string, limit = 50): Promise<ShortRow[
   return (data ?? []).map(mapRow);
 }
 
-export const CATEGORIES = ['all', 'latest', 'trending', 'music', 'gaming', 'funny', 'food', 'sports', 'dance', 'pets'] as const;
+export const CATEGORIES = ['all', 'latest', 'trending', 'music', 'gaming', 'funny', 'food', 'sports', 'news', 'pets'] as const;
 export type Category = typeof CATEGORIES[number];
