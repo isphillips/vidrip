@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, Linking, View } from 'react-native';
@@ -91,6 +91,24 @@ export default function RootNavigator() {
     };
   }, []);
 
+  // "Share to Vidrip" → go to the Share tab. The shared link can arrive before the
+  // NavigationContainer is mounted (cold start shows a loading spinner first), so we
+  // can't navigate on a timer — navRef may still be null. Instead navigate whenever
+  // BOTH a link is pending and the container is ready: from this effect (warm start /
+  // session just loaded) and from the container's onReady (cold start). ShareHomeScreen
+  // reads the URL from the store and fills it in.
+  const pendingShareUrl = useShareIntentStore(s => s.pendingUrl);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const navigateToShareIfReady = useCallback(() => {
+    if (sessionRef.current
+        && useShareIntentStore.getState().pendingUrl
+        && navRef.current?.isReady()) {
+      navRef.current.navigate('Main', { screen: 'Share', params: { screen: 'ShareHome' } });
+    }
+  }, []);
+  useEffect(() => { navigateToShareIfReady(); }, [pendingShareUrl, session, navigateToShareIfReady]);
+
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
       .from('users')
@@ -104,7 +122,9 @@ export default function RootNavigator() {
     if (!url.startsWith('reaxn://')) { return; }
 
     // OS "Share to Vidrip" (Android ACTION_SEND rewritten to reaxn://share, or the
-    // iOS Share Extension) → pull the link out and drop it into the paste flow.
+    // iOS Share Extension) → pull the link out and stash it. The navigation to the
+    // Share tab is driven by the effect below, once the navigator + session are
+    // actually ready (on a cold start the link arrives before they mount).
     if (url.startsWith('reaxn://share')) {
       const query = url.split('?')[1] ?? '';
       const text = new URLSearchParams(query).get('text');
@@ -112,7 +132,6 @@ export default function RootNavigator() {
         // Shared text may be "Check this out https://…"; grab the URL if present.
         const link = text.match(/https?:\/\/\S+/)?.[0] ?? text;
         useShareIntentStore.getState().setPendingUrl(link);
-        navRef.current?.navigate('Main', { screen: 'Share', params: { screen: 'ShareHome' } });
       }
       return;
     }
@@ -147,7 +166,7 @@ export default function RootNavigator() {
   const showOnboarding = !!session && (!onboarded || replaying);
 
   return (
-    <NavigationContainer ref={navRef}>
+    <NavigationContainer ref={navRef} onReady={navigateToShareIfReady}>
       <Root.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           showOnboarding ? (

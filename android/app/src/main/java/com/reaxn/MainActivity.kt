@@ -35,6 +35,7 @@ class MainActivity : ReactActivity() {
       if (!text.isNullOrBlank()) {
         intent.action = Intent.ACTION_VIEW
         intent.data = Uri.parse("reaxn://share?text=" + Uri.encode(text))
+        setIntent(intent)
       }
     }
   }
