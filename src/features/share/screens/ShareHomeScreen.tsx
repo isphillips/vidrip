@@ -41,6 +41,11 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
+function extractInstagramId(url: string): string | null {
+  const m = url.match(/instagram\.com\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
 function DurationBadge({ seconds }: { seconds: number }) {
   const s = seconds % 60;
   const m = Math.floor(seconds / 60);
@@ -297,8 +302,9 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     if (mode !== 'paste') { return; }
     const trimmed = url.trim();
     if (!trimmed) { setLinkStatus('idle'); return; }
-    // TikTok: can't fetch duration from the public API → allow through.
+    // TikTok / Instagram: can't fetch duration → allow through.
     if (extractTikTokId(trimmed)) { setLinkStatus('ok'); return; }
+    if (extractInstagramId(trimmed)) { setLinkStatus('ok'); return; }
     const ytId = extractYouTubeId(trimmed);
     if (!ytId) { setLinkStatus('invalid'); return; }
     setLinkStatus('checking');
@@ -330,8 +336,14 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       return;
     }
 
+    const igId = extractInstagramId(url.trim());
+    if (igId) {
+      openPlayer({ videoId: igId, title: 'Instagram Reel', thumbnail: '', channelTitle: '', sourceType: 'instagram' });
+      return;
+    }
+
     const videoId = extractYouTubeId(url.trim());
-    if (!videoId) { Alert.alert('Invalid Link', 'Paste a YouTube Shorts or TikTok link to continue.'); return; }
+    if (!videoId) { Alert.alert('Invalid Link', 'Paste a YouTube Shorts, TikTok, or Instagram Reel link to continue.'); return; }
     setPasting(true);
     let title = 'YouTube Short';
     let thumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
@@ -383,10 +395,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       {/* Paste mode */}
       {mode === 'paste' ? (
         <View style={styles.pasteContainer}>
-          <Text style={styles.pasteLabel}>YouTube or TikTok URL</Text>
+          <Text style={styles.pasteLabel}>YouTube, TikTok, or Instagram URL</Text>
           <TextInput
             style={styles.pasteInput} value={url} onChangeText={setUrl}
-            placeholder="Paste a YouTube Shorts or TikTok link" placeholderTextColor={C.SUBTLE}
+            placeholder="Paste a YouTube, TikTok, or Instagram Reel link" placeholderTextColor={C.SUBTLE}
             autoCapitalize="none" autoCorrect={false} keyboardType="url" autoFocus
           />
           {linkStatus === 'tooLong' ? (
@@ -514,6 +526,15 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               playInBackground={false}
               playWhenInactive={false}
               repeat
+            />
+          ) : selectedVideo.sourceType === 'instagram' ? (
+            <WebView
+              style={StyleSheet.absoluteFill}
+              source={{ uri: `https://www.instagram.com/reel/${selectedVideo.videoId}/embed/` }}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo={false}
+              javaScriptEnabled
             />
           ) : (
           <WebView

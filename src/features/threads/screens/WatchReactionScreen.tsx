@@ -1,6 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
+import { WebView } from 'react-native-webview';
+
+const IG_INJECT_JS = `(function(){
+  var hooked=false;
+  function send(t){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:t}));}}
+  function hook(v){if(hooked){return;}hooked=true;v.addEventListener('play',function(){send('playing');});v.addEventListener('ended',function(){send('ended');});}
+  function tryHook(){var vs=document.querySelectorAll('video');if(vs.length>0){hook(vs[0]);return;}setTimeout(tryHook,300);}
+  tryHook();
+  new MutationObserver(function(){if(!hooked){tryHook();}}).observe(document.documentElement,{childList:true,subtree:true});
+  true;
+})();`;
 import {
   View,
   Text,
@@ -344,15 +355,15 @@ export default function WatchReactionScreen({
         />
       </View>
 
-      {/* Tap-to-play background — only when there's NO source PIP. When a PIP is
-          present, the source video's controls drive the reaction (no main controls). */}
+      {/* Tap-to-play background — only when there's NO source PIP (or Instagram, which
+          can't drive the reaction via embed events so the user taps to play directly). */}
       <Pressable
         style={StyleSheet.absoluteFill}
-        onPress={reaction?.yt_video_id ? undefined : handlePlayPause}
+        onPress={reaction?.yt_video_id && reaction.source_type !== 'instagram' ? undefined : handlePlayPause}
       />
 
-      {/* Play icon — only when tap-to-play is active (no PIP). */}
-      {paused && !reaction?.yt_video_id && (
+      {/* Play icon — when tap-to-play is active. */}
+      {paused && (!reaction?.yt_video_id || reaction.source_type === 'instagram') && (
         <View style={styles.playOverlay} pointerEvents="none">
           <View style={styles.playCircle}>
             <Text style={styles.playIcon}>▶</Text>
@@ -364,7 +375,7 @@ export default function WatchReactionScreen({
       {!hasStarted && (
         <View style={styles.startPrompt} pointerEvents="none">
           <Text style={styles.startPromptText}>
-            {reaction?.yt_video_id ? 'Tap ▶ on the video to start' : 'Tap to play reaction'}
+            {reaction?.yt_video_id && reaction.source_type !== 'instagram' ? 'Tap ▶ on the video to start' : 'Tap to play reaction'}
           </Text>
         </View>
       )}
@@ -372,7 +383,24 @@ export default function WatchReactionScreen({
       {/* Source player — full-screen, then animates into the corner on play. */}
       {sessionReady && reaction?.yt_video_id && (
         <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
-          {reaction.source_type === 'tiktok' ? (
+          {reaction.source_type === 'instagram' ? (
+            <WebView
+              style={{ width, height, backgroundColor: '#000' }}
+              source={{ uri: `https://www.instagram.com/reel/${reaction.yt_video_id}/embed/` }}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo={false}
+              javaScriptEnabled
+              injectedJavaScript={IG_INJECT_JS}
+              onMessage={(e) => {
+                try {
+                  const msg = JSON.parse(e.nativeEvent.data);
+                  // Ignore 'paused' — fires during buffering; only 'playing' drives the reaction start.
+                  if (msg.type && msg.type !== 'paused') { handleYtStateChange(msg.type); }
+                } catch { /* ignore */ }
+              }}
+            />
+          ) : reaction.source_type === 'tiktok' ? (
             <TikTokPlayer
               ref={ttRef}
               startMuted={!reaction.recorded_with_headphones}

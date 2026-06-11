@@ -7,6 +7,7 @@ import Orientation from 'react-native-orientation-locker';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
 import InstagramPlayer, { type InstagramPlayerHandle } from '../../../components/InstagramPlayer';
+import { WebView } from 'react-native-webview';
 import {
   Camera,
   useCameraDevice,
@@ -21,6 +22,18 @@ import {
   checkHeadphonesConnected,
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
+
+// Injected into the Instagram embed WebView to bridge <video> play/pause/ended
+// events back to React Native so recording auto-starts/stops like YouTube.
+const IG_INJECT_JS = `(function(){
+  var hooked=false;
+  function send(t){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:t}));}}
+  function hook(v){if(hooked){return;}hooked=true;v.addEventListener('play',function(){send('playing');});v.addEventListener('pause',function(){send('paused');});v.addEventListener('ended',function(){send('ended');});}
+  function tryHook(){var vs=document.querySelectorAll('video');if(vs.length>0){hook(vs[0]);return;}setTimeout(tryHook,300);}
+  tryHook();
+  new MutationObserver(function(){if(!hooked){tryHook();}}).observe(document.documentElement,{childList:true,subtree:true});
+  true;
+})();`;
 
 function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -80,6 +93,9 @@ export default function ReactionRecorder({
   // clips, reviews) the user records with the manual controls.
   const sourceDriven = !!videoId || (sourceType === 'instagram' && !!sourceUri);
   const igSource = sourceType === 'instagram' && !!sourceUri;
+  // Instagram thread shortcode — WebView embed has no controllable player, so the
+  // user starts/stops recording manually while watching the reel.
+  const igWebEmbed = sourceType === 'instagram' && !!videoId && !sourceUri;
 
   const device = useCameraDevice('front');
   // Cap the reaction to 720p/30fps so files stay under the 50MB storage upload
@@ -329,6 +345,27 @@ export default function ReactionRecorder({
             onChangeState={onYtStateChange}
           />
         </View>
+      ) : videoId && sourceType === 'instagram' ? (
+        <View style={styles.ytCover}>
+          <WebView
+            style={StyleSheet.absoluteFill}
+            source={{ uri: `https://www.instagram.com/reel/${videoId}/embed/` }}
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            allowsFullscreenVideo={false}
+            javaScriptEnabled
+            injectedJavaScript={IG_INJECT_JS}
+            onMessage={(e) => {
+              try {
+                const msg = JSON.parse(e.nativeEvent.data);
+                // Ignore 'paused' — Instagram's embed fires it during buffering,
+                // which would prematurely trigger stop. Only 'playing' and 'ended'
+                // drive the recording lifecycle; the manual Stop button handles early exit.
+                if (msg.type && msg.type !== 'paused') { onYtStateChange(msg.type); }
+              } catch { /* ignore non-JSON messages */ }
+            }}
+          />
+        </View>
       ) : videoId ? (() => {
         const coverW = Math.round(height * (16 / 9));
         const offsetX = -Math.round((coverW - width) / 2);
@@ -421,7 +458,7 @@ export default function ReactionRecorder({
       {/* Controls. Source-driven (reactions): start is driven by the source video,
           but once recording you can restart or stop manually. Otherwise (private
           clips / reviews) the manual record button starts it. */}
-      {!uploading && (!sourceDriven || isRecording) && (
+      {!uploading && (!sourceDriven || isRecording || igWebEmbed) && (
         <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
           {isRecording ? (
             <>
