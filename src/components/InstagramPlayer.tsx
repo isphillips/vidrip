@@ -60,6 +60,7 @@ const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function Instag
       muted={muted}
       resizeMode="cover"
       mixWithOthers="mix"
+      playInBackground={false}
       onLoad={() => onReady?.()}
       onProgress={(d: any) =>
         onCurrentTime?.(d.currentTime, d.seekableDuration ?? d.playableDuration ?? 0)}

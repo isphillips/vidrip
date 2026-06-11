@@ -408,7 +408,11 @@ export default function WatchChannelClipScreen({
               <InstagramPlayer
                 ref={igRef}
                 uri={parentSourceUri}
-                startMuted={!post?.recorded_with_headphones}
+                // Unlike the YouTube/TikTok WebView sources, the Instagram source is
+                // a re-hosted file (react-native-video) whose audio the mic barely
+                // captures during recording — so the bleed model gives silence. Play
+                // the HQ source live instead (it's sync-locked to the reaction clock).
+                startMuted={false}
                 style={{ width, height }}
                 onCurrentTime={(t) => { igTimeRef.current = t; }}
               />
