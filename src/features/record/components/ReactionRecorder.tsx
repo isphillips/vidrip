@@ -203,11 +203,11 @@ export default function ReactionRecorder({
           setTimeout(() => reject(new Error('Recording timed out — please try again.')), 15000)
         ),
       ]);
-      // Dismiss the recorder immediately — upload runs in the background via
-      // the upload store and shows progress as a toast.
+      // Commit the save first (fast: DB row + local copy) so the reaction shows
+      // as watchable the moment we return; the slow upload runs in the background
+      // via the upload store and shows progress as a toast.
+      await onSave(video.path, elapsedRef.current, ytStartOffsetRef.current, recordedWithHeadphonesRef.current);
       onBack();
-      onSave(video.path, elapsedRef.current, ytStartOffsetRef.current, recordedWithHeadphonesRef.current)
-        .catch(() => {});
     } catch (e: any) {
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
       setUploading(false);

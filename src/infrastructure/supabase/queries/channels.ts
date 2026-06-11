@@ -722,22 +722,25 @@ async function uploadClipToCloud(localPath: string, uploadPath: string): Promise
   return publicUrl;
 }
 
-export async function postChannelClip({
-  channelId,
-  userId,
-  filePath,
-  duration,
-  parentPostId,
-  recordedWithHeadphones = false,
-}: {
+interface ChannelClipParams {
   channelId: string;
   userId: string;
   filePath: string;
   duration: number;
   parentPostId?: string;
   recordedWithHeadphones?: boolean;
-}): Promise<string> {
-  // Insert first to get a stable ID (video_url filled after upload).
+}
+
+/**
+ * Fast "commit" half of posting a channel clip: insert the row and move the
+ * recording into the local channel-clips dir keyed by the new post id. After
+ * this resolves the clip is immediately playable on THIS device (hasLocalClip
+ * is true) — so callers can navigate back and the clip shows as watchable right
+ * away, while uploadChannelClipRelay() runs the slow upload in the background.
+ */
+export async function commitChannelClip({
+  channelId, userId, filePath, duration, parentPostId, recordedWithHeadphones = false,
+}: ChannelClipParams): Promise<string> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .insert({
@@ -752,25 +755,35 @@ export async function postChannelClip({
     })
     .select('id')
     .single();
-
   if (error) { throw error; }
   const postId = data.id as string;
 
-  // Upload to the channel-clips bucket so OTHER devices/members can download it.
-  // Best-effort: the local copy below still works on this device if upload fails.
-  try {
-    const cloudUrl = await uploadClipToCloud(filePath, `${userId}/${postId}.mp4`);
-    await (supabase as any).from('channel_posts').update({ video_url: cloudUrl }).eq('id', postId);
-  } catch (e) {
-    console.error('[postChannelClip] cloud upload failed:', JSON.stringify(e));
-  }
-
-  // Keep a local copy for instant playback on this device.
-  // WatchChannelClipScreen uses localPathForClip(postId) to find this file.
+  // Keep a local copy for instant playback on this device (before the upload).
+  // WatchChannelClipScreen / ChannelPostScreen use localPathForClip(postId).
   const dir = `${RNFS.DocumentDirectoryPath}/channel-clips`;
   if (!(await RNFS.exists(dir))) { await RNFS.mkdir(dir); }
   await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), `${dir}/${postId}.mp4`);
 
+  return postId;
+}
+
+/** Background "upload" half: push the local copy to the channel-clips bucket so
+ *  other members can download it, then fill in the row's video_url. */
+export async function uploadChannelClipRelay(postId: string, userId: string): Promise<void> {
+  const localPath = `${RNFS.DocumentDirectoryPath}/channel-clips/${postId}.mp4`;
+  const cloudUrl = await uploadClipToCloud(localPath, `${userId}/${postId}.mp4`);
+  await (supabase as any).from('channel_posts').update({ video_url: cloudUrl }).eq('id', postId);
+}
+
+/** One-shot post (commit + upload). Kept for any non-interactive callers; the
+ *  record screens use commit + a backgrounded relay so playback is instant. */
+export async function postChannelClip(params: ChannelClipParams): Promise<string> {
+  const postId = await commitChannelClip(params);
+  try {
+    await uploadChannelClipRelay(postId, params.userId);
+  } catch (e) {
+    console.error('[postChannelClip] cloud upload failed:', JSON.stringify(e));
+  }
   return postId;
 }
 

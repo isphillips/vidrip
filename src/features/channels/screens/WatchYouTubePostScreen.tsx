@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
-import { fetchChannelPost, postChannelClip } from '../../../infrastructure/supabase/queries/channels';
+import { fetchChannelPost, commitChannelClip, uploadChannelClipRelay } from '../../../infrastructure/supabase/queries/channels';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
 import { C } from '../../../theme';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
@@ -25,7 +25,10 @@ export default function WatchYouTubePostScreen({
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
   const onSave = useCallback(async (filePath: string, duration: number, _ytStartOffset: number, recordedWithHeadphones: boolean) => {
-    enqueue('Posting reaction…', () => postChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones }));
+    // Commit (row + local copy) before returning so the reaction is watchable
+    // immediately; upload the cloud copy in the background for other members.
+    const newPostId = await commitChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones });
+    enqueue('Posting reaction…', () => uploadChannelClipRelay(newPostId, user!.id));
   }, [channelId, postId, user, enqueue]);
 
   if (!videoId) {
