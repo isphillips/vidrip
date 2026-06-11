@@ -24,6 +24,7 @@ import {
   fetchConnectedFeed, refreshConnectedFeed, feedCooldownRemainingMs,
 } from '../../../infrastructure/supabase/queries/connectedFeed';
 import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/syncedAccounts';
+import { fetchRecommended, refreshRecommended } from '../../../infrastructure/supabase/queries/recommended';
 import { useAuthStore } from '../../../store/authStore';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
 
@@ -74,7 +75,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
   // browse state
   const [mode, setMode]         = useState<Mode>('browse');
-  const [category, setCategory] = useState<Category>('all');
+  const [category, setCategory] = useState<Category>('latest');
   const [query, setQuery]       = useState('');
   const [results, setResults]   = useState<ShortRow[]>([]);
   const [memberVideos, setMemberVideos] = useState<VideoItem[]>([]);
@@ -89,6 +90,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [feedRefreshing, setFeedRefreshing] = useState(false);
   const [hasFeedConnection, setHasFeedConnection] = useState(false);
   const [feedLastSyncedAt, setFeedLastSyncedAt] = useState<string | null>(null);
+  // Recommended (short-form from the user's relevant subscriptions)
+  const [showRecommended, setShowRecommended] = useState(false);
+  const [recItems, setRecItems] = useState<VideoItem[]>([]);
+  const [recLoading, setRecLoading] = useState(false);
+  const [recRefreshing, setRecRefreshing] = useState(false);
   const offsetRef  = useRef(0);
   const hasMoreRef = useRef(true);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -154,6 +160,41 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     finally { setFeedLoading(false); }
   }, [user?.id]);
 
+  // Know whether the YouTube feed account exists up front — gates the Recommended
+  // tab and the For You refresh bar without first opening the For You tab.
+  useEffect(() => {
+    if (!user?.id) { return; }
+    fetchSyncedAccounts(user.id, 'feed')
+      .then(accts => {
+        const yt = accts.find(a => a.provider === 'youtube');
+        setHasFeedConnection(!!yt);
+        setFeedLastSyncedAt(yt?.last_synced_at ?? null);
+      })
+      .catch(() => {});
+  }, [user?.id]);
+
+  // ── Recommended (relevant subscriptions, short-form) ──────────────────────────
+  const loadRecommended = useCallback(async () => {
+    if (!user?.id) { return; }
+    setRecLoading(true);
+    try {
+      const items = await fetchRecommended(user.id);
+      setRecItems(items.map(it => ({
+        videoId: it.videoId, title: it.title, thumbnail: it.thumbnail,
+        channelTitle: it.channelTitle, sourceType: it.sourceType,
+        createdAt: it.publishedAt ?? undefined,
+      })));
+    } catch (e) { console.error('[ShareHome] recommended', e); }
+    finally { setRecLoading(false); }
+  }, [user?.id]);
+
+  const handleRefreshRecommended = useCallback(async () => {
+    setRecRefreshing(true);
+    try { await refreshRecommended(); await loadRecommended(); }
+    catch (e: any) { Alert.alert('Recommended', e?.message ?? 'Could not refresh recommendations.'); }
+    finally { setRecRefreshing(false); }
+  }, [loadRecommended]);
+
   const handleRefreshFeed = useCallback(async () => {
     if (feedRefreshing) { return; }
     setFeedRefreshing(true);
@@ -192,6 +233,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // Grid = Members Only videos interleaved into the YouTube shorts feed by recency
   // (newest first), rather than pinned to the top. Search results stay as-is.
   const gridData = useMemo(() => {
+    if (showRecommended) { return recItems; }
     if (showForYou) { return feedItems; }
     type GridItem = VideoItem & { duration?: number; fetchedAt?: string };
     const shorts = results.map(r => ({ ...r })) as GridItem[];
@@ -200,10 +242,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     if (category !== 'latest') { return shorts; }
     const sortTs = (it: GridItem) => it.fetchedAt ?? it.createdAt ?? '';
     return [...memberVideos, ...shorts].sort((a, b) => sortTs(b).localeCompare(sortTs(a)));
-  }, [showForYou, feedItems, results, memberVideos, query, category]);
+  }, [showRecommended, recItems, showForYou, feedItems, results, memberVideos, query, category]);
 
   useEffect(() => {
     if (mode !== 'browse') { return; }
+    if (showRecommended) { loadRecommended(); return; }
     if (showForYou) { loadForYou(); return; }
     clearTimeout(searchTimer.current);
     if (!query.trim()) { loadCategory(category); return; }
@@ -214,7 +257,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     }, 500);
     return () => clearTimeout(searchTimer.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, category, mode, showForYou]);
+  }, [query, category, mode, showForYou, showRecommended]);
 
   const handleLoadMore = useCallback(() => {
     if (!hasMoreRef.current || loadingMore || query.trim()) { return; }
@@ -420,7 +463,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         </View>
       ) : (
         <>
-          {!showForYou && (
+          {!showForYou && !showRecommended && (
             <View style={styles.searchRow}>
               <TextInput
                 style={styles.searchInput} value={query} onChangeText={setQuery}
@@ -434,14 +477,20 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
           {!query.trim() && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
               <TouchableOpacity key="foryou" style={[styles.tab, showForYou && styles.tabActive]}
-                onPress={() => { setShowForYou(true); setQuery(''); }}>
+                onPress={() => { setShowForYou(true); setShowRecommended(false); setQuery(''); }}>
                 <Text style={[styles.tabTxt, showForYou && styles.tabTxtActive]}>For You</Text>
               </TouchableOpacity>
+              {hasFeedConnection && (
+                <TouchableOpacity key="recommended" style={[styles.tab, showRecommended && styles.tabActive]}
+                  onPress={() => { setShowRecommended(true); setShowForYou(false); setQuery(''); }}>
+                  <Text style={[styles.tabTxt, showRecommended && styles.tabTxtActive]}>Recommended</Text>
+                </TouchableOpacity>
+              )}
               {CATEGORIES.map(cat => {
-                const active = !showForYou && category === cat;
+                const active = !showForYou && !showRecommended && category === cat;
                 return (
                   <TouchableOpacity key={cat} style={[styles.tab, active && styles.tabActive]}
-                    onPress={() => { setShowForYou(false); setCategory(cat); setQuery(''); }}>
+                    onPress={() => { setShowForYou(false); setShowRecommended(false); setCategory(cat); setQuery(''); }}>
                     <Text style={[styles.tabTxt, active && styles.tabTxtActive]}>
                       {cat.charAt(0).toUpperCase() + cat.slice(1)}
                     </Text>
@@ -464,32 +513,49 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               </TouchableOpacity>
             </View>
           )}
+
+          {showRecommended && (
+            <View style={styles.feedBar}>
+              <Text style={styles.feedBarText}>From your subscriptions</Text>
+              <TouchableOpacity
+                style={[styles.feedRefreshBtn, recRefreshing && styles.feedRefreshBtnDisabled]}
+                onPress={handleRefreshRecommended}
+                disabled={recRefreshing}>
+                {recRefreshing
+                  ? <ActivityIndicator size="small" color={C.WHITE} />
+                  : <Text style={styles.feedRefreshText}>Refresh</Text>}
+              </TouchableOpacity>
+            </View>
+          )}
           <View style={{ height: SPACE.SM }} />
 
           {(() => {
-            const gridLoading = showForYou ? feedLoading : loading;
+            const special = showForYou || showRecommended;
+            const gridLoading = showRecommended ? recLoading : showForYou ? feedLoading : loading;
             const data: typeof gridData = gridLoading ? [] : gridData;
             const isEmpty = data.length === 0;
             return (
               <FlatList
-                style={isEmpty ? styles.fill : undefined}
+                style={isEmpty && !special ? styles.fill : undefined}
                 data={data}
                 keyExtractor={item => item.videoId}
                 numColumns={2}
-                contentContainerStyle={isEmpty ? styles.gridCenter : styles.grid}
+                contentContainerStyle={isEmpty ? (special ? styles.gridTop : styles.gridCenter) : styles.grid}
                 columnWrapperStyle={styles.row}
-                refreshControl={showForYou ? undefined : (
+                refreshControl={special ? undefined : (
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.ACCENT} />
                 )}
-                onEndReached={(showForYou || isEmpty) ? undefined : handleLoadMore}
+                onEndReached={(special || isEmpty) ? undefined : handleLoadMore}
                 onEndReachedThreshold={0.4}
-                ListFooterComponent={!showForYou && loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.XL }} /> : null}
+                ListFooterComponent={!special && loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.XL }} /> : null}
                 ListEmptyComponent={
                   gridLoading ? (
                     <ActivityIndicator color={C.ACCENT} style={styles.gridSpinner} />
                   ) : (
-                    <Text style={[styles.emptyText, styles.emptyTextCenter]}>
-                      {showForYou
+                    <Text style={[styles.emptyText, special ? styles.emptyTextTop : styles.emptyTextCenter]}>
+                      {showRecommended
+                        ? 'No recommendations yet — tap Refresh to pull from your subscriptions.'
+                        : showForYou
                         ? (hasFeedConnection
                             ? 'No videos yet — tap Refresh to pull your liked videos.'
                             : 'Connect a YouTube account in your profile to see your For You feed.')
@@ -691,7 +757,7 @@ const styles = StyleSheet.create({
 
   // mode toggle
   toggle: {
-    flexDirection: 'row', margin: SPACE.LG,
+    flexDirection: 'row', margin: SPACE.LG, marginTop: SPACE.MD,
     backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, padding: 3, gap: 3,
   },
   toggleBtn:       { flex: 1, paddingVertical: SPACE.SM, alignItems: 'center', borderRadius: RADIUS.SM },
@@ -743,7 +809,9 @@ const styles = StyleSheet.create({
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACE.XXXL },
   fill:          { flex: 1 },
   gridCenter:    { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
+  gridTop:       { alignItems: 'center', paddingTop: SPACE.LG, paddingHorizontal: SPACE.LG },
   emptyTextCenter: { textAlign: 'center', paddingHorizontal: SPACE.XL, height: '100%' },
+  emptyTextTop:  { textAlign: 'center', paddingHorizontal: SPACE.XL },
   grid:          { paddingHorizontal: SPACE.LG, paddingBottom: SPACE.XXXL },
   row:           { gap: SPACE.MD, marginBottom: SPACE.MD },
   card:          { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, overflow: 'hidden' },
