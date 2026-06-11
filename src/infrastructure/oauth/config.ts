@@ -1,7 +1,7 @@
 // OAuth config for syncing creator accounts. Only PUBLIC client ids live here
 // (safe in the app). Client secrets live in the sync-oauth edge function env.
 
-export type SyncProvider = 'youtube' | 'tiktok';
+export type SyncProvider = 'youtube' | 'tiktok' | 'instagram';
 
 // 'creator' = opens a Members Only channel from the account's uploads.
 // 'feed'    = pulls the user's personal feed (e.g. Liked Videos) into "For You".
@@ -18,9 +18,16 @@ export const REDIRECT_URI =
 export const GOOGLE_CLIENT_ID = '1028980678970-ea99v2h8kmli81rangil85dfqoqui459.apps.googleusercontent.com';
 // TODO: fill from TikTok developer portal (Client key).
 export const TIKTOK_CLIENT_KEY = 'sbawbp2z1skyo0obdt';
+// Meta (Facebook) App ID (public). Instagram is read via the Instagram Graph API
+// through Facebook Login (the app doesn't expose "Instagram Login"), so this is the
+// Facebook OAuth client_id. The app secret lives in the sync-oauth edge function env.
+export const INSTAGRAM_APP_ID = '1759282622105408';
 
 const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
 const TIKTOK_SCOPE = 'user.info.basic,user.info.profile,video.list';
+// Instagram Graph API via Facebook Login — read the creator's own Reels through
+// the Facebook Page linked to their Instagram Business/Creator account.
+const INSTAGRAM_SCOPE = 'instagram_basic,pages_show_list,pages_read_engagement,business_management';
 
 // One redirect URL serves both providers + connection types, so both are carried
 // in `state` as `${provider}.${type}.${nonce}`.
@@ -45,6 +52,18 @@ export function buildAuthUrl(
       state,
     });
     return { url: `https://accounts.google.com/o/oauth2/v2/auth?${p.toString()}`, state };
+  }
+  if (provider === 'instagram') {
+    // Facebook OAuth dialog — we read Instagram media via the Graph API using the
+    // Facebook Page linked to the creator's Instagram Business account.
+    const p = new URLSearchParams({
+      client_id: INSTAGRAM_APP_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: 'code',
+      scope: INSTAGRAM_SCOPE,
+      state,
+    });
+    return { url: `https://www.facebook.com/v21.0/dialog/oauth?${p.toString()}`, state };
   }
   // tiktok
   const p = new URLSearchParams({
@@ -83,7 +102,8 @@ export function parseOAuthDeepLink(
   }
   // state = `${provider}.${type}.${nonce}` (older builds: `${provider}.${nonce}`).
   const parts = state.split('.');
-  const provider: SyncProvider = parts[0] === 'tiktok' ? 'tiktok' : 'youtube';
+  const provider: SyncProvider =
+    parts[0] === 'tiktok' ? 'tiktok' : parts[0] === 'instagram' ? 'instagram' : 'youtube';
   const connectionType: ConnectionType = parts[1] === 'feed' ? 'feed' : 'creator';
   return {
     provider,

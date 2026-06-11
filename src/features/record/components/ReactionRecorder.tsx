@@ -6,6 +6,7 @@ import {
 import Orientation from 'react-native-orientation-locker';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
+import InstagramPlayer, { type InstagramPlayerHandle } from '../../../components/InstagramPlayer';
 import {
   Camera,
   useCameraDevice,
@@ -47,7 +48,9 @@ const floatStyles = StyleSheet.create({
 
 export interface ReactionRecorderProps {
   videoId?: string;
-  sourceType?: 'youtube' | 'tiktok';
+  // Instagram has no embed player — its source plays from this re-hosted file URL.
+  sourceUri?: string;
+  sourceType?: 'youtube' | 'tiktok' | 'instagram';
   onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
@@ -62,6 +65,7 @@ const PIP_H = 155;
 
 export default function ReactionRecorder({
   videoId,
+  sourceUri,
   sourceType = 'youtube',
   onSave,
   onBack,
@@ -74,7 +78,8 @@ export default function ReactionRecorder({
   // With a source video (feed / channel-post reactions) the source's own play /
   // pause / end drives recording — no manual buttons. Without one (private channel
   // clips, reviews) the user records with the manual controls.
-  const sourceDriven = !!videoId;
+  const sourceDriven = !!videoId || (sourceType === 'instagram' && !!sourceUri);
+  const igSource = sourceType === 'instagram' && !!sourceUri;
 
   const device = useCameraDevice('front');
   // Cap the reaction to 720p/30fps so files stay under the 50MB storage upload
@@ -99,6 +104,7 @@ export default function ReactionRecorder({
 
   const ytRef = useRef<YoutubeIframeRef>(null);
   const ttRef = useRef<TikTokPlayerHandle>(null);
+  const igRef = useRef<InstagramPlayerHandle>(null);
   const cameraRef = useRef<Camera>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
@@ -291,8 +297,26 @@ export default function ReactionRecorder({
 
   return (
     <View style={styles.container}>
-      {/* Source-video full-screen background (or black if no videoId) */}
-      {videoId && sourceType === 'tiktok' ? (
+      {/* Source-video full-screen background (or black if no source) */}
+      {igSource ? (
+        <View style={styles.ytCover}>
+          <InstagramPlayer
+            ref={igRef}
+            uri={sourceUri as string}
+            style={{ width, height }}
+            onChangeState={onYtStateChange}
+          />
+          {/* react-native-video has no built-in controls — tap to start (which begins recording). */}
+          {!ytPlaying && (
+            <TouchableOpacity
+              style={[StyleSheet.absoluteFill, styles.igPlayOverlay]}
+              activeOpacity={0.85}
+              onPress={() => igRef.current?.play()}>
+              <View style={styles.igPlayBtn}><Text style={styles.igPlayIcon}>▶</Text></View>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : videoId && sourceType === 'tiktok' ? (
         <View style={styles.ytCover}>
           <TikTokPlayer
             ref={ttRef}
@@ -444,6 +468,13 @@ const styles = StyleSheet.create({
   devStartTxt: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
   ytCover: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   ytCoverInner: { position: 'absolute' },
+  igPlayOverlay: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
+  igPlayBtn: {
+    width: 72, height: 72, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  igPlayIcon: { color: C.WHITE, fontSize: 26, marginLeft: 5 },
   center: { flex: 1, backgroundColor: C.BLACK, alignItems: 'center', justifyContent: 'center', gap: SPACE.LG, padding: SPACE.XL },
   infoText: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center' },
   backBtn: { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, paddingVertical: SPACE.MD, paddingHorizontal: SPACE.LG },

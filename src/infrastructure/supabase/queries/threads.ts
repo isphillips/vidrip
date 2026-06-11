@@ -7,7 +7,7 @@ export type FeedThread = {
   video_id: string;
   video_title: string | null;
   video_thumbnail: string | null;
-  source_type: 'youtube' | 'tiktok';
+  source_type: 'youtube' | 'tiktok' | 'instagram';
   sender_id: string;
   created_at: string;
   sender: { handle: string; display_name: string } | null;
@@ -20,7 +20,7 @@ export type ThreadDetail = {
   video_id: string;
   video_title: string | null;
   video_thumbnail: string | null;
-  source_type: 'youtube' | 'tiktok';
+  source_type: 'youtube' | 'tiktok' | 'instagram';
   sender_id: string;
   created_at: string;
   sender: { handle: string; display_name: string } | null;
@@ -38,7 +38,7 @@ export type ReactionItem = {
   emoji_reactions: { emoji: string; user_id: string }[];
   yt_video_id: string | null;
   yt_start_offset: number;
-  source_type: 'youtube' | 'tiktok';
+  source_type: 'youtube' | 'tiktok' | 'instagram';
   recorded_with_headphones?: boolean;
   // Resolved at fetch time by resolveReactionUri
   resolvedUri: string | null;
@@ -180,7 +180,7 @@ export async function sendThread(
   videoTitle: string,
   videoThumbnail: string,
   recipientIds: string[],
-  sourceType: 'youtube' | 'tiktok' = 'youtube',
+  sourceType: 'youtube' | 'tiktok' | 'instagram' = 'youtube',
 ): Promise<{ threadId: string; alreadySentTo: string[] }> {
   // Find or create the thread for this (sender, video) pair — stacking behaviour.
   // Use limit(1) + order so legacy duplicates don't break the lookup.

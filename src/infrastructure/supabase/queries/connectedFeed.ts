@@ -6,7 +6,7 @@ export type FeedItem = {
   title: string;
   thumbnail: string;
   channelTitle: string;
-  sourceType: 'youtube' | 'tiktok';
+  sourceType: 'youtube' | 'tiktok' | 'instagram';
   publishedAt: string | null;
 };
 
@@ -25,7 +25,7 @@ export async function fetchConnectedFeed(userId: string, limit = 50): Promise<Fe
     title: r.title ?? '',
     thumbnail: r.thumbnail ?? '',
     channelTitle: r.channel_title ?? '',
-    sourceType: (r.source_type ?? 'youtube') as 'youtube' | 'tiktok',
+    sourceType: (r.source_type ?? 'youtube') as 'youtube' | 'tiktok' | 'instagram',
     publishedAt: r.published_at ?? null,
   }));
 }

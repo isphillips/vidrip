@@ -11,6 +11,8 @@ const GOOGLE_CLIENT_ID = (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim();
 const GOOGLE_CLIENT_SECRET = (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim();
 const TIKTOK_CLIENT_KEY = (Deno.env.get("TIKTOK_CLIENT_KEY") ?? "").trim();
 const TIKTOK_CLIENT_SECRET = (Deno.env.get("TIKTOK_CLIENT_SECRET") ?? "").trim();
+const INSTAGRAM_APP_ID = (Deno.env.get("INSTAGRAM_APP_ID") ?? "").trim();
+const INSTAGRAM_APP_SECRET = (Deno.env.get("INSTAGRAM_APP_SECRET") ?? "").trim();
 
 // Must exactly match the redirect_uri used in the authorize request
 // (src/infrastructure/oauth/config.ts) and registered in each provider console.
@@ -22,7 +24,9 @@ const cors = {
 };
 
 type Profile = { accountId: string; handle: string; displayName: string; avatar: string | null };
-type Video = { id: string; title: string; thumbnail: string | null };
+// mediaUrl is the direct video file (Instagram only) — re-hosted to storage at
+// import since YouTube/TikTok play by id while Instagram has no embed player.
+type Video = { id: string; title: string; thumbnail: string | null; mediaUrl?: string | null };
 
 // ── YouTube ───────────────────────────────────────────────────────────────────
 async function youtubeExchange(code: string) {
@@ -99,6 +103,99 @@ async function tiktokProfileAndVideos(accessToken: string): Promise<{ profile: P
   return { profile, videos };
 }
 
+// ── Instagram (Instagram Graph API via Facebook Login) ──────────────────────
+const FB_GRAPH = "https://graph.facebook.com/v21.0";
+
+async function instagramExchange(code: string) {
+  // 1. Code → short-lived user token (Facebook OAuth).
+  const shortRes = await fetch(
+    `${FB_GRAPH}/oauth/access_token?client_id=${INSTAGRAM_APP_ID}` +
+    `&client_secret=${INSTAGRAM_APP_SECRET}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+    `&code=${encodeURIComponent(code)}`);
+  if (!shortRes.ok) { throw new Error(`instagram(fb) token: ${await shortRes.text()}`); }
+  const short = await shortRes.json();
+  // 2. Short-lived → long-lived (~60-day) user token.
+  const longRes = await fetch(
+    `${FB_GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${INSTAGRAM_APP_ID}` +
+    `&client_secret=${INSTAGRAM_APP_SECRET}&fb_exchange_token=${short.access_token}`);
+  const long = longRes.ok ? await longRes.json() : null;
+  return {
+    access_token: long?.access_token ?? short.access_token,
+    refresh_token: null,
+    expires_in: long?.expires_in ?? null,
+    scope: null,
+  };
+}
+
+async function instagramProfileAndVideos(accessToken: string): Promise<{ profile: Profile; videos: Video[] }> {
+  // Find the Facebook Page the user admins that's linked to an IG Business account.
+  const pagesRes = await fetch(
+    `${FB_GRAPH}/me/accounts?fields=name,instagram_business_account{id,username,profile_picture_url}` +
+    `&access_token=${accessToken}`);
+  const pagesJson = await pagesRes.json();
+  const pages = pagesJson.data ?? [];
+  const ig = pages.map((p: any) => p.instagram_business_account).find((a: any) => a?.id);
+  if (!ig) {
+    // Surface what Facebook actually returned so we can see why the link is invisible.
+    const names = pages.map((p: any) => p.name).join(", ");
+    const apiErr = pagesJson.error ? ` graph-error: ${pagesJson.error.message}` : "";
+    throw new Error(
+      `No Instagram Business account on your Pages. Pages returned: ${pages.length}` +
+      (names ? ` [${names}]` : "") +
+      ". Connect Instagram from the Facebook PAGE's settings (Linked accounts), not only Accounts Center, " +
+      "and grant the Page during login." + apiErr);
+  }
+  const profile: Profile = {
+    accountId: String(ig.id),
+    handle: ig.username ?? "",
+    displayName: ig.username ?? "",
+    avatar: ig.profile_picture_url ?? null,
+  };
+  const mRes = await fetch(
+    `${FB_GRAPH}/${ig.id}/media?fields=id,media_type,media_product_type,` +
+    `media_url,thumbnail_url,caption,permalink&limit=25&access_token=${accessToken}`);
+  const mJson = await mRes.json();
+  const items = mJson.data ?? [];
+  const videos: Video[] = items
+    .filter((m: any) => m.media_type === "VIDEO")   // Reels report media_type VIDEO
+    .slice(0, 12)
+    .map((m: any) => ({
+      id: String(m.id),
+      title: (m.caption ?? "").slice(0, 120),
+      thumbnail: m.thumbnail_url ?? null,
+      mediaUrl: m.media_url ?? null,
+    }))
+    .filter((v: Video) => v.id && v.mediaUrl);
+  // TEMP diagnostic: surface what the Graph API returned when nothing imports.
+  if (videos.length === 0) {
+    const summary = items.map((m: any) =>
+      `${m.media_type}/${m.media_product_type}${m.media_url ? "+url" : "-url"}`).join(", ");
+    const apiErr = mJson.error ? ` graph-error: ${mJson.error.message}` : "";
+    throw new Error(`IG: no importable videos. ${items.length} media: [${summary}]${apiErr}`);
+  }
+  return { profile, videos };
+}
+
+// Download a (signed, expiring) Instagram media URL and re-host it to our storage
+// so it stays playable. Returns the stable public URL, or null on failure.
+async function rehostInstagramVideo(
+  admin: any, channelId: string, mediaId: string, mediaUrl: string,
+): Promise<string | null> {
+  try {
+    const dl = await fetch(mediaUrl);
+    if (!dl.ok) { return null; }
+    const bytes = new Uint8Array(await dl.arrayBuffer());
+    const path = `instagram/${channelId}/${mediaId}.mp4`;
+    const { error } = await admin.storage.from("channel-clips")
+      .upload(path, bytes, { contentType: "video/mp4", upsert: true });
+    if (error) { console.error("[sync-oauth] ig upload", error); return null; }
+    return admin.storage.from("channel-clips").getPublicUrl(path).data.publicUrl;
+  } catch (e) {
+    console.error("[sync-oauth] ig rehost failed", mediaId, e);
+    return null;
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") { return new Response("ok", { headers: cors }); }
@@ -128,17 +225,20 @@ Deno.serve(async (req) => {
     }
 
     const { provider, code, connectionType } = await req.json();
-    if (provider !== "youtube" && provider !== "tiktok") {
+    if (provider !== "youtube" && provider !== "tiktok" && provider !== "instagram") {
       return new Response("bad provider", { status: 400, headers: cors });
     }
     const connType = connectionType === "feed" ? "feed" : "creator";
 
     // 1. Exchange code → tokens, fetch profile + recent videos.
-    const tokens = provider === "youtube" ? await youtubeExchange(code) : await tiktokExchange(code);
+    const tokens = provider === "youtube" ? await youtubeExchange(code)
+      : provider === "tiktok" ? await tiktokExchange(code)
+      : await instagramExchange(code);
     const accessToken = tokens.access_token;
     const { profile, videos } = provider === "youtube"
       ? await youtubeProfileAndVideos(accessToken)
-      : await tiktokProfileAndVideos(accessToken);
+      : provider === "tiktok" ? await tiktokProfileAndVideos(accessToken)
+      : await instagramProfileAndVideos(accessToken);
 
     // 2. Upsert the synced account (display data). A 'feed' connection leaves
     //    last_synced_at null so the first refresh-feed call is allowed immediately.
@@ -214,13 +314,31 @@ Deno.serve(async (req) => {
         .eq("channel_id", channel.id)
         .eq("post_type", "youtube");
       const have = new Set((existing ?? []).map((r: any) => r.yt_video_id));
-      const rows = videos.filter(v => !have.has(v.id)).map(v => ({
-        channel_id: channel!.id, poster_id: userId,
-        post_type: "youtube", source_type: provider,
-        yt_video_id: v.id, yt_video_title: v.title, yt_video_thumbnail: v.thumbnail,
-        is_pinned: false,
-      }));
+      const fresh = videos.filter(v => !have.has(v.id));
+      const rows: any[] = [];
+      let rehostFail = 0;
+      for (const v of fresh) {
+        // Instagram source posts play from a re-hosted file (no embed player).
+        // Skip a Reel we couldn't host — it would be unplayable otherwise.
+        let videoUrl: string | null = null;
+        if (provider === "instagram") {
+          if (!v.mediaUrl) { rehostFail++; continue; }
+          videoUrl = await rehostInstagramVideo(admin, channel!.id, v.id, v.mediaUrl);
+          if (!videoUrl) { rehostFail++; continue; }
+        }
+        rows.push({
+          channel_id: channel!.id, poster_id: userId,
+          post_type: "youtube", source_type: provider,
+          yt_video_id: v.id, yt_video_title: v.title, yt_video_thumbnail: v.thumbnail,
+          video_url: videoUrl,
+          is_pinned: false,
+        });
+      }
       if (rows.length) { await admin.from("channel_posts").insert(rows); }
+      // TEMP diagnostic: all fresh Reels failed to re-host to storage.
+      if (provider === "instagram" && fresh.length > 0 && rows.length === 0) {
+        throw new Error(`IG: re-host failed for all ${fresh.length} Reels (check channel-clips bucket).`);
+      }
     }
 
     return new Response(JSON.stringify({

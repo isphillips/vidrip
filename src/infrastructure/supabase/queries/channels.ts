@@ -36,7 +36,7 @@ export type ChannelPost = {
   poster_id: string;
   poster: { handle: string } | null;
   post_type: 'youtube' | 'clip' | 'audio' | 'status';
-  source_type: 'youtube' | 'tiktok';
+  source_type: 'youtube' | 'tiktok' | 'instagram';
   yt_video_id: string | null;
   yt_video_title: string | null;
   yt_video_thumbnail: string | null;
@@ -52,7 +52,7 @@ export type ChannelPost = {
   has_my_review: boolean;
   parent_post_id: string | null;
   parent_yt_video_id: string | null;
-  parent_source_type: 'youtube' | 'tiktok';
+  parent_source_type: 'youtube' | 'tiktok' | 'instagram';
   recorded_with_headphones?: boolean;
 };
 
@@ -71,7 +71,7 @@ export type ChannelReview = {
   post_yt_video_id: string | null;
   post_yt_video_title: string | null;
   post_yt_video_thumbnail: string | null;
-  post_source_type: 'youtube' | 'tiktok';
+  post_source_type: 'youtube' | 'tiktok' | 'instagram';
   channel_name: string | null;
 };
 
@@ -227,7 +227,7 @@ export type MembersOnlyVideo = {
   title: string;
   thumbnail: string;
   channelTitle: string;
-  sourceType: 'youtube' | 'tiktok';
+  sourceType: 'youtube' | 'tiktok' | 'instagram';
   createdAt: string;   // recency axis for interleaving into the shorts feed
 };
 
@@ -270,7 +270,7 @@ export async function fetchMembersOnlyVideos(userId: string, limit = 30): Promis
       title: p.yt_video_title ?? '',
       thumbnail: p.yt_video_thumbnail ?? '',
       channelTitle: `@${handleById.get(p.channel_id) ?? ''}`,
-      sourceType: (p.source_type ?? 'youtube') as 'youtube' | 'tiktok',
+      sourceType: (p.source_type ?? 'youtube') as 'youtube' | 'tiktok' | 'instagram',
       createdAt: p.created_at ?? '',
     }));
 }
@@ -483,7 +483,7 @@ export type ChannelClipTile = {
   parent_yt_video_id: string | null;
   parent_yt_video_title: string | null;
   parent_yt_video_thumbnail: string | null;
-  parent_source_type: 'youtube' | 'tiktok';
+  parent_source_type: 'youtube' | 'tiktok' | 'instagram';
 };
 
 // An unreacted source video from a channel the user has joined.
@@ -494,7 +494,7 @@ export type ChannelToReact = {
   title: string | null;
   videoId: string | null;
   thumbnail: string | null;        // stored (TikTok ones may be expired — resolve at render)
-  sourceType: 'youtube' | 'tiktok';
+  sourceType: 'youtube' | 'tiktok' | 'instagram';
   createdAt: string;
 };
 
@@ -541,7 +541,7 @@ export async function fetchChannelsToReact(userId: string): Promise<ChannelToRea
       title: p.yt_video_title ?? null,
       videoId: p.yt_video_id ?? null,
       thumbnail: p.yt_video_thumbnail ?? null,
-      sourceType: (p.source_type ?? 'youtube') as 'youtube' | 'tiktok',
+      sourceType: (p.source_type ?? 'youtube') as 'youtube' | 'tiktok' | 'instagram',
       createdAt: p.created_at ?? '',
     }));
 }
@@ -623,7 +623,7 @@ export async function postYouTubeToChannel(params: {
   ytVideoId: string;
   ytVideoTitle: string | null;
   ytVideoThumbnail: string | null;
-  sourceType?: 'youtube' | 'tiktok';
+  sourceType?: 'youtube' | 'tiktok' | 'instagram';
 }): Promise<string> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')

@@ -11,7 +11,7 @@ export interface SaveReactionParams {
   mode: StorageMode;
   ytVideoId?: string;
   ytStartOffset?: number;
-  sourceType?: 'youtube' | 'tiktok';
+  sourceType?: 'youtube' | 'tiktok' | 'instagram';
   recordedWithHeadphones?: boolean;
 }
 

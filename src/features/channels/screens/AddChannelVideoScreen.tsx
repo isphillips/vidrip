@@ -51,7 +51,7 @@ export default function AddChannelVideoScreen({
   const [input, setInput] = useState('');
   const [videoId, setVideoId] = useState<string | null>(null);
   const [title, setTitle] = useState<string | null>(null);
-  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok'>('youtube');
+  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok' | 'instagram'>('youtube');
   const [thumb, setThumb] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [posting, setPosting] = useState(false);

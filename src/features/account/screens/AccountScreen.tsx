@@ -35,6 +35,7 @@ import { fetchMyCreatorChannel, type MyCreatorChannel } from '../../../infrastru
 const PROVIDERS: { key: SyncProvider; label: string }[] = [
   { key: 'youtube', label: 'YouTube' },
   { key: 'tiktok', label: 'TikTok' },
+  { key: 'instagram', label: 'Instagram' },
 ];
 
 // Personal-feed connections (powers the "For You" grid). YouTube only for now.
@@ -86,6 +87,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   const [synced, setSynced] = useState<SyncedAccount[]>([]);       // connection_type 'creator'
   const [feedAccounts, setFeedAccounts] = useState<SyncedAccount[]>([]); // 'feed'
   const [syncing, setSyncing] = useState(false);
+  const [syncingType, setSyncingType] = useState<ConnectionType | null>(null);
   const { pending, clearPending } = useOAuthStore();
 
   const loadSynced = useCallback(async () => {
@@ -118,6 +120,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
       return;
     }
     setSyncing(true);
+    setSyncingType(connectionType);
     syncOAuthCode(provider, code, connectionType)
       .then(async () => {
         // A feed connection has no content yet — kick off the first pull now.
@@ -125,7 +128,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         await loadSynced();
       })
       .catch((e: any) => Alert.alert('Sync failed', e?.message ?? 'Could not connect account.'))
-      .finally(() => setSyncing(false));
+      .finally(() => { setSyncing(false); setSyncingType(null); });
   }, [pending, clearPending, loadSynced]);
 
   const handleToggleEnabled = async (acct: SyncedAccount) => {
@@ -134,7 +137,8 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   };
 
   const handleDisconnect = (acct: SyncedAccount) => {
-    Alert.alert('Disconnect', `Disconnect ${acct.provider === 'tiktok' ? 'TikTok' : 'YouTube'}?`, [
+    const provLabel = acct.provider === 'tiktok' ? 'TikTok' : acct.provider === 'instagram' ? 'Instagram' : 'YouTube';
+    Alert.alert('Disconnect', `Disconnect ${provLabel}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Disconnect', style: 'destructive',
@@ -312,6 +316,12 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                 </View>
               );
             })}
+            {syncing && syncingType === 'creator' && (
+              <View style={styles.syncingRow}>
+                <ActivityIndicator color={C.ACCENT} size="small" />
+                <Text style={styles.syncingText}>Syncing…</Text>
+              </View>
+            )}
           </View>
         </>
       )}
@@ -358,7 +368,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
             </View>
           );
         })}
-        {syncing && (
+        {syncing && syncingType === 'feed' && (
           <View style={styles.syncingRow}>
             <ActivityIndicator color={C.ACCENT} size="small" />
             <Text style={styles.syncingText}>Syncing…</Text>

@@ -53,7 +53,7 @@ function DurationBadge({ seconds }: { seconds: number }) {
 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok'; createdAt?: string };
+type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok' | 'instagram'; createdAt?: string };
 type Mode = 'browse' | 'paste';
 const PAGE = 50;
 const DRAWER_HEIGHT_PCT = 0.68;

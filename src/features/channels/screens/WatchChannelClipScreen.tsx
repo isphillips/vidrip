@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
+import InstagramPlayer, { type InstagramPlayerHandle } from '../../../components/InstagramPlayer';
 import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import Animated, {
   useSharedValue, useAnimatedStyle,
@@ -89,11 +90,14 @@ export default function WatchChannelClipScreen({
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [sessionReady, setSessionReady] = useState(false);
   const [parentYtVideoId, setParentYtVideoId] = useState<string | null>(null);
-  const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok'>('youtube');
+  const [parentSourceUri, setParentSourceUri] = useState<string | null>(null); // instagram parent file
+  const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok' | 'instagram'>('youtube');
 
   const videoRef = useRef<any>(null);
   const ytRef = useRef<any>(null);
   const ttRef = useRef<TikTokPlayerHandle>(null);
+  const igRef = useRef<InstagramPlayerHandle>(null);
+  const igTimeRef = useRef(0); // latest instagram-source playhead (from onCurrentTime)
   // True while we're force-stopping at the end — ignore the source's auto "playing"
   // (seekTo resumes YouTube, which would otherwise loop the source).
   const stoppingRef = useRef(false);
@@ -114,9 +118,12 @@ export default function WatchChannelClipScreen({
       if (p.parent_post_id) {
         fetchChannelPost(p.parent_post_id)
           .then(parent => {
-            if (parent?.yt_video_id) {
+            if (!parent) { return; }
+            setParentSourceType(parent.source_type ?? 'youtube');
+            if (parent.source_type === 'instagram') {
+              setParentSourceUri(parent.video_url ?? null); // instagram plays the re-hosted file
+            } else if (parent.yt_video_id) {
               setParentYtVideoId(parent.yt_video_id);
-              setParentSourceType(parent.source_type ?? 'youtube');
             }
           })
           .catch(() => {});
@@ -204,6 +211,24 @@ export default function WatchChannelClipScreen({
   useEffect(() => {
     if (parentSourceType !== 'tiktok') { return; }
     if (paused) { ttRef.current?.pause(); } else { ttRef.current?.play(); }
+  }, [paused, parentSourceType]);
+
+  // Instagram source (react-native-video) — push our paused state in, like TikTok.
+  useEffect(() => {
+    if (parentSourceType !== 'instagram') { return; }
+    if (paused) { igRef.current?.pause(); } else { igRef.current?.play(); }
+  }, [paused, parentSourceType]);
+
+  // Keep the instagram source locked to the reaction clip's clock (it reports its
+  // playhead via onCurrentTime → igTimeRef). Nudge it back only on meaningful drift.
+  useEffect(() => {
+    if (paused || parentSourceType !== 'instagram') { return; }
+    const id = setInterval(() => {
+      if (stoppingRef.current) { return; }
+      const target = progressRef.current;
+      if (Math.abs(igTimeRef.current - target) > 0.5) { igRef.current?.seekTo?.(target); }
+    }, 1200);
+    return () => clearInterval(id);
   }, [paused, parentSourceType]);
 
   // Keep the parent YouTube source locked to the reaction clip's clock. The clip is
@@ -376,14 +401,35 @@ export default function WatchChannelClipScreen({
       )}
 
       {/* Source player — full-screen, then animates into the corner on play. */}
-      {sessionReady && parentYtVideoId && (
+      {sessionReady && (parentYtVideoId || parentSourceUri) && (
         <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
-          {parentSourceType === 'tiktok' ? (
+          {parentSourceType === 'instagram' && parentSourceUri ? (
+            <View style={{ width, height }}>
+              <InstagramPlayer
+                ref={igRef}
+                uri={parentSourceUri}
+                startMuted={!post?.recorded_with_headphones}
+                style={{ width, height }}
+                onCurrentTime={(t) => { igTimeRef.current = t; }}
+              />
+              {/* No native controls — tap to start/toggle (drives the reaction clip too). */}
+              <TouchableOpacity
+                style={StyleSheet.absoluteFill}
+                activeOpacity={1}
+                onPress={() => { setHasStarted(true); setPaused(p => !p); }}>
+                {paused && (
+                  <View style={styles.playOverlay} pointerEvents="none">
+                    <View style={styles.playCircle}><Text style={styles.playIcon}>▶</Text></View>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : parentSourceType === 'tiktok' ? (
             <TikTokPlayer
               ref={ttRef}
               startMuted={!post?.recorded_with_headphones}
               style={{ width, height, backgroundColor: '#000' }}
-              videoId={parentYtVideoId}
+              videoId={parentYtVideoId as string}
               onChangeState={(state) => {
                 if (state === 'playing') {
                   if (stoppingRef.current) { setPaused(true); return; }
@@ -401,7 +447,7 @@ export default function WatchChannelClipScreen({
                   ref={ytRef}
                   height={height}
                   width={ytCoverW}
-                  videoId={parentYtVideoId}
+                  videoId={parentYtVideoId as string}
                   mute={!post?.recorded_with_headphones}
                   play={Platform.OS === 'ios' ? !paused : undefined}
                   onChangeState={(state) => {

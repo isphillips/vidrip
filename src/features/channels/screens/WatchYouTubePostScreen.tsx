@@ -14,12 +14,16 @@ export default function WatchYouTubePostScreen({
   const { user } = useAuthStore();
   const enqueue = useUploadStore(s => s.enqueue);
   const [videoId, setVideoId] = useState<string | null>(null);
-  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok'>('youtube');
+  const [sourceUri, setSourceUri] = useState<string | null>(null);
+  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok' | 'instagram'>('youtube');
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     fetchChannelPost(postId).then(p => {
       setVideoId(p?.yt_video_id ?? null);
+      setSourceUri(p?.video_url ?? null);     // instagram plays from the re-hosted file
       setSourceType(p?.source_type ?? 'youtube');
+      setLoaded(true);
     });
   }, [postId]);
 
@@ -31,7 +35,8 @@ export default function WatchYouTubePostScreen({
     enqueue('Posting reaction…', () => uploadChannelClipRelay(newPostId, user!.id));
   }, [channelId, postId, user, enqueue]);
 
-  if (!videoId) {
+  const ready = sourceType === 'instagram' ? !!sourceUri : !!videoId;
+  if (!loaded || !ready) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={C.ACCENT_HOT} size="large" />
@@ -41,7 +46,8 @@ export default function WatchYouTubePostScreen({
 
   return (
     <ReactionRecorder
-      videoId={videoId}
+      videoId={sourceType === 'instagram' ? undefined : (videoId ?? undefined)}
+      sourceUri={sourceUri ?? undefined}
       sourceType={sourceType}
       onBack={onBack}
       uploadingText="Posting reaction…"
