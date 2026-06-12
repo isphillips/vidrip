@@ -29,7 +29,7 @@ export const C = {
 
   // Gold — the logo's leaf, for Art-Deco linework/flourishes (onboarding)
   GOLD: '#e056fd',
-  GOLD_DIM: 'rgba(201,162,75,0.35)',
+  GOLD_DIM: '#71368a',
 
   // Status
   SUCCESS: '#22C55E',

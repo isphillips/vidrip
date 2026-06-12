@@ -11,7 +11,7 @@ import { buildAuthUrl } from '../../infrastructure/oauth/config';
 import { syncOAuthCode } from '../../infrastructure/supabase/queries/syncedAccounts';
 import { refreshConnectedFeed } from '../../infrastructure/supabase/queries/connectedFeed';
 import { DecoDivider, Kicker, Pips, DecoButton } from './components';
-import CurtainStage from '../../components/CurtainStage';
+import PaintReveal from '../../components/PaintReveal';
 
 const STEPS = 5;
 const LOGO_W = 96;
@@ -99,8 +99,11 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
   });
 
   return (
-    <CurtainStage raised={reveal} style={{ paddingTop: top }}>
+    <View style={[styles.stage, { paddingTop: top }]}>
+      {/* Dark backdrop over the gradient; fades out on the final step. */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.cover, coverStyle]} />
+      {/* Paint splatter + dripping reveal, replacing the curtain on the last step. */}
+      <PaintReveal active={reveal} />
       {step > 0 && (
         <TouchableOpacity style={[styles.backBtn, { top: top + SPACE.SM }]} onPress={back} hitSlop={12}>
           <Text style={styles.backText}>‹ Back</Text>
@@ -203,7 +206,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
           {step === 4 && <DecoButton label="ENTER" variant="solid" onPress={onDone} />}
         </View>
       </View>
-    </CurtainStage>
+    </View>
   );
 }
 
@@ -431,7 +434,9 @@ function DemoStep({ p, index, range, label }: { p: SharedValue<number>; index: n
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
-  // Opaque black backdrop covering the curtain stage until the final step.
+  // Onboarding stage — sits over the app gradient (ScreenGradient wrap).
+  stage: { flex: 1 },
+  // Opaque dark backdrop over the gradient until the final step, then fades out.
   cover: { backgroundColor: C.BG_SOLID },
 
   // Curtain photo backdrop (final step)
@@ -458,7 +463,7 @@ const styles = StyleSheet.create({
   connectedRow: { marginTop: SPACE.SM, borderWidth: 1, borderColor: C.GOLD, borderRadius: RADIUS.FULL, paddingHorizontal: SPACE.LG, paddingVertical: SPACE.XS },
   connectedText: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
 
-  footer: { paddingHorizontal: SPACE.XL, paddingTop: SPACE.LG, gap: SPACE.LG, borderTopWidth: 1, borderTopColor: C.BORDER },
+  footer: { paddingHorizontal: SPACE.XL, paddingTop: SPACE.LG, gap: SPACE.LG },
   ctaCol: { gap: SPACE.SM },
 
   // animated how-to demos
