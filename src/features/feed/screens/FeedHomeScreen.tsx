@@ -240,7 +240,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           />
           <Text style={styles.headerTitle}>
             <Text style={styles.titleVi}>Vi</Text>
-            {'drip'.split('').map((ch, i) => (
+            {'drip '.split('').map((ch, i) => (
               <Text key={i} style={DRIP_COLORS[i]}>{ch}</Text>
             ))}
           </Text>
@@ -477,11 +477,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT.SIZES.XXL,
     fontFamily: FONT.DISPLAY_BOLD,
+    fontWeight: FONT.WEIGHTS.EXTRA_BOLD,
     color: C.INK,
     letterSpacing: -1,
     marginTop: 10,
     marginLeft: -5,
     display: 'flex',
+    textTransform: 'uppercase',
   },
   titleVi: {
     color: C.WHITE,
