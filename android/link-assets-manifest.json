@@ -56,6 +56,26 @@
     {
       "path": "src/assets/fonts/Raleway-SemiBoldItalic.ttf",
       "sha1": "c42b7304f432bea3c6e2177c9ab20ff6dbf1777d"
+    },
+    {
+      "path": "src/assets/fonts/Syne-Bold.ttf",
+      "sha1": "5fbaa5a2d69b162adb2c1c07809af4633ef8cbda"
+    },
+    {
+      "path": "src/assets/fonts/Syne-ExtraBold.ttf",
+      "sha1": "a8d3f1002f653a9bf7070205a6d897979be00891"
+    },
+    {
+      "path": "src/assets/fonts/Syne-Medium.ttf",
+      "sha1": "d69b611555aa308b9c2fa96a24bb4641c0b959dd"
+    },
+    {
+      "path": "src/assets/fonts/Syne-Regular.ttf",
+      "sha1": "a23691085505af89f0c4212d691a95c7923ee4c7"
+    },
+    {
+      "path": "src/assets/fonts/Syne-SemiBold.ttf",
+      "sha1": "ef239f624fa563589bd3aefa90e0c387c6190fe0"
     }
   ]
 }

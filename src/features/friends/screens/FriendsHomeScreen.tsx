@@ -167,12 +167,13 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   title: {
-    fontSize: FONT.SIZES.XXL,
+    fontSize: FONT.SIZES.XL,
     fontFamily: FONT.DISPLAY_BOLD,
-    fontWeight: '700',
     color: C.INK,
     padding: SPACE.LG,
     marginTop: 0,
+    fontWeight: FONT.WEIGHTS.EXTRA_BOLD,
+    textTransform: 'uppercase',
   },
   addButton: {
     backgroundColor: C.SURFACE,

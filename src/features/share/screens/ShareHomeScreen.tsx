@@ -1138,8 +1138,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.LG, paddingTop: SPACE.LG,
   },
   headerTitle: {
-    fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD,
+    fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD,
     color: C.INK, letterSpacing: -1,
+    fontWeight: FONT.WEIGHTS.EXTRA_BOLD,
+    textTransform: 'uppercase',
   },
   searchToggle: { padding: SPACE.XS },
 

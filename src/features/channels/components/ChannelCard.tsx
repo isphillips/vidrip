@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.ACCENT_HOT,
   },
   name: {
-    fontSize: FONT.SIZES.LG,
+    fontSize: FONT.SIZES.MD,
     fontFamily: FONT.DISPLAY_SEMIBOLD,
     color: C.INK,
   },

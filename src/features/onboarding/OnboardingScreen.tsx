@@ -17,6 +17,12 @@ const STEPS = 5;
 const LOGO_W = 96;
 const LOGO_H = 104;
 
+// Per-letter pink→purple ramp across the 6 letters of VIDRIP (stable objects).
+const VIDRIP_COLORS = [
+  { color: '#E73D93' }, { color: '#D93D9F' }, { color: '#CB3EAB' },
+  { color: '#BC3EB8' }, { color: '#AE3FC4' }, { color: '#A03FD0' },
+];
+
 export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'replay'; onDone: () => void }) {
   const { top, bottom } = useSafeAreaInsets();
   const { profile } = useAuthStore();
@@ -125,7 +131,12 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
                 <Sparkle x={LOGO_W * 0.30} y={LOGO_H * 0.58} size={9} delay={1350} />
               </Animated.View>
               <Kicker>Members Only</Kicker>
-              <Text style={styles.h1}>Welcome to Vidrip</Text>
+              <Text style={styles.h1}>
+                Welcome to{'\n'}
+                {'VIDRIP'.split('').map((ch, i) => (
+                  <Text key={i} style={[styles.vidrip, VIDRIP_COLORS[i]]}>{ch}</Text>
+                ))}
+              </Text>
               <DecoDivider />
               <Text style={styles.body}>
                 You've been let in. Pour yourself something. This is where friends trade clips and react, just for each other.
@@ -175,7 +186,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
           {step === 4 && (
             <View style={styles.center}>
               <Kicker>You're set</Kicker>
-              <Text style={styles.h1}>The night is yours</Text>
+              <Text style={styles.h2}>The night is yours</Text>
               <DecoDivider />
               <Text style={[styles.body, { color: C.WHITE}]}>
                 That's the whole show. Share what you love. React to what they send.
@@ -454,8 +465,9 @@ const styles = StyleSheet.create({
   logo: { width: LOGO_W, height: LOGO_H },
   // Twinkling sparkles over the coin.
   sparkle: { position: 'absolute', color: '#FFF8E1', textShadowColor: C.GOLD, textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } },
-  h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, textAlign: 'center' },
-  h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, textAlign: 'center' },
+  h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.MEDIUM, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
+  vidrip: { fontFamily: 'Syne-ExtraBold', fontWeight: FONT.WEIGHTS.EXTRA_BOLD, letterSpacing: 0.5 },
+  h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.EXTRA_BOLD, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
   body: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', lineHeight: 24, maxWidth: 320 },
   em: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD },
   whisper: { fontSize: FONT.SIZES.MD, fontFamily: FONT.DISPLAY_ITALIC, fontStyle: 'italic', color: C.GOLD, textAlign: 'center', marginTop: SPACE.SM },

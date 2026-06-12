@@ -36,6 +36,11 @@
 		<string>PlayfairDisplay-SemiBoldItalic.ttf</string>
 		<string>PlayfairDisplay-MediumItalic.ttf</string>
 		<string>Raleway-Bold.ttf</string>
+		<string>Syne-Regular.ttf</string>
+		<string>Syne-ExtraBold.ttf</string>
+		<string>Syne-Bold.ttf</string>
+		<string>Syne-SemiBold.ttf</string>
+		<string>Syne-Medium.ttf</string>
 	</array>
 </dict>
 </plist>

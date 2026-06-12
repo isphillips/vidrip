@@ -157,7 +157,7 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
         <View style={styles.hero}>
           <Text style={styles.wordmark}>
             <Text style={styles.titleVi}>Vi</Text>
-            {'drip'.split('').map((ch, i) => (
+            {'drip '.split('').map((ch, i) => (
               <Text key={i} style={DRIP_COLORS[i]}>{ch}</Text>
             ))}
           </Text>
@@ -222,6 +222,8 @@ const styles = StyleSheet.create({
     fontFamily: FONT.DISPLAY_BOLD,
     color: C.WHITE,
     letterSpacing: -1.5,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   titleVi: { color: C.WHITE },
   logo: {
@@ -230,7 +232,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: FONT.SIZES.XL,
-    fontFamily: FONT.DISPLAY_SEMIBOLD,
+    fontFamily: FONT.DISPLAY_BOLD,
     color: C.WHITE,
     textAlign: 'center',
     lineHeight: 30,
@@ -238,7 +240,7 @@ const styles = StyleSheet.create({
   },
   button: {
     borderRadius: RADIUS.MD,
-    overflow: 'hidden',          // clip the gradient to the rounded corners
+    overflow: 'hidden',
     marginBottom: SPACE.MD,
     marginTop: -30,
     width: '90%',

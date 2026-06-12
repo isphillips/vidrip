@@ -42,15 +42,15 @@ export const C = {
   TRANSPARENT: 'transparent',
 } as const;
 
-// Playfair Display — high-contrast serif, 1920s editorial/speakeasy headings
-// Raleway — geometric Art Nouveau sans, body + UI
+// Syne — geometric, modern display face (matches the new web brand)
+// Raleway — geometric sans, body + UI
 export const FONT = {
-  // Display (Playfair Display) — for large headings, screen titles, brand
-  DISPLAY: 'PlayfairDisplay-Regular',
-  DISPLAY_MEDIUM: 'PlayfairDisplay-Medium',
-  DISPLAY_SEMIBOLD: 'PlayfairDisplay-SemiBold',
-  DISPLAY_BOLD: 'PlayfairDisplay-Bold',
-  DISPLAY_ITALIC: 'PlayfairDisplay-Regular', // italic via fontStyle
+  // Display (Syne) — for large headings, screen titles, brand
+  DISPLAY: 'Syne-Regular',
+  DISPLAY_MEDIUM: 'Syne-Medium',
+  DISPLAY_SEMIBOLD: 'Syne-SemiBold',
+  DISPLAY_BOLD: 'Syne-Bold',
+  DISPLAY_ITALIC: 'Syne-Regular', // Syne has no italic; fontStyle synthesizes
 
   // Body (Raleway) — for all UI text, buttons, labels, body copy
   BODY: 'Raleway-Regular',
@@ -70,6 +70,14 @@ export const FONT = {
     XL: 20,
     XXL: 24,
     XXXL: 32,
+  },
+
+  WEIGHTS: {
+    REGULAR: '400',
+    MEDIUM: '500',
+    SEMIBOLD: '600',
+    BOLD: '700',
+    EXTRA_BOLD: '900',
   },
 } as const;
 
