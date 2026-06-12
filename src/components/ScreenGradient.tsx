@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 // Diagonal purple background. Two tones: the lighter one for the hero surfaces
@@ -11,14 +11,20 @@ export const GRADIENT_DARK = ['#170728', '#0C0418', '#030109'];
 // gets its OWN opaque gradient — that keeps native-stack push/pop transitions clean
 // (no see-through to the screen below), which a single shared overlay would not.
 export default function ScreenGradient({ children, dark = false }: { children?: React.ReactNode; dark?: boolean }) {
+  // Gradient is an absolute-fill BACKGROUND; content lives in a separate flex:1
+  // layer on top. This decouples the screen's layout from the gradient view — if
+  // LinearGradient ever measures late/zero during a transition, the content still
+  // lays out normally (fixes "content sometimes doesn't show on load").
   return (
-    <LinearGradient
-      colors={dark ? GRADIENT_DARK : GRADIENT_LIGHT}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.fill}>
-      {children}
-    </LinearGradient>
+    <View style={styles.fill}>
+      <LinearGradient
+        colors={dark ? GRADIENT_DARK : GRADIENT_LIGHT}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.fill}>{children}</View>
+    </View>
   );
 }
 

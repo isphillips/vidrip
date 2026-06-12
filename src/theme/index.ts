@@ -6,10 +6,10 @@ export const C = {
   // the old BG — button text/spinners drawn IN the background color, nav theme, etc.
   BG_SOLID: '#190A33',
   SURFACE: '#07000e',
-  SURFACE_2: '#221A17',
+  SURFACE_2: '#1b0f27',
 
   // Borders
-  BORDER: '#413548',
+  BORDER: '#261438',
   BORDER_STRONG: '#382f40',
 
   // Text
