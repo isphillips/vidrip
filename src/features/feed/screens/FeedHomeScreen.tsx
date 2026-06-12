@@ -311,7 +311,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
               })}>
               <View style={styles.thumbnail}>
                 <View style={styles.thumbnailBlind}>
-                  <Text style={styles.thumbnailBlindIcon}>?</Text>
+                  <Image source={require('../../../assets/questionmark.png')} style={styles.thumbnailBlindImg} resizeMode="contain" />
                 </View>
               </View>
               <View style={styles.info}>
@@ -416,7 +416,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
                 <View style={styles.thumbnail}>
                   {unreacted ? (
                     <View style={styles.thumbnailBlind}>
-                      <Text style={styles.thumbnailBlindIcon}>?</Text>
+                      <Image source={require('../../../assets/questionmark.png')} style={styles.thumbnailBlindImg} resizeMode="contain" />
                     </View>
                   ) : item.video_thumbnail ? (
                     <Image source={{ uri: item.video_thumbnail }} style={styles.thumbnailImage} />
@@ -465,16 +465,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.LG,
     paddingTop: SPACE.LG,
     paddingBottom: 0,
-    zIndex: 10,           // paint the drips above the tab row below
+    zIndex: 10,
   },
-  // Tall enough to show the paint dripping off the play button; the negative
-  // marginBottom lets those drips overhang down into the tab row. Decorative —
-  // pointerEvents:'none' lets taps fall through to the Feed/Favorites toggle.
   headerLogo: {
     width: 48,
     height: 84,
     marginTop: -8,
-    marginBottom: -30,
+    marginBottom: -32,
     pointerEvents: 'none',
   },
   headerTitle: {
@@ -482,7 +479,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT.DISPLAY_BOLD,
     color: C.INK,
     letterSpacing: -1,
-    marginTop: 0,
+    marginTop: 10,
     marginLeft: -5,
     display: 'flex',
   },
@@ -494,11 +491,10 @@ const styles = StyleSheet.create({
   },
 
   // Tab toggle
-  // Mirrors the Browse/Paste Link segmented toggle on the Share screen.
   tabRow: {
     flexDirection: 'row',
     marginHorizontal: SPACE.LG,
-    marginVertical: SPACE.XS,
+    marginBottom: SPACE.XS,
     backgroundColor: C.SURFACE,
     borderRadius: RADIUS.MD,
     padding: 3,
@@ -562,6 +558,7 @@ const styles = StyleSheet.create({
   thumbnailIcon:      { fontSize: 24 },
   thumbnailBlind:     { width: 72, height: 72, backgroundColor: C.BLACK, alignItems: 'center', justifyContent: 'center' },
   thumbnailBlindIcon: { fontSize: 28, color: 'rgba(255,255,255,0.4)', fontWeight: '700' },
+  thumbnailBlindImg:  { width: 22, height: 32 },
   favDot: {
     position: 'absolute', bottom: 4, right: 4,
     backgroundColor: 'rgba(255,255,255,0.9)',

@@ -539,11 +539,11 @@ export default function ChannelhamburderScreen({
               <View style={[styles.gridThumb, { height: cardH }]}>
                 {item.locked ? (
                   <View style={styles.gridThumbBlind}>
-                    <Text style={styles.gridThumbBlindIcon}>🔒</Text>
+                    <Image source={require('../../../assets/lock.png')} style={styles.gridThumbBlindImg} resizeMode="contain" />
                   </View>
                 ) : item.obscured ? (
                   <View style={styles.gridThumbBlind}>
-                    <Text style={styles.gridThumbBlindIcon}>?</Text>
+                    <Image source={require('../../../assets/questionmark.png')} style={styles.gridThumbBlindImg} resizeMode="contain" />
                   </View>
                 ) : item.thumbnail ? (
                   <Image source={{ uri: item.thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -842,6 +842,7 @@ const styles = StyleSheet.create({
   gridThumb: { width: '100%', backgroundColor: C.SURFACE_2, overflow: 'hidden' },
   gridThumbBlind: { flex: 1, backgroundColor: C.BLACK, alignItems: 'center', justifyContent: 'center' },
   gridThumbBlindIcon: { fontSize: 28, color: 'rgba(255,255,255,0.4)', fontWeight: '700' },
+  gridThumbBlindImg:  { width: 32, height: 46 },
   pinBadge: {
     position: 'absolute', top: SPACE.XS, left: SPACE.XS,
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.SM,

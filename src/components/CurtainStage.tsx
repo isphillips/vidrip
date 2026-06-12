@@ -7,13 +7,12 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, Easing,
 } from 'react-native-reanimated';
 
-const BACKGROUND = require('../assets/background.png');
 const CURTAIN_BACK = require('../assets/curtain-back.png');
 const CURTAIN_FRONT = require('../assets/curtain-front.png');
 
 /**
- * Three-layer theatrical backdrop:
- *   background.png  → the scene behind the stage
+ * Theatrical backdrop layered over whatever sits behind it (the app's purple
+ * ScreenGradient on the onboarding screen):
  *   curtain-back.png → the closed curtain (raises off the top when `raised`)
  *   curtain-front.png → the proscenium frame (stays put, transparent center)
  * Children render on top of all layers.
@@ -50,7 +49,6 @@ export default function CurtainStage({
 
   return (
     <View style={[styles.root, style]}>
-      <Image source={BACKGROUND} style={styles.layer} resizeMode="stretch" />
       <Animated.Image source={CURTAIN_BACK} style={[styles.layer, backStyle]} resizeMode="stretch" />
       <Image source={CURTAIN_FRONT} style={styles.layer} resizeMode="stretch" pointerEvents="none" />
       {scrim > 0 && (

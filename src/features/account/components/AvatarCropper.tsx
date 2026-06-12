@@ -108,7 +108,7 @@ export default function AvatarCropper({ image, onCancel, onDone }: Props) {
             <Text style={styles.btnGhostText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.btnSolid, busy && styles.btnDisabled]} onPress={handleUse} disabled={busy}>
-            {busy ? <ActivityIndicator color={C.BG} /> : <Text style={styles.btnSolidText}>Use Photo</Text>}
+            {busy ? <ActivityIndicator color={C.BG_SOLID} /> : <Text style={styles.btnSolidText}>Use Photo</Text>}
           </TouchableOpacity>
         </View>
       </GestureHandlerRootView>
@@ -128,6 +128,6 @@ const styles = StyleSheet.create({
   btnGhost: { flex: 1, height: 52, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, alignItems: 'center', justifyContent: 'center' },
   btnGhostText: { color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.MD },
   btnSolid: { flex: 1, height: 52, borderRadius: RADIUS.MD, backgroundColor: C.GOLD, alignItems: 'center', justifyContent: 'center' },
-  btnSolidText: { color: C.BG, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.MD, letterSpacing: 1 },
+  btnSolidText: { color: C.BG_SOLID, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.MD, letterSpacing: 1 },
   btnDisabled: { opacity: 0.5 },
 });

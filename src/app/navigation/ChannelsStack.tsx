@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { C } from '../../theme';
+import { screenLayout } from '../../components/ScreenGradient';
 import type { ChannelsStackParamList } from './types';
 
 import ChannelsHomeScreen from '../../features/channels/screens/ChannelsHomeScreen';
@@ -28,7 +29,7 @@ const NAV_OPTS = {
 
 export default function ChannelsNavigator() {
   return (
-    <Stack.Navigator screenOptions={NAV_OPTS}>
+    <Stack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <Stack.Screen
         name="ChannelsHome"
         component={ChannelsHomeScreen}

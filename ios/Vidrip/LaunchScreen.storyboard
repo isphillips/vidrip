@@ -16,22 +16,29 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="goldlogo" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="127.5" y="259" width="120" height="129"/>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="launchbg" translatesAutoresizingMaskIntoConstraints="NO" id="BGV-00-001">
+                                <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                            </imageView>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="driplogo" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
+                                <rect key="frame" x="127.5" y="234" width="120" height="199"/>
                                 <constraints>
                                     <constraint firstAttribute="width" constant="120" id="w0g-lo-w01"/>
-                                    <constraint firstAttribute="height" constant="129" id="h0g-lo-h01"/>
+                                    <constraint firstAttribute="height" constant="199" id="h0g-lo-h01"/>
                                 </constraints>
                             </imageView>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Vidrip" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="LBL-vi-001">
-                                <rect key="frame" x="157" y="406" width="61" height="45"/>
+                                <rect key="frame" x="157" y="451" width="61" height="45"/>
                                 <fontDescription key="fontDescription" name="PlayfairDisplay-Bold" family="Playfair Display" pointSize="34"/>
-                                <color key="textColor" red="0.788" green="0.635" blue="0.294" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                                <color key="textColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
                         </subviews>
-                        <color key="backgroundColor" red="0.047" green="0.039" blue="0.035" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <color key="backgroundColor" red="0.098" green="0.039" blue="0.2" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
+                            <constraint firstItem="BGV-00-001" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="bg-top-001"/>
+                            <constraint firstItem="BGV-00-001" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="bg-bot-001"/>
+                            <constraint firstItem="BGV-00-001" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="bg-lead-001"/>
+                            <constraint firstItem="BGV-00-001" firstAttribute="trailing" secondItem="Ze5-6b-2t3" secondAttribute="trailing" id="bg-trail-001"/>
                             <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="Q3B-4B-g5h"/>
                             <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="-36" id="moa-c2-u7t"/>
                             <constraint firstItem="LBL-vi-001" firstAttribute="top" secondItem="GJd-Yh-RWb" secondAttribute="bottom" constant="18" id="lbl-top-001"/>
@@ -46,6 +53,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="goldlogo" width="607" height="652"/>
+        <image name="driplogo" width="194" height="321"/>
+        <image name="launchbg" width="1290" height="2796"/>
     </resources>
 </document>

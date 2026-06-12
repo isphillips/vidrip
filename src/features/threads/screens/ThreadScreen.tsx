@@ -217,7 +217,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
                   {pct > 0 && <Text style={styles.dlPct}>{pct}%</Text>}
                 </View>
               )}
-              {status === 'unavailable' && <Text style={styles.reactionThumbIcon}>🔒</Text>}
+              {status === 'unavailable' && <Image source={require('../../../assets/lock.png')} style={styles.reactionThumbLock} resizeMode="contain" />}
             </View>
 
             <View style={styles.reactionInfo}>
@@ -320,6 +320,7 @@ const styles = StyleSheet.create({
   },
   reactionThumbDim: { opacity: 0.5 },
   reactionThumbIcon: { fontSize: 20 },
+  reactionThumbLock: { width: 22, height: 32 },
   dlProgress: { alignItems: 'center', gap: 2 },
   dlPct: { fontSize: 10, color: C.MUTED },
   reactionInfo: { flex: 1 },

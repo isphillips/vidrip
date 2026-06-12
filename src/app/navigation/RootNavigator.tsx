@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, Linking, View } from 'react-native';
 import type { NavigationContainerRef } from '@react-navigation/native';
@@ -20,9 +20,14 @@ import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
 import OnboardingScreen from '../../features/onboarding/OnboardingScreen';
+import ScreenGradient from '../../components/ScreenGradient';
 import { useOnboarding, useOnboardingStore } from '../../features/onboarding/onboarding';
 
 const Root = createNativeStackNavigator();
+
+// Dark purple base so cold-start / any uncovered area matches the app gradient
+// (instead of the default white/black flash).
+const navTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: C.BG_SOLID } };
 
 export default function RootNavigator() {
   const { session, isLoading, setSession, setProfile, setLoading } = useAuthStore();
@@ -171,7 +176,7 @@ export default function RootNavigator() {
   // Wait for the onboarding flag to load too, so signed-in users don't flash the app.
   if (isLoading || (session && !onbReady)) {
     return (
-      <View style={{ flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: C.BG_SOLID, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={C.ACCENT} />
       </View>
     );
@@ -180,16 +185,18 @@ export default function RootNavigator() {
   const showOnboarding = !!session && (!onboarded || replaying);
 
   return (
-    <NavigationContainer ref={navRef} onReady={runPendingNavigation}>
+    <NavigationContainer ref={navRef} theme={navTheme} onReady={runPendingNavigation}>
       <Root.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           showOnboarding ? (
             <Root.Screen name="Onboarding">
               {() => (
-                <OnboardingScreen
-                  mode={onboarded ? 'replay' : 'firstRun'}
-                  onDone={() => { if (!onboarded) { completeOnboarding(); } endReplay(); }}
-                />
+                <ScreenGradient>
+                  <OnboardingScreen
+                    mode={onboarded ? 'replay' : 'firstRun'}
+                    onDone={() => { if (!onboarded) { completeOnboarding(); } endReplay(); }}
+                  />
+                </ScreenGradient>
               )}
             </Root.Screen>
           ) : (

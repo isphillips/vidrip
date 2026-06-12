@@ -10,9 +10,9 @@ import { C, FONT } from './src/theme';
 
 function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.appRoot}>
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor={C.BG} />
+        <StatusBar barStyle="light-content" backgroundColor={C.BG_SOLID} />
         <RootNavigator />
         <UploadToast />
       </SafeAreaProvider>
@@ -33,8 +33,12 @@ function UpdatingScreen({ progress = 0 }: { progress?: number }) {
   );
 }
 
+const styles = StyleSheet.create({
+  appRoot: { flex: 1, backgroundColor: C.BG_SOLID },
+});
+
 const updateStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center', gap: 20 },
+  container: { flex: 1, backgroundColor: C.BG_SOLID, alignItems: 'center', justifyContent: 'center', gap: 20 },
   logo: { width: 84, height: 90 },
   title: { color: C.GOLD, fontFamily: FONT.DISPLAY_SEMIBOLD, fontSize: FONT.SIZES.LG },
   track: { width: 160, height: 4, borderRadius: 2, backgroundColor: C.GOLD_DIM, overflow: 'hidden' },

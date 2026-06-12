@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   avatarBadge: {
     position: 'absolute', right: -2, bottom: -2,
     width: 30, height: 30, borderRadius: 15, backgroundColor: C.ACCENT,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.BG,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.BG_SOLID,
   },
   avatarBadgeText: { color: C.WHITE, fontSize: FONT.SIZES.SM },
   changePhoto: { color: C.ACCENT_HOT, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },

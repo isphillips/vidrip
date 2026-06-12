@@ -6,12 +6,14 @@ import EnterInviteCodeScreen from '../../features/auth/screens/EnterInviteCodeSc
 import CreateProfileScreen from '../../features/auth/screens/CreateProfileScreen';
 import type { AuthStackParamList } from './types';
 import { C } from '../../theme';
+import { screenLayout } from '../../components/ScreenGradient';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export default function AuthStack() {
   return (
     <Stack.Navigator
+      screenLayout={screenLayout}
       screenOptions={{
         headerStyle: { backgroundColor: C.BG },
         headerTintColor: C.INK,

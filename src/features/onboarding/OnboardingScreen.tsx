@@ -417,7 +417,7 @@ function DemoStep({ p, index, range, label }: { p: SharedValue<number>; index: n
     backgroundColor: (p.value >= range[0] && p.value <= range[1]) ? C.GOLD : 'transparent',
   }));
   const numTextStyle = useAnimatedStyle(() => ({
-    color: (p.value >= range[0] && p.value <= range[1]) ? C.BG : C.GOLD,
+    color: (p.value >= range[0] && p.value <= range[1]) ? C.BG_SOLID : C.GOLD,
   }));
   return (
     <Animated.View style={[styles.dStepLine, rowStyle]}>
@@ -432,7 +432,7 @@ function DemoStep({ p, index, range, label }: { p: SharedValue<number>; index: n
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
   // Opaque black backdrop covering the curtain stage until the final step.
-  cover: { backgroundColor: C.BG },
+  cover: { backgroundColor: C.BG_SOLID },
 
   // Curtain photo backdrop (final step)
   curtains: { ...StyleSheet.absoluteFillObject, marginLeft: -35 },

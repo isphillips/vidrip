@@ -1,7 +1,11 @@
 export const C = {
-  // Backgrounds — warm near-black to match logo's dark warmth
-  BG: 'rgb(11, 9, 8)',
-  SURFACE: '#17100e',
+  // Screen backgrounds are transparent so the app-wide purple gradient
+  // (ScreenGradient, applied via each navigator's screenLayout) shows through.
+  BG: 'transparent',
+  // Opaque fallback (the gradient's mid tone) for the rare non-background uses of
+  // the old BG — button text/spinners drawn IN the background color, nav theme, etc.
+  BG_SOLID: '#190A33',
+  SURFACE: '#07000e',
   SURFACE_2: '#221A17',
 
   // Borders

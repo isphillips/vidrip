@@ -51,7 +51,7 @@ export function DecoButton({ label, onPress, variant = 'outline', loading, disab
       activeOpacity={0.85}
       disabled={disabled || loading}>
       {loading
-        ? <ActivityIndicator color={variant === 'solid' ? C.BG : C.GOLD} size="small" />
+        ? <ActivityIndicator color={variant === 'solid' ? C.BG_SOLID : C.GOLD} size="small" />
         : <Text style={[s.btnText, variant === 'solid' ? s.btnTextSolid : s.btnTextGold, variant === 'ghost' && s.btnTextGhost]}>{label}</Text>}
     </TouchableOpacity>
   );
@@ -85,7 +85,7 @@ const s = StyleSheet.create({
   btnGhost: { },
   btnDisabled: { opacity: 0.5 },
   btnText: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD, letterSpacing: 1 },
-  btnTextSolid: { color: C.BG },
+  btnTextSolid: { color: C.BG_SOLID },
   btnTextGold: { color: C.GOLD },
   btnTextGhost: { color: C.MUTED, fontFamily: FONT.BODY_MEDIUM, letterSpacing: 0.5 },
 });

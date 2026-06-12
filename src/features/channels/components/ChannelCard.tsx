@@ -207,11 +207,11 @@ const styles = StyleSheet.create({
     color: C.ACCENT_HOT,
   },
   ownerPill: {
-    backgroundColor: 'rgba(180,130,40,0.15)',
-    borderColor: 'rgba(180,130,40,0.5)',
+    backgroundColor: C.ACCENT,
+    borderColor: C.INK,
   },
   ownerText: {
-    color: 'rgba(200,155,50,1)',
+    color: C.WHITE,
   },
   inviteActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
   acceptBtn: {

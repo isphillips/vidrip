@@ -345,7 +345,7 @@ export default function ChannelPostScreen({
                   {pct > 0 && <Text style={styles.dlPct}>{pct}%</Text>}
                 </View>
               )}
-              {state === 'unavailable' && <Text style={styles.thumbPlayIcon}>🔒</Text>}
+              {state === 'unavailable' && <Image source={require('../../../assets/lock.png')} style={styles.thumbLock} resizeMode="contain" />}
             </View>
 
             <View style={styles.reactionInfo}>
@@ -452,6 +452,7 @@ const styles = StyleSheet.create({
   },
   reactionThumbDim: { opacity: 0.5 },
   thumbPlayIcon: { fontSize: 20 },
+  thumbLock: { width: 22, height: 32 },
   dlWrap: { alignItems: 'center', gap: 2 },
   dlPct: { fontSize: 10, color: C.MUTED, fontFamily: FONT.BODY },
   reactionInfo: { flex: 1 },

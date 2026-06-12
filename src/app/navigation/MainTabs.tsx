@@ -11,6 +11,7 @@ import type {
   AccountStackParamList,
 } from './types';
 import ChannelsNavigator from './ChannelsStack';
+import { screenLayout } from '../../components/ScreenGradient';
 
 import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
 import { useFeedStore } from '../../store/feedStore';
@@ -51,7 +52,7 @@ const NAV_OPTS = {
 
 function FeedNavigator() {
   return (
-    <FeedStack.Navigator screenOptions={NAV_OPTS}>
+    <FeedStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <FeedStack.Screen name="FeedHome" component={FeedHomeScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
@@ -62,7 +63,7 @@ function FeedNavigator() {
 
 function FriendsNavigator() {
   return (
-    <FriendsStack.Navigator screenOptions={NAV_OPTS}>
+    <FriendsStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <FriendsStack.Screen name="FriendsHome" component={FriendsHomeScreen} options={{ headerShown: false }} />
       <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
       <FriendsStack.Screen name="Profile" component={UserProfileScreen} options={{ title: 'Profile', headerBackTitle: 'Friends' }} />
@@ -73,7 +74,7 @@ function FriendsNavigator() {
 
 function ShareNavigator() {
   return (
-    <ShareStack.Navigator screenOptions={NAV_OPTS}>
+    <ShareStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <ShareStack.Screen name="ShareHome" component={ShareHomeScreen} options={{ headerShown: false }} />
     </ShareStack.Navigator>
   );
@@ -81,7 +82,7 @@ function ShareNavigator() {
 
 function AccountNavigator() {
   return (
-    <AccountStack.Navigator screenOptions={NAV_OPTS}>
+    <AccountStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <AccountStack.Screen name="AccountHome" component={AccountScreen} options={{ headerShown: false }} />
       <AccountStack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Account' }} />
