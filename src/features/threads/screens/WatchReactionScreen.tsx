@@ -35,6 +35,7 @@ import Animated, {
 // Height of the source player when shrunk into the corner (screen-aspect mini).
 const PIP_H = 184;
 import Video from 'react-native-video';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import { shareTextNative } from '../../../infrastructure/share/nativeShare';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -495,7 +496,7 @@ export default function WatchReactionScreen({
       <TouchableOpacity
         style={[styles.shareBtn, { top: topInset + SPACE.SM }]}
         onPress={() => shareTextNative('Watch my reaction on Vidrip', `reaxn://reaction/${reactionId}`)}>
-        <Text style={styles.shareTxt}>↗</Text>
+        <Ionicons name="share-outline" size={20} color={C.WHITE} />
       </TouchableOpacity>
 
       {/* Close */}
@@ -555,8 +556,8 @@ const styles = StyleSheet.create({
   },
   playIcon: { color: C.WHITE, fontSize: 26, marginLeft: 5 },
   infoBar: {
-    position: 'absolute', left: SPACE.LG, right: 60,
-    flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+    position: 'absolute', left: 0, right: 0,
+    flexDirection: 'column', alignItems: 'center', gap: 2,
   },
   handle: {
     color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD,

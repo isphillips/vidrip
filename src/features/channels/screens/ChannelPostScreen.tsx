@@ -93,6 +93,31 @@ export default function ChannelPostScreen({
     }
   }, [post?.source_type, post?.yt_video_id]);
 
+  // Download a clip from its (public) cloud URL, tracking status + progress.
+  const runClipDownload = useCallback((id: string, url: string) => {
+    if (activeDownloadsRef.current.has(id)) { return; }
+    activeDownloadsRef.current.add(id);
+    setDlState(prev => ({ ...prev, [id]: 'downloading' }));
+    setDlPct(prev => ({ ...prev, [id]: 0 }));
+
+    downloadChannelClip(id, url, (pct) => {
+      if (mountedRef.current) { setDlPct(prev => ({ ...prev, [id]: pct })); }
+    })
+      .then(() => {
+        activeDownloadsRef.current.delete(id);
+        if (mountedRef.current) { setDlState(prev => ({ ...prev, [id]: 'local' })); }
+      })
+      .catch(() => {
+        activeDownloadsRef.current.delete(id);
+        if (mountedRef.current) { setDlState(prev => ({ ...prev, [id]: 'unavailable' })); }
+      });
+  }, []);
+
+  // Manual retry for a clip whose cloud copy still exists but failed to download.
+  const retryClip = useCallback((r: ChannelPost) => {
+    if (r.video_url) { runClipDownload(r.id, r.video_url); }
+  }, [runClipDownload]);
+
   // Kick off downloads for reactions that aren't cached yet
   useEffect(() => {
     if (!reactions.length) { return; }
@@ -116,26 +141,7 @@ export default function ChannelPostScreen({
           return;
         }
         // No local copy — try cloud URL if available
-        if (!r.video_url) { return; }
-
-        activeDownloadsRef.current.add(r.id);
-        setDlState(prev => ({ ...prev, [r.id]: 'downloading' }));
-
-        downloadChannelClip(r.id, r.video_url, (pct) => {
-          if (mountedRef.current) { setDlPct(prev => ({ ...prev, [r.id]: pct })); }
-        })
-          .then(() => {
-            activeDownloadsRef.current.delete(r.id);
-            if (mountedRef.current) {
-              setDlState(prev => ({ ...prev, [r.id]: 'local' }));
-            }
-          })
-          .catch(() => {
-            activeDownloadsRef.current.delete(r.id);
-            if (mountedRef.current) {
-              setDlState(prev => ({ ...prev, [r.id]: 'unavailable' }));
-            }
-          });
+        if (r.video_url) { runClipDownload(r.id, r.video_url); }
       });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -329,13 +335,20 @@ export default function ChannelPostScreen({
         const state = dlState[r.id] ?? 'unavailable';
         const pct = dlPct[r.id] ?? 0;
         const canWatch = state === 'local';
+        // No cloud copy left → permanently gone. Has one but failed → retryable.
+        const expired = !r.video_url;
+        const retryable = state === 'unavailable' && !expired;
 
         return (
           <TouchableOpacity
             key={r.id}
             style={styles.reactionCard}
-            activeOpacity={canWatch ? 0.8 : 1}
-            onPress={canWatch ? () => navigation.navigate('WatchChannelClip', { postId: r.id }) : undefined}>
+            activeOpacity={canWatch || retryable ? 0.8 : 1}
+            onPress={canWatch
+              ? () => navigation.navigate('WatchChannelClip', { postId: r.id })
+              : retryable
+              ? () => retryClip(r)
+              : undefined}>
 
             <View style={[styles.reactionThumb, !canWatch && styles.reactionThumbDim]}>
               {canWatch && <Text style={styles.thumbPlayIcon}>▶</Text>}
@@ -345,14 +358,20 @@ export default function ChannelPostScreen({
                   {pct > 0 && <Text style={styles.dlPct}>{pct}%</Text>}
                 </View>
               )}
-              {state === 'unavailable' && <Image source={require('../../../assets/lock.png')} style={styles.thumbLock} resizeMode="contain" />}
+              {state === 'unavailable' && (expired
+                ? <Image source={require('../../../assets/lock.png')} style={styles.thumbLock} resizeMode="contain" />
+                : <Text style={styles.thumbRetryIcon}>↻</Text>)}
             </View>
 
             <View style={styles.reactionInfo}>
               <Text style={styles.reactionHandle}>@{(r.user as any)?.handle ?? r.poster?.handle ?? '?'}</Text>
               {canWatch && <Text style={styles.reactionDuration}>{r.duration}s reaction</Text>}
               {state === 'downloading' && <Text style={styles.reactionStatus}>Downloading…</Text>}
-              {state === 'unavailable' && <Text style={styles.reactionStatus}>Unavailable</Text>}
+              {state === 'unavailable' && (
+                <Text style={[styles.reactionStatus, retryable && styles.reactionRetry]}>
+                  {expired ? 'No longer available' : 'Tap to re-download'}
+                </Text>
+              )}
             </View>
 
             <EmojiChips
@@ -450,15 +469,17 @@ const styles = StyleSheet.create({
     backgroundColor: C.SURFACE_2,
     alignItems: 'center', justifyContent: 'center',
   },
-  reactionThumbDim: { opacity: 0.5 },
+  reactionThumbDim: { opacity: 0.9 },
   thumbPlayIcon: { fontSize: 20 },
   thumbLock: { width: 22, height: 32 },
+  thumbRetryIcon: { fontSize: 24, color: C.ACCENT_HOT, fontWeight: '700' },
   dlWrap: { alignItems: 'center', gap: 2 },
   dlPct: { fontSize: 10, color: C.MUTED, fontFamily: FONT.BODY },
   reactionInfo: { flex: 1 },
   reactionHandle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM, color: C.INK },
   reactionDuration: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY },
   reactionStatus: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY, fontStyle: 'italic' },
+  reactionRetry: { color: C.ACCENT_HOT, fontStyle: 'normal' },
   backBtn: {
     position: 'absolute', left: SPACE.MD,
     width: 36, height: 36, borderRadius: RADIUS.FULL,
@@ -474,7 +495,7 @@ const styles = StyleSheet.create({
   thumbBlindImg: { width: 160, height: 200, opacity: 0.85 },
   blindOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: C.BG,
+    backgroundColor: 'rgba(0,0,0,0.95)',
     paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingTop: SPACE.LG,
   },
   videoTitleObscured: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: 'rgba(255,255,255,0.7)', fontStyle: 'italic' },

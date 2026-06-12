@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
   backdrop:   { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 20 },
   drawer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: C.BG,
+    backgroundColor: C.BG_SOLID,
     borderTopLeftRadius: RADIUS.XL ?? 24,
     borderTopRightRadius: RADIUS.XL ?? 24,
     zIndex: 21,

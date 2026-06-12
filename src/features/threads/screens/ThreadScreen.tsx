@@ -27,6 +27,7 @@ import {
 import {
   downloadAndCache,
   recordReactionDownload,
+  resolveReactionUri,
 } from '../../../infrastructure/storage/reactionStorage';
 import {
   addEmojiReaction,
@@ -96,6 +97,37 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   useEffect(() => { load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // Download a reaction from a resolved cloud URL, tracking status + progress.
+  const runDownload = useCallback((id: string, uri: string) => {
+    if (activeDownloadsRef.current.has(id)) { return; }
+    activeDownloadsRef.current.add(id);
+    setDlStatus(prev => ({ ...prev, [id]: 'downloading' }));
+    setDlPct(prev => ({ ...prev, [id]: 0 }));
+
+    downloadAndCache(id, uri, (pct) => {
+      if (mountedRef.current) { setDlPct(prev => ({ ...prev, [id]: pct })); }
+    })
+      .then(() => {
+        activeDownloadsRef.current.delete(id);
+        if (!mountedRef.current) { return; }
+        setDlStatus(prev => ({ ...prev, [id]: 'local' }));
+        setDlPct(prev => ({ ...prev, [id]: 100 }));
+        if (user?.id) { recordReactionDownload(id, user.id).catch(() => {}); }
+      })
+      .catch(() => {
+        activeDownloadsRef.current.delete(id);
+        if (mountedRef.current) { setDlStatus(prev => ({ ...prev, [id]: 'unavailable' })); }
+      });
+  }, [user?.id]);
+
+  // Manual retry: a reaction whose cloud copy still exists (video_url) but failed
+  // to download. Re-resolve a FRESH signed URL (the cached one may have expired).
+  const retryDownload = useCallback(async (r: ReactionItem) => {
+    if (!r.video_url || activeDownloadsRef.current.has(r.id)) { return; }
+    const resolved = await resolveReactionUri(r);
+    if (resolved?.uri) { runDownload(r.id, resolved.uri); }
+  }, [runDownload]);
+
   // Auto-download all cloud reactions when thread loads — messages inbox model
   useEffect(() => {
     if (!reactions.length) { return; }
@@ -107,30 +139,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     setDlStatus(initialStatuses);
 
     reactions.forEach(r => {
-      if (!r.needsDownload || !r.resolvedUri) { return; }
-      if (activeDownloadsRef.current.has(r.id)) { return; }
-
-      activeDownloadsRef.current.add(r.id);
-      setDlStatus(prev => ({ ...prev, [r.id]: 'downloading' }));
-
-      downloadAndCache(r.id, r.resolvedUri, (pct) => {
-        if (mountedRef.current) {
-          setDlPct(prev => ({ ...prev, [r.id]: pct }));
-        }
-      })
-        .then(() => {
-          activeDownloadsRef.current.delete(r.id);
-          if (!mountedRef.current) { return; }
-          setDlStatus(prev => ({ ...prev, [r.id]: 'local' }));
-          setDlPct(prev => ({ ...prev, [r.id]: 100 }));
-          if (user?.id) { recordReactionDownload(r.id, user.id).catch(() => {}); }
-        })
-        .catch(() => {
-          activeDownloadsRef.current.delete(r.id);
-          if (mountedRef.current) {
-            setDlStatus(prev => ({ ...prev, [r.id]: 'unavailable' }));
-          }
-        });
+      if (r.needsDownload && r.resolvedUri) { runDownload(r.id, r.resolvedUri); }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reactions]);
@@ -198,14 +207,19 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
         const pct = dlPct[r.id] ?? 0;
         const handle = (r.user as any)?.handle ?? '?';
         const canWatch = status === 'local';
+        // No cloud copy left → permanently gone. Has one but failed → retryable.
+        const expired = !r.video_url;
+        const retryable = status === 'unavailable' && !expired;
 
         return (
           <TouchableOpacity
             key={r.id}
             style={styles.reactionCard}
-            activeOpacity={canWatch ? 0.8 : 1}
+            activeOpacity={canWatch || retryable ? 0.8 : 1}
             onPress={canWatch
               ? () => navigation.navigate('WatchReaction', { reactionId: r.id })
+              : retryable
+              ? () => retryDownload(r)
               : undefined
             }>
 
@@ -217,7 +231,9 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
                   {pct > 0 && <Text style={styles.dlPct}>{pct}%</Text>}
                 </View>
               )}
-              {status === 'unavailable' && <Image source={require('../../../assets/lock.png')} style={styles.reactionThumbLock} resizeMode="contain" />}
+              {status === 'unavailable' && (expired
+                ? <Image source={require('../../../assets/lock.png')} style={styles.reactionThumbLock} resizeMode="contain" />
+                : <Text style={styles.reactionRetryIcon}>↻</Text>)}
             </View>
 
             <View style={styles.reactionInfo}>
@@ -229,8 +245,8 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
                 <Text style={styles.reactionStatusText}>Downloading…</Text>
               )}
               {status === 'unavailable' && (
-                <Text style={styles.reactionStatusText}>
-                  {r.storage_mode === 'local' ? 'Expired' : 'Unavailable'}
+                <Text style={[styles.reactionStatusText, retryable && styles.reactionRetryText]}>
+                  {expired ? 'No longer available' : 'Tap to re-download'}
                 </Text>
               )}
             </View>
@@ -271,7 +287,7 @@ const styles = StyleSheet.create({
   thumbBlindImg: { width: 160, height: 200, opacity: 0.85 },
   blindOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: C.BG,
+    backgroundColor: 'rgba(0,0,0,0.95)',
     paddingHorizontal: SPACE.LG, gap: SPACE.SM, paddingTop: SPACE.LG, paddingBottom: SPACE.LG,
   },
   posterHandle: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
@@ -318,15 +334,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  reactionThumbDim: { opacity: 0.5 },
+  reactionThumbDim: { opacity: 1 },
   reactionThumbIcon: { fontSize: 20 },
   reactionThumbLock: { width: 22, height: 32 },
+  reactionRetryIcon: { fontSize: 24, color: C.ACCENT_HOT, fontWeight: '700' },
   dlProgress: { alignItems: 'center', gap: 2 },
   dlPct: { fontSize: 10, color: C.MUTED },
   reactionInfo: { flex: 1 },
   reactionHandle: { fontSize: FONT.SIZES.MD, fontWeight: '600', color: C.INK },
   reactionDuration: { fontSize: FONT.SIZES.SM, color: C.MUTED },
   reactionStatusText: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontStyle: 'italic' },
+  reactionRetryText: { color: C.ACCENT_HOT, fontStyle: 'normal' },
   backBtn: {
     position: 'absolute', left: SPACE.MD,
     width: 36, height: 36, borderRadius: RADIUS.FULL,

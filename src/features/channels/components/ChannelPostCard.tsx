@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   thumb: {
     width: 96, height: 64,
     borderRadius: RADIUS.SM,
-    backgroundColor: C.BG,
+    backgroundColor: C.BG_SOLID,
     overflow: 'hidden',
     flexShrink: 0,
   },
