@@ -466,8 +466,8 @@ const styles = StyleSheet.create({
   // Twinkling sparkles over the coin.
   sparkle: { position: 'absolute', color: '#FFF8E1', textShadowColor: C.GOLD, textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } },
   h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.MEDIUM, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
-  vidrip: { fontFamily: 'Syne-ExtraBold', fontWeight: FONT.WEIGHTS.EXTRA_BOLD, letterSpacing: 0.5 },
-  h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.EXTRA_BOLD, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
+  vidrip: { fontFamily: 'Syne-ExtraBold', fontWeight: FONT.WEIGHTS.BOLD, letterSpacing: 0.5 },
+  h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.BOLD, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
   body: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', lineHeight: 24, maxWidth: 320 },
   em: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD },
   whisper: { fontSize: FONT.SIZES.MD, fontFamily: FONT.DISPLAY_ITALIC, fontStyle: 'italic', color: C.GOLD, textAlign: 'center', marginTop: SPACE.SM },

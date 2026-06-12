@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     color: C.INK,
     padding: SPACE.LG,
     marginTop: 0,
-    fontWeight: FONT.WEIGHTS.EXTRA_BOLD,
+    fontWeight: FONT.WEIGHTS.BOLD,
     textTransform: 'uppercase',
   },
   addButton: {

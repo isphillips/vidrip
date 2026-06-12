@@ -77,7 +77,7 @@ export const FONT = {
     MEDIUM: '500',
     SEMIBOLD: '600',
     BOLD: '700',
-    EXTRA_BOLD: '900',
+    EXTRA_BOLD: '800',
   },
 } as const;
 
