@@ -36,6 +36,7 @@ import Animated, {
 const PIP_H = 184;
 import Video from 'react-native-video';
 import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
+import { shareTextNative } from '../../../infrastructure/share/nativeShare';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
@@ -131,7 +132,7 @@ export default function WatchReactionScreen({
   useEffect(() => {
     fetchReactionById(reactionId)
       .then(async (r) => {
-        if (!r) { setLoading(false); return; }
+        if (!r) { setDownloadState('unavailable'); setLoading(false); return; }
         setReaction(r);
         fetchEmojiReactions(r.id).then(setEmojiReactions).catch(() => {});
         if (r.thread_id) {
@@ -158,6 +159,17 @@ export default function WatchReactionScreen({
       .catch(() => setDownloadState('unavailable'))
       .finally(() => setLoading(false));
   }, [reactionId, user?.id]);
+
+  // Safety net: a bad/inaccessible link or a stalled network must resolve to
+  // "Not available" rather than spinning forever. Cleared as soon as load finishes.
+  useEffect(() => {
+    if (!loading) { return; }
+    const t = setTimeout(() => {
+      setDownloadState(s => (s === 'idle' ? 'unavailable' : s));
+      setLoading(false);
+    }, 15000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   // Realtime emoji updates
   useEffect(() => {
@@ -479,6 +491,13 @@ export default function WatchReactionScreen({
         <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
 
+      {/* Share this reaction as a Vidrip deep link (opens it for thread members) */}
+      <TouchableOpacity
+        style={[styles.shareBtn, { top: topInset + SPACE.SM }]}
+        onPress={() => shareTextNative('Watch my reaction on Vidrip', `reaxn://reaction/${reactionId}`)}>
+        <Text style={styles.shareTxt}>↗</Text>
+      </TouchableOpacity>
+
       {/* Close */}
       <TouchableOpacity
         style={[styles.closeBtn, { top: topInset + SPACE.SM }]}
@@ -613,6 +632,13 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   closeTxt: { color: C.WHITE, fontSize: 16, fontFamily: FONT.BODY_BOLD, lineHeight: 20 },
+  shareBtn: {
+    position: 'absolute', right: SPACE.LG + 44,
+    width: 36, height: 36, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  shareTxt: { color: C.WHITE, fontSize: 18, fontFamily: FONT.BODY_BOLD, lineHeight: 20 },
   startPrompt: {
     position: 'absolute', bottom: 0, left: 0, right: 0, top: 0,
     alignItems: 'center', justifyContent: 'center',

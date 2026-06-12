@@ -91,23 +91,30 @@ export default function RootNavigator() {
     };
   }, []);
 
-  // "Share to Vidrip" → go to the Share tab. The shared link can arrive before the
-  // NavigationContainer is mounted (cold start shows a loading spinner first), so we
-  // can't navigate on a timer — navRef may still be null. Instead navigate whenever
-  // BOTH a link is pending and the container is ready: from this effect (warm start /
-  // session just loaded) and from the container's onReady (cold start). ShareHomeScreen
-  // reads the URL from the store and fills it in.
+  // Pending deep-link navigation (Share-to-Vidrip paste, or a reaxn://reaction link).
+  // A link can arrive before the NavigationContainer mounts (cold start shows a
+  // loading spinner first), so navRef may be null on a timer. Instead run whenever a
+  // pending item exists AND the container is ready: from this effect (warm start /
+  // session just loaded) and from the container's onReady (cold start).
   const pendingShareUrl = useShareIntentStore(s => s.pendingUrl);
+  const pendingReactionId = useShareIntentStore(s => s.pendingReactionId);
   const sessionRef = useRef(session);
   sessionRef.current = session;
-  const navigateToShareIfReady = useCallback(() => {
-    if (sessionRef.current
-        && useShareIntentStore.getState().pendingUrl
-        && navRef.current?.isReady()) {
+  const runPendingNavigation = useCallback(() => {
+    if (!sessionRef.current || !navRef.current?.isReady()) { return; }
+    const store = useShareIntentStore.getState();
+    if (store.pendingReactionId) {
+      const reactionId = store.pendingReactionId;
+      store.setPendingReactionId(null);
+      navRef.current.navigate('Main', {
+        screen: 'Feed', params: { screen: 'WatchReaction', params: { reactionId } },
+      });
+    } else if (store.pendingUrl) {
+      // ShareHomeScreen reads pendingUrl from the store and fills it in once focused.
       navRef.current.navigate('Main', { screen: 'Share', params: { screen: 'ShareHome' } });
     }
   }, []);
-  useEffect(() => { navigateToShareIfReady(); }, [pendingShareUrl, session, navigateToShareIfReady]);
+  useEffect(() => { runPendingNavigation(); }, [pendingShareUrl, pendingReactionId, session, runPendingNavigation]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -133,6 +140,13 @@ export default function RootNavigator() {
         const link = text.match(/https?:\/\/\S+/)?.[0] ?? text;
         useShareIntentStore.getState().setPendingUrl(link);
       }
+      return;
+    }
+
+    // reaxn://reaction/<id> — a shared Vidrip reaction link → open that reaction.
+    if (url.startsWith('reaxn://reaction/')) {
+      const id = url.slice('reaxn://reaction/'.length).split(/[?#/]/)[0];
+      if (id) { useShareIntentStore.getState().setPendingReactionId(id); }
       return;
     }
 
@@ -166,7 +180,7 @@ export default function RootNavigator() {
   const showOnboarding = !!session && (!onboarded || replaying);
 
   return (
-    <NavigationContainer ref={navRef} onReady={navigateToShareIfReady}>
+    <NavigationContainer ref={navRef} onReady={runPendingNavigation}>
       <Root.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           showOnboarding ? (
