@@ -110,6 +110,7 @@ export default function MainTabs() {
           tabBarIcon: tabIcon(require('../../assets/icon-feed.png')),
           tabBarLabel: 'Feed',
           tabBarBadge: toReact > 0 ? toReact : undefined,
+          tabBarBadgeStyle: { backgroundColor: C.ACCENT_HOT, color: C.WHITE },
         }} />
       <Tab.Screen name="Channels" component={ChannelsNavigator}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Channels' }} />

@@ -112,7 +112,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
             <View style={styles.center}>
               <Animated.View style={[styles.logoWrap, logoStyle]}>
                 <Animated.Image
-                  source={require('../../assets/goldlogo.png')}
+                  source={require('../../assets/driplogo.png')}
                   style={styles.logo}
                   resizeMode="contain"
                 />

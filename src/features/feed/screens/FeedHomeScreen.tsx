@@ -39,6 +39,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'requests', label: 'My Requests' },
   { key: 'reviews', label: 'My Reviews' },
 ];
+
 // A thread "needs your reaction" if a friend sent it and you haven't reacted.
 const needsReaction = (t: FeedThread, uid?: string) =>
   t.sender_id !== uid && t.my_status !== 'reacted';
@@ -228,8 +229,16 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     <View style={styles.container}>
       <View style={{ marginTop: top }}>
         <View style={styles.header}>
-          <Image source={require('../../../assets/goldlogo.png')} style={styles.headerLogo} resizeMode="contain" />
-          <Text style={styles.headerTitle}>Vidrip</Text>
+          <Image
+            source={require('../../../assets/driplogo.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.headerTitle}>
+            <Text style={styles.titleDrip}>
+              <Text style={styles.titleVi}>Vi</Text>{'drip'.split('').map((ch) => (ch))}
+            </Text>
+          </Text>
         </View>
         <View style={styles.tabRow}>
           <TouchableOpacity
@@ -446,18 +455,37 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: SPACE.SM,
     paddingHorizontal: SPACE.LG,
     paddingTop: SPACE.LG,
-    paddingBottom: SPACE.SM,
+    paddingBottom: 0,
+    zIndex: 10,           // paint the drips above the tab row below
   },
-  headerLogo: { width: 34, height: 37 },
+  // Tall enough to show the paint dripping off the play button; the negative
+  // marginBottom lets those drips overhang down into the tab row. Decorative —
+  // pointerEvents:'none' lets taps fall through to the Feed/Favorites toggle.
+  headerLogo: {
+    width: 48,
+    height: 84,
+    marginTop: -8,
+    marginBottom: -30,
+    pointerEvents: 'none',
+  },
   headerTitle: {
     fontSize: FONT.SIZES.XXL,
     fontFamily: FONT.DISPLAY_BOLD,
     color: C.INK,
     letterSpacing: -1,
+    marginTop: 0,
+    marginLeft: -5,
+    display: 'flex',
+  },
+  titleVi: {
+    color: C.WHITE,
+  },
+  titleDrip: {
+    color: C.ACCENT_HOT,
   },
 
   // Tab toggle
@@ -477,7 +505,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: RADIUS.SM,
   },
-  tabBtnActive:   { backgroundColor: C.ACCENT },
+  tabBtnActive:   {
+    backgroundColor: C.ACCENT,
+  },
   tabLabel:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED },
   tabLabelActive: { color: C.WHITE },
   filterRow: { gap: SPACE.SM, paddingHorizontal: SPACE.LG, marginTop: SPACE.SM, marginBottom: SPACE.XS, alignItems: 'center' },

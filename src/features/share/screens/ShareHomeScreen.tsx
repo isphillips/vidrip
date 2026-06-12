@@ -862,9 +862,9 @@ const styles = StyleSheet.create({
   searchSpinner: { marginLeft: SPACE.SM },
   gridSpinner: { position: 'absolute', top: '50%' },
   tabsScroll: {  height: 50, marginBottom: SPACE.SM },
-  tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, alignItems: 'center' },
+  tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, alignItems: 'center', height: 33 },
   tab:     { alignItems: 'center', justifyContent: 'center', height: 33, paddingHorizontal: SPACE.MD, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
-  tabActive:    { backgroundColor: C.ACCENT, borderColor: C.ACCENT },
+  tabActive:    { backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.ACCENT },
   tabTxt:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   tabTxtActive: { color: C.WHITE },
 
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
   },
   feedBarText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   feedRefreshBtn: {
-    backgroundColor: C.ACCENT, borderRadius: RADIUS.SM,
+    backgroundColor: C.ACCENT_LITE, borderRadius: RADIUS.SM, borderWidth: 1, borderColor: C.ACCENT,
     paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, minWidth: 96, alignItems: 'center',
   },
   feedRefreshBtnDisabled: { opacity: 0.45 },

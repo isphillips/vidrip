@@ -1,35 +1,35 @@
 export const C = {
   // Backgrounds — warm near-black to match logo's dark warmth
-  BG: '#0C0A09',
-  SURFACE: '#171210',
+  BG: 'rgb(11, 9, 8)',
+  SURFACE: '#17100e',
   SURFACE_2: '#221A17',
 
   // Borders
-  BORDER: '#2E2420',
-  BORDER_STRONG: '#3E3028',
+  BORDER: '#413548',
+  BORDER_STRONG: '#382f40',
 
   // Text
   INK: '#F5F0EE',
-  MUTED: '#A09088',
-  SUBTLE: '#655550',
+  MUTED: '#EAC9EE',
+  SUBTLE: '#EAC9EE',
 
   // Brand — deep crimson pulled from logo wax seal
-  ACCENT: '#8C1A14',        // deep wax seal crimson — primary actions
-  ACCENT_MID: '#A82820',    // warm crimson mid — hover/active
-  ACCENT_HOT: '#C43C30',    // bright crimson highlight
-  ACCENT_LITE: '#1C0806',   // dark crimson tint for surfaces
+  ACCENT: '#8b22a5',        // deep wax seal crimson — primary actions
+  ACCENT_MID: '#8e44ad',    // warm crimson mid — hover/active
+  ACCENT_HOT: '#e056fd',    // bright crimson highlight
+  ACCENT_LITE: '#2a0a33',   // dark crimson tint for surfaces
 
   // Gradient pair (bright → deep crimson, matches logo wax highlights)
   GRAD_START: '#C43C30',
   GRAD_END: '#8C1A14',
 
   // Gold — the logo's leaf, for Art-Deco linework/flourishes (onboarding)
-  GOLD: '#C9A24B',
+  GOLD: '#e056fd',
   GOLD_DIM: 'rgba(201,162,75,0.35)',
 
   // Status
   SUCCESS: '#22C55E',
-  DANGER: '#EF4444',
+  DANGER: '#e056fd',
   WARNING: '#F59E0B',
 
   // Utility
