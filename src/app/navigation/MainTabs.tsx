@@ -114,7 +114,7 @@ export default function MainTabs() {
       <Tab.Screen name="Channels" component={ChannelsNavigator}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Channels' }} />
       <Tab.Screen name="Share" component={ShareNavigator}
-        options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Share' }} />
+        options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Browse' }} />
       <Tab.Screen name="Friends" component={FriendsNavigator}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-friends.png')), tabBarLabel: 'Friends' }} />
       <Tab.Screen name="Account" component={AccountNavigator}
