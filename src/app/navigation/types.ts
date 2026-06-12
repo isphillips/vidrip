@@ -70,6 +70,18 @@ export type RecordStackParamList = {
   RecordReaction: { threadId: string; videoId: string; sourceType?: 'youtube' | 'tiktok' | 'instagram' };
 };
 
+// Root-level modals
+export type RootStackParamList = {
+  Main: undefined;
+  RecordReaction: RecordStackParamList['RecordReaction'];
+  RecordComment: {
+    rootSourceId: string;
+    sourceType: 'youtube' | 'tiktok' | 'instagram';
+    parentCommentId?: string;
+    videoTitle?: string;
+  };
+};
+
 export type AuthStackScreenProps<T extends keyof AuthStackParamList> =
   NativeStackScreenProps<AuthStackParamList, T>;
 

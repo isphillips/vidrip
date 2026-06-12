@@ -25,6 +25,7 @@ import {
 import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/syncedAccounts';
 import { fetchRecommended, refreshRecommended, RECOMMENDED_COOLDOWN_MS } from '../../../infrastructure/supabase/queries/recommended';
 import { useAuthStore } from '../../../store/authStore';
+import VideoCommentsSheet from '../../comments/components/VideoCommentsSheet';
 import type { ShareStackScreenProps } from '../../../app/navigation/types';
 
 // Natural height of the expanding search row (input padding + line + border).
@@ -166,6 +167,18 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [toastMsg, setToastMsg]   = useState('');
   const drawerAnim = useRef(new Animated.Value(height)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
+
+  // comments sheet
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentsRefreshKey, setCommentsRefreshKey] = useState(0);
+
+  // Re-fetch comments when returning from RecordCommentScreen
+  useEffect(() => {
+    if (isFocused && commentsOpen) {
+      setCommentsRefreshKey(k => k + 1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused]);
 
   const drawerH = Math.round(height * DRAWER_HEIGHT_PCT);
   const cardW   = (width - SPACE.LG * 2 - SPACE.MD) / 2;
@@ -327,6 +340,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   };
 
   const closePlayer = () => {
+    setCommentsOpen(false);
     closeDrawer();
     Animated.timing(playerAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
       setSelectedVideo(null);
@@ -697,6 +711,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 <Text style={styles.overlayChannel}>{selectedVideo.channelTitle}</Text>
               )}
             </View>
+            <TouchableOpacity style={styles.commentsBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.85}>
+              <Ionicons name="chatbubbles-outline" size={18} color={C.INK} />
+              <Text style={styles.commentsBtnText}>Comments</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.shareBtn} onPress={openDrawer} activeOpacity={0.85}>
               <Text style={styles.shareBtnText}>Share with Friend</Text>
             </TouchableOpacity>
@@ -705,6 +723,18 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
             )}
           </View>
         </Animated.View>
+      )}
+
+      {/* ── Video comments sheet ──────────────────────────────────────────── */}
+      {selectedVideo && (
+        <VideoCommentsSheet
+          visible={commentsOpen}
+          rootSourceId={selectedVideo.videoId}
+          sourceType={selectedVideo.sourceType ?? 'youtube'}
+          videoTitle={selectedVideo.title}
+          refreshKey={commentsRefreshKey}
+          onClose={() => setCommentsOpen(false)}
+        />
       )}
 
       {/* ── Share drawer ───────────────────────────────────────────────────── */}
@@ -910,6 +940,8 @@ const styles = StyleSheet.create({
   overlayInfo:    { gap: 2 },
   overlayTitle:   { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   overlayChannel: { color: 'rgba(255,255,255,0.7)', fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
+  commentsBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: RADIUS.MD, paddingVertical: SPACE.MD, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  commentsBtnText: { color: C.INK, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
   shareBtn:     { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.LG, alignItems: 'center', justifyContent: 'center' },
   shareBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
   toast: { backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: RADIUS.MD, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG, alignSelf: 'center' },
