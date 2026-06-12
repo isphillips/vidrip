@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, TextInput, FlatList, StyleSheet,
   TouchableOpacity, Image, ActivityIndicator, Alert, RefreshControl,
-  ScrollView, useWindowDimensions, Animated, KeyboardAvoidingView, Platform, BackHandler,
+  ScrollView, useWindowDimensions, Animated, Easing, PanResponder, KeyboardAvoidingView, Platform, BackHandler, InteractionManager,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Video from 'react-native-video';
@@ -30,6 +30,10 @@ import type { ShareStackScreenProps } from '../../../app/navigation/types';
 
 // Natural height of the expanding search row (input padding + line + border).
 const SEARCH_ROW_HEIGHT = 56;
+
+// Blank page loaded into idle WebView slots so the browser context is pre-created
+// before any video is loaded, eliminating mount-time jitter on the UI thread.
+const BLANK_SLOT_HTML = '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{background:#000;margin:0;padding:0;overflow:hidden}</style></head><body></body></html>';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function extractYouTubeId(url: string): string | null {
@@ -172,6 +176,21 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentsRefreshKey, setCommentsRefreshKey] = useState(0);
 
+  // 3-slot WebView pool — always keeps prev/current/next video pre-buffering
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [slotVideos, setSlotVideos] = useState<[VideoItem|null, VideoItem|null, VideoItem|null]>([null, null, null]);
+  const slotAnims     = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  const slotLogicalX  = useRef([0, 0, 0]);          // tracks position without reading _value
+  const activeSlotRef = useRef<0|1|2>(1);
+  const slotVideoIdxRef = useRef<[number|null, number|null, number|null]>([null, null, null]);
+  const wvRefs        = useRef<(WebView|null)[]>([null, null, null]);
+  const gooX          = useRef(new Animated.Value(0)).current;
+  const gooScaleY     = useRef(new Animated.Value(1)).current;
+  const gooOpacity    = useRef(new Animated.Value(0)).current;
+  const transitioningRef  = useRef(false);
+  const gridDataRef       = useRef<VideoItem[]>([]);
+  const nextSlotTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Re-fetch comments when returning from RecordCommentScreen
   useEffect(() => {
     if (isFocused && commentsOpen) {
@@ -307,6 +326,19 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     return [...memberVideos, ...shorts].sort((a, b) => sortTs(b).localeCompare(sortTs(a)));
   }, [query, results, showRecommended, recItems, showForYou, feedItems, memberVideos, category]);
 
+  useEffect(() => { gridDataRef.current = gridData; }, [gridData]);
+
+  // Prefetch thumbnails for adjacent videos so the slide animation never shows a blank image
+  useEffect(() => {
+    if (selectedIndex === null) { return; }
+    const data = gridDataRef.current;
+    if (data.length < 2) { return; }
+    const prev = data[(selectedIndex - 1 + data.length) % data.length];
+    const next = data[(selectedIndex + 1) % data.length];
+    if (prev?.thumbnail) { Image.prefetch(prev.thumbnail).catch(() => {}); }
+    if (next?.thumbnail) { Image.prefetch(next.thumbnail).catch(() => {}); }
+  }, [selectedIndex]);
+
   useEffect(() => {
     if (mode !== 'browse') { return; }
     clearTimeout(searchTimer.current);
@@ -331,21 +363,201 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     loadCategory(category, false);
   }, [loadingMore, query, category, loadCategory]);
 
+  // ── JS injection helpers for mute/unmute control ────────────────────────────
+  const injectActivate = (slotIdx: number, sourceType?: string) => {
+    const ref = wvRefs.current[slotIdx];
+    if (!ref) { return; }
+    const t = sourceType ?? 'youtube';
+    if (t === 'youtube') {
+      ref.injectJavaScript(`(function(){var i=document.querySelector('iframe');if(i&&i.contentWindow){i.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*');i.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}','*');}true;})();`);
+    } else if (t === 'tiktok') {
+      ref.injectJavaScript(`(function(){var f=document.getElementById('tt');if(f&&f.contentWindow){f.contentWindow.postMessage({'x-tiktok-player':true,type:'unMute'},'*');f.contentWindow.postMessage({'x-tiktok-player':true,type:'play'},'*');}true;})();`);
+    } else if (t === 'instagram') {
+      ref.injectJavaScript(`(function(){var v=document.querySelector('video');if(v){v.muted=false;try{v.play();}catch(e){}}true;})();`);
+    }
+  };
+
+  const injectMute = (slotIdx: number, sourceType?: string) => {
+    const ref = wvRefs.current[slotIdx];
+    if (!ref) { return; }
+    const t = sourceType ?? 'youtube';
+    if (t === 'youtube') {
+      ref.injectJavaScript(`(function(){var i=document.querySelector('iframe');if(i&&i.contentWindow){i.contentWindow.postMessage('{"event":"command","func":"mute","args":""}','*');i.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}','*');}true;})();`);
+    } else if (t === 'tiktok') {
+      ref.injectJavaScript(`(function(){var f=document.getElementById('tt');if(f&&f.contentWindow){f.contentWindow.postMessage({'x-tiktok-player':true,type:'mute'},'*');f.contentWindow.postMessage({'x-tiktok-player':true,type:'pause'},'*');}true;})();`);
+    } else if (t === 'instagram') {
+      ref.injectJavaScript(`(function(){var v=document.querySelector('video');if(v){v.muted=true;v.pause();}true;})();`);
+    }
+  };
+
+  // ── Background slot scheduling ───────────────────────────────────────────────
+  // WebViews are always mounted (blank HTML when idle), so navigating to a video
+  // source is cheap. We still wait for interactions to settle so the current video's
+  // initial playback isn't competing with a navigation on the background slot.
+  const scheduleNextSlot = (slotIdx: 0|1|2, video: VideoItem | null) => {
+    if (nextSlotTimerRef.current) { clearTimeout(nextSlotTimerRef.current); nextSlotTimerRef.current = null; }
+    if (!video) { return; }
+    InteractionManager.runAfterInteractions(() => {
+      nextSlotTimerRef.current = setTimeout(() => {
+        nextSlotTimerRef.current = null;
+        setSlotVideos(prev => {
+          const next = [...prev] as [VideoItem|null, VideoItem|null, VideoItem|null];
+          next[slotIdx] = video;
+          return next;
+        });
+      }, 500);
+    });
+  };
+
   // ── Player open/close ───────────────────────────────────────────────────────
-  const openPlayer = (video: VideoItem) => {
+  const initSlots = (video: VideoItem, index: number) => {
+    const data = gridDataRef.current;
+    if (!data.length) { return; }
+    const prevIdx = (index - 1 + data.length) % data.length;
+    const nextIdx = (index + 1) % data.length;
+    activeSlotRef.current = 1;
+    slotVideoIdxRef.current = [prevIdx, index, nextIdx];
+    slotLogicalX.current = [-width, 0, width];
+    slotAnims[0].setValue(-width);
+    slotAnims[1].setValue(0);
+    slotAnims[2].setValue(width);
+    setSlotVideos([null, video, null]);
+    scheduleNextSlot(2, data[nextIdx] ?? null);
+  };
+
+  const openPlayer = (video: VideoItem, index?: number) => {
     setSelectedVideo(video);
+    setSelectedIndex(index ?? null);
     setSentThisSession(new Set());
     setSelectedFriends(new Set());
+    if (index != null) { initSlots(video, index); }
     Animated.spring(playerAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }).start();
   };
 
   const closePlayer = () => {
+    if (nextSlotTimerRef.current) { clearTimeout(nextSlotTimerRef.current); nextSlotTimerRef.current = null; }
     setCommentsOpen(false);
+    transitioningRef.current = false;
     closeDrawer();
     Animated.timing(playerAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
       setSelectedVideo(null);
+      setSelectedIndex(null);
+      setSlotVideos([null, null, null]);
     });
   };
+
+  // ── Swipe-to-next/prev video ─────────────────────────────────────────────────
+  const goToVideoRef = useRef<(dir: 'left' | 'right') => void>(() => {});
+
+  const goToVideo = useCallback((direction: 'left' | 'right') => {
+    if (transitioningRef.current) { return; }
+    const data = gridDataRef.current;
+    if (data.length < 2) { return; }
+    const active = activeSlotRef.current;
+    // Which slot slides to center, which slot gets freed for the new adjacent video
+    const nextActive = ((active + (direction === 'right' ? 1 : 2)) % 3) as 0|1|2;
+    const freed      = ((active + (direction === 'right' ? 2 : 1)) % 3) as 0|1|2;
+
+    // Right swipe requires prebuffered next; left loads on demand
+    if (direction === 'right' && !slotVideos[nextActive]) { return; }
+    const prevIdxForLoad = slotVideoIdxRef.current[nextActive];
+    if (direction === 'left' && prevIdxForLoad == null) { return; }
+
+    transitioningRef.current = true;
+    const slideBy = (direction === 'right' ? -1 : 1) * width;
+
+    // Stop the current video immediately — don't wait for animation to finish
+    injectMute(active, slotVideos[active]?.sourceType);
+
+    // Load prev video now if not prebuffered — WebView will buffer during the animation
+    if (direction === 'left' && !slotVideos[nextActive]) {
+      setSlotVideos(prev => {
+        const next = [...prev] as [VideoItem|null, VideoItem|null, VideoItem|null];
+        next[nextActive] = data[prevIdxForLoad!] ?? null;
+        return next;
+      });
+    }
+
+    gooX.setValue(-slideBy * 0.6);
+    gooOpacity.setValue(0);
+    gooScaleY.setValue(0.7);
+
+    Animated.parallel([
+      // All 3 slots slide together
+      Animated.timing(slotAnims[0], { toValue: slotLogicalX.current[0] + slideBy, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(slotAnims[1], { toValue: slotLogicalX.current[1] + slideBy, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(slotAnims[2], { toValue: slotLogicalX.current[2] + slideBy, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      // Goo sweeps through
+      Animated.sequence([
+        Animated.timing(gooOpacity, { toValue: 1, duration: 90, useNativeDriver: true }),
+        Animated.timing(gooOpacity, { toValue: 0, duration: 130, delay: 170, useNativeDriver: true }),
+      ]),
+      Animated.timing(gooX, { toValue: slideBy * 0.6, duration: 380, easing: Easing.out(Easing.exp), useNativeDriver: true }),
+      Animated.sequence([
+        Animated.timing(gooScaleY, { toValue: 1.35, duration: 110, useNativeDriver: true }),
+        Animated.timing(gooScaleY, { toValue: 0.8, duration: 160, useNativeDriver: true }),
+        Animated.spring(gooScaleY, { toValue: 1, useNativeDriver: true, tension: 180, friction: 8 }),
+      ]),
+    ]).start(() => {
+      // Update logical positions
+      slotLogicalX.current[0] += slideBy;
+      slotLogicalX.current[1] += slideBy;
+      slotLogicalX.current[2] += slideBy;
+      activeSlotRef.current = nextActive;
+
+      // Use data directly — slotVideos[nextActive] may be stale if we loaded it inline
+      const newIdx  = slotVideoIdxRef.current[nextActive]!;
+      const newVideo = data[newIdx];
+      if (!newVideo) { transitioningRef.current = false; return; }
+      setSelectedVideo(newVideo);
+      setSelectedIndex(newIdx);
+
+      // Unmute/play the newly active slot — current was already muted before animation
+      injectActivate(nextActive, newVideo.sourceType);
+
+      if (direction === 'right') {
+        // Snap freed slot to right edge, then schedule next video load after current settles
+        const newNextIdx = (newIdx + 1) % data.length;
+        slotAnims[freed].setValue(width);
+        slotLogicalX.current[freed] = width;
+        slotVideoIdxRef.current[freed] = newNextIdx;
+        setSlotVideos(prev => {
+          const next = [...prev] as [VideoItem|null, VideoItem|null, VideoItem|null];
+          next[freed] = null;
+          return next;
+        });
+        scheduleNextSlot(freed, data[newNextIdx] ?? null);
+      } else {
+        // Snap freed slot to left edge and null it — we don't prebuffer prev
+        const newPrevIdx = (newIdx - 1 + data.length) % data.length;
+        slotAnims[freed].setValue(-width);
+        slotLogicalX.current[freed] = -width;
+        slotVideoIdxRef.current[freed] = newPrevIdx;
+        setSlotVideos(prev => {
+          const next = [...prev] as [VideoItem|null, VideoItem|null, VideoItem|null];
+          next[freed] = null;
+          return next;
+        });
+      }
+
+      transitioningRef.current = false;
+    });
+  }, [width, gooX, gooOpacity, gooScaleY, slotAnims, slotVideos]);
+
+  useEffect(() => { goToVideoRef.current = goToVideo; }, [goToVideo]);
+
+  const swipePanResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gs) =>
+      !transitioningRef.current &&
+      Math.abs(gs.dx) > 14 &&
+      Math.abs(gs.dx) > Math.abs(gs.dy) * 1.3,
+    onPanResponderRelease: (_, gs) => {
+      if (Math.abs(gs.dx) > 55 || Math.abs(gs.vx) > 0.4) {
+        goToVideoRef.current(gs.dx > 0 ? 'left' : 'right');
+      }
+    },
+    onPanResponderTerminate: () => {},
+  })).current;
 
   // ── Drawer open/close ───────────────────────────────────────────────────────
   const openDrawer = async () => {
@@ -646,8 +858,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                     </Text>
                   )
                 }
-                renderItem={({ item }) => (
-                  <TouchableOpacity style={[styles.card, { width: cardW }]} onPress={() => openPlayer(item)} activeOpacity={0.8}>
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity style={[styles.card, { width: cardW }]} onPress={() => openPlayer(item, index)} activeOpacity={0.8}>
                     <Image source={{ uri: item.thumbnail }} style={[styles.cardThumb, { height: cardH }]} resizeMode="cover" />
                     {item.duration != null && <DurationBadge seconds={item.duration} />}
                     <View style={styles.cardInfo}>
@@ -663,67 +875,152 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       )}
 
       {/* ── Player overlay ─────────────────────────────────────────────────── */}
-      {selectedVideo && (
-        <Animated.View style={[styles.playerOverlay, { opacity: playerOpacity, transform: [{ scale: playerScale }] }]}>
-          {selectedVideo.sourceType === 'instagram' && selectedVideo.videoUrl ? (
-            <Video
-              source={{ uri: selectedVideo.videoUrl }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="contain"
-              controls
-              paused={!isFocused}
-              playInBackground={false}
-              playWhenInactive={false}
-              repeat
-            />
-          ) : selectedVideo.sourceType === 'instagram' ? (
-            <WebView
-              style={StyleSheet.absoluteFill}
-              source={{ uri: `https://www.instagram.com/reel/${selectedVideo.videoId}/embed/` }}
-              allowsInlineMediaPlayback
-              mediaPlaybackRequiresUserAction={false}
-              allowsFullscreenVideo={false}
-              javaScriptEnabled
-            />
-          ) : (
-          <WebView
-            style={StyleSheet.absoluteFill}
-            source={selectedVideo.sourceType === 'tiktok'
-              ? { html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{width:100vw;height:100vh;border:0}</style></head><body><iframe id="tt" src="${tikTokPlayerUrl(selectedVideo.videoId, { controls: true, autoplay: true })}" allow="autoplay;fullscreen;encrypted-media" allowfullscreen></iframe><script>(function(){var f=document.getElementById('tt');function cmd(t){f.contentWindow.postMessage({'x-tiktok-player':true,type:t},'*');}window.addEventListener('message',function(e){var d=e.data;if(typeof d==='string'){try{d=JSON.parse(d);}catch(_){return;}}if(d&&d.type==='onPlayerReady'){cmd('unMute');cmd('play');}});document.addEventListener('click',function(){cmd('unMute');cmd('play');});document.addEventListener('touchstart',function(){cmd('unMute');cmd('play');});})();</script></body></html>`, baseUrl: 'https://www.tiktok.com' }
-              : { html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56.25vh;height:100vh;min-width:100vw;min-height:177.78vw}</style></head><body><iframe src="https://www.youtube.com/embed/${selectedVideo.videoId}?autoplay=1&playsinline=1&controls=1&rel=0&modestbranding=1&origin=https://youtube.com" frameborder="0" allow="autoplay;fullscreen" allowfullscreen></iframe></body></html>`, baseUrl: 'https://youtube.com' }}
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            allowsFullscreenVideo={false}
-            javaScriptEnabled
-          />
-          )}
+      {/*
+        The outer Animated.View is ALWAYS mounted (not conditional on selectedVideo).
+        This keeps all 3 WebViews permanently in the tree so their browser contexts
+        are pre-created — loading a video becomes a cheap navigation rather than an
+        expensive mount, eliminating the jitter when the next slot starts buffering.
+        When the player is closed: opacity=0, pointerEvents="none" (grid works normally).
+      */}
+      <Animated.View
+        style={[styles.playerOverlay, { opacity: playerOpacity, transform: [{ scale: playerScale }] }]}
+        pointerEvents={selectedVideo ? 'auto' : 'none'}
+        {...swipePanResponder.panHandlers}>
 
-          {/* Close */}
-          <TouchableOpacity style={[styles.overlayClose, { top: top + SPACE.MD }]} onPress={closePlayer} activeOpacity={0.8}>
+        {/* Neon goo blob — sweeps behind videos during transition */}
+        {selectedVideo && (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0, bottom: 0,
+              left: -width * 0.5,
+              width: width * 2,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: gooOpacity,
+              transform: [{ translateX: gooX }, { scaleY: gooScaleY }],
+              zIndex: 1,
+            }}>
+            <View style={{ position: 'absolute', width: width * 1.9, height: height * 0.68, borderRadius: height * 0.34, backgroundColor: 'rgba(88, 14, 180, 0.20)' }} />
+            <View style={{ position: 'absolute', width: width * 1.4, height: height * 0.52, borderRadius: height * 0.26, backgroundColor: 'rgba(130, 40, 230, 0.32)' }} />
+            <View style={{ position: 'absolute', width: width * 0.95, height: height * 0.38, borderRadius: height * 0.19, backgroundColor: 'rgba(175, 70, 255, 0.44)' }} />
+            <View style={{ position: 'absolute', width: width * 0.55, height: height * 0.22, borderRadius: height * 0.11, backgroundColor: 'rgba(215, 120, 255, 0.60)' }} />
+          </Animated.View>
+        )}
+
+        {/* WebView pool — slots 1 (current) + 2 (next) always mounted with blank HTML
+             when idle; slot 0 (prev) only mounts on demand since back-navigation is rare */}
+        {([0, 1, 2] as const).map(i => {
+          const sv = slotVideos[i];
+          // Prev slot: skip when empty — mounts on demand if user swipes back
+          if (i === 0 && !sv) { return null; }
+          const isActive = i === activeSlotRef.current;
+          const onSlotLoad = () => {
+            if (!sv) { return; }
+            if (activeSlotRef.current === i && !transitioningRef.current) {
+              injectActivate(i, sv.sourceType);
+            } else {
+              // Reinforce muting for background slots — URL mute=1 alone can leak
+              injectMute(i, sv.sourceType);
+            }
+          };
+          return (
+            <Animated.View
+              key={i}
+              style={[StyleSheet.absoluteFill, { transform: [{ translateX: slotAnims[i] }], zIndex: 2 }]}
+            >
+              {!sv ? (
+                // Blank page — keeps browser context alive for current/next slots
+                <WebView
+                  ref={el => { wvRefs.current[i] = el; }}
+                  style={StyleSheet.absoluteFill}
+                  source={{ html: BLANK_SLOT_HTML, baseUrl: '' }}
+                  javaScriptEnabled={false}
+                  mediaPlaybackRequiresUserAction
+                />
+              ) : sv.sourceType === 'instagram' && sv.videoUrl ? (
+                <Video
+                  source={{ uri: sv.videoUrl }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="contain"
+                  controls
+                  paused={!isFocused || !isActive}
+                  muted={!isActive}
+                  playInBackground={false}
+                  playWhenInactive={false}
+                  repeat
+                />
+              ) : sv.sourceType === 'instagram' ? (
+                <WebView
+                  ref={el => { wvRefs.current[i] = el; }}
+                  style={StyleSheet.absoluteFill}
+                  source={{ uri: `https://www.instagram.com/reel/${sv.videoId}/embed/` }}
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  allowsFullscreenVideo={false}
+                  javaScriptEnabled
+                  onLoad={onSlotLoad}
+                />
+              ) : sv.sourceType === 'tiktok' ? (
+                <WebView
+                  ref={el => { wvRefs.current[i] = el; }}
+                  style={StyleSheet.absoluteFill}
+                  source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{width:100vw;height:100vh;border:0}</style></head><body><iframe id="tt" src="${tikTokPlayerUrl(sv.videoId, { controls: true, autoplay: true })}" allow="autoplay;fullscreen;encrypted-media" allowfullscreen></iframe></body></html>`, baseUrl: 'https://www.tiktok.com' }}
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  allowsFullscreenVideo={false}
+                  javaScriptEnabled
+                  onLoad={onSlotLoad}
+                />
+              ) : (
+                <WebView
+                  ref={el => { wvRefs.current[i] = el; }}
+                  style={StyleSheet.absoluteFill}
+                  source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56.25vh;height:100vh;min-width:100vw;min-height:177.78vw}</style></head><body><iframe src="https://www.youtube.com/embed/${sv.videoId}?autoplay=1&mute=1&enablejsapi=1&playsinline=1&controls=1&rel=0&modestbranding=1&origin=https://youtube.com" frameborder="0" allow="autoplay;fullscreen" allowfullscreen></iframe></body></html>`, baseUrl: 'https://youtube.com' }}
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  allowsFullscreenVideo={false}
+                  javaScriptEnabled
+                  onLoad={onSlotLoad}
+                />
+              )}
+            </Animated.View>
+          );
+        })}
+
+        {/* Close — always on top */}
+        {selectedVideo && (
+          <TouchableOpacity style={[styles.overlayClose, { top: top + SPACE.MD, zIndex: 5 }]} onPress={closePlayer} activeOpacity={0.8}>
             <Text style={styles.overlayCloseText}>✕</Text>
           </TouchableOpacity>
+        )}
 
-          {/* Video info + Share button */}
-          <View style={[styles.overlayBottom, { paddingBottom: bottom + SPACE.LG }]}>
-            <View style={styles.overlayInfo}>
-              <Text style={styles.overlayTitle} numberOfLines={2}>{selectedVideo.title}</Text>
-              {!!selectedVideo.channelTitle && (
-                <Text style={styles.overlayChannel}>{selectedVideo.channelTitle}</Text>
-              )}
+        {/* Video info + action buttons — always on top */}
+        {selectedVideo && (
+          <View style={[styles.overlayBottom, { paddingBottom: bottom + SPACE.LG, zIndex: 5 }]}>
+            <View style={styles.overlayRow}>
+              <View style={styles.overlayInfo}>
+                <Text style={styles.overlayTitle} numberOfLines={2}>{selectedVideo.title}</Text>
+                {!!selectedVideo.channelTitle && (
+                  <Text style={styles.overlayChannel}>{selectedVideo.channelTitle}</Text>
+                )}
+              </View>
+              <View style={styles.overlayActions}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.75}>
+                  <Ionicons name="chatbubbles-outline" size={22} color={C.ACCENT} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={openDrawer} activeOpacity={0.75}>
+                  <Ionicons name="paper-plane-outline" size={22} color={C.ACCENT} />
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity style={styles.commentsBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.85}>
-              <Ionicons name="chatbubbles-outline" size={18} color={C.INK} />
-              <Text style={styles.commentsBtnText}>Comments</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.shareBtn} onPress={openDrawer} activeOpacity={0.85}>
-              <Text style={styles.shareBtnText}>Share with Friend</Text>
-            </TouchableOpacity>
             {!!toastMsg && (
               <View style={styles.toast}><Text style={styles.toastText}>{toastMsg}</Text></View>
             )}
           </View>
-        </Animated.View>
-      )}
+        )}
+      </Animated.View>
 
       {/* ── Video comments sheet ──────────────────────────────────────────── */}
       {selectedVideo && (
@@ -937,13 +1234,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.LG, gap: SPACE.SM,
     zIndex: 11,
   },
-  overlayInfo:    { gap: 2 },
+  incomingDim:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  overlayRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: SPACE.MD },
+  overlayInfo:    { flex: 1, gap: 2 },
   overlayTitle:   { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   overlayChannel: { color: 'rgba(255,255,255,0.7)', fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
-  commentsBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: RADIUS.MD, paddingVertical: SPACE.MD, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  commentsBtnText: { color: C.INK, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
-  shareBtn:     { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.LG, alignItems: 'center', justifyContent: 'center' },
-  shareBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
+  overlayActions: { flexDirection: 'row', gap: SPACE.SM, paddingBottom: 2 },
+  actionBtn: {
+    width: 48, height: 48, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(10, 0, 25, 0.88)',
+    borderWidth: 1.5, borderColor: C.ACCENT,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: C.ACCENT, shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.75, shadowRadius: 10, elevation: 8,
+  },
   toast: { backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: RADIUS.MD, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG, alignSelf: 'center' },
   toastText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
 
