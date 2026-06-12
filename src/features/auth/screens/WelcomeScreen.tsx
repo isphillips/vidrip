@@ -132,9 +132,11 @@ function LavaLamp() {
   const { width, height } = useWindowDimensions();
   return (
     <View style={styles.lava} pointerEvents="none">
-      {/* Deep gradient base */}
+      {/* Dark diagonal purple base */}
       <LinearGradient
-        colors={['#1A0A2E', '#0C0610', '#000000']}
+        colors={['#2A0E4E', '#190A33', '#0B0518']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
       {BLOBS.map((cfg, i) => (
@@ -166,7 +168,15 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
           style={styles.button}
           activeOpacity={0.85}
           onPress={() => navigation.navigate('EnterInviteCode')}>
-          <Text style={styles.buttonText}>Enter Invitation Code</Text>
+          <LinearGradient
+            colors={['#E73D93', '#A03FD0']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.buttonInner}>
+            <Text style={styles.buttonText}>Enter Invitation Code</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.signInLink}
@@ -227,16 +237,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   button: {
-    backgroundColor: C.GOLD,
     borderRadius: RADIUS.MD,
-    padding: SPACE.LG,
-    alignItems: 'center',
+    overflow: 'hidden',          // clip the gradient to the rounded corners
     marginBottom: SPACE.MD,
-    borderWidth: 1,
-    borderColor: C.GOLD,
     marginTop: -30,
     width: '90%',
     alignSelf: 'center',
+  },
+  buttonInner: {
+    padding: SPACE.LG,
+    alignItems: 'center',
   },
   buttonText: {
     fontSize: FONT.SIZES.LG,
@@ -253,5 +263,6 @@ const styles = StyleSheet.create({
     color: C.WHITE,
     fontSize: FONT.SIZES.MD,
     fontFamily: FONT.BODY,
+    marginBottom: SPACE.XXL,
   },
 });

@@ -40,6 +40,10 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'reviews', label: 'My Reviews' },
 ];
 
+// Per-letter color steps for the "drip" wordmark — sampled from the logo's
+// pink→purple gradient. Stable objects so they aren't inline styles.
+const DRIP_COLORS = [{ color: '#E73D93' }, { color: '#CF3EA7' }, { color: '#B83EBC' }, { color: '#A03FD0' }];
+
 // A thread "needs your reaction" if a friend sent it and you haven't reacted.
 const needsReaction = (t: FeedThread, uid?: string) =>
   t.sender_id !== uid && t.my_status !== 'reacted';
@@ -235,9 +239,10 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             resizeMode="contain"
           />
           <Text style={styles.headerTitle}>
-            <Text style={styles.titleDrip}>
-              <Text style={styles.titleVi}>Vi</Text>{'drip'.split('').map((ch) => (ch))}
-            </Text>
+            <Text style={styles.titleVi}>Vi</Text>
+            {'drip'.split('').map((ch, i) => (
+              <Text key={i} style={DRIP_COLORS[i]}>{ch}</Text>
+            ))}
           </Text>
         </View>
         <View style={styles.tabRow}>
