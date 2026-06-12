@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HotUpdater } from '@hot-updater/react-native';
 import RootNavigator from './src/app/navigation/RootNavigator';
+import ScreenGradient from './src/components/ScreenGradient';
 import UploadToast from './src/components/UploadToast';
 import { SUPABASE_ANON_KEY } from './src/infrastructure/supabase/client';
 import { C, FONT } from './src/theme';
@@ -23,13 +24,15 @@ function App() {
 // Shown while a force update downloads on launch (gates the stale bundle).
 function UpdatingScreen({ progress = 0 }: { progress?: number }) {
   return (
-    <View style={updateStyles.container}>
-      <Image source={require('./src/assets/goldlogo.png')} style={updateStyles.logo} resizeMode="contain" />
-      <Text style={updateStyles.title}>Setting the stage…</Text>
-      <View style={updateStyles.track}>
-        <View style={[updateStyles.fill, { width: `${Math.round(progress * 100)}%` }]} />
+    <ScreenGradient>
+      <View style={updateStyles.container}>
+        <Image source={require('./src/assets/driplogo.png')} style={updateStyles.logo} resizeMode="contain" />
+        <Text style={updateStyles.title}>Setting the stage…</Text>
+        <View style={updateStyles.track}>
+          <View style={[updateStyles.fill, { width: `${Math.round(progress * 100)}%` }]} />
+        </View>
       </View>
-    </View>
+    </ScreenGradient>
   );
 }
 
@@ -38,11 +41,11 @@ const styles = StyleSheet.create({
 });
 
 const updateStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.BG_SOLID, alignItems: 'center', justifyContent: 'center', gap: 20 },
-  logo: { width: 84, height: 90 },
-  title: { color: C.GOLD, fontFamily: FONT.DISPLAY_SEMIBOLD, fontSize: FONT.SIZES.LG },
-  track: { width: 160, height: 4, borderRadius: 2, backgroundColor: C.GOLD_DIM, overflow: 'hidden' },
-  fill: { height: 4, borderRadius: 2, backgroundColor: C.GOLD },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24 },
+  logo: { width: 96, height: 159 },
+  title: { color: C.WHITE, fontFamily: FONT.DISPLAY_SEMIBOLD, fontSize: FONT.SIZES.LG },
+  track: { width: 160, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)', overflow: 'hidden' },
+  fill: { height: 4, borderRadius: 2, backgroundColor: '#E73D93' },
 });
 
 export default HotUpdater.wrap({
