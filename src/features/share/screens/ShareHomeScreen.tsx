@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD,
     color: C.INK, letterSpacing: -1,
-    fontWeight: FONT.WEIGHTS.EXTRA_BOLD,
+    fontWeight: FONT.WEIGHTS.BOLD,
     textTransform: 'uppercase',
   },
   searchToggle: { padding: SPACE.XS },

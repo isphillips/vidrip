@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT.SIZES.XXL,
     fontFamily: FONT.DISPLAY_BOLD,
-    fontWeight: FONT.WEIGHTS.EXTRA_BOLD,
+    fontWeight: FONT.WEIGHTS.BOLD,
     color: C.INK,
     letterSpacing: -1,
     marginTop: 10,

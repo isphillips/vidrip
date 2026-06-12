@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     color: C.INK,
     marginTop: SPACE.SM,
     paddingHorizontal: SPACE.LG,
-    fontWeight: FONT.WEIGHTS.EXTRA_BOLD,
+    fontWeight: FONT.WEIGHTS.BOLD,
     textTransform: 'uppercase',
   },
   toggleWrap: { paddingHorizontal: SPACE.LG },
