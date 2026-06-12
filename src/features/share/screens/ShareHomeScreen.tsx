@@ -18,7 +18,6 @@ import { sendThread } from '../../../infrastructure/supabase/queries/threads';
 import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
 import { fetchYouTubeDurationSeconds, MAX_VIDEO_SECONDS } from '../../../infrastructure/youtube/api';
 import { useShareIntentStore } from '../../../store/shareIntentStore';
-import { shareTextNative, sourceVideoUrl } from '../../../infrastructure/share/nativeShare';
 import { fetchMembersOnlyVideos } from '../../../infrastructure/supabase/queries/channels';
 import {
   fetchConnectedFeed, refreshConnectedFeed, FEED_REFRESH_COOLDOWN_MS,
@@ -698,22 +697,9 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 <Text style={styles.overlayChannel}>{selectedVideo.channelTitle}</Text>
               )}
             </View>
-            <View style={styles.shareRow}>
-              <TouchableOpacity style={[styles.shareBtn, styles.shareBtnFlex]} onPress={openDrawer} activeOpacity={0.85}>
-                <Text style={styles.shareBtnText}>Share with Friend</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.nativeShareBtn}
-                activeOpacity={0.85}
-                onPress={() => selectedVideo && shareTextNative(
-                  selectedVideo.title || 'Check out this video',
-                  selectedVideo.sourceType === 'instagram'
-                    ? (selectedVideo.videoUrl ?? '')   // instagram: share the re-hosted file URL
-                    : sourceVideoUrl(selectedVideo.videoId, selectedVideo.sourceType ?? 'youtube'),
-                )}>
-                <Ionicons name="share-outline" size={24} color={C.WHITE} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.shareBtn} onPress={openDrawer} activeOpacity={0.85}>
+              <Text style={styles.shareBtnText}>Share with Friend</Text>
+            </TouchableOpacity>
             {!!toastMsg && (
               <View style={styles.toast}><Text style={styles.toastText}>{toastMsg}</Text></View>
             )}
@@ -924,12 +910,8 @@ const styles = StyleSheet.create({
   overlayInfo:    { gap: 2 },
   overlayTitle:   { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   overlayChannel: { color: 'rgba(255,255,255,0.7)', fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
-  shareRow:     { flexDirection: 'row', gap: SPACE.SM, alignItems: 'stretch' },
   shareBtn:     { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.LG, alignItems: 'center', justifyContent: 'center' },
-  shareBtnFlex: { flex: 1 },
   shareBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
-  nativeShareBtn:  { width: 56, borderRadius: RADIUS.MD, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
-  nativeShareIcon: { color: C.WHITE, fontSize: 24, fontFamily: FONT.BODY_BOLD },
   toast: { backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: RADIUS.MD, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG, alignSelf: 'center' },
   toastText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
 
