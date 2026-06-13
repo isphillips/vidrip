@@ -31,9 +31,6 @@ import type { ShareStackScreenProps } from '../../../app/navigation/types';
 // Natural height of the expanding search row (input padding + line + border).
 const SEARCH_ROW_HEIGHT = 56;
 
-// Blank page loaded into idle WebView slots so the browser context is pre-created
-// before any video is loaded, eliminating mount-time jitter on the UI thread.
-const BLANK_SLOT_HTML = '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{background:#000;margin:0;padding:0;overflow:hidden}</style></head><body></body></html>';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function extractYouTubeId(url: string): string | null {
@@ -184,6 +181,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const activeSlotRef = useRef<0|1|2>(1);
   const slotVideoIdxRef = useRef<[number|null, number|null, number|null]>([null, null, null]);
   const wvRefs        = useRef<(WebView|null)[]>([null, null, null]);
+  const slotReadyRef  = useRef([false, false, false]); // doc loaded → safe to injectJavaScript
+  const autoSkipRef   = useRef(0);                      // consecutive auto-skips on unplayable videos
   const gooX          = useRef(new Animated.Value(0)).current;
   const gooScaleY     = useRef(new Animated.Value(1)).current;
   const gooOpacity    = useRef(new Animated.Value(0)).current;
@@ -366,10 +365,12 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // ── JS injection helpers for mute/unmute control ────────────────────────────
   const injectActivate = (slotIdx: number, sourceType?: string) => {
     const ref = wvRefs.current[slotIdx];
-    if (!ref) { return; }
+    // Only inject once the slot's document has loaded — injecting commands into a
+    // still-loading YouTube/TikTok player can break it ("An error has occurred").
+    if (!ref || !slotReadyRef.current[slotIdx]) { return; }
     const t = sourceType ?? 'youtube';
     if (t === 'youtube') {
-      ref.injectJavaScript(`(function(){var i=document.querySelector('iframe');if(i&&i.contentWindow){i.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}','*');i.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}','*');}true;})();`);
+      ref.injectJavaScript(`window.__ytPlay&&window.__ytPlay();true;`);
     } else if (t === 'tiktok') {
       ref.injectJavaScript(`(function(){var f=document.getElementById('tt');if(f&&f.contentWindow){f.contentWindow.postMessage({'x-tiktok-player':true,type:'unMute'},'*');f.contentWindow.postMessage({'x-tiktok-player':true,type:'play'},'*');}true;})();`);
     } else if (t === 'instagram') {
@@ -379,10 +380,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
   const injectMute = (slotIdx: number, sourceType?: string) => {
     const ref = wvRefs.current[slotIdx];
-    if (!ref) { return; }
+    if (!ref || !slotReadyRef.current[slotIdx]) { return; }
     const t = sourceType ?? 'youtube';
     if (t === 'youtube') {
-      ref.injectJavaScript(`(function(){var i=document.querySelector('iframe');if(i&&i.contentWindow){i.contentWindow.postMessage('{"event":"command","func":"mute","args":""}','*');i.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}','*');}true;})();`);
+      ref.injectJavaScript(`window.__ytPause&&window.__ytPause();true;`);
     } else if (t === 'tiktok') {
       ref.injectJavaScript(`(function(){var f=document.getElementById('tt');if(f&&f.contentWindow){f.contentWindow.postMessage({'x-tiktok-player':true,type:'mute'},'*');f.contentWindow.postMessage({'x-tiktok-player':true,type:'pause'},'*');}true;})();`);
     } else if (t === 'instagram') {
@@ -918,11 +919,22 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
           const isActive = i === activeSlotRef.current;
           const onSlotLoad = () => {
             if (!sv) { return; }
+            slotReadyRef.current[i] = true; // document loaded → injects are safe now
             if (activeSlotRef.current === i && !transitioningRef.current) {
               injectActivate(i, sv.sourceType);
             } else {
               // Reinforce muting for background slots — URL mute=1 alone can leak
               injectMute(i, sv.sourceType);
+            }
+          };
+          const onSlotLoadStart = () => { slotReadyRef.current[i] = false; };
+          // YouTube IFrame API → RN bridge: reset skip-guard on ready; auto-advance
+          // past a video the player can't play (onError) when it's the active slot.
+          const onSlotMessage = (e: any) => {
+            let msg: any; try { msg = JSON.parse(e.nativeEvent.data); } catch { return; }
+            if (msg?.type === 'yt-ready') { autoSkipRef.current = 0; return; }
+            if (msg?.type === 'yt-error' && activeSlotRef.current === i && !transitioningRef.current) {
+              if (autoSkipRef.current < 6) { autoSkipRef.current += 1; goToVideoRef.current('right'); }
             }
           };
           return (
@@ -931,14 +943,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               style={[StyleSheet.absoluteFill, { transform: [{ translateX: slotAnims[i] }], zIndex: 2 }]}
             >
               {!sv ? (
-                // Blank page — keeps browser context alive for current/next slots
-                <WebView
-                  ref={el => { wvRefs.current[i] = el; }}
-                  style={StyleSheet.absoluteFill}
-                  source={{ html: BLANK_SLOT_HTML, baseUrl: '' }}
-                  javaScriptEnabled={false}
-                  mediaPlaybackRequiresUserAction
-                />
+                // Idle slot — plain black placeholder. Using a View (not a
+                // JS-disabled WebView) avoids react-native-webview's internal
+                // bridge throwing "unable to execute JavaScript". The next video
+                // still prebuffers as a real WebView via scheduleNextSlot.
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
               ) : sv.sourceType === 'instagram' && sv.videoUrl ? (
                 <Video
                   source={{ uri: sv.videoUrl }}
@@ -961,6 +970,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   allowsFullscreenVideo={false}
                   javaScriptEnabled
                   onLoad={onSlotLoad}
+                  onLoadStart={onSlotLoadStart}
                 />
               ) : sv.sourceType === 'tiktok' ? (
                 <WebView
@@ -972,17 +982,20 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   allowsFullscreenVideo={false}
                   javaScriptEnabled
                   onLoad={onSlotLoad}
+                  onLoadStart={onSlotLoadStart}
                 />
               ) : (
                 <WebView
                   ref={el => { wvRefs.current[i] = el; }}
                   style={StyleSheet.absoluteFill}
-                  source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56.25vh;height:100vh;min-width:100vw;min-height:177.78vw}</style></head><body><iframe src="https://www.youtube.com/embed/${sv.videoId}?autoplay=1&mute=1&enablejsapi=1&playsinline=1&controls=1&rel=0&modestbranding=1&origin=https://youtube.com" frameborder="0" allow="autoplay;fullscreen" allowfullscreen></iframe></body></html>`, baseUrl: 'https://youtube.com' }}
+                  source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;overflow:hidden;width:100vw;height:100vh}#p{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56.25vh;height:100vh;min-width:100vw;min-height:177.78vw}#p iframe{width:100%;height:100%;border:0}</style></head><body><div id="p"></div><script>var player,ready=false,wantPlay=false;function post(m){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify(m));}}function onYouTubeIframeAPIReady(){player=new YT.Player('p',{videoId:'${sv.videoId}',playerVars:{autoplay:1,mute:1,playsinline:1,controls:1,rel:0,modestbranding:1,fs:0,origin:'https://lonelycpp.github.io'},events:{onReady:function(e){ready=true;e.target.playVideo();if(wantPlay){e.target.unMute();}post({type:'yt-ready'});},onError:function(e){post({type:'yt-error',code:e.data});}}});}window.__ytPlay=function(){wantPlay=true;if(ready&&player){player.unMute();player.playVideo();}};window.__ytPause=function(){wantPlay=false;if(ready&&player){player.mute();player.pauseVideo();}};var s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);</script></body></html>`, baseUrl: 'https://lonelycpp.github.io' }}
                   allowsInlineMediaPlayback
                   mediaPlaybackRequiresUserAction={false}
                   allowsFullscreenVideo={false}
                   javaScriptEnabled
                   onLoad={onSlotLoad}
+                  onLoadStart={onSlotLoadStart}
+                  onMessage={onSlotMessage}
                 />
               )}
             </Animated.View>
