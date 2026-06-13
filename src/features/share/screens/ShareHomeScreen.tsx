@@ -28,7 +28,7 @@ import {
 } from '../../../infrastructure/supabase/queries/connectedFeed';
 import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/syncedAccounts';
 import { fetchRecommended, refreshRecommended, RECOMMENDED_COOLDOWN_MS } from '../../../infrastructure/supabase/queries/recommended';
-import { fetchFriendsTrending, fetchPersonalizedShorts } from '../../../infrastructure/supabase/queries/personalized';
+import { fetchFriendsTrending, fetchPersonalizedShorts, fetchTrending } from '../../../infrastructure/supabase/queries/personalized';
 import { useAuthStore } from '../../../store/authStore';
 import VideoCommentsSheet from '../../comments/components/VideoCommentsSheet';
 import type { ShareStackScreenProps, RootStackParamList } from '../../../app/navigation/types';
@@ -134,7 +134,7 @@ const FEED_BAR_HEIGHT = 44;   // fixed height of the collapsible feed bar
 // One-line descriptor shown in the feed bar for each category grid. 'latest' is the
 // personalized grid (labelled "For You"); the rest are YouTube category buckets.
 const CATEGORY_DESC: Record<string, string> = {
-  latest:   'Picked for you from what you react to',
+  latest:   'Picked for you based on what you react to',
   trending: 'Trending Shorts right now',
   music:    'Music videos & performances',
   gaming:   'Gaming clips & highlights',
@@ -301,10 +301,14 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const loadCategory = useCallback(async (cat: Category, reset = true, silent = false) => {
     if (reset) { if (!silent) { setLoading(true); } offsetRef.current = 0; hasMoreRef.current = true; }
     try {
-      // The default 'latest' grid is personalized (affinity-ranked) when signed in;
-      // specific categories stay chronological so the category filter means what it says.
-      const data = (cat === 'latest' && user?.id)
+      // 'latest' = personalized (affinity-ranked); 'trending' = hybrid velocity +
+      // mostPopular; other categories stay chronological so the filter means what it says.
+      const data = !user?.id
+        ? await fetchShorts(cat, PAGE, reset ? 0 : offsetRef.current)
+        : cat === 'latest'
         ? await fetchPersonalizedShorts(user.id, PAGE, reset ? 0 : offsetRef.current)
+        : cat === 'trending'
+        ? await fetchTrending(user.id, PAGE, reset ? 0 : offsetRef.current)
         : await fetchShorts(cat, PAGE, reset ? 0 : offsetRef.current);
       setResults(prev => reset ? data : [...prev, ...data]);
       offsetRef.current += data.length;
@@ -997,7 +1001,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
               {showRecommended && (
                 <View style={styles.feedBar}>
-                  <Text style={styles.feedBarText}>Your subscriptions</Text>
+                  <Text style={styles.feedBarText}>Your external subscriptions</Text>
                   <RefreshButton
                     lastFetchedAt={recLastFetchedAt}
                     cooldownMs={RECOMMENDED_COOLDOWN_MS}

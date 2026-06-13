@@ -27,19 +27,24 @@ export async function fetchShorts(
   limit = 50,
   offset = 0,
 ): Promise<ShortRow[]> {
-  let q = (supabase as any)
-    .from('shorts')
-    .select('video_id, title, thumbnail, channel, duration, category, fetched_at')
-    .order('fetched_at', { ascending: false })
-    .range(offset, offset + limit - 1);
-
-  if (category && category !== 'all') {
-    q = q.eq('category', category);
-  }
-
-  const { data, error } = await q;
+  // RPC applies channel round-robin so a creator's batch-ingested uploads don't
+  // cluster (plain order-by-fetched_at clusters them). Returns rows shaped like the
+  // table select below — mapRow keys are the same.
+  const { data, error } = await (supabase as any).rpc('fetch_category_shorts', {
+    p_category: category && category !== 'all' ? category : 'all',
+    p_limit: limit,
+    p_offset: offset,
+  });
   if (error) { throw error; }
-  return (data ?? []).map(mapRow);
+  return (data ?? []).map((r: any) => ({
+    videoId:      r.video_id,
+    title:        r.title,
+    thumbnail:    r.thumbnail,
+    channelTitle: r.channel_title ?? '',
+    duration:     r.duration ?? 0,
+    category:     r.category,
+    fetchedAt:    r.fetched_at ?? '',
+  }));
 }
 
 export async function searchShorts(query: string, limit = 50): Promise<ShortRow[]> {
