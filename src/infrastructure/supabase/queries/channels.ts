@@ -27,7 +27,8 @@ export type ChannelSummary = {
   // For the current user, on invite-only channels: their relationship to the room.
   invite_status?: 'owner' | 'member' | 'pending' | 'none';
   avatar_url?: string | null;
-  subscribed?: boolean;   // user has an active paid subscription to this room
+  subscribed?: boolean;       // user has an active paid subscription to this room
+  subscriber_mode?: boolean;  // the room is gated by paid subscription
 };
 
 export type ChannelPost = {
@@ -154,7 +155,7 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
     (supabase as any)
       .from('groups')
       .select(`
-        id, name, description, is_public, created_by, member_count, avatar_url, invite_only,
+        id, name, description, is_public, created_by, member_count, avatar_url, invite_only, subscriber_mode,
         pinned_video_id, pinned_video_title, pinned_video_thumbnail,
         owner:users!created_by(handle, avatar_url)
       `)
@@ -209,6 +210,7 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
     last_message_at: null,
     is_members_only: true,
     invite_only: !!c.invite_only,
+    subscriber_mode: !!c.subscriber_mode,
     is_listed: !!c.is_public,
     invite_status: (
       c.created_by === userId ? 'owner'
