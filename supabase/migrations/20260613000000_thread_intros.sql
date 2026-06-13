@@ -9,8 +9,11 @@ alter table public.threads
   add column if not exists intro_duration integer;
 
 -- 2. `threads` had SELECT (sender + members) and INSERT (sender) policies but no
---    UPDATE policy, so attaching the intro after upload would be denied by RLS.
---    Let a sender update their own thread.
+--    UPDATE path at all, so attaching the intro after upload was denied. Two pieces
+--    are required: a table-level GRANT (checked before RLS) and an RLS policy.
+--    The GRANT is column-scoped so a sender can ONLY touch the intro fields.
+grant update (intro_url, intro_duration) on public.threads to authenticated;
+
 drop policy if exists "threads_update_own" on public.threads;
 create policy "threads_update_own" on public.threads
   for update to authenticated
