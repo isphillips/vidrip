@@ -400,6 +400,13 @@ export default function ReactionRecorder({
             device={device}
             format={format}
             fps={targetFps}
+            // In the PIP corner, force a TextureView preview. The default
+            // 'surface-view' renders on its own SurfaceView layer that ignores
+            // the parent's rounded-corner clip, so the square camera frame
+            // bleeds past the PIP border on Android. TextureView is an ordinary
+            // child view and honors overflow:'hidden' + borderRadius. Full-screen
+            // has nothing to clip, so it keeps the more efficient surface-view.
+            androidPreviewViewType={sourceDriven ? 'texture-view' : 'surface-view'}
             // 2 Mbps video (+~0.13 audio) keeps a 180s reaction/review at ~48MB,
             // under the 50MB Supabase storage upload limit (60s ≈ 16MB).
             videoBitRate={2}
