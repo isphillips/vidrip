@@ -611,20 +611,25 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         await assertVideoAllowed(introClip.path, { durationSec: introClip.duration, contentType: 'reaction' });
       }
 
-      const { threadId } = await sendThread(
+      // Upload + attach the intro BEFORE recipients are added (sendThread runs this
+      // hook just before inserting members / firing the push), so a failed attach
+      // can't notify anyone with a broken share.
+      const onThreadReady = introClip
+        ? async (threadId: string) => {
+            const introUrl = await uploadIntro(threadId, introClip.path);
+            await updateThreadIntro(threadId, introUrl, introClip.duration);
+          }
+        : undefined;
+
+      await sendThread(
         user.id,
         selectedVideo.videoId,
         selectedVideo.title,
         selectedVideo.thumbnail,
         [...selectedFriends],
         selectedVideo.sourceType ?? 'youtube',
+        onThreadReady,
       );
-
-      // Upload the intro and attach it to the thread (plays before the source video + reactions).
-      if (introClip) {
-        const introUrl = await uploadIntro(threadId, introClip.path);
-        await updateThreadIntro(threadId, introUrl, introClip.duration);
-      }
 
       setSentThisSession(prev => new Set([...prev, ...selectedFriends]));
       setSelectedFriends(new Set());
@@ -633,11 +638,12 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       closeDrawer();
       setToastMsg(`Sent to ${selectedFriends.size} friend${selectedFriends.size !== 1 ? 's' : ''}!`);
       setTimeout(() => setToastMsg(''), 2500);
-    } catch (e) {
+    } catch (e: any) {
       if (e instanceof ModerationRejected) {
         Alert.alert('Intro not allowed', e.message);
       } else {
-        Alert.alert('Error', 'Could not send. Try again.');
+        // Surface the real reason (storage/permission/network) instead of a generic line.
+        Alert.alert('Could not send', e?.message ? String(e.message) : 'Please try again.');
       }
     } finally {
       setSending(false);

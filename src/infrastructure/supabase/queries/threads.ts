@@ -208,6 +208,10 @@ export async function sendThread(
   videoThumbnail: string,
   recipientIds: string[],
   sourceType: 'youtube' | 'tiktok' | 'instagram' = 'youtube',
+  // Runs after the thread row exists but BEFORE recipients are added (and thus
+  // before the share push fires). Used to attach an intro; if it throws, no
+  // recipient is notified and the send fails cleanly.
+  onThreadReady?: (threadId: string) => Promise<void>,
 ): Promise<{ threadId: string; alreadySentTo: string[] }> {
   // Find or create the thread for this (sender, video) pair — stacking behaviour.
   // Use limit(1) + order so legacy duplicates don't break the lookup.
@@ -222,6 +226,7 @@ export async function sendThread(
 
   let threadId: string;
   let alreadySentTo: string[] = [];
+  let newRecipients = recipientIds;
 
   if (existing) {
     threadId = existing.id;
@@ -235,14 +240,7 @@ export async function sendThread(
 
     const alreadySet = new Set((existingMembers ?? []).map((m: any) => m.user_id as string));
     alreadySentTo = [...alreadySet];
-    const newRecipients = recipientIds.filter(id => !alreadySet.has(id));
-
-    if (newRecipients.length > 0) {
-      const { error } = await supabase
-        .from('thread_members')
-        .insert(newRecipients.map(userId => ({ thread_id: threadId, user_id: userId, status: 'pending' })));
-      if (error) { throw error; }
-    }
+    newRecipients = recipientIds.filter(id => !alreadySet.has(id));
   } else {
     const { data: thread, error: threadError } = await supabase
       .from('threads')
@@ -252,11 +250,17 @@ export async function sendThread(
 
     if (threadError || !thread) { throw threadError ?? new Error('Failed to create thread'); }
     threadId = thread.id;
+  }
 
-    const { error: membersError } = await supabase
+  // Attach the intro (or any pre-notify work) before recipients are added, so a
+  // failure here can't leave a notified-but-broken share.
+  if (onThreadReady) { await onThreadReady(threadId); }
+
+  if (newRecipients.length > 0) {
+    const { error } = await supabase
       .from('thread_members')
-      .insert(recipientIds.map(userId => ({ thread_id: threadId, user_id: userId, status: 'pending' })));
-    if (membersError) { throw membersError; }
+      .insert(newRecipients.map(userId => ({ thread_id: threadId, user_id: userId, status: 'pending' })));
+    if (error) { throw error; }
   }
 
   // Ensure private channels exist for each new pair — fire-and-forget.

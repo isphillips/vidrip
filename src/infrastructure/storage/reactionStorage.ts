@@ -26,8 +26,10 @@ export interface SaveReactionResult {
 
 /** Upload a local file to the (private) `reactions` bucket at `uploadPath` and
  *  return its public-form URL (parsed + re-signed on read). Exported so the
- *  intro-clip flow can reuse the same relay upload. */
-export async function uploadToCloud(localPath: string, uploadPath: string): Promise<string> {
+ *  intro-clip flow can reuse the same relay upload. `upsert` overwrites an
+ *  existing object at the path (intros use a deterministic path so retries /
+ *  re-records replace rather than orphan). */
+export async function uploadToCloud(localPath: string, uploadPath: string, upsert = false): Promise<string> {
   const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
 
   const { data: { session } } = await supabase.auth.getSession();
@@ -43,7 +45,7 @@ export async function uploadToCloud(localPath: string, uploadPath: string): Prom
     headers: {
       'Authorization': `Bearer ${token}`,
       'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0cHNjd3RpY2F2cXV0YnpycmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMDEwMTEsImV4cCI6MjA5NTc3NzAxMX0.wHXV1IFLk7UbRWOrJWZN-sjsw8Kau0Rn6OKs29debKo',
-      'x-upsert': 'false',
+      'x-upsert': upsert ? 'true' : 'false',
     },
     body: formData,
   });
