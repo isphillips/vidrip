@@ -687,6 +687,54 @@ export async function fetchChannelAccess(channelId: string, userId?: string): Pr
   return { gated: true, tiers: (tiers ?? []) as ChannelTier[] };
 }
 
+// Rooms the user actively subscribes to (for the "Subscribed" channels section).
+// Returns ChannelSummary so they render/navigate like any other channel.
+export async function fetchSubscribedChannels(userId: string): Promise<ChannelSummary[]> {
+  const nowIso = new Date().toISOString();
+  const { data: subs } = await (supabase as any)
+    .from('channel_subscriptions')
+    .select('channel_id, status, current_period_end')
+    .eq('user_id', userId)
+    .in('status', ['active', 'trialing']);
+  const ids = (subs ?? [])
+    .filter((s: any) => !s.current_period_end || s.current_period_end > nowIso)
+    .map((s: any) => s.channel_id);
+  if (!ids.length) { return []; }
+
+  const { data: groups } = await (supabase as any)
+    .from('groups')
+    .select('id, name, description, is_public, is_members_only, member_count, created_by, avatar_url')
+    .in('id', ids);
+
+  const ownerIds = [...new Set((groups ?? []).map((g: any) => g.created_by).filter(Boolean))];
+  const owners: Record<string, { handle: string; avatar_url: string | null }> = {};
+  if (ownerIds.length) {
+    const { data: us } = await (supabase as any).from('users').select('id, handle, avatar_url').in('id', ownerIds);
+    for (const u of (us ?? [])) { owners[u.id] = { handle: u.handle, avatar_url: u.avatar_url ?? null }; }
+  }
+
+  return ((groups ?? []) as any[]).map((g) => ({
+    id: g.id,
+    name: g.name,
+    description: g.description ?? null,
+    is_public: !!g.is_public,
+    created_by: g.created_by,
+    owner: g.created_by ? { handle: owners[g.created_by]?.handle ?? '', avatar_url: owners[g.created_by]?.avatar_url ?? null } : null,
+    pinned_video_id: null,
+    pinned_video_title: null,
+    pinned_video_thumbnail: null,
+    member_count: g.member_count ?? 0,
+    is_joined: true,
+    unread_count: 0,
+    last_message_at: null,
+    is_members_only: !!g.is_members_only,
+    invite_only: false,
+    is_listed: true,
+    invite_status: 'member' as const,
+    avatar_url: g.avatar_url ?? null,
+  })) as ChannelSummary[];
+}
+
 export async function joinChannel(channelId: string, userId: string): Promise<void> {
   const { error } = await (supabase as any)
     .from('group_members')

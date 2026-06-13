@@ -12,6 +12,7 @@ import {
   fetchPublicChannels,
   fetchPrivateChannels,
   fetchMembersOnlyChannels,
+  fetchSubscribedChannels,
   acceptChannelInvite,
   declineChannelInvite,
   setChannelPublic,
@@ -27,10 +28,11 @@ type Tab = typeof TABS[number];
 
 // Sub-filters within the Public tab.
 const FILTERS = [
-  { key: 'mine', label: 'My Channels' },
   { key: 'curated', label: 'Curated' },
   { key: 'open', label: 'Members (Open)' },
   { key: 'invite', label: 'Members (Invite Only)' },
+  { key: 'subscribed', label: 'My Subscriptions' },
+  { key: 'mine', label: 'My Channels' },
 ] as const;
 type Filter = typeof FILTERS[number]['key'];
 
@@ -45,6 +47,7 @@ export default function ChannelsHomeScreen({
   const [publicChannels, setPublicChannels] = useState<ChannelSummary[]>([]);
   const [membersOnly, setMembersOnly] = useState<ChannelSummary[]>([]);
   const [privateChannels, setPrivateChannels] = useState<ChannelSummary[]>([]);
+  const [subscribed, setSubscribed] = useState<ChannelSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -52,14 +55,16 @@ export default function ChannelsHomeScreen({
     if (!user) { return; }
     if (!silent) { setLoading(true); }
     try {
-      const [pub, mo, priv] = await Promise.all([
+      const [pub, mo, priv, subd] = await Promise.all([
         fetchPublicChannels(user.id).catch(() => []),
         fetchMembersOnlyChannels(user.id).catch(() => []),
         fetchPrivateChannels(user.id).catch(() => []),
+        fetchSubscribedChannels(user.id).catch(() => []),
       ]);
       setPublicChannels(pub);
       setMembersOnly(mo);
       setPrivateChannels(priv);
+      setSubscribed(subd);
     } catch (e) {
       console.error('[ChannelsHome] load error:', JSON.stringify(e));
     } finally {
@@ -144,13 +149,15 @@ export default function ChannelsHomeScreen({
     k === 'mine' ? myChannels.length
     : k === 'curated' ? publicChannels.length
     : k === 'open' ? membersOpen.length
-    : membersInvite.length;
+    : k === 'invite' ? membersInvite.length
+    : subscribed.length;
 
   const publicData =
     filter === 'mine' ? myChannels
     : filter === 'curated' ? publicChannels
     : filter === 'open' ? membersOpen
-    : membersInvite;
+    : filter === 'invite' ? membersInvite
+    : subscribed;
 
   const data = tab === 'Private' ? privateChannels : publicData;
 
@@ -159,7 +166,8 @@ export default function ChannelsHomeScreen({
     : filter === 'mine' ? "You don't own any channels yet"
     : filter === 'curated' ? 'No curated channels yet'
     : filter === 'open' ? 'No open Members channels yet'
-    : 'No invite-only Members channels yet';
+    : filter === 'invite' ? 'No invite-only Members channels yet'
+    : 'No subscriptions yet. Subscribe to a creator to unlock their members-only room and get exclusive posts, reactions, and reviews.';
 
   return (
     <View style={[styles.container, { paddingTop: top }]}>
