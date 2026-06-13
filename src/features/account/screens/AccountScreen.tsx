@@ -208,27 +208,54 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         <Text style={styles.editLink}>Edit profile</Text>
       </TouchableOpacity>
 
-      {/* Phone (optional) */}
-      <Text style={styles.sectionLabel}>Phone (optional)</Text>
+      {/* Liked sources (personal feed) */}
+      <Text style={styles.sectionLabel}>Liked Sources</Text>
+      <Text style={styles.sectionHint}>
+        Connect an account to pull your feed (e.g. YouTube Liked videos) into the “Liked” tab when sharing.
+      </Text>
       <View style={styles.section}>
-        <View style={styles.phoneRow}>
-          <TextInput
-            style={styles.phoneInput}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="Add phone number"
-            placeholderTextColor={C.SUBTLE}
-            keyboardType="phone-pad"
-            autoCorrect={false}
-          />
-          {phoneDirty && (
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSavePhone} disabled={savingPhone}>
-              {savingPhone
-                ? <ActivityIndicator color={C.WHITE} size="small" />
-                : <Text style={styles.saveBtnText}>Save</Text>}
-            </TouchableOpacity>
-          )}
-        </View>
+        {FEED_PROVIDERS.map(({ key, label }, i) => {
+          const acct = feedAccounts.find(a => a.provider === key);
+          return (
+            <View key={key}>
+              {i > 0 && <View style={styles.divider} />}
+              <View style={styles.row}>
+                <View style={styles.syncLeft}>
+                  {acct?.provider_avatar_url ? (
+                    <Image source={{ uri: acct.provider_avatar_url }} style={styles.syncAvatar} />
+                  ) : null}
+                  <View style={styles.syncInfo}>
+                    <Text style={styles.rowLabel}>{label}</Text>
+                    {acct ? (
+                      <Text style={styles.syncHandle} numberOfLines={1}>
+                        {acct.provider_display_name
+                          || (acct.provider_handle ? `@${acct.provider_handle}` : 'Connected')}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+                {acct ? (
+                  <TouchableOpacity onPress={() => handleDisconnect(acct)} hitSlop={8}>
+                    <Text style={styles.syncDisconnect}>Disconnect</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.connectBtn}
+                    onPress={() => handleConnect(key, 'feed')}
+                    disabled={syncing}>
+                    <Text style={styles.connectBtnText}>Connect</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })}
+        {syncing && syncingType === 'feed' && (
+          <View style={styles.syncingRow}>
+            <ActivityIndicator color={C.ACCENT} size="small" />
+            <Text style={styles.syncingText}>Syncing…</Text>
+          </View>
+        )}
       </View>
 
       {/* Creator mode */}
@@ -326,54 +353,27 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         </>
       )}
 
-      {/* For You sources (personal feed) */}
-      <Text style={styles.sectionLabel}>For You Sources</Text>
-      <Text style={styles.sectionHint}>
-        Connect an account to pull your feed (e.g. YouTube Liked videos) into the “For You” tab when sharing.
-      </Text>
+      {/* Phone (optional) */}
+      <Text style={styles.sectionLabel}>Phone (optional)</Text>
       <View style={styles.section}>
-        {FEED_PROVIDERS.map(({ key, label }, i) => {
-          const acct = feedAccounts.find(a => a.provider === key);
-          return (
-            <View key={key}>
-              {i > 0 && <View style={styles.divider} />}
-              <View style={styles.row}>
-                <View style={styles.syncLeft}>
-                  {acct?.provider_avatar_url ? (
-                    <Image source={{ uri: acct.provider_avatar_url }} style={styles.syncAvatar} />
-                  ) : null}
-                  <View style={styles.syncInfo}>
-                    <Text style={styles.rowLabel}>{label}</Text>
-                    {acct ? (
-                      <Text style={styles.syncHandle} numberOfLines={1}>
-                        {acct.provider_display_name
-                          || (acct.provider_handle ? `@${acct.provider_handle}` : 'Connected')}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-                {acct ? (
-                  <TouchableOpacity onPress={() => handleDisconnect(acct)} hitSlop={8}>
-                    <Text style={styles.syncDisconnect}>Disconnect</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.connectBtn}
-                    onPress={() => handleConnect(key, 'feed')}
-                    disabled={syncing}>
-                    <Text style={styles.connectBtnText}>Connect</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          );
-        })}
-        {syncing && syncingType === 'feed' && (
-          <View style={styles.syncingRow}>
-            <ActivityIndicator color={C.ACCENT} size="small" />
-            <Text style={styles.syncingText}>Syncing…</Text>
-          </View>
-        )}
+        <View style={styles.phoneRow}>
+          <TextInput
+            style={styles.phoneInput}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="Add phone number"
+            placeholderTextColor={C.SUBTLE}
+            keyboardType="phone-pad"
+            autoCorrect={false}
+          />
+          {phoneDirty && (
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSavePhone} disabled={savingPhone}>
+              {savingPhone
+                ? <ActivityIndicator color={C.WHITE} size="small" />
+                : <Text style={styles.saveBtnText}>Save</Text>}
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Actions */}
@@ -389,6 +389,13 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           style={styles.row}
           onPress={() => navigation.navigate('PasswordSetup')}>
           <Text style={styles.rowLabel}>Password Login</Text>
+          <Text style={styles.rowChevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.divider} />
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => navigation.navigate('TwoFactor')}>
+          <Text style={styles.rowLabel}>Two-Factor Auth</Text>
           <Text style={styles.rowChevron}>›</Text>
         </TouchableOpacity>
         <View style={styles.divider} />

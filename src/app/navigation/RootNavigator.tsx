@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, Linking, View } from 'react-native';
@@ -18,6 +18,7 @@ import {
 } from '../../infrastructure/notifications/pushService';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
+import MfaChallengeScreen from '../../features/auth/screens/MfaChallengeScreen';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
 import RecordCommentScreen from '../../features/comments/screens/RecordCommentScreen';
 import RecordIntroScreen from '../../features/share/screens/RecordIntroScreen';
@@ -107,6 +108,28 @@ export default function RootNavigator() {
   const pendingReactionId = useShareIntentStore(s => s.pendingReactionId);
   const sessionRef = useRef(session);
   sessionRef.current = session;
+
+  // Second-factor gate: a user with a verified authenticator signs in at AAL1 and
+  // must pass the TOTP challenge to reach AAL2. Keyed on user id (NOT the whole
+  // session) so routine token refreshes don't re-trigger a spinner. No factor →
+  // nextLevel stays aal1 → this is a no-op, so non-enrolled users are unaffected.
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaChecked, setMfaChecked] = useState(false);
+  const recheckMfa = useCallback(async () => {
+    if (!sessionRef.current) { setMfaRequired(false); setMfaChecked(true); return; }
+    let required = false;
+    try {
+      const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      required = !error && data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2';
+    } catch { required = false; } // never hard-lock the app on an AAL read error
+    setMfaRequired(required);
+    setMfaChecked(true);
+  }, []);
+  useEffect(() => {
+    setMfaChecked(false);
+    recheckMfa();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
   const runPendingNavigation = useCallback(() => {
     if (!sessionRef.current || !navRef.current?.isReady()) { return; }
     const store = useShareIntentStore.getState();
@@ -175,13 +198,19 @@ export default function RootNavigator() {
     await supabase.auth.exchangeCodeForSession(url);
   };
 
-  // Wait for the onboarding flag to load too, so signed-in users don't flash the app.
-  if (isLoading || (session && !onbReady)) {
+  // Wait for the onboarding flag and the MFA check to load too, so signed-in users
+  // don't flash the app before the second-factor gate.
+  if (isLoading || (session && !onbReady) || (session && !mfaChecked)) {
     return (
       <View style={{ flex: 1, backgroundColor: C.BG_SOLID, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={C.ACCENT} />
       </View>
     );
+  }
+
+  // Signed in but second factor outstanding → block on the TOTP challenge.
+  if (session && mfaRequired) {
+    return <MfaChallengeScreen onVerified={recheckMfa} />;
   }
 
   const showOnboarding = !!session && (!onboarded || replaying);

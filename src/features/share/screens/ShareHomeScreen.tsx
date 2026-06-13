@@ -129,6 +129,22 @@ type VideoItem = { videoId: string; title: string; thumbnail: string; channelTit
 type Mode = 'browse' | 'paste';
 const PAGE = 50;
 const DRAWER_HEIGHT_PCT = 0.68;
+const FEED_BAR_HEIGHT = 44;   // fixed height of the collapsible feed bar
+
+// One-line descriptor shown in the feed bar for each category grid. 'latest' is the
+// personalized grid (labelled "For You"); the rest are YouTube category buckets.
+const CATEGORY_DESC: Record<string, string> = {
+  latest:   'Picked for you from what you react to',
+  trending: 'Trending Shorts right now',
+  music:    'Music videos & performances',
+  gaming:   'Gaming clips & highlights',
+  funny:    'Comedy & funny moments',
+  food:     'Food, cooking & recipes',
+  sports:   'Sports highlights & plays',
+  news:     'News & current events',
+  pets:     'Pets & animals',
+  cars:     'Cars & motors',
+};
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenProps<'ShareHome'>) {
@@ -159,8 +175,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [searching, setSearching]    = useState(false);
   const [searchOpen, setSearchOpen]  = useState(false);   // header search icon → expanding input
   // Friends (videos your friends reacted to / shared — collaborative signal).
-  // Default landing tab — social proof leads the browse experience.
-  const [showFriends, setShowFriends] = useState(true);
+  // Not the default — the personalized "For You" grid (category 'latest') leads.
+  const [showFriends, setShowFriends] = useState(false);
   const [friendItems, setFriendItems] = useState<VideoItem[]>([]);
   const [friendsFeedLoading, setFriendsFeedLoading] = useState(false);
   const [friendsRefreshing, setFriendsRefreshing] = useState(false);
@@ -180,6 +196,33 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const offsetRef  = useRef(0);
   const hasMoreRef = useRef(true);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Feed bar collapse-on-scroll: 1 = shown, 0 = collapsed. Fixed bar height (no
+  // measuring) so the collapse can't feed back into a re-render mid-animation.
+  const feedBarAnim   = useRef(new Animated.Value(1)).current;
+  const barShownRef   = useRef(true);
+  const lastScrollY   = useRef(0);
+  const setFeedBar = useCallback((shown: boolean) => {
+    if (barShownRef.current === shown) { return; }
+    barShownRef.current = shown;
+    Animated.timing(feedBarAnim, {
+      toValue: shown ? 1 : 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: false,
+    }).start();
+  }, [feedBarAnim]);
+  const onGridScroll = useCallback((e: any) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const dy = y - lastScrollY.current;
+    lastScrollY.current = y;
+    if (y <= 0) { setFeedBar(true); return; }     // at the top → always show
+    if (dy > 6) { setFeedBar(false); }            // scrolling down → collapse
+    else if (dy < -6) { setFeedBar(true); }       // scrolling up → reveal
+  }, [setFeedBar]);
+  // Switching tabs/categories resets the grid to the top → always reveal the bar.
+  useEffect(() => {
+    lastScrollY.current = 0;
+    barShownRef.current = true;
+    feedBarAnim.setValue(1);
+  }, [showFriends, showForYou, showRecommended, category, query, feedBarAnim]);
 
   // paste state
   const [url, setUrl]         = useState('');
@@ -289,14 +332,6 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   }, [user?.id]);
 
   // ── Friends (videos friends reacted to / shared) ──────────────────────────────
-  // Friends is the default landing tab, but users with no friends (or no friend
-  // activity) would land on an empty grid. Fall back to Latest on the FIRST load
-  // only, and only if the user hasn't already tapped away — never override an
-  // explicit tab choice. `didFriendsFallbackRef` makes it run at most once.
-  const showFriendsRef = useRef(showFriends);
-  showFriendsRef.current = showFriends;
-  const didFriendsFallbackRef = useRef(false);
-
   const loadFriendsFeed = useCallback(async () => {
     if (!user?.id) { return; }
     setFriendsFeedLoading(true);
@@ -306,13 +341,6 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         videoId: it.videoId, title: it.title, thumbnail: it.thumbnail,
         channelTitle: it.channelTitle, sourceType: it.sourceType,
       })));
-      if (!didFriendsFallbackRef.current) {
-        didFriendsFallbackRef.current = true;
-        if (items.length === 0 && showFriendsRef.current) {
-          setShowFriends(false);   // route effect then loads the personalized Latest grid
-          setCategory('latest');
-        }
-      }
     } catch (e) { console.error('[ShareHome] friends', e); }
     finally { setFriendsFeedLoading(false); }
   }, [user?.id]);
@@ -897,13 +925,19 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
           {!query.trim() && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
+              {/* "For You" = the personalized 'latest' grid. First + default-selected tab. */}
+              <TouchableOpacity key="foryou-latest"
+                style={[styles.tab, (!showFriends && !showForYou && !showRecommended && category === 'latest') && styles.tabActive]}
+                onPress={() => { setShowFriends(false); setShowForYou(false); setShowRecommended(false); setCategory('latest'); setQuery(''); }}>
+                <Text style={[styles.tabTxt, (!showFriends && !showForYou && !showRecommended && category === 'latest') && styles.tabTxtActive]}>For You</Text>
+              </TouchableOpacity>
               <TouchableOpacity key="friends" style={[styles.tab, showFriends && styles.tabActive]}
                 onPress={() => { setShowFriends(true); setShowForYou(false); setShowRecommended(false); setQuery(''); }}>
                 <Text style={[styles.tabTxt, showFriends && styles.tabTxtActive]}>Friends</Text>
               </TouchableOpacity>
               <TouchableOpacity key="foryou" style={[styles.tab, showForYou && styles.tabActive]}
                 onPress={() => { setShowForYou(true); setShowFriends(false); setShowRecommended(false); setQuery(''); }}>
-                <Text style={[styles.tabTxt, showForYou && styles.tabTxtActive]}>For You</Text>
+                <Text style={[styles.tabTxt, showForYou && styles.tabTxtActive]}>Liked</Text>
               </TouchableOpacity>
               {hasFeedConnection && (
                 <TouchableOpacity key="recommended" style={[styles.tab, showRecommended && styles.tabActive]}
@@ -911,7 +945,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   <Text style={[styles.tabTxt, showRecommended && styles.tabTxtActive]}>Recommended</Text>
                 </TouchableOpacity>
               )}
-              {CATEGORIES.map(cat => {
+              {CATEGORIES.filter(cat => cat !== 'latest').map(cat => {
                 const active = !showFriends && !showForYou && !showRecommended && category === cat;
                 return (
                   <TouchableOpacity key={cat} style={[styles.tab, active && styles.tabActive]}
@@ -925,29 +959,52 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
             </ScrollView>
           )}
 
-          {showForYou && hasFeedConnection && (
-            <View style={styles.feedBar}>
-              <Text style={styles.feedBarText}>Liked videos</Text>
-              <RefreshButton
-                lastFetchedAt={feedLastSyncedAt}
-                cooldownMs={FEED_REFRESH_COOLDOWN_MS}
-                refreshing={feedRefreshing}
-                onPress={handleRefreshFeed}
-              />
-            </View>
-          )}
+          {/* Feed bar — collapses on scroll down, reveals on scroll up. Fixed height
+              so the collapse can't re-measure and clip its own content. */}
+          <Animated.View
+            style={{
+              overflow: 'hidden',
+              opacity: feedBarAnim,
+              height: feedBarAnim.interpolate({ inputRange: [0, 1], outputRange: [0, FEED_BAR_HEIGHT] }),
+            }}>
+            <View>
+              {showFriends && (
+                <View style={styles.feedBar}>
+                  <Text style={styles.feedBarText}>Videos your friends reacted to & shared</Text>
+                </View>
+              )}
 
-          {showRecommended && (
-            <View style={styles.feedBar}>
-              <Text style={styles.feedBarText}>From your subscriptions</Text>
-              <RefreshButton
-                lastFetchedAt={recLastFetchedAt}
-                cooldownMs={RECOMMENDED_COOLDOWN_MS}
-                refreshing={recRefreshing}
-                onPress={handleRefreshRecommended}
-              />
+              {!showFriends && !showForYou && !showRecommended && !query.trim() && CATEGORY_DESC[category] && (
+                <View style={styles.feedBar}>
+                  <Text style={styles.feedBarText}>{CATEGORY_DESC[category]}</Text>
+                </View>
+              )}
+
+              {showForYou && hasFeedConnection && (
+                <View style={styles.feedBar}>
+                  <Text style={styles.feedBarText}>Your liked videos</Text>
+                  <RefreshButton
+                    lastFetchedAt={feedLastSyncedAt}
+                    cooldownMs={FEED_REFRESH_COOLDOWN_MS}
+                    refreshing={feedRefreshing}
+                    onPress={handleRefreshFeed}
+                  />
+                </View>
+              )}
+
+              {showRecommended && (
+                <View style={styles.feedBar}>
+                  <Text style={styles.feedBarText}>Your subscriptions</Text>
+                  <RefreshButton
+                    lastFetchedAt={recLastFetchedAt}
+                    cooldownMs={RECOMMENDED_COOLDOWN_MS}
+                    refreshing={recRefreshing}
+                    onPress={handleRefreshRecommended}
+                  />
+                </View>
+              )}
             </View>
-          )}
+          </Animated.View>
           <View style={{ height: SPACE.SM }} />
 
           {(() => {
@@ -964,6 +1021,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 data={data}
                 keyExtractor={item => item.videoId}
                 numColumns={2}
+                onScroll={onGridScroll}
+                scrollEventThrottle={16}
                 contentContainerStyle={isEmpty ? (special ? styles.gridTop : styles.gridCenter) : styles.grid}
                 columnWrapperStyle={styles.row}
                 refreshControl={
@@ -992,7 +1051,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                         : showForYou
                         ? (hasFeedConnection
                             ? 'No videos yet — tap Refresh to pull your liked videos.'
-                            : 'Connect a YouTube account in your profile to see your For You feed.')
+                            : 'Connect a YouTube account in your profile to see your Liked videos.')
                         : 'No Shorts yet'}
                     </Text>
                   )
@@ -1345,7 +1404,7 @@ const styles = StyleSheet.create({
   searchInput:   { flex: 1, paddingVertical: SPACE.MD, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   searchSpinner: { marginLeft: SPACE.SM },
   gridSpinner: { position: 'absolute', top: '50%' },
-  tabsScroll: {  height: 50, marginBottom: SPACE.SM },
+  tabsScroll: {  height: 50, marginBottom: 0 },
   tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, alignItems: 'center', height: 33 },
   tab:     { alignItems: 'center', justifyContent: 'center', height: 33, paddingHorizontal: SPACE.MD, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
   tabActive:    { borderWidth: 1, borderColor: C.DANGER },
@@ -1354,8 +1413,9 @@ const styles = StyleSheet.create({
 
   // For You refresh bar
   feedBar: {
+    height: FEED_BAR_HEIGHT,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginHorizontal: SPACE.LG, marginTop: SPACE.SM,
+    marginHorizontal: SPACE.LG,
   },
   feedBarText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   feedRefreshBtn: {

@@ -42,6 +42,7 @@ export type AccountStackParamList = {
   EditProfile: undefined;
   InviteManagement: undefined;
   PasswordSetup: undefined;
+  TwoFactor: undefined;
 };
 
 // Feed stack

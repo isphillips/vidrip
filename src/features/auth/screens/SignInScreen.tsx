@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
 import type { AuthStackScreenProps } from '../../../app/navigation/types';
@@ -58,9 +60,15 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
 
   if (sent) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.sentIcon}>📬</Text>
-        <Text style={styles.sentTitle}>check your email</Text>
+      <View style={[styles.container, styles.sentContainer]}>
+        <LinearGradient
+          colors={['#e056fd', '#8b22a5', '#16e0d5']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.sentBadge}>
+          <Ionicons name="mail-outline" size={42} color={C.WHITE} />
+        </LinearGradient>
+        <Text style={styles.sentTitle}>Check your email</Text>
         <Text style={styles.sentSubtitle}>
           We sent a magic link to{'\n'}
           <Text style={styles.sentEmail}>{email.trim().toLowerCase()}</Text>
@@ -68,8 +76,8 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
         <Text style={styles.sentHint}>
           Tap the link in the email to sign in. You can close this screen.
         </Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-          <Text style={styles.backLinkText}>← back</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink} activeOpacity={0.7}>
+          <Text style={styles.backLinkText}>← Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -242,32 +250,57 @@ const styles = StyleSheet.create({
     fontFamily: FONT.BODY_BOLD,
     fontWeight: '700',
   },
-  sentIcon: {
-    fontSize: 56,
-    textAlign: 'center',
-    marginTop: SPACE.XXXL,
-    marginBottom: SPACE.LG,
+  sentContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: SPACE.XL,
+  },
+  sentBadge: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACE.XL,
+    // brand glow
+    shadowColor: C.ACCENT_HOT,
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
   },
   sentTitle: {
-    fontSize: FONT.SIZES.XXL,
+    fontSize: FONT.SIZES.XXXL,
+    fontFamily: FONT.DISPLAY_BOLD,
     fontWeight: '700',
     color: C.INK,
     textAlign: 'center',
-    marginBottom: SPACE.SM,
+    marginBottom: SPACE.MD,
   },
   sentSubtitle: {
     fontSize: FONT.SIZES.MD,
+    fontFamily: FONT.BODY,
     color: C.MUTED,
     textAlign: 'center',
+    lineHeight: 24,
     marginBottom: SPACE.XL,
   },
-  sentEmail: { color: C.INK, fontWeight: '600' },
+  sentEmail: { color: C.ACCENT_HOT, fontFamily: FONT.DISPLAY_SEMIBOLD },
   sentHint: {
     fontSize: FONT.SIZES.SM,
+    fontFamily: FONT.BODY,
     color: C.SUBTLE,
     textAlign: 'center',
     lineHeight: 20,
+    maxWidth: 280,
   },
-  backLink: { marginTop: SPACE.XL, alignItems: 'center' },
-  backLinkText: { color: C.MUTED, fontSize: FONT.SIZES.MD },
+  backLink: {
+    marginTop: SPACE.XXL,
+    paddingVertical: SPACE.SM,
+    paddingHorizontal: SPACE.XL,
+    borderRadius: RADIUS.FULL,
+    borderWidth: 1,
+    borderColor: C.BORDER_STRONG,
+  },
+  backLinkText: { color: C.ACCENT_HOT, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
 });

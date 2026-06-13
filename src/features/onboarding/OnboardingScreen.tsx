@@ -148,12 +148,12 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
           {step === 1 && (
             <View style={styles.center}>
               <Kicker>Step One</Kicker>
-              <Text style={styles.h2}>Your “For You”</Text>
+              <Text style={styles.h2}>Your “Liked”</Text>
               <DecoDivider />
               <ForYouMock />
               <Text style={styles.body}>
                 Bring your YouTube <Text style={styles.em}>Liked videos</Text> to the table. They show up in your private{' '}
-                <Text style={styles.em}>For You</Text> shelf when you go to share, so you always have something good on hand.
+                <Text style={styles.em}>Liked</Text> shelf when you go to share, so you always have something good on hand.
               </Text>
               {connected ? (
                 <View style={styles.connectedRow}>

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Animated,
+  Easing,
   ScrollView,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -40,9 +41,9 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'reviews', label: 'My Reviews' },
 ];
 
-// Per-letter color steps for the "drip" wordmark — sampled from the logo's
-// pink→purple gradient. Stable objects so they aren't inline styles.
-const DRIP_COLORS = [{ color: '#E73D93' }, { color: '#CF3EA7' }, { color: '#B83EBC' }, { color: '#A03FD0' }];
+// Flowing-water wordmark palette: pink → purple → teal, looped. Each "drip" letter
+// cycles through these with a phase offset so the colors drift across the word.
+const FLOW_PALETTE = ['#FF4FA3', '#A05CFF', '#2DD4BF'];
 
 // A thread "needs your reaction" if a friend sent it and you haven't reacted.
 const needsReaction = (t: FeedThread, uid?: string) =>
@@ -83,6 +84,28 @@ function ActionBtn({
 export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'FeedHome'>) {
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
+
+  // Continuously loops 0→1 to drift the "drip" wordmark colors like flowing water.
+  const flow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(flow, { toValue: 1, duration: 5200, easing: Easing.linear, useNativeDriver: false }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [flow]);
+  // Color for "drip" letter i: cycles through FLOW_PALETTE, phase-shifted by index so
+  // the gradient travels across the word. Wraps seamlessly (last stop == first).
+  const dripColor = (i: number) => {
+    const n = FLOW_PALETTE.length;
+    const inputRange: number[] = [];
+    const outputRange: string[] = [];
+    for (let k = 0; k <= n; k++) {
+      inputRange.push(k / n);
+      outputRange.push(FLOW_PALETTE[(i + k) % n]);
+    }
+    return flow.interpolate({ inputRange, outputRange });
+  };
 
   const [threads, setThreads]     = useState<FeedThread[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -240,8 +263,8 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           />
           <Text style={styles.headerTitle}>
             <Text style={styles.titleVi}>Vi</Text>
-            {'drip '.split('').map((ch, i) => (
-              <Text key={i} style={DRIP_COLORS[i]}>{ch}</Text>
+            {'drip'.split('').map((ch, i) => (
+              <Animated.Text key={i} style={{ color: dripColor(i) }}>{ch}</Animated.Text>
             ))}
           </Text>
         </View>

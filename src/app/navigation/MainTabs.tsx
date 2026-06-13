@@ -26,6 +26,7 @@ import ShareHomeScreen from '../../features/share/screens/ShareHomeScreen';
 import AccountScreen from '../../features/account/screens/AccountScreen';
 import EditProfileScreen from '../../features/account/screens/EditProfileScreen';
 import PasswordSetupScreen from '../../features/account/screens/PasswordSetupScreen';
+import TwoFactorScreen from '../../features/account/screens/TwoFactorScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -87,6 +88,7 @@ function AccountNavigator() {
       <AccountStack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="PasswordSetup" component={PasswordSetupScreen} options={{ title: 'Password Login', headerBackTitle: 'Account' }} />
+      <AccountStack.Screen name="TwoFactor" component={TwoFactorScreen} options={{ title: 'Two-Factor Auth', headerBackTitle: 'Account' }} />
     </AccountStack.Navigator>
   );
 }

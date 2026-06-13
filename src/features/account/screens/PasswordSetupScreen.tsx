@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: FONT.SIZES.SM,
     fontFamily: FONT.BODY_SEMIBOLD,
-    color: C.CHARCOAL,
+    color: C.INK,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: SPACE.SM,
