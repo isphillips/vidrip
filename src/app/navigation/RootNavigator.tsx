@@ -106,6 +106,7 @@ export default function RootNavigator() {
   // session just loaded) and from the container's onReady (cold start).
   const pendingShareUrl = useShareIntentStore(s => s.pendingUrl);
   const pendingReactionId = useShareIntentStore(s => s.pendingReactionId);
+  const pendingChannel = useShareIntentStore(s => s.pendingChannel);
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
@@ -133,7 +134,16 @@ export default function RootNavigator() {
   const runPendingNavigation = useCallback(() => {
     if (!sessionRef.current || !navRef.current?.isReady()) { return; }
     const store = useShareIntentStore.getState();
-    if (store.pendingReactionId) {
+    if (store.pendingChannel) {
+      const { id, justSubscribed } = store.pendingChannel;
+      store.setPendingChannel(null);
+      // Coming back from the channel should land on My Subscriptions.
+      if (justSubscribed) { store.setSubscribedTabPending(true); }
+      navRef.current.navigate('Main', {
+        screen: 'Channels',
+        params: { screen: 'Channel', params: { channelId: id, channelName: '', isPublic: true, isJoined: true, isMembersOnly: true, justSubscribed } },
+      });
+    } else if (store.pendingReactionId) {
       const reactionId = store.pendingReactionId;
       store.setPendingReactionId(null);
       navRef.current.navigate('Main', {
@@ -144,7 +154,7 @@ export default function RootNavigator() {
       navRef.current.navigate('Main', { screen: 'Share', params: { screen: 'ShareHome' } });
     }
   }, []);
-  useEffect(() => { runPendingNavigation(); }, [pendingShareUrl, pendingReactionId, session, runPendingNavigation]);
+  useEffect(() => { runPendingNavigation(); }, [pendingShareUrl, pendingReactionId, pendingChannel, session, runPendingNavigation]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -177,6 +187,16 @@ export default function RootNavigator() {
     if (url.startsWith('reaxn://reaction/')) {
       const id = url.slice('reaxn://reaction/'.length).split(/[?#/]/)[0];
       if (id) { useShareIntentStore.getState().setPendingReactionId(id); }
+      return;
+    }
+
+    // reaxn://channel/<id>?subscribed=1 — returning from the web subscribe flow.
+    // Stash it; runPendingNavigation opens it once the navigator + session are
+    // ready (handles cold start, where the link arrives before they mount).
+    if (url.startsWith('reaxn://channel/')) {
+      const id = url.slice('reaxn://channel/'.length).split(/[?#/]/)[0];
+      const justSubscribed = /[?&]subscribed=1/.test(url);
+      if (id) { useShareIntentStore.getState().setPendingChannel({ id, justSubscribed }); }
       return;
     }
 

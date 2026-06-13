@@ -19,6 +19,7 @@ import {
   setChannelInviteOnly,
   type ChannelSummary,
 } from '../../../infrastructure/supabase/queries/channels';
+import { useShareIntentStore } from '../../../store/shareIntentStore';
 import RadioToggle from '../components/RadioToggle';
 import ChannelCard from '../components/ChannelCard';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
@@ -73,7 +74,16 @@ export default function ChannelsHomeScreen({
     }
   }, [user]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load();
+    // After a fresh subscribe, land on the My Subscriptions tab (set in RootNavigator).
+    const st = useShareIntentStore.getState();
+    if (st.subscribedTabPending) {
+      setTab('Public');
+      setFilter('subscribed');
+      st.setSubscribedTabPending(false);
+    }
+  }, [load]));
 
   // Realtime: auto-refresh when someone adds this user to a channel.
   useEffect(() => {
@@ -139,11 +149,13 @@ export default function ChannelsHomeScreen({
 
   // Public-tab sub-lists. Only listed (is_listed) channels appear in the public
   // Members sections; an owner's private/unlisted channel shows under My Channels only.
-  const membersOpen = membersOnly.filter(m => m.is_listed && !m.invite_only);
-  const membersInvite = membersOnly.filter(m => m.is_listed && m.invite_only);
-  // Channels the user actively pays for — used to show "Subscribed" (not "Joined")
-  // on their cards across every tab.
+  // Channels the user actively pays for — shown only under "My Subscriptions",
+  // and used to label cards "Subscribed" elsewhere.
   const subscribedIds = new Set(subscribed.map(s => s.id));
+  // Subscribed rooms live under My Subscriptions only — keep them out of the
+  // Members tabs so they don't duplicate (and look locked) there.
+  const membersOpen = membersOnly.filter(m => m.is_listed && !m.invite_only && !subscribedIds.has(m.id));
+  const membersInvite = membersOnly.filter(m => m.is_listed && m.invite_only && !subscribedIds.has(m.id));
   // "My Channels" = the public-side channels I own (created), curated + members.
   const myChannels = [...publicChannels, ...membersOnly]
     .filter(c => c.created_by === user?.id);

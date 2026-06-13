@@ -53,7 +53,7 @@ export default function ChannelhamburderScreen({
   route,
   navigation,
 }: ChannelsStackScreenProps<'Channel'>) {
-  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner, isMembersOnly, inviteOnly: inviteOnlyParam, ownerHandle } = route.params;
+  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner, isMembersOnly, inviteOnly: inviteOnlyParam, ownerHandle, justSubscribed } = route.params;
   const { user } = useAuthStore();
   const { top } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -71,6 +71,11 @@ export default function ChannelhamburderScreen({
   // Subscriber-mode paywall: gated=true → show the paywall instead of content.
   const [gated, setGated] = useState(false);
   const [tiers, setTiers] = useState<ChannelTier[]>([]);
+  const [myTier, setMyTier] = useState<string | null>(null);   // subscribed tier name (header pill)
+  // Just returned from web checkout: poll entitlement (webhook lags ~1-2s) and
+  // show "Unlocking…" instead of the paywall until the subscription lands.
+  const [finalizing, setFinalizing] = useState(!!justSubscribed);
+  const unlockTriesRef = useRef(0);
   const [reactionTiles, setReactionTiles] = useState<ChannelClipTile[]>([]);
   const [reviewTiles, setReviewTiles] = useState<ChannelReview[]>([]);
   // Fresh TikTok thumbnails resolved by video id (stored ones expire — see api.ts).
@@ -122,6 +127,18 @@ export default function ChannelhamburderScreen({
           wasGatedRef.current = a.gated;
           setGated(a.gated);
           setTiers(a.tiers);
+          setMyTier(a.myTier ?? null);
+          // An entitled subscriber has access — treat as joined so the grid isn't
+          // invite-locked (their nav param `joined` can be stale on re-entry).
+          if (a.subscriberMode && !a.gated) { setJoined(true); }
+          // Returning from checkout: the webhook lags a beat, so poll entitlement
+          // and keep showing "Unlocking…" rather than the paywall until it lands.
+          if (!a.gated) { setFinalizing(false); }
+          else if (justSubscribed && unlockTriesRef.current < 8) {
+            unlockTriesRef.current += 1;
+            setFinalizing(true);
+            setTimeout(() => { if (mountedRef.current) { load(true); } }, 1500);
+          } else { setFinalizing(false); }
         })
         .catch(() => {});
       fetchChannelReviewSettings(channelId)
@@ -130,6 +147,7 @@ export default function ChannelhamburderScreen({
     } catch { /* swallow */ } finally {
       if (mountedRef.current) { setLoading(false); setRefreshing(false); }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
   // Keep postsRef in sync
@@ -491,9 +509,12 @@ export default function ChannelhamburderScreen({
             <Text style={styles.lockedHeaderText}>🔒 Invite only</Text>
           </View>
         ) : isMembersOnly ? (
-          // Members-only / subscriber room you're in — no Join/Leave button;
-          // subscribers manage (or cancel) from the Account screen.
-          null
+          // Subscriber room you're in — show your tier (no Join/Leave; manage from Account).
+          myTier ? (
+            <View style={styles.tierPill}>
+              <Text style={styles.tierPillText} numberOfLines={1}>{myTier}</Text>
+            </View>
+          ) : null
         ) : isPublic ? (
           // Public / curated channels only.
           <TouchableOpacity
@@ -536,6 +557,11 @@ export default function ChannelhamburderScreen({
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
+      ) : gated && finalizing ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={C.ACCENT_HOT} />
+          <Text style={[styles.emptyText, { marginTop: SPACE.MD }]}>Unlocking your subscription…</Text>
+        </View>
       ) : gated ? (
         <SubscriberPaywall channelId={channelId} label={title} tiers={tiers} />
       ) : isPublic ? (
@@ -789,6 +815,11 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.FULL, borderWidth: 1, borderColor: C.BORDER, backgroundColor: C.SURFACE,
   },
   lockedHeaderText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
+  tierPill: {
+    maxWidth: 130, paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS + 1,
+    borderRadius: RADIUS.FULL, borderWidth: 1, borderColor: C.ACCENT, backgroundColor: C.ACCENT_LITE,
+  },
+  tierPillText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.ACCENT_HOT },
   filterRow: {
     flexDirection: 'row',
     gap: SPACE.SM,

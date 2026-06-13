@@ -665,21 +665,35 @@ export async function togglePinPost(postId: string, pin: boolean): Promise<void>
 }
 
 export type ChannelTier = { id: string; title: string; price_cents: number };
-export type ChannelAccess = { gated: boolean; tiers: ChannelTier[] };
+
+// What the fan actually pays: tier price + Stripe processing (2.9%+30¢) + 1%
+// platform margin, so the creator nets their full price. Mirrors the web's
+// fanCheckoutAmounts / fanPriceCents so the paywall matches Stripe Checkout.
+export function fanPriceCents(priceCents: number): number {
+  return Math.ceil((priceCents * 1.01 + 30) / (1 - 0.029));
+}
+export type ChannelAccess = { gated: boolean; tiers: ChannelTier[]; myTier?: string | null; subscriberMode?: boolean };
 
 // Subscriber-mode entitlement: a creator's subscriber room is locked to active
-// subscribers (and the owner). Returns gated=true + the tiers to show a paywall.
+// subscribers (and the owner). Returns gated=true + the tiers to show a paywall,
+// or (when entitled) myTier = the name of the tier the user subscribes to.
 export async function fetchChannelAccess(channelId: string, userId?: string): Promise<ChannelAccess> {
   const { data: g } = await (supabase as any)
     .from('groups').select('subscriber_mode, created_by').eq('id', channelId).single();
   const subscriberMode = !!g?.subscriber_mode;
   const isOwner = !!userId && g?.created_by === userId;
-  if (!subscriberMode || isOwner) { return { gated: false, tiers: [] }; }
+  if (!subscriberMode || isOwner) { return { gated: false, tiers: [], subscriberMode }; }
 
   if (userId) {
     const { data: ok } = await (supabase as any)
       .rpc('has_active_channel_sub', { uid: userId, p_channel_id: channelId });
-    if (ok) { return { gated: false, tiers: [] }; }
+    if (ok) {
+      const { data: sub } = await (supabase as any)
+        .from('channel_subscriptions')
+        .select('tier:channel_subscription_tiers!tier_id(title)')
+        .eq('user_id', userId).eq('channel_id', channelId).maybeSingle();
+      return { gated: false, tiers: [], myTier: sub?.tier?.title ?? null, subscriberMode: true };
+    }
   }
 
   const { data: tiers } = await (supabase as any)
@@ -687,7 +701,7 @@ export async function fetchChannelAccess(channelId: string, userId?: string): Pr
     .select('id, title, price_cents')
     .eq('channel_id', channelId).eq('active', true)
     .order('idx', { ascending: true });
-  return { gated: true, tiers: (tiers ?? []) as ChannelTier[] };
+  return { gated: true, tiers: (tiers ?? []) as ChannelTier[], subscriberMode: true };
 }
 
 // Rooms the user actively subscribes to (for the "Subscribed" channels section).
@@ -742,56 +756,61 @@ export async function fetchSubscribedChannels(userId: string): Promise<ChannelSu
 // The user's own channel subscriptions (for the Account screen). RLS lets a user
 // read their own rows.
 export type MySubscription = {
-  channelId: string; name: string; status: string;
+  channelId: string; name: string; tierTitle: string | null; status: string;
   currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean;
 };
 export async function fetchMySubscriptions(userId: string): Promise<MySubscription[]> {
   const { data } = await (supabase as any)
     .from('channel_subscriptions')
-    .select('channel_id, status, current_period_end, cancel_at_period_end, channel:groups!channel_id(name)')
+    .select('channel_id, status, current_period_end, cancel_at_period_end, channel:groups!channel_id(name), tier:channel_subscription_tiers!tier_id(title)')
     .eq('user_id', userId)
     .in('status', ['active', 'trialing', 'past_due'])
     .order('updated_at', { ascending: false });
   return ((data ?? []) as any[]).map((s) => ({
     channelId: s.channel_id,
     name: s.channel?.name ?? 'Channel',
+    tierTitle: s.tier?.title ?? null,
     status: s.status,
     currentPeriodEnd: s.current_period_end ?? null,
     cancelAtPeriodEnd: !!s.cancel_at_period_end,
   }));
 }
 
-// Cancel a subscription via the web API (Stripe lives server-side). Cancels at
-// period end; the user keeps access until then.
+// Subscription management calls the web API (Stripe lives server-side).
 const WEB_API_BASE = 'https://www.vidrip.app/api';
-export async function cancelChannelSubscription(channelId: string): Promise<void> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${WEB_API_BASE}/subscribe/cancel`, {
+
+// A valid (non-expired) access token for the cross-service call. getSession() can
+// hand back a stale token; refresh if it's missing or about to expire, else the
+// web function rejects it as "unauthorized".
+async function freshAccessToken(): Promise<string> {
+  let session = (await supabase.auth.getSession()).data.session;
+  // Only refresh an EXISTING, near-expiry session — refreshSession() throws
+  // ("Auth session missing") when there's no session to refresh.
+  if (session?.expires_at && session.expires_at * 1000 < Date.now() + 60_000) {
+    try { const r = await supabase.auth.refreshSession(); if (r.data.session) { session = r.data.session; } }
+    catch { /* keep the current token */ }
+  }
+  const token = session?.access_token;
+  if (!token) { throw new Error('Please sign in again to manage your subscription.'); }
+  return token;
+}
+
+async function billingPost(path: string, channelId: string): Promise<void> {
+  const token = await freshAccessToken();
+  const res = await fetch(`${WEB_API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({ channelId }),
   });
   if (!res.ok) {
     const j = await res.json().catch(() => ({} as any));
-    throw new Error(j.error ?? 'Could not cancel subscription');
+    throw new Error(j.error ?? `Request failed (${res.status})`);
   }
 }
 
-// Un-cancel a subscription that was set to end at period close.
-export async function resumeChannelSubscription(channelId: string): Promise<void> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch(`${WEB_API_BASE}/subscribe/resume`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ channelId }),
-  });
-  if (!res.ok) {
-    const j = await res.json().catch(() => ({} as any));
-    throw new Error(j.error ?? 'Could not resume subscription');
-  }
-}
+// Cancel at period end (user keeps access until then) / un-cancel.
+export const cancelChannelSubscription = (channelId: string) => billingPost('/subscribe/cancel', channelId);
+export const resumeChannelSubscription = (channelId: string) => billingPost('/subscribe/resume', channelId);
 
 export async function joinChannel(channelId: string, userId: string): Promise<void> {
   const { error } = await (supabase as any)

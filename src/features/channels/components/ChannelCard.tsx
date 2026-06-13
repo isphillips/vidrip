@@ -62,9 +62,13 @@ export default function ChannelCard({
             </Text>
             {isOwner
               ? null
-              : channel.is_joined ? (
+              : channel.subscribed ? (
                 <View style={styles.joinedPill}>
-                  <Text style={styles.joinedText}>{channel.subscribed ? 'Subscribed' : 'Joined'}</Text>
+                  <Text style={styles.joinedText}>Subscribed</Text>
+                </View>
+              ) : channel.is_joined ? (
+                <View style={styles.joinedPill}>
+                  <Text style={styles.joinedText}>Joined</Text>
                 </View>
               ) : channel.invite_only && channel.invite_status === 'pending' ? (
                 <View style={styles.inviteActions}>

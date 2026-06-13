@@ -421,7 +421,9 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                 {i > 0 && <View style={styles.divider} />}
                 <View style={styles.row}>
                   <View style={{ flex: 1, paddingRight: SPACE.MD }}>
-                    <Text style={styles.rowLabel}>{s.name}</Text>
+                    <Text style={styles.rowLabel} numberOfLines={1}>
+                      {s.name}{s.tierTitle ? <Text style={styles.syncHandle}>  ·  {s.tierTitle}</Text> : null}
+                    </Text>
                     <Text style={styles.syncHandle} numberOfLines={1}>
                       {s.cancelAtPeriodEnd
                         ? `Ends ${s.currentPeriodEnd ? new Date(s.currentPeriodEnd).toLocaleDateString() : 'soon'}`

@@ -1021,13 +1021,14 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
             return (
               <FlatList
                 ref={gridRef}
-                style={isEmpty && !special ? styles.fill : undefined}
+                // No flex:1 — when empty the list shrinks to its content so the
+                // spinner/message sits just under the pills instead of centering.
                 data={data}
                 keyExtractor={item => item.videoId}
                 numColumns={2}
                 onScroll={onGridScroll}
                 scrollEventThrottle={16}
-                contentContainerStyle={isEmpty ? (special ? styles.gridTop : styles.gridCenter) : styles.grid}
+                contentContainerStyle={isEmpty ? [styles.gridTop, { minHeight: height * 0.9 }] : styles.grid}
                 columnWrapperStyle={styles.row}
                 refreshControl={
                   // Friends is free (pure SQL) → pull-to-refresh. For You / Recommended
@@ -1045,7 +1046,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   gridLoading ? (
                     <ActivityIndicator color={C.ACCENT} style={styles.gridSpinner} />
                   ) : (
-                    <Text style={[styles.emptyText, special ? styles.emptyTextTop : styles.emptyTextCenter]}>
+                    <Text style={[styles.emptyText, styles.emptyTextTop]}>
                       {query.trim()
                         ? `No results for "${query.trim()}"`
                         : showFriends
@@ -1407,7 +1408,7 @@ const styles = StyleSheet.create({
   },
   searchInput:   { flex: 1, paddingVertical: SPACE.MD, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   searchSpinner: { marginLeft: SPACE.SM },
-  gridSpinner: { position: 'absolute', top: '50%' },
+  gridSpinner: { marginTop: SPACE.XL },
   tabsScroll: {  height: 50, marginBottom: 0 },
   tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, alignItems: 'center', height: 33 },
   tab:     { alignItems: 'center', justifyContent: 'center', height: 33, paddingHorizontal: SPACE.MD, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
