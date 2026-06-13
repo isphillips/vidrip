@@ -8,10 +8,16 @@ const INTERNAL_SECRET = Deno.env.get('INTERNAL_SECRET')!;
 
 const YT = 'https://www.googleapis.com/youtube/v3';
 
+const HOURS_BACK = 6;
+const MAX_SHORT_DURATION = 180;
+
 const CATEGORIES = [
-  { name: 'latest', q: '#Shorts' },
-  { name: 'latest', q: '#viral #Shorts' },
+  { name: 'latest' },
 ];
+
+function looksEnglish(text: string) {
+  return /^[\x00-\x7F\s.,!?'"()\-:&%#@]+$/.test(text);
+}
 
 function parseDuration(iso: string): number {
   const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -24,9 +30,9 @@ function parseDuration(iso: string): number {
   );
 }
 
-async function searchCategory(category: string, q: string) {
+async function searchCategory(category: string) {
   const publishedAfter = new Date(
-    Date.now() - 6 * 60 * 60 * 1000
+    Date.now() - HOURS_BACK * 60 * 60 * 1000
   ).toISOString();
 
   const params = new URLSearchParams({
@@ -34,10 +40,12 @@ async function searchCategory(category: string, q: string) {
     type: 'video',
     videoDuration: 'short',
     maxResults: '50',
-    q,
     order: 'date',
+    q: 'shorts',
     publishedAfter,
     key: YOUTUBE_API_KEY,
+    regionCode: 'US',
+    relevanceLanguage: 'en',
   });
 
   const res = await fetch(`${YT}/search?${params.toString()}`);
@@ -55,16 +63,90 @@ async function searchCategory(category: string, q: string) {
   return (data.items ?? [])
     .filter((item: any) => item.id?.videoId)
     .map((item: any) => ({
-      videoId: item.id.videoId,
-      title: item.snippet.title ?? '',
-      thumbnail:
+      videoId: item.id.videoId as string,
+      title: (item.snippet.title ?? '') as string,
+      thumbnail: (
         item.snippet.thumbnails?.high?.url ??
         item.snippet.thumbnails?.default?.url ??
-        '',
-      channel: item.snippet.channelTitle ?? '',
+        ''
+      ) as string,
+      channel: (item.snippet.channelTitle ?? '') as string,
+      channelId: (item.snippet.channelId ?? '') as string,
       publishedAt: item.snippet.publishedAt ?? null,
       category,
-    }));
+    }))
+    .filter((v: any) => looksEnglish(v.title));
+}
+
+async function getChannelCountries(
+  channelIds: string[]
+): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+  const uniqueIds = [...new Set(channelIds.filter(Boolean))];
+
+  for (let i = 0; i < uniqueIds.length; i += 50) {
+    const chunk = uniqueIds.slice(i, i + 50);
+
+    const params = new URLSearchParams({
+      part: 'snippet',
+      id: chunk.join(','),
+      key: YOUTUBE_API_KEY,
+    });
+
+    const res = await fetch(`${YT}/channels?${params.toString()}`);
+
+    if (!res.ok) {
+      console.error(
+        '[fetch-latest-shorts] channel country fetch failed:',
+        await res.text()
+      );
+      continue;
+    }
+
+    const data = await res.json();
+
+    for (const item of data.items ?? []) {
+      result[item.id] = item.snippet?.country ?? '';
+    }
+  }
+
+  return result;
+}
+
+async function getDurations(
+  videoIds: string[]
+): Promise<Record<string, number>> {
+  if (!videoIds.length) return {};
+
+  const result: Record<string, number> = {};
+
+  for (let i = 0; i < videoIds.length; i += 50) {
+    const chunk = videoIds.slice(i, i + 50);
+
+    const params = new URLSearchParams({
+      part: 'contentDetails',
+      id: chunk.join(','),
+      key: YOUTUBE_API_KEY,
+    });
+
+    const res = await fetch(`${YT}/videos?${params.toString()}`);
+
+    if (!res.ok) {
+      console.error(
+        '[fetch-latest-shorts] duration fetch failed:',
+        await res.text()
+      );
+      continue;
+    }
+
+    const data = await res.json();
+
+    for (const item of data.items ?? []) {
+      result[item.id] = parseDuration(item.contentDetails?.duration ?? '');
+    }
+  }
+
+  return result;
 }
 
 async function verifyShorts(videoIds: string[]): Promise<Set<string>> {
@@ -82,7 +164,7 @@ async function verifyShorts(videoIds: string[]): Promise<Set<string>> {
         });
 
         return { id, isShort: res.url.includes('/shorts/') };
-      }),
+      })
     );
 
     for (const r of results) {
@@ -95,37 +177,6 @@ async function verifyShorts(videoIds: string[]): Promise<Set<string>> {
   return verified;
 }
 
-async function getDurations(videoIds: string[]): Promise<Record<string, number>> {
-  if (!videoIds.length) return {};
-
-  const result: Record<string, number> = {};
-
-  for (let i = 0; i < videoIds.length; i += 50) {
-    const chunk = videoIds.slice(i, i + 50);
-
-    const params = new URLSearchParams({
-      part: 'contentDetails',
-      id: chunk.join(','),
-      key: YOUTUBE_API_KEY,
-    });
-
-    const res = await fetch(`${YT}/videos?${params.toString()}`);
-
-    if (!res.ok) {
-      console.error('[fetch-latest-shorts] duration fetch failed:', await res.text());
-      continue;
-    }
-
-    const data = await res.json();
-
-    for (const item of data.items ?? []) {
-      result[item.id] = parseDuration(item.contentDetails?.duration ?? '');
-    }
-  }
-
-  return result;
-}
-
 serve(async (req) => {
   if (req.headers.get('x-internal-secret') !== INTERNAL_SECRET) {
     return new Response('Unauthorized', { status: 401 });
@@ -134,23 +185,41 @@ serve(async (req) => {
   const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   let totalUpserted = 0;
 
-  for (const { name, q } of CATEGORIES) {
+  for (const { name } of CATEGORIES) {
     try {
-      const candidates = await searchCategory(name, q);
+      const candidates = await searchCategory(name);
+
       if (!candidates.length) continue;
 
-      const ids = candidates.map((c: any) => c.videoId);
+      const channelCountries = await getChannelCountries(
+        candidates.map((c: any) => c.channelId)
+      );
+
+      const usCandidates = candidates.filter((c: any) => {
+        return channelCountries[c.channelId] === 'US';
+      });
+
+      if (!usCandidates.length) {
+        console.log(
+          `[fetch-latest-shorts] ${name}: ${candidates.length} candidates → 0 US-channel candidates`
+        );
+        continue;
+      }
+
+      const ids = usCandidates.map((c: any) => c.videoId);
       const durations = await getDurations(ids);
 
-      const durationFiltered = candidates
+      const durationFiltered = usCandidates
         .map((c: any) => ({
           ...c,
           duration: durations[c.videoId] ?? 999,
         }))
-        .filter((c: any) => c.duration > 0 && c.duration <= 60);
+        .filter(
+          (c: any) => c.duration > 0 && c.duration <= MAX_SHORT_DURATION
+        );
 
       const confirmedShortIds = await verifyShorts(
-        durationFiltered.map((c: any) => c.videoId),
+        durationFiltered.map((c: any) => c.videoId)
       );
 
       const rows = durationFiltered
@@ -160,6 +229,8 @@ serve(async (req) => {
           title: c.title,
           thumbnail: c.thumbnail,
           channel: c.channel,
+          channel_id: c.channelId,
+          channel_country: channelCountries[c.channelId] ?? null,
           duration: c.duration,
           category: c.category,
           published_at: c.publishedAt,
@@ -179,14 +250,17 @@ serve(async (req) => {
       }
 
       console.log(
-        `[fetch-latest-shorts] ${name}: ${candidates.length} candidates → ${rows.length} latest shorts`,
+        `[fetch-latest-shorts] ${name}: ${candidates.length} candidates → ${usCandidates.length} US-channel candidates → ${durationFiltered.length} ≤${MAX_SHORT_DURATION}s → Shorts → ${rows.length} inserted`
       );
     } catch (e) {
       console.error(`[fetch-latest-shorts] error for category ${name}:`, e);
     }
   }
 
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const cutoff = new Date(
+    Date.now() - 7 * 24 * 60 * 60 * 1000
+  ).toISOString();
+
   await db.from('shorts').delete().lt('fetched_at', cutoff);
 
   return new Response(JSON.stringify({ ok: true, upserted: totalUpserted }), {

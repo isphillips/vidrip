@@ -17,7 +17,7 @@ export class ModerationRejected extends Error {
   }
 }
 
-export type ModerationContentType = 'reaction' | 'channel_clip' | 'channel_video' | 'review';
+export type ModerationContentType = 'reaction' | 'channel_clip' | 'channel_video' | 'review' | 'comment';
 
 const FRAME_INTERVAL_SEC = 2;    // sample ~one frame every 2s …
 const MAX_FRAMES = 90;           // … capped (covers a full 180s clip at 2s spacing).
