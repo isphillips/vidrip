@@ -67,7 +67,14 @@ export type ShareStackParamList = {
 
 // Record stack
 export type RecordStackParamList = {
-  RecordReaction: { threadId: string; videoId: string; sourceType?: 'youtube' | 'tiktok' | 'instagram' };
+  RecordReaction: {
+    threadId: string;
+    videoId: string;
+    sourceType?: 'youtube' | 'tiktok' | 'instagram';
+    // When the share carries a sender intro, play it before the source video.
+    introUrl?: string;
+    introDuration?: number;
+  };
 };
 
 // Root-level modals
@@ -80,6 +87,8 @@ export type RootStackParamList = {
     parentCommentId?: string;
     videoTitle?: string;
   };
+  // Record a personal intro to attach to a share (returned via pendingIntroStore).
+  RecordIntro: undefined;
 };
 
 export type AuthStackScreenProps<T extends keyof AuthStackParamList> =

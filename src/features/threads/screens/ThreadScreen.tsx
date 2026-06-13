@@ -184,7 +184,11 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
           ) : null}
           {canReact ? (
             <TouchableOpacity style={styles.reactBtn} activeOpacity={0.85}
-              onPress={() => navigation.getParent()?.navigate('RecordReaction', { threadId, videoId: thread.video_id, sourceType: thread.source_type })}>
+              onPress={() => navigation.getParent()?.navigate('RecordReaction', {
+                threadId, videoId: thread.video_id, sourceType: thread.source_type,
+                introUrl: thread.intro_url ?? undefined,
+                introDuration: thread.intro_duration ?? undefined,
+              })}>
               <Text style={styles.reactBtnText}>Record Your Reaction</Text>
             </TouchableOpacity>
           ) : hasReacted ? (

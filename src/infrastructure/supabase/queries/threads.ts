@@ -25,6 +25,9 @@ export type ThreadDetail = {
   created_at: string;
   sender: { handle: string; display_name: string } | null;
   my_status: 'pending' | 'seen' | 'reacted' | null;
+  // Sender intro attached to this share (plays before the source video / reactions).
+  intro_url: string | null;
+  intro_duration: number | null;
 };
 
 export type ReactionItem = {
@@ -40,6 +43,9 @@ export type ReactionItem = {
   yt_start_offset: number;
   source_type: 'youtube' | 'tiktok' | 'instagram';
   recorded_with_headphones?: boolean;
+  // Sender intro on the parent thread (plays once before this reaction is watched).
+  intro_url?: string | null;
+  intro_duration?: number | null;
   // Resolved at fetch time by resolveReactionUri
   resolvedUri: string | null;
   needsDownload: boolean;         // true = cloud URL available but not yet local
@@ -79,7 +85,7 @@ export async function fetchThread(threadId: string, userId: string): Promise<Thr
   const { data, error } = await supabase
     .from('threads')
     .select(`
-      id, video_id, video_title, video_thumbnail, source_type, sender_id, created_at,
+      id, video_id, video_title, video_thumbnail, source_type, sender_id, created_at, intro_url, intro_duration,
       sender:users!sender_id(handle, display_name),
       thread_members(user_id, status)
     `)
@@ -99,6 +105,8 @@ export async function fetchThread(threadId: string, userId: string): Promise<Thr
     created_at: data.created_at,
     sender: (data as any).sender,
     my_status: myMembership?.status ?? null,
+    intro_url: (data as any).intro_url ?? null,
+    intro_duration: (data as any).intro_duration ?? null,
   };
 }
 
@@ -127,13 +135,19 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
     .select(`
       id, thread_id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type, recorded_with_headphones,
       user:users!user_id(handle, display_name),
-      emoji_reactions(emoji, user_id)
+      emoji_reactions(emoji, user_id),
+      thread:threads!thread_id(intro_url, intro_duration)
     `)
     .eq('id', reactionId)
     .single();
 
   if (error || !data) return null;
-  return hydrateReaction(data);
+  const item = await hydrateReaction(data);
+  return {
+    ...item,
+    intro_url: (data as any).thread?.intro_url ?? null,
+    intro_duration: (data as any).thread?.intro_duration ?? null,
+  };
 }
 
 export async function fetchReactions(threadId: string): Promise<ReactionItem[]> {
@@ -172,6 +186,19 @@ export async function fetchAlreadySentRecipients(
     return [];
   }
   return (data ?? []) as string[];
+}
+
+/** Attach (or replace) a sender intro on a thread after the clip is uploaded. */
+export async function updateThreadIntro(
+  threadId: string,
+  introUrl: string,
+  introDuration: number,
+): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('threads')
+    .update({ intro_url: introUrl, intro_duration: Math.round(introDuration) })
+    .eq('id', threadId);
+  if (error) { throw error; }
 }
 
 export async function sendThread(

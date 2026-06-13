@@ -50,6 +50,8 @@ import {
   type EmojiReaction,
 } from '../../../infrastructure/supabase/queries/reactions';
 import { useAuthStore } from '../../../store/authStore';
+import { useIntroSeenStore } from '../../../store/introSeenStore';
+import IntroPreroll from '../components/IntroPreroll';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
@@ -100,6 +102,9 @@ export default function WatchReactionScreen({
 }: FeedStackScreenProps<'WatchReaction'>) {
   const { reactionId } = route.params;
   const { user } = useAuthStore();
+  // Intro pre-roll: play the sender's intro once per thread per viewing session.
+  const introSeen = useIntroSeenStore(s => s.seen);
+  const markIntroSeen = useIntroSeenStore(s => s.markSeen);
   const { width, height } = useWindowDimensions();
   const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
 
@@ -336,6 +341,16 @@ export default function WatchReactionScreen({
           <Text style={styles.backBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
+    );
+  }
+
+  // Sender intro plays once per thread per session, before the reaction is shown.
+  if (reaction?.intro_url && reaction.thread_id && !introSeen.has(reaction.thread_id)) {
+    return (
+      <IntroPreroll
+        introUrl={reaction.intro_url}
+        onDone={() => markIntroSeen(reaction.thread_id!)}
+      />
     );
   }
 

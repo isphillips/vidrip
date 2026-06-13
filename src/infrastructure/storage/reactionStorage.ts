@@ -24,7 +24,10 @@ export interface SaveReactionResult {
 
 // ─── Cloud path (relay upload) ─────────────────────────────────────────────
 
-async function uploadToCloud(localPath: string, uploadPath: string): Promise<string> {
+/** Upload a local file to the (private) `reactions` bucket at `uploadPath` and
+ *  return its public-form URL (parsed + re-signed on read). Exported so the
+ *  intro-clip flow can reuse the same relay upload. */
+export async function uploadToCloud(localPath: string, uploadPath: string): Promise<string> {
   const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
 
   const { data: { session } } = await supabase.auth.getSession();

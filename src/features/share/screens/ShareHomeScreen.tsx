@@ -7,14 +7,18 @@ import {
 import { WebView } from 'react-native-webview';
 import Video from 'react-native-video';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import {
   fetchShorts, searchShorts, CATEGORIES, type ShortRow, type Category,
 } from '../../../infrastructure/supabase/queries/shorts';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
-import { sendThread } from '../../../infrastructure/supabase/queries/threads';
+import { sendThread, updateThreadIntro } from '../../../infrastructure/supabase/queries/threads';
+import { assertVideoAllowed, ModerationRejected } from '../../../infrastructure/moderation/moderateVideo';
+import { uploadIntro } from '../../../infrastructure/storage/introStorage';
+import { usePendingIntroStore } from '../../../store/pendingIntroStore';
 import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
 import { fetchYouTubeDurationSeconds, MAX_VIDEO_SECONDS } from '../../../infrastructure/youtube/api';
 import { useShareIntentStore } from '../../../store/shareIntentStore';
@@ -26,7 +30,7 @@ import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/sy
 import { fetchRecommended, refreshRecommended, RECOMMENDED_COOLDOWN_MS } from '../../../infrastructure/supabase/queries/recommended';
 import { useAuthStore } from '../../../store/authStore';
 import VideoCommentsSheet from '../../comments/components/VideoCommentsSheet';
-import type { ShareStackScreenProps } from '../../../app/navigation/types';
+import type { ShareStackScreenProps, RootStackParamList } from '../../../app/navigation/types';
 
 // Natural height of the expanding search row (input padding + line + border).
 const SEARCH_ROW_HEIGHT = 56;
@@ -103,6 +107,16 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const isFocused = useIsFocused();   // pause the instagram preview when leaving the tab
   const { width, height } = useWindowDimensions();
   const { user } = useAuthStore();
+  // Root nav so we can reach the RecordIntro full-screen modal (lives in the root stack).
+  const rootNav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  // Optional intro clip recorded for the current share (handed back from RecordIntro).
+  const [introClip, setIntroClip] = useState<{ path: string; duration: number } | null>(null);
+  const pendingIntroClip = usePendingIntroStore(s => s.clip);
+  const clearPendingIntro = usePendingIntroStore(s => s.clear);
+  useEffect(() => {
+    if (pendingIntroClip) { setIntroClip(pendingIntroClip); clearPendingIntro(); }
+  }, [pendingIntroClip, clearPendingIntro]);
 
   // browse state
   const [mode, setMode]         = useState<Mode>('browse');
@@ -565,6 +579,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     setDrawerOpen(true);
     setFriendFilter('');
     setSelectedFriends(new Set());
+    setIntroClip(null);          // intros are per-share; don't leak across videos
+    clearPendingIntro();
     // Load friends lazily
     if (!friends.length && user) {
       setFriendsLoading(true);
@@ -590,7 +606,12 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     if (!user || !selectedVideo || selectedFriends.size === 0) { return; }
     setSending(true);
     try {
-      await sendThread(
+      // Moderate the intro up front so a rejected clip never creates a thread.
+      if (introClip) {
+        await assertVideoAllowed(introClip.path, { durationSec: introClip.duration, contentType: 'reaction' });
+      }
+
+      const { threadId } = await sendThread(
         user.id,
         selectedVideo.videoId,
         selectedVideo.title,
@@ -598,13 +619,26 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         [...selectedFriends],
         selectedVideo.sourceType ?? 'youtube',
       );
+
+      // Upload the intro and attach it to the thread (plays before the source video + reactions).
+      if (introClip) {
+        const introUrl = await uploadIntro(threadId, introClip.path);
+        await updateThreadIntro(threadId, introUrl, introClip.duration);
+      }
+
       setSentThisSession(prev => new Set([...prev, ...selectedFriends]));
       setSelectedFriends(new Set());
+      setIntroClip(null);
+      clearPendingIntro();
       closeDrawer();
       setToastMsg(`Sent to ${selectedFriends.size} friend${selectedFriends.size !== 1 ? 's' : ''}!`);
       setTimeout(() => setToastMsg(''), 2500);
-    } catch {
-      Alert.alert('Error', 'Could not send. Try again.');
+    } catch (e) {
+      if (e instanceof ModerationRejected) {
+        Alert.alert('Intro not allowed', e.message);
+      } else {
+        Alert.alert('Error', 'Could not send. Try again.');
+      }
     } finally {
       setSending(false);
     }
@@ -1081,6 +1115,24 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 />
               </View>
 
+              {/* Record-intro row — optional personal intro that plays before the video */}
+              {introClip ? (
+                <View style={styles.introRowDone}>
+                  <Ionicons name="checkmark-circle" size={18} color={C.ACCENT} />
+                  <TouchableOpacity style={styles.introRowDoneMain} onPress={() => rootNav.navigate('RecordIntro')} activeOpacity={0.7}>
+                    <Text style={styles.introRowDoneText}>Intro ready · tap to re-record</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setIntroClip(null); clearPendingIntro(); }} hitSlop={8}>
+                    <Ionicons name="close-circle" size={18} color={C.MUTED} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.introRow} onPress={() => rootNav.navigate('RecordIntro')} activeOpacity={0.7}>
+                  <Ionicons name="videocam-outline" size={18} color={C.ACCENT} />
+                  <Text style={styles.introRowText}>Record intro?</Text>
+                </TouchableOpacity>
+              )}
+
               {/* Friends list */}
               {friendsLoading ? (
                 <View style={styles.drawerCenter}><ActivityIndicator color={C.ACCENT} /></View>
@@ -1285,6 +1337,13 @@ const styles = StyleSheet.create({
   drawerSearchInput: { paddingVertical: SPACE.SM, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   drawerCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   drawerEmpty:  { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY },
+
+  // record-intro row
+  introRow:     { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, marginHorizontal: SPACE.LG, marginBottom: SPACE.SM, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.MD, backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.ACCENT },
+  introRowText: { color: C.ACCENT, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
+  introRowDone: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, marginHorizontal: SPACE.LG, marginBottom: SPACE.SM, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.MD, backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER },
+  introRowDoneMain: { flex: 1 },
+  introRowDoneText: { color: C.INK, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
 
   // friend rows
   friendRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD, gap: SPACE.MD },

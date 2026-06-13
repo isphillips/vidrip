@@ -20,6 +20,7 @@ import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
 import RecordCommentScreen from '../../features/comments/screens/RecordCommentScreen';
+import RecordIntroScreen from '../../features/share/screens/RecordIntroScreen';
 import OnboardingScreen from '../../features/onboarding/OnboardingScreen';
 import ScreenGradient from '../../components/ScreenGradient';
 import { useOnboarding, useOnboardingStore } from '../../features/onboarding/onboarding';
@@ -211,6 +212,11 @@ export default function RootNavigator() {
               <Root.Screen
                 name="RecordComment"
                 component={RecordCommentScreen}
+                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+              />
+              <Root.Screen
+                name="RecordIntro"
+                component={RecordIntroScreen}
                 options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
               />
             </>
