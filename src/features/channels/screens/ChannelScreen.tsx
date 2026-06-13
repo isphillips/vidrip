@@ -25,9 +25,11 @@ import {
   fetchChannelReactions,
   fetchChannelReviews,
   fetchChannelDisplayName,
+  fetchChannelAccess,
   type ChannelPost,
   type ChannelClipTile,
   type ChannelReview,
+  type ChannelTier,
 } from '../../../infrastructure/supabase/queries/channels';
 import {
   startAudioRecording,
@@ -37,6 +39,7 @@ import {
 import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import ChannelMessageBubble from '../components/ChannelMessageBubble';
 import ChannelSettingsSheet from '../components/ChannelSettingsSheet';
+import SubscriberPaywall from '../components/SubscriberPaywall';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 type GridFilter = 'all' | 'reactions' | 'reviews';
@@ -65,6 +68,9 @@ export default function ChannelhamburderScreen({
   const [inviteOnly, setInviteOnly] = useState(!!inviteOnlyParam);
   const [isListed, setIsListed] = useState(false); // groups.is_public — public visibility
   const [filter, setFilter] = useState<GridFilter>('all');
+  // Subscriber-mode paywall: gated=true → show the paywall instead of content.
+  const [gated, setGated] = useState(false);
+  const [tiers, setTiers] = useState<ChannelTier[]>([]);
   const [reactionTiles, setReactionTiles] = useState<ChannelClipTile[]>([]);
   const [reviewTiles, setReviewTiles] = useState<ChannelReview[]>([]);
   // Fresh TikTok thumbnails resolved by video id (stored ones expire — see api.ts).
@@ -105,6 +111,9 @@ export default function ChannelhamburderScreen({
     try {
       const data = await fetchChannelPosts(channelId, user?.id);
       if (mountedRef.current) { setPosts(data); }
+      fetchChannelAccess(channelId, user?.id)
+        .then(a => { if (mountedRef.current) { setGated(a.gated); setTiers(a.tiers); } })
+        .catch(() => {});
       fetchChannelReviewSettings(channelId)
         .then(s => { if (mountedRef.current) { setReviewsEnabled(s.reviewsEnabled); setInviteOnly(s.inviteOnly); setIsListed(s.isListed); } })
         .catch(() => {});
@@ -497,105 +506,126 @@ export default function ChannelhamburderScreen({
         </View>
       )}
 
-      {/* Reviews filter pills — public grid only, when the creator enabled reviews */}
-      {isPublic && reviewsEnabled && !loading && (
-        <View style={styles.filterRow}>
-          {GRID_FILTERS.map(f => {
-            const active = filter === f.key;
-            return (
-              <TouchableOpacity key={f.key} style={[styles.pill, active && styles.pillActive]}
-                onPress={() => setFilter(f.key)} activeOpacity={0.8}>
-                <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
+      ) : gated ? (
+        <SubscriberPaywall channelId={channelId} label={title} tiers={tiers} />
       ) : isPublic ? (
-        <FlatList
-          data={gridTiles}
-          keyExtractor={item => item.key}
-          numColumns={2}
-          contentContainerStyle={gridTiles.length === 0 ? styles.emptyContainer : styles.grid}
-          columnWrapperStyle={styles.gridRow}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Text style={styles.emptyText}>
-                {filter === 'reactions' ? 'No reactions yet'
-                  : filter === 'reviews' ? 'No reviews yet'
-                  : 'No posts yet'}
-              </Text>
+        <>
+          {/* Reviews filter pills — public grid only, when the creator enabled reviews */}
+          {isPublic && reviewsEnabled && !loading && (
+            <View style={styles.filterRow}>
+              {GRID_FILTERS.map(f => {
+                const active = filter === f.key;
+                return (
+                  <TouchableOpacity key={f.key} style={[styles.pill, active && styles.pillActive]}
+                    onPress={() => setFilter(f.key)} activeOpacity={0.8}>
+                    <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.gridCard, { width: cardW }]}
-              activeOpacity={0.8}
-              onPress={item.onPress}>
-              <View style={[styles.gridThumb, { height: cardH }]}>
-                {item.locked ? (
-                  <View style={styles.gridThumbBlind}>
-                    <Image source={require('../../../assets/lock.png')} style={styles.gridThumbBlindImg} resizeMode="contain" />
-                  </View>
-                ) : item.obscured ? (
-                  <View style={styles.gridThumbBlind}>
-                    <Image source={require('../../../assets/questionmark.png')} style={styles.gridThumbBlindImg} resizeMode="contain" />
-                  </View>
-                ) : item.thumbnail ? (
-                  <Image source={{ uri: item.thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                ) : (
-                  <View style={[styles.gridThumbBlind, { backgroundColor: C.SURFACE_2 }]}>
-                    <Text style={styles.gridThumbBlindIcon}>▶</Text>
-                  </View>
-                )}
-                {item.isPinned && (
-                  <View style={styles.pinBadge}><Text style={styles.pinBadgeText}>📌</Text></View>
-                )}
-                {/* Clip tiles: play scrim + reactor/reviewer chip */}
-                {item.badge && !item.obscured && (
-                  <View style={styles.tilePlay}><Text style={styles.tilePlayIcon}>{item.badge}</Text></View>
-                )}
-                {item.handle && (
-                  <View style={styles.tileHandle}>
-                    <Text style={styles.tileHandleTxt} numberOfLines={1}>@{item.handle}</Text>
-                  </View>
-                )}
+          )}
+
+          <FlatList
+            data={gridTiles}
+            keyExtractor={item => item.key}
+            numColumns={2}
+            contentContainerStyle={gridTiles.length === 0 ? styles.emptyContainer : styles.grid}
+            columnWrapperStyle={styles.gridRow}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <Text style={styles.emptyText}>
+                  {filter === 'reactions' ? 'No reactions yet'
+                    : filter === 'reviews' ? 'No reviews yet'
+                    : 'No posts yet'}
+                </Text>
               </View>
-              {item.obscured ? (
-                <Text style={styles.gridTitleObscured}>React to reveal</Text>
-              ) : item.title ? (
-                <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
-              ) : null}
-              <Text style={[
-                styles.gridReactionCount,
-                !item.obscured && !item.title && styles.gridReactionCountNoTitle,
-              ]}>
-                {item.meta}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.gridCard, { width: cardW }]}
+                activeOpacity={0.8}
+                onPress={item.onPress}>
+                <View style={[styles.gridThumb, { height: cardH }]}>
+                  {item.locked ? (
+                    <View style={styles.gridThumbBlind}>
+                      <Image source={require('../../../assets/lock.png')} style={styles.gridThumbBlindImg} resizeMode="contain" />
+                    </View>
+                  ) : item.obscured ? (
+                    <View style={styles.gridThumbBlind}>
+                      <Image source={require('../../../assets/questionmark.png')} style={styles.gridThumbBlindImg} resizeMode="contain" />
+                    </View>
+                  ) : item.thumbnail ? (
+                    <Image source={{ uri: item.thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.gridThumbBlind, { backgroundColor: C.SURFACE_2 }]}>
+                      <Text style={styles.gridThumbBlindIcon}>▶</Text>
+                    </View>
+                  )}
+                  {item.isPinned && (
+                    <View style={styles.pinBadge}><Text style={styles.pinBadgeText}>📌</Text></View>
+                  )}
+                  {/* Clip tiles: play scrim + reactor/reviewer chip */}
+                  {item.badge && !item.obscured && (
+                    <View style={styles.tilePlay}><Text style={styles.tilePlayIcon}>{item.badge}</Text></View>
+                  )}
+                  {item.handle && (
+                    <View style={styles.tileHandle}>
+                      <Text style={styles.tileHandleTxt} numberOfLines={1}>@{item.handle}</Text>
+                    </View>
+                  )}
+                </View>
+                {item.obscured ? (
+                  <Text style={styles.gridTitleObscured}>React to reveal</Text>
+                ) : item.title ? (
+                  <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
+                ) : null}
+                <Text style={[
+                  styles.gridReactionCount,
+                  !item.obscured && !item.title && styles.gridReactionCountNoTitle,
+                ]}>
+                  {item.meta}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </>
       ) : (
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={[posts.length === 0 ? styles.emptyContainer : undefined, styles.msgPad]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}>
-          {posts.length === 0 ? (
-            <View style={styles.center}><Text style={styles.emptyText}>No messages yet</Text></View>
-          ) : (
-            [...posts].reverse().map(item => (
-              <ChannelMessageBubble key={item.id} post={item}
-                isMe={item.poster_id === user?.id} userId={user?.id}
-                onPress={() => navigation.navigate('WatchChannelClip', { postId: item.id })}
-                onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)}
-                onDelete={() => handleDeletePost(item.id)} />
-            ))
+        <>
+          {/* Reviews filter pills — public grid only, when the creator enabled reviews */}
+          {isPublic && reviewsEnabled && !loading && (
+            <View style={styles.filterRow}>
+              {GRID_FILTERS.map(f => {
+                const active = filter === f.key;
+                return (
+                  <TouchableOpacity key={f.key} style={[styles.pill, active && styles.pillActive]}
+                    onPress={() => setFilter(f.key)} activeOpacity={0.8}>
+                    <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           )}
-        </ScrollView>
+
+          <ScrollView
+            ref={scrollViewRef}
+            contentContainerStyle={[posts.length === 0 ? styles.emptyContainer : undefined, styles.msgPad]}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}>
+            {posts.length === 0 ? (
+              <View style={styles.center}><Text style={styles.emptyText}>No messages yet</Text></View>
+            ) : (
+              [...posts].reverse().map(item => (
+                <ChannelMessageBubble key={item.id} post={item}
+                  isMe={item.poster_id === user?.id} userId={user?.id}
+                  onPress={() => navigation.navigate('WatchChannelClip', { postId: item.id })}
+                  onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)}
+                  onDelete={() => handleDeletePost(item.id)} />
+              ))
+            )}
+          </ScrollView>
+        </>
       )}
 
       {/* Private channel: pending audio preview */}

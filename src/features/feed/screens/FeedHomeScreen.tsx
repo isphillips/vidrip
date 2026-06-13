@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import LinearGradient from 'react-native-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
@@ -41,9 +43,11 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'reviews', label: 'My Reviews' },
 ];
 
-// Flowing-water wordmark palette: pink → purple → teal, looped. Each "drip" letter
-// cycles through these with a phase offset so the colors drift across the word.
-const FLOW_PALETTE = ['#FF4FA3', '#A05CFF', '#2DD4BF'];
+// Flowing-water wordmark: a pink↔purple gradient slides under a "drip" text mask so
+// the colors flow continuously through the letters (not per-letter steps).
+const FLOW_PINK = '#FF4FA3';
+const FLOW_PURPLE = '#A05CFF';
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 // A thread "needs your reaction" if a friend sent it and you haven't reacted.
 const needsReaction = (t: FeedThread, uid?: string) =>
@@ -85,27 +89,19 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
 
-  // Continuously loops 0→1 to drift the "drip" wordmark colors like flowing water.
+  // The "drip" gradient is twice the text width with a repeating pink→purple→pink
+  // pattern; sliding it left by one text-width loops seamlessly, so the colors flow
+  // continuously through the letters (UI-thread transform = smooth).
+  const [dripSize, setDripSize] = useState({ w: 70, h: 34 });
   const flow = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
-      Animated.timing(flow, { toValue: 1, duration: 5200, easing: Easing.linear, useNativeDriver: false }),
+      Animated.timing(flow, { toValue: 1, duration: 3200, easing: Easing.linear, useNativeDriver: true }),
     );
     loop.start();
     return () => loop.stop();
   }, [flow]);
-  // Color for "drip" letter i: cycles through FLOW_PALETTE, phase-shifted by index so
-  // the gradient travels across the word. Wraps seamlessly (last stop == first).
-  const dripColor = (i: number) => {
-    const n = FLOW_PALETTE.length;
-    const inputRange: number[] = [];
-    const outputRange: string[] = [];
-    for (let k = 0; k <= n; k++) {
-      inputRange.push(k / n);
-      outputRange.push(FLOW_PALETTE[(i + k) % n]);
-    }
-    return flow.interpolate({ inputRange, outputRange });
-  };
+  const dripTranslateX = flow.interpolate({ inputRange: [0, 1], outputRange: [0, -dripSize.w] });
 
   const [threads, setThreads]     = useState<FeedThread[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -271,12 +267,31 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             style={styles.headerLogo}
             resizeMode="contain"
           />
-          <Text style={styles.headerTitle}>
-            <Text style={styles.titleVi}>Vi</Text>
-            {'drip'.split('').map((ch, i) => (
-              <Animated.Text key={i} style={{ color: dripColor(i) }}>{ch}</Animated.Text>
-            ))}
-          </Text>
+          <View style={styles.wordmarkRow}>
+            <Text style={[styles.wordmarkText, styles.titleVi]}>Vi</Text>
+            <MaskedView
+              style={{ width: dripSize.w, height: dripSize.h }}
+              maskElement={
+                <Text
+                  style={styles.wordmarkText}
+                  onLayout={e => {
+                    const { width, height } = e.nativeEvent.layout;
+                    setDripSize(s => (Math.abs(s.w - width) > 1 || Math.abs(s.h - height) > 1)
+                      ? { w: width, h: height } : s);
+                  }}>
+                  drip
+                </Text>
+              }>
+              {/* Gradient is 2× the word width with a repeating pink→purple→pink
+                  pattern; sliding it left by one word-width loops seamlessly. */}
+              <AnimatedLinearGradient
+                colors={[FLOW_PINK, FLOW_PURPLE, FLOW_PINK, FLOW_PURPLE, FLOW_PINK]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ width: dripSize.w * 2, height: dripSize.h, transform: [{ translateX: dripTranslateX }] }}
+              />
+            </MaskedView>
+          </View>
         </View>
         <View style={styles.tabRow}>
           <TouchableOpacity
@@ -517,6 +532,20 @@ const styles = StyleSheet.create({
     marginLeft: -5,
     display: 'flex',
     textTransform: 'uppercase',
+  },
+  wordmarkRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginTop: 10,
+    marginLeft: -5,
+  },
+  wordmarkText: {
+    fontSize: FONT.SIZES.XXL,
+    fontFamily: FONT.DISPLAY_BOLD,
+    fontWeight: FONT.WEIGHTS.BOLD,
+    letterSpacing: -1,
+    textTransform: 'uppercase',
+    color: C.BLACK,   // mask only uses alpha; opaque = visible through the gradient
   },
   titleVi: {
     color: C.WHITE,
