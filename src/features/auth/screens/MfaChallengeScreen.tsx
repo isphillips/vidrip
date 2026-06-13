@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
 
@@ -29,7 +31,13 @@ export default function MfaChallengeScreen({ onVerified }: { onVerified: () => v
 
   return (
     <View style={styles.container}>
-      <Text style={styles.icon}>🔐</Text>
+      <LinearGradient
+        colors={['#e056fd', '#8b22a5', '#16e0d5']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.badge}>
+        <Ionicons name="shield-checkmark-outline" size={42} color={C.WHITE} />
+      </LinearGradient>
       <Text style={styles.title}>Two-factor</Text>
       <Text style={styles.sub}>Enter the current 6-digit code from your authenticator app.</Text>
       <TextInput
@@ -60,8 +68,14 @@ export default function MfaChallengeScreen({ onVerified }: { onVerified: () => v
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center', padding: SPACE.XL, gap: SPACE.SM },
-  icon: { fontSize: 56, marginBottom: SPACE.SM },
-  title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
+  badge: {
+    width: 96, height: 96, borderRadius: 48,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: SPACE.MD,
+    shadowColor: C.ACCENT_HOT, shadowOpacity: 0.6, shadowRadius: 22,
+    shadowOffset: { width: 0, height: 8 }, elevation: 12,
+  },
+  title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, textTransform: 'uppercase' },
   sub: { fontSize: FONT.SIZES.MD, color: C.MUTED, fontFamily: FONT.BODY, textAlign: 'center', lineHeight: 22, marginBottom: SPACE.MD },
   input: {
     width: '100%', backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER,
