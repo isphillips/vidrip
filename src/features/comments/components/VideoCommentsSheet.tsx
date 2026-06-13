@@ -15,6 +15,7 @@ import {
 } from '../../../infrastructure/supabase/queries/videoComments';
 import { localPathForComment } from '../../../infrastructure/storage/commentStorage';
 import { useAuthStore } from '../../../store/authStore';
+import { usePendingCommentsStore } from '../../../store/pendingCommentsStore';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import type { RootStackParamList } from '../../../app/navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -214,6 +215,10 @@ export default function VideoCommentsSheet({
   const navigation = useNavigation<RootNav>();
   const { user } = useAuthStore();
 
+  // Optimistic, just-recorded comments awaiting their cloud upload.
+  const pending = usePendingCommentsStore(s => s.pending);
+  const reconcilePending = usePendingCommentsStore(s => s.reconcile);
+
   const [comments, setComments] = useState<VideoComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -255,6 +260,8 @@ export default function VideoCommentsSheet({
       } else {
         setComments(prev => [...prev, ...page]);
       }
+      // Drop optimistic copies that have now landed server-side (video_url set).
+      reconcilePending(page.map(p => p.id));
       hasMoreRef.current = page.length === 20;
       if (page.length > 0) {
         const last = page[page.length - 1];
@@ -266,7 +273,7 @@ export default function VideoCommentsSheet({
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [rootSourceId, sourceType, user?.id, cursor]);
+  }, [rootSourceId, sourceType, user?.id, cursor, reconcilePending]);
 
   useEffect(() => {
     if (!visible) { return; }
@@ -302,12 +309,13 @@ export default function VideoCommentsSheet({
         limit: 30,
       });
       setReplies(page);
+      reconcilePending(page.map(p => p.id));
     } catch (e) {
       console.error('[VideoCommentsSheet] loadReplies', e);
     } finally {
       setRepliesLoading(false);
     }
-  }, [rootSourceId, sourceType, user?.id]);
+  }, [rootSourceId, sourceType, user?.id, reconcilePending]);
 
   const handleDelete = (comment: VideoComment) => {
     Alert.alert('Delete comment?', 'This cannot be undone.', [
@@ -361,12 +369,25 @@ export default function VideoCommentsSheet({
 
   if (!visible) { return null; }
 
+  // Fold in optimistic comments for this level (own just-posted, upload in-flight).
+  const mergePending = (real: VideoComment[], level: string | null) => {
+    const extra = pending.filter(p =>
+      p.root_source_id === rootSourceId &&
+      p.source_type === sourceType &&
+      (p.parent_comment_id ?? null) === level &&
+      !real.some(r => r.id === p.id),
+    );
+    return extra.length ? [...extra, ...real] : real;
+  };
+
   const showReplies = replyParent !== null;
-  const listData = showReplies ? replies : comments;
+  const mergedComments = mergePending(comments, null);
+  const mergedReplies = showReplies ? mergePending(replies, replyParent!.id) : replies;
+  const listData = showReplies ? mergedReplies : mergedComments;
   const listLoading = showReplies ? repliesLoading : loading;
   const headerTitle = showReplies
     ? `Replies to @${replyParent!.author_handle}`
-    : `Comments${comments.length > 0 ? ` (${comments.length})` : ''}`;
+    : `Comments${mergedComments.length > 0 ? ` (${mergedComments.length})` : ''}`;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
