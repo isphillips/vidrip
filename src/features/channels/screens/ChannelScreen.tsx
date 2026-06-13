@@ -462,6 +462,10 @@ export default function ChannelhamburderScreen({
               transform: [{ rotate: cogAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
             }]}>⚙</Animated.Text>
           </TouchableOpacity>
+        ) : gated ? (
+          // Subscriber-mode channel, viewer isn't a subscriber — no Join/Leave here;
+          // subscribing happens through the paywall below.
+          null
         ) : isPublic && inviteOnly && !joined ? (
           // Invite-only room, not a member — can't self-join.
           <View style={styles.lockedHeaderPill}>
