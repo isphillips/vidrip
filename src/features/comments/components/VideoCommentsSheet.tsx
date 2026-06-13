@@ -401,12 +401,10 @@ export default function VideoCommentsSheet({
 
         {/* Header */}
         <View style={s.header}>
-          {showReplies ? (
+          {showReplies && (
             <TouchableOpacity onPress={() => setReplyParent(null)} hitSlop={8} style={s.backBtn}>
               <Ionicons name="chevron-back" size={22} color={C.INK} />
             </TouchableOpacity>
-          ) : (
-            <View style={{ width: 30 }} />
           )}
           <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={8}>
@@ -495,12 +493,12 @@ const s = StyleSheet.create({
     elevation: 32,
   },
   handle: { width: 40, height: 4, backgroundColor: C.BORDER_STRONG, borderRadius: RADIUS.FULL, alignSelf: 'center', marginTop: SPACE.MD, marginBottom: SPACE.SM },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACE.LG, paddingBottom: SPACE.MD, borderBottomWidth: 1, borderColor: C.BORDER },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACE.LG, paddingBottom: SPACE.MD },
   backBtn: { padding: SPACE.XS },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK, paddingHorizontal: SPACE.SM },
+  headerTitle: { flex: 1, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
   center:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
   empty:   { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center', paddingHorizontal: SPACE.XL },
-  footer:  { paddingHorizontal: SPACE.LG, paddingTop: SPACE.SM, borderTopWidth: 1, borderColor: C.BORDER },
-  commentBtn: { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.MD, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM },
+  footer:  { paddingHorizontal: SPACE.LG, paddingTop: SPACE.SM },
+  commentBtn: { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.LG, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM },
   commentBtnText: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD },
 });

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Share,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { fetchMyInviteCodes } from '../../../infrastructure/supabase/queries/friends';
@@ -73,8 +74,8 @@ export default function InviteManagementScreen() {
       renderItem={({ item }) => (
         <View style={styles.codeRow}>
           <Text style={styles.code}>{item.code}</Text>
-          <TouchableOpacity style={styles.shareBtn} onPress={() => handleShare(item.code)}>
-            <Text style={styles.shareBtnText}>share</Text>
+          <TouchableOpacity style={styles.shareBtn} onPress={() => handleShare(item.code)} hitSlop={8}>
+            <Ionicons name="paper-plane-outline" size={20} color={C.WHITE} />
           </TouchableOpacity>
         </View>
       )}
@@ -88,7 +89,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.BG },
   title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD,
     fontWeight: '700', color: C.INK, marginBottom: SPACE.XS },
-  subtitle: { fontSize: FONT.SIZES.MD, color: C.MUTED, marginBottom: SPACE.XL },
+  subtitle: { fontSize: FONT.SIZES.MD, color: C.DANGER, marginBottom: SPACE.XL },
   codeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -107,10 +108,11 @@ const styles = StyleSheet.create({
   shareBtn: {
     backgroundColor: C.ACCENT,
     borderRadius: RADIUS.SM,
-    paddingHorizontal: SPACE.MD,
+    paddingHorizontal: SPACE.SM,
     paddingVertical: SPACE.XS,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  shareBtnText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontWeight: '600' },
   empty: { alignItems: 'center', paddingVertical: SPACE.XXXL, gap: SPACE.SM },
   emptyText: { fontSize: FONT.SIZES.LG, fontWeight: '600', color: C.INK },
   emptyHint: { fontSize: FONT.SIZES.SM, color: C.MUTED, textAlign: 'center' },

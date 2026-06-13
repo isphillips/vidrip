@@ -1159,10 +1159,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               </View>
               <View style={styles.overlayActions}>
                 <TouchableOpacity style={styles.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.75}>
-                  <Ionicons name="chatbubbles-outline" size={22} color={C.ACCENT} />
+                  <Ionicons name="chatbubbles-outline" size={22} color={C.DANGER} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn} onPress={openDrawer} activeOpacity={0.75}>
-                  <Ionicons name="paper-plane-outline" size={22} color={C.ACCENT} />
+                  <Ionicons name="paper-plane-outline" size={22} color={C.DANGER} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1219,24 +1219,6 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 />
               </View>
 
-              {/* Record-intro row — optional personal intro that plays before the video */}
-              {introClip ? (
-                <View style={styles.introRowDone}>
-                  <Ionicons name="checkmark-circle" size={18} color={C.ACCENT} />
-                  <TouchableOpacity style={styles.introRowDoneMain} onPress={() => rootNav.navigate('RecordIntro')} activeOpacity={0.7}>
-                    <Text style={styles.introRowDoneText}>Intro ready · tap to re-record</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setIntroClip(null); clearPendingIntro(); }} hitSlop={8}>
-                    <Ionicons name="close-circle" size={18} color={C.MUTED} />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={styles.introRow} onPress={() => rootNav.navigate('RecordIntro')} activeOpacity={0.7}>
-                  <Ionicons name="videocam-outline" size={18} color={C.ACCENT} />
-                  <Text style={styles.introRowText}>Record intro?</Text>
-                </TouchableOpacity>
-              )}
-
               {/* Friends list */}
               {friendsLoading ? (
                 <View style={styles.drawerCenter}><ActivityIndicator color={C.ACCENT} /></View>
@@ -1275,6 +1257,24 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 />
               )}
 
+              {/* Record-intro row — optional personal intro that plays before the video */}
+              {introClip ? (
+                <View style={styles.introRowDone}>
+                  <Ionicons name="checkmark-circle" size={18} color={C.ACCENT} />
+                  <TouchableOpacity style={styles.introRowDoneMain} onPress={() => rootNav.navigate('RecordIntro')} activeOpacity={0.7}>
+                    <Text style={styles.introRowDoneText}>Intro ready · tap to re-record</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setIntroClip(null); clearPendingIntro(); }} hitSlop={8}>
+                    <Ionicons name="close-circle" size={18} color={C.MUTED} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.introRow} onPress={() => rootNav.navigate('RecordIntro')} activeOpacity={0.7}>
+                  <Ionicons name="videocam-outline" size={18} color={C.DANGER} />
+                  <Text style={styles.introRowText}>Tap to record an intro before sending</Text>
+                </TouchableOpacity>
+              )}
+
               {/* Send button */}
               <View style={[styles.drawerFooter, { paddingBottom: bottom + SPACE.MD }]}>
                 <TouchableOpacity
@@ -1304,7 +1304,7 @@ const styles = StyleSheet.create({
 
   headerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACE.LG, paddingTop: SPACE.LG,
+    paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD,
   },
   headerTitle: {
     fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD,
@@ -1348,7 +1348,7 @@ const styles = StyleSheet.create({
   tabsScroll: {  height: 50, marginBottom: SPACE.SM },
   tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, alignItems: 'center', height: 33 },
   tab:     { alignItems: 'center', justifyContent: 'center', height: 33, paddingHorizontal: SPACE.MD, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
-  tabActive:    { backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.DANGER },
+  tabActive:    { borderWidth: 1, borderColor: C.DANGER },
   tabTxt:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   tabTxtActive: { color: C.DANGER },
 
@@ -1414,9 +1414,9 @@ const styles = StyleSheet.create({
   actionBtn: {
     width: 48, height: 48, borderRadius: RADIUS.FULL,
     backgroundColor: 'rgba(10, 0, 25, 0.88)',
-    borderWidth: 1.5, borderColor: C.ACCENT,
+    borderWidth: 1.5, borderColor: C.DANGER,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: C.ACCENT, shadowOffset: { width: 0, height: 0 },
+    shadowColor: C.ACCENT_HOT, shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.75, shadowRadius: 10, elevation: 8,
   },
   toast: { backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: RADIUS.MD, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG, alignSelf: 'center' },
@@ -1438,13 +1438,13 @@ const styles = StyleSheet.create({
   drawerTitle:  { fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, color: C.INK },
   drawerClose:  { fontSize: 18, color: C.MUTED, paddingHorizontal: SPACE.SM },
   drawerSearch: { marginHorizontal: SPACE.LG, marginBottom: SPACE.SM, backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, paddingHorizontal: SPACE.MD },
-  drawerSearchInput: { paddingVertical: SPACE.SM, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
+  drawerSearchInput: { paddingVertical: SPACE.MD, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   drawerCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   drawerEmpty:  { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY },
 
   // record-intro row
-  introRow:     { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, marginHorizontal: SPACE.LG, marginBottom: SPACE.SM, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.MD, backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.ACCENT },
-  introRowText: { color: C.ACCENT, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
+  introRow:     { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, marginHorizontal: SPACE.LG, marginBottom: SPACE.SM, paddingVertical: SPACE.MD, paddingHorizontal: SPACE.MD, backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.DANGER },
+  introRowText: { color: C.DANGER, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
   introRowDone: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, marginHorizontal: SPACE.LG, marginBottom: SPACE.SM, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.MD, backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER },
   introRowDoneMain: { flex: 1 },
   introRowDoneText: { color: C.INK, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
@@ -1452,14 +1452,14 @@ const styles = StyleSheet.create({
   // friend rows
   friendRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD, gap: SPACE.MD },
   friendRowSent: { opacity: 0.5 },
-  friendAvatar:  { width: 44, height: 44, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_LITE, alignItems: 'center', justifyContent: 'center' },
+  friendAvatar:  { width: 44, height: 44, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_LITE, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.ACCENT },
   friendAvatarText: { color: C.ACCENT, fontSize: FONT.SIZES.LG, fontWeight: '700' },
   friendInfo:   { flex: 1 },
   friendName:   { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
   friendHandle: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY },
   checkbox: {
     width: 24, height: 24, borderRadius: RADIUS.FULL,
-    borderWidth: 2, borderColor: C.BORDER,
+    borderWidth: 2, borderColor: C.ACCENT,
     alignItems: 'center', justifyContent: 'center',
   },
   checkboxSelected: { backgroundColor: C.ACCENT, borderColor: C.ACCENT },

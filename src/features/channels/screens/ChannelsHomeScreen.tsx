@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
     backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER,
   },
-  pillActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.DANGER },
+  pillActive: { borderColor: C.DANGER },
   pillTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
   pillTxtActive: { color: C.DANGER },
   pillCount: {
