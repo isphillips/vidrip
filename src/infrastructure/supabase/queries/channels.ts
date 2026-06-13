@@ -1052,7 +1052,7 @@ export async function fetchMyCreatorChannel(userId: string): Promise<MyCreatorCh
   const { data } = await (supabase as any)
     .from('groups')
     .select('id, name, display_name, invite_only, is_public')
-    .eq('creator_id', userId)
+    .eq('created_by', userId)
     .eq('is_members_only', true)
     .maybeSingle();
   if (!data) { return null; }

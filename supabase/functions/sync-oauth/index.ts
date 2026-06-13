@@ -281,16 +281,19 @@ Deno.serve(async (req) => {
     let { data: channel } = await admin
       .from("groups")
       .select("id")
-      .eq("creator_id", userId)
+      .eq("created_by", userId)
       .eq("is_members_only", true)
       .maybeSingle();
     if (!channel) {
+      // The private room is branded with the creator's Vidrip display name.
+      const { data: vUser } = await admin
+        .from("users").select("display_name, handle").eq("id", userId).maybeSingle();
+      const roomName = vUser?.display_name || vUser?.handle || profile.handle || "Creator";
       const { data: created, error: chErr } = await admin
         .from("groups")
         .insert({
-          name: `@${profile.handle || "creator"}`,
+          name: roomName,
           created_by: userId,
-          creator_id: userId,
           is_public: false,
           is_members_only: true,
           is_hidden: false,
