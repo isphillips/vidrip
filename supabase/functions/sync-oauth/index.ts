@@ -103,56 +103,56 @@ async function tiktokProfileAndVideos(accessToken: string): Promise<{ profile: P
   return { profile, videos };
 }
 
-// ── Instagram (Instagram Graph API via Facebook Login) ──────────────────────
-const FB_GRAPH = "https://graph.facebook.com/v21.0";
+// ── Instagram (Instagram API with Instagram Login — no Facebook Page) ────────
+const IG_GRAPH = "https://graph.instagram.com";
 
 async function instagramExchange(code: string) {
-  // 1. Code → short-lived user token (Facebook OAuth).
-  const shortRes = await fetch(
-    `${FB_GRAPH}/oauth/access_token?client_id=${INSTAGRAM_APP_ID}` +
-    `&client_secret=${INSTAGRAM_APP_SECRET}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-    `&code=${encodeURIComponent(code)}`);
-  if (!shortRes.ok) { throw new Error(`instagram(fb) token: ${await shortRes.text()}`); }
-  const short = await shortRes.json();
-  // 2. Short-lived → long-lived (~60-day) user token.
+  // 1. Code → short-lived token (~1 hour). Instagram Login has its OWN token
+  //    endpoint with a form-encoded body (not the Facebook Graph endpoint).
+  const shortRes = await fetch("https://api.instagram.com/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: INSTAGRAM_APP_ID,
+      client_secret: INSTAGRAM_APP_SECRET,
+      grant_type: "authorization_code",
+      redirect_uri: REDIRECT_URI,
+      // Instagram appends a stray "#_" fragment to the returned code.
+      code: code.replace(/#_$/, ""),
+    }),
+  });
+  if (!shortRes.ok) { throw new Error(`instagram token: ${await shortRes.text()}`); }
+  const short = await shortRes.json(); // { access_token, user_id, permissions }
+  // 2. Short-lived → long-lived (~60-day) token.
   const longRes = await fetch(
-    `${FB_GRAPH}/oauth/access_token?grant_type=fb_exchange_token&client_id=${INSTAGRAM_APP_ID}` +
-    `&client_secret=${INSTAGRAM_APP_SECRET}&fb_exchange_token=${short.access_token}`);
+    `${IG_GRAPH}/access_token?grant_type=ig_exchange_token` +
+    `&client_secret=${INSTAGRAM_APP_SECRET}&access_token=${short.access_token}`);
   const long = longRes.ok ? await longRes.json() : null;
   return {
     access_token: long?.access_token ?? short.access_token,
     refresh_token: null,
     expires_in: long?.expires_in ?? null,
-    scope: null,
+    scope: short.permissions ?? null,
   };
 }
 
 async function instagramProfileAndVideos(accessToken: string): Promise<{ profile: Profile; videos: Video[] }> {
-  // Find the Facebook Page the user admins that's linked to an IG Business account.
-  const pagesRes = await fetch(
-    `${FB_GRAPH}/me/accounts?fields=name,instagram_business_account{id,username,profile_picture_url}` +
+  // Instagram Login reads the creator's OWN account directly — no Facebook Page hop.
+  const pRes = await fetch(
+    `${IG_GRAPH}/me?fields=user_id,username,account_type,profile_picture_url` +
     `&access_token=${accessToken}`);
-  const pagesJson = await pagesRes.json();
-  const pages = pagesJson.data ?? [];
-  const ig = pages.map((p: any) => p.instagram_business_account).find((a: any) => a?.id);
-  if (!ig) {
-    // Surface what Facebook actually returned so we can see why the link is invisible.
-    const names = pages.map((p: any) => p.name).join(", ");
-    const apiErr = pagesJson.error ? ` graph-error: ${pagesJson.error.message}` : "";
-    throw new Error(
-      `No Instagram Business account on your Pages. Pages returned: ${pages.length}` +
-      (names ? ` [${names}]` : "") +
-      ". Connect Instagram from the Facebook PAGE's settings (Linked accounts), not only Accounts Center, " +
-      "and grant the Page during login." + apiErr);
+  const pJson = await pRes.json();
+  if (pJson.error || !pJson.username) {
+    throw new Error(`IG profile: ${pJson.error?.message ?? "no username returned"}`);
   }
   const profile: Profile = {
-    accountId: String(ig.id),
-    handle: ig.username ?? "",
-    displayName: ig.username ?? "",
-    avatar: ig.profile_picture_url ?? null,
+    accountId: String(pJson.user_id ?? pJson.id ?? ""),
+    handle: pJson.username ?? "",
+    displayName: pJson.username ?? "",
+    avatar: pJson.profile_picture_url ?? null,
   };
   const mRes = await fetch(
-    `${FB_GRAPH}/${ig.id}/media?fields=id,media_type,media_product_type,` +
+    `${IG_GRAPH}/me/media?fields=id,media_type,media_product_type,` +
     `media_url,thumbnail_url,caption,permalink&limit=25&access_token=${accessToken}`);
   const mJson = await mRes.json();
   const items = mJson.data ?? [];

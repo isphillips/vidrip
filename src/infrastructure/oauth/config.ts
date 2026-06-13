@@ -18,16 +18,16 @@ export const REDIRECT_URI =
 export const GOOGLE_CLIENT_ID = '1028980678970-ea99v2h8kmli81rangil85dfqoqui459.apps.googleusercontent.com';
 // TODO: fill from TikTok developer portal (Client key).
 export const TIKTOK_CLIENT_KEY = 'sbawbp2z1skyo0obdt';
-// Meta (Facebook) App ID (public). Instagram is read via the Instagram Graph API
-// through Facebook Login (the app doesn't expose "Instagram Login"), so this is the
-// Facebook OAuth client_id. The app secret lives in the sync-oauth edge function env.
-export const INSTAGRAM_APP_ID = '1759282622105408';
+// Instagram App ID (public) for "Instagram API with Instagram Login" — the creator
+// signs in with Instagram directly, no Facebook Page required. The app secret lives
+// in the sync-oauth edge function env.
+export const INSTAGRAM_APP_ID = '1354410146587874';
 
 const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
 const TIKTOK_SCOPE = 'user.info.basic,user.info.profile,video.list';
-// Instagram Graph API via Facebook Login — read the creator's own Reels through
-// the Facebook Page linked to their Instagram Business/Creator account.
-const INSTAGRAM_SCOPE = 'instagram_basic,pages_show_list,pages_read_engagement,business_management';
+// Instagram API with Instagram Login — read the creator's own profile + media
+// (Reels) straight from their Instagram Business/Creator account.
+const INSTAGRAM_SCOPE = 'instagram_business_basic';
 
 // One redirect URL serves both providers + connection types, so both are carried
 // in `state` as `${provider}.${type}.${nonce}`.
@@ -54,8 +54,8 @@ export function buildAuthUrl(
     return { url: `https://accounts.google.com/o/oauth2/v2/auth?${p.toString()}`, state };
   }
   if (provider === 'instagram') {
-    // Facebook OAuth dialog — we read Instagram media via the Graph API using the
-    // Facebook Page linked to the creator's Instagram Business account.
+    // Instagram Login dialog — the creator authorizes their own Instagram account
+    // directly (no Facebook Page). Returns ?code to REDIRECT_URI.
     const p = new URLSearchParams({
       client_id: INSTAGRAM_APP_ID,
       redirect_uri: REDIRECT_URI,
@@ -63,7 +63,7 @@ export function buildAuthUrl(
       scope: INSTAGRAM_SCOPE,
       state,
     });
-    return { url: `https://www.facebook.com/v21.0/dialog/oauth?${p.toString()}`, state };
+    return { url: `https://www.instagram.com/oauth/authorize?${p.toString()}`, state };
   }
   // tiktok
   const p = new URLSearchParams({
