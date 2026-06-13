@@ -60,28 +60,27 @@ export default function ChannelCard({
             <Text style={styles.memberCount}>
               {channel.member_count.toLocaleString()} member{channel.member_count !== 1 ? 's' : ''}
             </Text>
-            {isOwner ? (
-              <View style={[styles.joinedPill, styles.ownerPill]}>
-                <Text style={[styles.joinedText, styles.ownerText]}>Owner</Text>
-              </View>
-            ) : channel.is_joined ? (
-              <View style={styles.joinedPill}>
-                <Text style={styles.joinedText}>Joined</Text>
-              </View>
-            ) : channel.invite_only && channel.invite_status === 'pending' ? (
-              <View style={styles.inviteActions}>
-                <TouchableOpacity style={styles.declineBtn} onPress={onDeclineInvite} hitSlop={6} activeOpacity={0.8}>
-                  <Text style={styles.declineText}>Decline</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.acceptBtn} onPress={onAcceptInvite} activeOpacity={0.8}>
-                  <Text style={styles.acceptText}>Accept</Text>
-                </TouchableOpacity>
-              </View>
-            ) : channel.invite_only ? (
-              <View style={styles.lockPill}>
-                <Text style={styles.lockText}>🔒 Invite only</Text>
-              </View>
-            ) : null}
+            {isOwner
+              ? null
+              : channel.is_joined ? (
+                <View style={styles.joinedPill}>
+                  <Text style={styles.joinedText}>{channel.subscribed ? 'Subscribed' : 'Joined'}</Text>
+                </View>
+              ) : channel.invite_only && channel.invite_status === 'pending' ? (
+                <View style={styles.inviteActions}>
+                  <TouchableOpacity style={styles.declineBtn} onPress={onDeclineInvite} hitSlop={6} activeOpacity={0.8}>
+                    <Text style={styles.declineText}>Decline</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.acceptBtn} onPress={onAcceptInvite} activeOpacity={0.8}>
+                    <Text style={styles.acceptText}>Accept</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : channel.invite_only ? (
+                <View style={styles.lockPill}>
+                  <Text style={styles.lockText}>🔒 Invite only</Text>
+                </View>
+              ) : null
+            }
 
             {showOwnerControls && (
               <>

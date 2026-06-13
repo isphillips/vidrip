@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity, Modal, FlatList,
-  useWindowDimensions, Animated, Easing,
+  useWindowDimensions, Animated, Easing, AppState,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -91,6 +91,7 @@ export default function ChannelhamburderScreen({
   const [sendingAudio, setSendingAudio] = useState(false);
   const cogAnim = useRef(new Animated.Value(0)).current;  // 0 idle → 1 active (spin + red)
   const mountedRef = useRef(true);
+  const wasGatedRef = useRef(false);   // was the paywall showing? → detect unlock
   const scrollViewRef = useRef<ScrollView>(null);
   const postsRef = useRef<ChannelPost[]>([]);   // always-current snapshot for handlers
 
@@ -112,7 +113,16 @@ export default function ChannelhamburderScreen({
       const data = await fetchChannelPosts(channelId, user?.id);
       if (mountedRef.current) { setPosts(data); }
       fetchChannelAccess(channelId, user?.id)
-        .then(a => { if (mountedRef.current) { setGated(a.gated); setTiers(a.tiers); } })
+        .then(a => {
+          if (!mountedRef.current) { return; }
+          // Paywall → unlocked transition = subscription just went through.
+          if (wasGatedRef.current && !a.gated) {
+            Alert.alert('You’re subscribed! 🎉', 'Welcome in — enjoy the channel.');
+          }
+          wasGatedRef.current = a.gated;
+          setGated(a.gated);
+          setTiers(a.tiers);
+        })
         .catch(() => {});
       fetchChannelReviewSettings(channelId)
         .then(s => { if (mountedRef.current) { setReviewsEnabled(s.reviewsEnabled); setInviteOnly(s.inviteOnly); setIsListed(s.isListed); } })
@@ -124,6 +134,15 @@ export default function ChannelhamburderScreen({
 
   // Keep postsRef in sync
   useEffect(() => { postsRef.current = posts; }, [posts]);
+
+  // Fans subscribe in the browser (link-out). When they return to the app with the
+  // paywall still up, re-check entitlement so the room unlocks + confirms.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active' && wasGatedRef.current) { load(true); }
+    });
+    return () => sub.remove();
+  }, [load]);
 
   // Fetch current channel name (DB trigger may have updated it since nav)
   useEffect(() => {
@@ -471,12 +490,17 @@ export default function ChannelhamburderScreen({
           <View style={styles.lockedHeaderPill}>
             <Text style={styles.lockedHeaderText}>🔒 Invite only</Text>
           </View>
+        ) : isMembersOnly ? (
+          // Members-only / subscriber room you're in — no Join/Leave button;
+          // subscribers manage (or cancel) from the Account screen.
+          null
         ) : isPublic ? (
+          // Public / curated channels only.
           <TouchableOpacity
             style={[styles.joinBtn, joined && styles.joinBtnActive]}
             onPress={handleJoinLeave} disabled={joiningLeaving} activeOpacity={0.8}>
             <Text style={[styles.joinBtnText, joined && styles.joinBtnTextActive]}>
-              {joiningLeaving ? '…' : joined ? 'Leave' : 'Join'}
+              {joiningLeaving ? '…' : joined ? '✕ Leave' : '＋ Join'}
             </Text>
           </TouchableOpacity>
         ) : (

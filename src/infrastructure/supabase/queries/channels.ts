@@ -27,6 +27,7 @@ export type ChannelSummary = {
   // For the current user, on invite-only channels: their relationship to the room.
   invite_status?: 'owner' | 'member' | 'pending' | 'none';
   avatar_url?: string | null;
+  subscribed?: boolean;   // user has an active paid subscription to this room
 };
 
 export type ChannelPost = {
@@ -732,7 +733,62 @@ export async function fetchSubscribedChannels(userId: string): Promise<ChannelSu
     is_listed: true,
     invite_status: 'member' as const,
     avatar_url: g.avatar_url ?? null,
+    subscribed: true,
   })) as ChannelSummary[];
+}
+
+// The user's own channel subscriptions (for the Account screen). RLS lets a user
+// read their own rows.
+export type MySubscription = {
+  channelId: string; name: string; status: string;
+  currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean;
+};
+export async function fetchMySubscriptions(userId: string): Promise<MySubscription[]> {
+  const { data } = await (supabase as any)
+    .from('channel_subscriptions')
+    .select('channel_id, status, current_period_end, cancel_at_period_end, channel:groups!channel_id(name)')
+    .eq('user_id', userId)
+    .in('status', ['active', 'trialing', 'past_due'])
+    .order('updated_at', { ascending: false });
+  return ((data ?? []) as any[]).map((s) => ({
+    channelId: s.channel_id,
+    name: s.channel?.name ?? 'Channel',
+    status: s.status,
+    currentPeriodEnd: s.current_period_end ?? null,
+    cancelAtPeriodEnd: !!s.cancel_at_period_end,
+  }));
+}
+
+// Cancel a subscription via the web API (Stripe lives server-side). Cancels at
+// period end; the user keeps access until then.
+const WEB_API_BASE = 'https://www.vidrip.app/api';
+export async function cancelChannelSubscription(channelId: string): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const res = await fetch(`${WEB_API_BASE}/subscribe/cancel`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ channelId }),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({} as any));
+    throw new Error(j.error ?? 'Could not cancel subscription');
+  }
+}
+
+// Un-cancel a subscription that was set to end at period close.
+export async function resumeChannelSubscription(channelId: string): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const res = await fetch(`${WEB_API_BASE}/subscribe/resume`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ channelId }),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({} as any));
+    throw new Error(j.error ?? 'Could not resume subscription');
+  }
 }
 
 export async function joinChannel(channelId: string, userId: string): Promise<void> {

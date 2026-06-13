@@ -141,6 +141,9 @@ export default function ChannelsHomeScreen({
   // Members sections; an owner's private/unlisted channel shows under My Channels only.
   const membersOpen = membersOnly.filter(m => m.is_listed && !m.invite_only);
   const membersInvite = membersOnly.filter(m => m.is_listed && m.invite_only);
+  // Channels the user actively pays for — used to show "Subscribed" (not "Joined")
+  // on their cards across every tab.
+  const subscribedIds = new Set(subscribed.map(s => s.id));
   // "My Channels" = the public-side channels I own (created), curated + members.
   const myChannels = [...publicChannels, ...membersOnly]
     .filter(c => c.created_by === user?.id);
@@ -214,7 +217,7 @@ export default function ChannelsHomeScreen({
           keyExtractor={c => c.id}
           renderItem={({ item }) => (
             <ChannelCard
-              channel={item}
+              channel={subscribedIds.has(item.id) ? { ...item, subscribed: true } : item}
               userId={user?.id}
               onPress={() => navigateToChannel(item)}
               {...(tab === 'Public' && filter === 'invite' ? {
