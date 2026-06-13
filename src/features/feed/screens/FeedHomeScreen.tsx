@@ -205,18 +205,28 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     return list;
   }, [threads, hidden, favs, tab, filter, user?.id]);
 
-  // Pill counts (over non-hidden threads) + drive the Feed tab-bar badge.
+  // Pill counts are scoped to the ACTIVE tab's partition (Favorites = favorited
+  // threads, Feed = the rest) so the bubbles match the list actually shown.
   const counts = useMemo(() => {
     const visible = threads.filter(t => !hidden.has(t.id));
+    const base = tab === 'favorites'
+      ? visible.filter(t => favs.has(t.id))
+      : visible.filter(t => !favs.has(t.id));
     return {
-      toreact: visible.filter(t => needsReaction(t, user?.id)).length,
-      reactions: visible.filter(t => t.my_status === 'reacted').length,
-      requests: visible.filter(t => t.sender_id === user?.id).length,
+      toreact: base.filter(t => needsReaction(t, user?.id)).length,
+      reactions: base.filter(t => t.my_status === 'reacted').length,
+      requests: base.filter(t => t.sender_id === user?.id).length,
     } as Record<Filter, number>;
-  }, [threads, hidden, user?.id]);
+  }, [threads, hidden, favs, tab, user?.id]);
 
+  // The bottom-nav Feed badge always reflects the main feed's to-react items
+  // (non-favorited), independent of which tab the user is currently viewing.
+  const feedToReact = useMemo(
+    () => threads.filter(t => !hidden.has(t.id) && !favs.has(t.id) && needsReaction(t, user?.id)).length,
+    [threads, hidden, favs, user?.id],
+  );
   const setToReactCount = useFeedStore(s => s.setToReactCount);
-  useEffect(() => { setToReactCount(counts.toreact); }, [counts.toreact, setToReactCount]);
+  useEffect(() => { setToReactCount(feedToReact); }, [feedToReact, setToReactCount]);
 
   // ── Swipe actions ────────────────────────────────────────────────────────────
   const renderRightActions = (
@@ -356,7 +366,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No reviews yet</Text>
               <Text style={styles.emptySubtitle}>
-                Record a review after reacting to a channel post — they show up here.
+                Record a review after reacting to a channel post. They show up here.
               </Text>
             </View>
           }

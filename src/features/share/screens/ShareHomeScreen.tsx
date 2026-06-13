@@ -202,6 +202,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const feedBarAnim   = useRef(new Animated.Value(1)).current;
   const barShownRef   = useRef(true);
   const lastScrollY   = useRef(0);
+  const gridRef       = useRef<FlatList<VideoItem>>(null);
   const setFeedBar = useCallback((shown: boolean) => {
     if (barShownRef.current === shown) { return; }
     barShownRef.current = shown;
@@ -217,8 +218,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     if (dy > 6) { setFeedBar(false); }            // scrolling down → collapse
     else if (dy < -6) { setFeedBar(true); }       // scrolling up → reveal
   }, [setFeedBar]);
-  // Switching tabs/categories resets the grid to the top → always reveal the bar.
+  // Switching tabs/categories: scroll the grid back to the top and reveal the bar
+  // (the single FlatList is reused across tabs, so it otherwise keeps the old offset).
   useEffect(() => {
+    gridRef.current?.scrollToOffset({ offset: 0, animated: false });
     lastScrollY.current = 0;
     barShownRef.current = true;
     feedBarAnim.setValue(1);
@@ -1017,6 +1020,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
             const isEmpty = data.length === 0;
             return (
               <FlatList
+                ref={gridRef}
                 style={isEmpty && !special ? styles.fill : undefined}
                 data={data}
                 keyExtractor={item => item.videoId}

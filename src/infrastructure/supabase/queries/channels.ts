@@ -661,6 +661,32 @@ export async function togglePinPost(postId: string, pin: boolean): Promise<void>
   if (error) { throw error; }
 }
 
+export type ChannelTier = { id: string; title: string; price_cents: number };
+export type ChannelAccess = { gated: boolean; tiers: ChannelTier[] };
+
+// Subscriber-mode entitlement: a creator's subscriber room is locked to active
+// subscribers (and the owner). Returns gated=true + the tiers to show a paywall.
+export async function fetchChannelAccess(channelId: string, userId?: string): Promise<ChannelAccess> {
+  const { data: g } = await (supabase as any)
+    .from('groups').select('subscriber_mode, created_by').eq('id', channelId).single();
+  const subscriberMode = !!g?.subscriber_mode;
+  const isOwner = !!userId && g?.created_by === userId;
+  if (!subscriberMode || isOwner) { return { gated: false, tiers: [] }; }
+
+  if (userId) {
+    const { data: ok } = await (supabase as any)
+      .rpc('has_active_channel_sub', { uid: userId, p_channel_id: channelId });
+    if (ok) { return { gated: false, tiers: [] }; }
+  }
+
+  const { data: tiers } = await (supabase as any)
+    .from('channel_subscription_tiers')
+    .select('id, title, price_cents')
+    .eq('channel_id', channelId).eq('active', true)
+    .order('idx', { ascending: true });
+  return { gated: true, tiers: (tiers ?? []) as ChannelTier[] };
+}
+
 export async function joinChannel(channelId: string, userId: string): Promise<void> {
   const { error } = await (supabase as any)
     .from('group_members')
