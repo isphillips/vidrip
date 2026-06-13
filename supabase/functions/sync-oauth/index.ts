@@ -196,6 +196,35 @@ async function rehostInstagramVideo(
   }
 }
 
+// Instagram thumbnail URLs (scontent.cdninstagram.com) are signed and expire, so the
+// feed shows blank thumbnails once they 403. Re-host the image to storage at import
+// for a stable URL. Returns the public URL, or null on failure.
+async function rehostInstagramImage(
+  admin: any, channelId: string, mediaId: string, imageUrl: string,
+): Promise<string | null> {
+  try {
+    const dl = await fetch(imageUrl);
+    if (!dl.ok) { return null; }
+    const bytes = new Uint8Array(await dl.arrayBuffer());
+    const path = `instagram/${channelId}/${mediaId}.jpg`;
+    const { error } = await admin.storage.from("channel-clips")
+      .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+    if (error) { console.error("[sync-oauth] ig thumb upload", error); return null; }
+    return admin.storage.from("channel-clips").getPublicUrl(path).data.publicUrl;
+  } catch (e) {
+    console.error("[sync-oauth] ig thumb rehost failed", mediaId, e);
+    return null;
+  }
+}
+
+// Reel captions carry newlines/extra whitespace and are often empty. Collapse to a
+// clean single-line title; fall back to the creator handle when there's no caption.
+function cleanIgTitle(caption: string | null | undefined, handle: string): string {
+  const c = (caption ?? "").replace(/\s+/g, " ").trim();
+  if (c) { return c.slice(0, 120); }
+  return handle ? `@${handle} on Instagram` : "Instagram Reel";
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") { return new Response("ok", { headers: cors }); }
@@ -317,6 +346,27 @@ Deno.serve(async (req) => {
         .eq("channel_id", channel.id)
         .eq("post_type", "youtube");
       const have = new Set((existing ?? []).map((r: any) => r.yt_video_id));
+
+      // Instagram thumbnails come from expiring CDN URLs. Re-host the thumbnail for
+      // EVERY fetched Reel (stable storage URL) and refresh already-imported posts'
+      // thumbnail + title, so a single re-sync backfills old blank/garbled cards.
+      const igThumb = new Map<string, string>();
+      if (provider === "instagram") {
+        for (const v of videos) {
+          if (!v.thumbnail) { continue; }
+          const url = await rehostInstagramImage(admin, channel!.id, v.id, v.thumbnail);
+          if (url) { igThumb.set(v.id, url); }
+        }
+        for (const v of videos) {
+          if (!have.has(v.id)) { continue; }
+          const upd: Record<string, string> = { yt_video_title: cleanIgTitle(v.title, profile.handle) };
+          const t = igThumb.get(v.id);
+          if (t) { upd.yt_video_thumbnail = t; }
+          await admin.from("channel_posts").update(upd)
+            .eq("channel_id", channel!.id).eq("yt_video_id", v.id);
+        }
+      }
+
       const fresh = videos.filter(v => !have.has(v.id));
       const rows: any[] = [];
       let rehostFail = 0;
@@ -324,15 +374,19 @@ Deno.serve(async (req) => {
         // Instagram source posts play from a re-hosted file (no embed player).
         // Skip a Reel we couldn't host — it would be unplayable otherwise.
         let videoUrl: string | null = null;
+        let title = v.title;
+        let thumbnail = v.thumbnail;
         if (provider === "instagram") {
           if (!v.mediaUrl) { rehostFail++; continue; }
           videoUrl = await rehostInstagramVideo(admin, channel!.id, v.id, v.mediaUrl);
           if (!videoUrl) { rehostFail++; continue; }
+          title = cleanIgTitle(v.title, profile.handle);
+          thumbnail = igThumb.get(v.id) ?? v.thumbnail;
         }
         rows.push({
           channel_id: channel!.id, poster_id: userId,
           post_type: "youtube", source_type: provider,
-          yt_video_id: v.id, yt_video_title: v.title, yt_video_thumbnail: v.thumbnail,
+          yt_video_id: v.id, yt_video_title: title, yt_video_thumbnail: thumbnail,
           video_url: videoUrl,
           is_pinned: false,
         });

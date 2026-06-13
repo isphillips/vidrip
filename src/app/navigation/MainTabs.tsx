@@ -102,7 +102,7 @@ export default function MainTabs() {
           borderTopColor: C.BORDER,
           borderTopWidth: 1,
         },
-        tabBarActiveTintColor: C.ACCENT_HOT,
+        tabBarActiveTintColor: C.DANGER,
         tabBarInactiveTintColor: C.WHITE,
         tabBarShowLabel: true,
       }}>

@@ -28,6 +28,7 @@ import {
 } from '../../../infrastructure/supabase/queries/connectedFeed';
 import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/syncedAccounts';
 import { fetchRecommended, refreshRecommended, RECOMMENDED_COOLDOWN_MS } from '../../../infrastructure/supabase/queries/recommended';
+import { fetchFriendsTrending, fetchPersonalizedShorts } from '../../../infrastructure/supabase/queries/personalized';
 import { useAuthStore } from '../../../store/authStore';
 import VideoCommentsSheet from '../../comments/components/VideoCommentsSheet';
 import type { ShareStackScreenProps, RootStackParamList } from '../../../app/navigation/types';
@@ -53,6 +54,34 @@ function extractYouTubeId(url: string): string | null {
 function extractInstagramId(url: string): string | null {
   const m = url.match(/instagram\.com\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
   return m ? m[1] : null;
+}
+
+// Best-effort metadata for a pasted public Reel — scrape Open Graph tags from the
+// public page (RN fetch has no CORS). Instagram may login-wall, so every field is
+// optional; callers fall back to defaults. og:title is "Author on Instagram: caption".
+async function fetchInstagramOg(
+  id: string,
+): Promise<{ title: string; thumbnail: string; author: string }> {
+  try {
+    const res = await fetch(`https://www.instagram.com/reel/${id}/`, {
+      headers: { 'User-Agent': 'facebookexternalhit/1.1' },
+    });
+    const html = await res.text();
+    const decode = (s: string) => s
+      .replace(/&amp;/g, '&').replace(/&#0?39;/g, "'").replace(/&quot;/g, '"')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    const og = (p: string) => {
+      const m = html.match(new RegExp(`<meta property="og:${p}" content="([^"]*)"`, 'i'));
+      return m ? decode(m[1]) : '';
+    };
+    const raw = og('title');
+    const author = raw.match(/^(.*?) on Instagram/)?.[1]?.trim() ?? '';
+    // Prefer the caption portion after the colon when present, else the whole title.
+    const caption = raw.replace(/^.*? on Instagram[:]?\s*/, '').replace(/^["“]|["”]$/g, '').trim();
+    return { title: (caption || raw).slice(0, 120), thumbnail: og('image'), author };
+  } catch {
+    return { title: '', thumbnail: '', author: '' };
+  }
 }
 
 // Refresh button with a live MM:SS countdown while on cooldown. Self-ticking so it
@@ -129,6 +158,12 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching]    = useState(false);
   const [searchOpen, setSearchOpen]  = useState(false);   // header search icon → expanding input
+  // Friends (videos your friends reacted to / shared — collaborative signal).
+  // Default landing tab — social proof leads the browse experience.
+  const [showFriends, setShowFriends] = useState(true);
+  const [friendItems, setFriendItems] = useState<VideoItem[]>([]);
+  const [friendsFeedLoading, setFriendsFeedLoading] = useState(false);
+  const [friendsRefreshing, setFriendsRefreshing] = useState(false);
   // For You (personal connected feed)
   const [showForYou, setShowForYou]  = useState(false);
   const [feedItems, setFeedItems]    = useState<VideoItem[]>([]);
@@ -220,13 +255,17 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const loadCategory = useCallback(async (cat: Category, reset = true, silent = false) => {
     if (reset) { if (!silent) { setLoading(true); } offsetRef.current = 0; hasMoreRef.current = true; }
     try {
-      const data = await fetchShorts(cat, PAGE, reset ? 0 : offsetRef.current);
+      // The default 'latest' grid is personalized (affinity-ranked) when signed in;
+      // specific categories stay chronological so the category filter means what it says.
+      const data = (cat === 'latest' && user?.id)
+        ? await fetchPersonalizedShorts(user.id, PAGE, reset ? 0 : offsetRef.current)
+        : await fetchShorts(cat, PAGE, reset ? 0 : offsetRef.current);
       setResults(prev => reset ? data : [...prev, ...data]);
       offsetRef.current += data.length;
       hasMoreRef.current = data.length === PAGE;
     } catch (e) { console.error('[ShareHome]', e); }
     finally { setLoading(false); setLoadingMore(false); }
-  }, []);
+  }, [user?.id]);
 
   // ── For You (personal connected feed) ────────────────────────────────────────
   const loadForYou = useCallback(async () => {
@@ -248,6 +287,42 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     } catch (e) { console.error('[ShareHome] forYou', e); }
     finally { setFeedLoading(false); }
   }, [user?.id]);
+
+  // ── Friends (videos friends reacted to / shared) ──────────────────────────────
+  // Friends is the default landing tab, but users with no friends (or no friend
+  // activity) would land on an empty grid. Fall back to Latest on the FIRST load
+  // only, and only if the user hasn't already tapped away — never override an
+  // explicit tab choice. `didFriendsFallbackRef` makes it run at most once.
+  const showFriendsRef = useRef(showFriends);
+  showFriendsRef.current = showFriends;
+  const didFriendsFallbackRef = useRef(false);
+
+  const loadFriendsFeed = useCallback(async () => {
+    if (!user?.id) { return; }
+    setFriendsFeedLoading(true);
+    try {
+      const items = await fetchFriendsTrending(user.id);
+      setFriendItems(items.map(it => ({
+        videoId: it.videoId, title: it.title, thumbnail: it.thumbnail,
+        channelTitle: it.channelTitle, sourceType: it.sourceType,
+      })));
+      if (!didFriendsFallbackRef.current) {
+        didFriendsFallbackRef.current = true;
+        if (items.length === 0 && showFriendsRef.current) {
+          setShowFriends(false);   // route effect then loads the personalized Latest grid
+          setCategory('latest');
+        }
+      }
+    } catch (e) { console.error('[ShareHome] friends', e); }
+    finally { setFriendsFeedLoading(false); }
+  }, [user?.id]);
+
+  // Pull-to-refresh for the Friends tab — free (pure SQL, no quota), so no cooldown.
+  const onFriendsRefresh = useCallback(async () => {
+    setFriendsRefreshing(true);
+    try { await loadFriendsFeed(); }
+    finally { setFriendsRefreshing(false); }
+  }, [loadFriendsFeed]);
 
   // Know whether the YouTube feed account exists up front — gates the Recommended
   // tab and the For You refresh bar without first opening the For You tab.
@@ -331,13 +406,14 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     const shorts = results.map(r => ({ ...r })) as GridItem[];
     // Active search overrides whatever tab you're on (search runs against Shorts).
     if (query.trim()) { return shorts; }
+    if (showFriends) { return friendItems; }
     if (showRecommended) { return recItems; }
     if (showForYou) { return feedItems; }
     // Members Only content only surfaces in the Latest tab for now.
     if (category !== 'latest') { return shorts; }
     const sortTs = (it: GridItem) => it.fetchedAt ?? it.createdAt ?? '';
     return [...memberVideos, ...shorts].sort((a, b) => sortTs(b).localeCompare(sortTs(a)));
-  }, [query, results, showRecommended, recItems, showForYou, feedItems, memberVideos, category]);
+  }, [query, results, showFriends, friendItems, showRecommended, recItems, showForYou, feedItems, memberVideos, category]);
 
   useEffect(() => { gridDataRef.current = gridData; }, [gridData]);
 
@@ -364,11 +440,12 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       }, 500);
       return () => clearTimeout(searchTimer.current);
     }
+    if (showFriends) { loadFriendsFeed(); return; }
     if (showRecommended) { loadRecommended(); return; }
     if (showForYou) { loadForYou(); return; }
     loadCategory(category);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, category, mode, showForYou, showRecommended]);
+  }, [query, category, mode, showFriends, showForYou, showRecommended]);
 
   const handleLoadMore = useCallback(() => {
     if (!hasMoreRef.current || loadingMore || query.trim()) { return; }
@@ -701,7 +778,16 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
     const igId = extractInstagramId(url.trim());
     if (igId) {
-      openPlayer({ videoId: igId, title: 'Instagram Reel', thumbnail: '', channelTitle: '', sourceType: 'instagram' });
+      setPasting(true);
+      const og = await fetchInstagramOg(igId);   // best-effort title + thumbnail
+      setPasting(false);
+      openPlayer({
+        videoId: igId,
+        title: og.title || 'Instagram Reel',
+        thumbnail: og.thumbnail,
+        channelTitle: og.author,
+        sourceType: 'instagram',
+      });
       return;
     }
 
@@ -742,7 +828,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   return (
     <View style={styles.container}>
       <View style={[styles.headerRow, { marginTop: top }]}>
-        <Text style={styles.headerTitle}>Share</Text>
+        <Text style={styles.headerTitle}>Browse ✵ Share</Text>
         {mode === 'browse' && (
           <TouchableOpacity
             style={styles.searchToggle}
@@ -811,21 +897,25 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
           {!query.trim() && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
+              <TouchableOpacity key="friends" style={[styles.tab, showFriends && styles.tabActive]}
+                onPress={() => { setShowFriends(true); setShowForYou(false); setShowRecommended(false); setQuery(''); }}>
+                <Text style={[styles.tabTxt, showFriends && styles.tabTxtActive]}>Friends</Text>
+              </TouchableOpacity>
               <TouchableOpacity key="foryou" style={[styles.tab, showForYou && styles.tabActive]}
-                onPress={() => { setShowForYou(true); setShowRecommended(false); setQuery(''); }}>
+                onPress={() => { setShowForYou(true); setShowFriends(false); setShowRecommended(false); setQuery(''); }}>
                 <Text style={[styles.tabTxt, showForYou && styles.tabTxtActive]}>For You</Text>
               </TouchableOpacity>
               {hasFeedConnection && (
                 <TouchableOpacity key="recommended" style={[styles.tab, showRecommended && styles.tabActive]}
-                  onPress={() => { setShowRecommended(true); setShowForYou(false); setQuery(''); }}>
+                  onPress={() => { setShowRecommended(true); setShowFriends(false); setShowForYou(false); setQuery(''); }}>
                   <Text style={[styles.tabTxt, showRecommended && styles.tabTxtActive]}>Recommended</Text>
                 </TouchableOpacity>
               )}
               {CATEGORIES.map(cat => {
-                const active = !showForYou && !showRecommended && category === cat;
+                const active = !showFriends && !showForYou && !showRecommended && category === cat;
                 return (
                   <TouchableOpacity key={cat} style={[styles.tab, active && styles.tabActive]}
-                    onPress={() => { setShowForYou(false); setShowRecommended(false); setCategory(cat); setQuery(''); }}>
+                    onPress={() => { setShowFriends(false); setShowForYou(false); setShowRecommended(false); setCategory(cat); setQuery(''); }}>
                     <Text style={[styles.tabTxt, active && styles.tabTxtActive]}>
                       {cat.charAt(0).toUpperCase() + cat.slice(1)}
                     </Text>
@@ -861,8 +951,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
           <View style={{ height: SPACE.SM }} />
 
           {(() => {
-            const special = (showForYou || showRecommended) && !query.trim();
-            const gridLoading = showRecommended ? recLoading : showForYou ? feedLoading : loading;
+            const special = (showFriends || showForYou || showRecommended) && !query.trim();
+            const gridLoading = showFriends ? friendsFeedLoading : showRecommended ? recLoading : showForYou ? feedLoading : loading;
             // Keep the current items on screen while any tab reloads — the old
             // category's results linger in state until the new ones land, so there's
             // no blank flash or layout jump. Only truly-empty tabs show a spinner.
@@ -876,9 +966,15 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 numColumns={2}
                 contentContainerStyle={isEmpty ? (special ? styles.gridTop : styles.gridCenter) : styles.grid}
                 columnWrapperStyle={styles.row}
-                refreshControl={special ? undefined : (
-                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.ACCENT} />
-                )}
+                refreshControl={
+                  // Friends is free (pure SQL) → pull-to-refresh. For You / Recommended
+                  // hit quota'd APIs so they keep their cooldown buttons (no pull).
+                  showFriends ? (
+                    <RefreshControl refreshing={friendsRefreshing} onRefresh={onFriendsRefresh} tintColor={C.ACCENT} />
+                  ) : special ? undefined : (
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.ACCENT} />
+                  )
+                }
                 onEndReached={(special || isEmpty) ? undefined : handleLoadMore}
                 onEndReachedThreshold={0.4}
                 ListFooterComponent={!special && loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.XL }} /> : null}
@@ -889,6 +985,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                     <Text style={[styles.emptyText, special ? styles.emptyTextTop : styles.emptyTextCenter]}>
                       {query.trim()
                         ? `No results for "${query.trim()}"`
+                        : showFriends
+                        ? 'Nothing from friends yet — when your friends react to or share videos, they show up here.'
                         : showRecommended
                         ? 'No recommendations yet — tap Refresh to pull from your subscriptions.'
                         : showForYou
