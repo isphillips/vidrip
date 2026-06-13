@@ -21,7 +21,11 @@ class MainActivity : ReactActivity() {
   // and warm-start the 'url' event both see it.
   override fun onCreate(savedInstanceState: Bundle?) {
     rewriteShareIntent(intent)
-    super.onCreate(savedInstanceState)
+    // Pass null, not savedInstanceState: react-native-screens fragments can't be
+    // restored from saved state — on a background-kill/restore (or rotation) the
+    // restore path throws "Unable to instantiate fragment ScreenStackFragment".
+    // Letting RN rebuild the screen stack from scratch avoids that crash.
+    super.onCreate(null)
   }
 
   override fun onNewIntent(intent: Intent) {
