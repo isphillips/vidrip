@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   since: { fontSize: FONT.SIZES.SM, color: C.SUBTLE, fontFamily: FONT.BODY },
   bio: { fontSize: FONT.SIZES.SM, color: C.INK, fontFamily: FONT.BODY, textAlign: 'center', marginTop: SPACE.XS, marginHorizontal: SPACE.LG, lineHeight: 19 },
   location: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY },
-  editLink: { fontSize: FONT.SIZES.SM, color: C.ACCENT_HOT, fontFamily: FONT.BODY_SEMIBOLD, marginTop: SPACE.SM },
+  editLink: { fontSize: FONT.SIZES.SM, color: C.DANGER, fontFamily: FONT.BODY_SEMIBOLD, marginTop: SPACE.SM },
   section: {
     backgroundColor: C.SURFACE,
     borderRadius: RADIUS.MD,

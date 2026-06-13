@@ -5,8 +5,7 @@ import { supabase } from '../client';
 
 export type ChannelSummary = {
   id: string;
-  name: string;
-  display_name?: string | null;
+  name: string;          // the channel's display title (consolidated from display_name)
   description: string | null;
   is_public: boolean;
   created_by: string;
@@ -82,7 +81,7 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     (supabase as any)
       .from('groups')
       .select(`
-        id, name, display_name, description, is_public, created_by, member_count,
+        id, name, description, is_public, created_by, member_count,
         pinned_video_id, pinned_video_title, pinned_video_thumbnail,
         owner:users!created_by(handle, avatar_url)
       `)
@@ -135,7 +134,6 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
   return (channelsResult.data ?? []).map((c: any) => ({
     id: c.id,
     name: c.name,
-    display_name: c.display_name ?? null,
     description: c.description ?? null,
     is_public: c.is_public,
     created_by: c.created_by,
@@ -155,7 +153,7 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
     (supabase as any)
       .from('groups')
       .select(`
-        id, name, display_name, description, is_public, created_by, member_count, avatar_url, invite_only,
+        id, name, description, is_public, created_by, member_count, avatar_url, invite_only,
         pinned_video_id, pinned_video_title, pinned_video_thumbnail,
         owner:users!created_by(handle, avatar_url)
       `)
@@ -197,7 +195,6 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
   return (channelsResult.data ?? []).map((c: any) => ({
     id: c.id,
     name: c.name,
-    display_name: c.display_name ?? null,
     description: c.description ?? null,
     is_public: c.is_public,
     created_by: c.created_by,
@@ -523,15 +520,15 @@ export async function fetchChannelsToReact(userId: string): Promise<ChannelToRea
       .not('parent_post_id', 'is', null),
     (supabase as any)
       .from('groups')
-      .select('id, name, display_name, is_members_only, owner:users!created_by(handle)')
+      .select('id, name, is_members_only, owner:users!created_by(handle)')
       .in('id', channelIds),
   ]);
 
   const reacted = new Set<string>((mineRes.data ?? []).map((r: any) => r.parent_post_id));
   const nameById = new Map<string, string>();
   (groupsRes.data ?? []).forEach((g: any) => {
-    const fallback = g.is_members_only ? (g.owner?.handle ? `@${g.owner.handle}` : (g.name ?? '')) : (g.name ?? '');
-    nameById.set(g.id, g.display_name ?? fallback);
+    const fallback = g.is_members_only && !g.name && g.owner?.handle ? `@${g.owner.handle}` : (g.name ?? '');
+    nameById.set(g.id, fallback);
   });
 
   return (postsRes.data ?? [])
@@ -934,7 +931,7 @@ function mapReview(r: any): ChannelReview {
     post_yt_video_title: r.post?.yt_video_title ?? null,
     post_yt_video_thumbnail: r.post?.yt_video_thumbnail ?? null,
     post_source_type: r.post?.source_type ?? 'youtube',
-    channel_name: r.channel?.display_name ?? r.channel?.name ?? null,
+    channel_name: r.channel?.name ?? null,
   };
 }
 
@@ -976,7 +973,7 @@ export async function fetchMyReviews(userId: string): Promise<ChannelReview[]> {
       id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
       reviewer:users!reviewer_id(handle),
       post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type),
-      channel:groups!channel_id(name, display_name)
+      channel:groups!channel_id(name)
     `)
     .eq('reviewer_id', userId)
     .order('created_at', { ascending: false });
@@ -1042,7 +1039,7 @@ export async function setChannelPublic(channelId: string, isPublic: boolean): Pr
 
 export type MyCreatorChannel = {
   id: string;
-  title: string;          // display_name ?? name
+  title: string;          // groups.name
   inviteOnly: boolean;
   isListed: boolean;      // groups.is_public
 };
@@ -1051,14 +1048,14 @@ export type MyCreatorChannel = {
 export async function fetchMyCreatorChannel(userId: string): Promise<MyCreatorChannel | null> {
   const { data } = await (supabase as any)
     .from('groups')
-    .select('id, name, display_name, invite_only, is_public')
+    .select('id, name, invite_only, is_public')
     .eq('created_by', userId)
     .eq('is_members_only', true)
     .maybeSingle();
   if (!data) { return null; }
   return {
     id: data.id,
-    title: data.display_name ?? data.name ?? 'Your Channel',
+    title: data.name ?? 'Your Channel',
     inviteOnly: !!data.invite_only,
     isListed: !!data.is_public,
   };
@@ -1128,19 +1125,20 @@ export async function setChannelReviewsAllowed(channelId: string, allowed: boole
   if (error) { throw error; }
 }
 
-// Writes display_name (not name): for Members Only / private channels `name` is
-// auto-managed by a DB trigger, so display_name is the durable user-set title.
+// The channel title lives in groups.name. The member-name trigger only renames
+// pure group chats (is_public=false AND is_members_only=false), so writing name on
+// a channel is durable.
 export async function setChannelName(channelId: string, name: string): Promise<void> {
   const { error } = await (supabase as any)
     .from('groups')
-    .update({ display_name: name })
+    .update({ name })
     .eq('id', channelId);
   if (error) { throw error; }
 }
 
-/** The creator-set display name override, if any. */
+/** The channel's display title. */
 export async function fetchChannelDisplayName(channelId: string): Promise<string | null> {
   const { data } = await (supabase as any)
-    .from('groups').select('display_name').eq('id', channelId).single();
-  return data?.display_name ?? null;
+    .from('groups').select('name').eq('id', channelId).single();
+  return data?.name ?? null;
 }

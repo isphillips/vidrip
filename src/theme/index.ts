@@ -33,7 +33,7 @@ export const C = {
 
   // Status
   SUCCESS: '#22C55E',
-  DANGER: '#e056fd',
+  DANGER: '#16e0d5',
   WARNING: '#F59E0B',
 
   // Utility

@@ -519,9 +519,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
     backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER,
   },
-  pillActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
+  pillActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.DANGER },
   pillTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
-  pillTxtActive: { color: C.ACCENT_HOT },
+  pillTxtActive: { color: C.DANGER },
   pillCount: {
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5,
     backgroundColor: C.ACCENT, alignItems: 'center', justifyContent: 'center',

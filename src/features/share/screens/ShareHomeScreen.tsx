@@ -852,9 +852,9 @@ const styles = StyleSheet.create({
   tabsScroll: {  height: 50, marginBottom: SPACE.SM },
   tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, alignItems: 'center', height: 33 },
   tab:     { alignItems: 'center', justifyContent: 'center', height: 33, paddingHorizontal: SPACE.MD, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
-  tabActive:    { backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.ACCENT },
+  tabActive:    { backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.DANGER },
   tabTxt:       { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.MUTED },
-  tabTxtActive: { color: C.WHITE },
+  tabTxtActive: { color: C.DANGER },
 
   // For You refresh bar
   feedBar: {

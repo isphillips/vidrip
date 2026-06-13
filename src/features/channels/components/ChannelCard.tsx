@@ -45,14 +45,12 @@ export default function ChannelCard({
         <View style={styles.meta}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>
-              {channel.display_name
-                ?? (channel.is_members_only ? (channel.owner?.handle ?? channel.name) : channel.name)}
+              {channel.name || (channel.owner?.handle ? `@${channel.owner.handle}` : 'Channel')}
             </Text>
             {hasUnread && <View style={styles.unreadDot} />}
           </View>
-          {/* Show the @handle subtitle for curated channels, and for Members Only
-              channels once a custom name replaces the handle in the title. */}
-          {channel.owner && (!channel.is_members_only || !!channel.display_name) && (
+          {/* Owner @handle subtitle (the title now always holds the channel name). */}
+          {channel.owner && (
             <Text style={styles.owner}>@{channel.owner.handle}</Text>
           )}
           {channel.description ? (
