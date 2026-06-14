@@ -172,7 +172,7 @@ export default function WatchChannelClipScreen({
   useEffect(() => {
     if (!post) { return; }
     const channel = (supabase as any)
-      .channel(`cper-clip:${postId}`)
+      .channel(`cper-clip:${postId}:${Date.now()}`)
       .on('postgres_changes', {
         event: '*', schema: 'public',
         table: 'channel_post_emoji_reactions',
@@ -187,7 +187,9 @@ export default function WatchChannelClipScreen({
           });
       })
       .subscribe();
-    return () => { channel.unsubscribe(); };
+    // removeChannel (not unsubscribe) so re-opening the same clip doesn't reuse a
+    // stale, already-subscribed channel → "cannot add postgres_changes callbacks".
+    return () => { (supabase as any).removeChannel(channel); };
   }, [postId, post?.id]);
 
   // Source player: full-screen until playback starts, then shrinks to the corner

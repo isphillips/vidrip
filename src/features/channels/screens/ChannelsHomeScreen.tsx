@@ -87,13 +87,15 @@ export default function ChannelsHomeScreen({
   useEffect(() => {
     if (!user) { return; }
     const sub = (supabase as any)
-      .channel(`my-memberships-${user.id}`)
+      .channel(`my-memberships-${user.id}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'group_members',
         filter: `user_id=eq.${user.id}`,
       }, () => { load(true); })
       .subscribe();
-    return () => { sub.unsubscribe(); };
+    // removeChannel (not unsubscribe) so the channel is dropped from the registry
+    // and a later re-subscribe with the same name doesn't throw.
+    return () => { (supabase as any).removeChannel(sub); };
   }, [user?.id, user, load]);
 
   const handleRefresh = useCallback(() => {

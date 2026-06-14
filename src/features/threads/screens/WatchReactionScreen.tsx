@@ -180,7 +180,7 @@ export default function WatchReactionScreen({
   // Realtime emoji updates
   useEffect(() => {
     const channel = (supabase as any)
-      .channel(`emoji:${reactionId}`)
+      .channel(`emoji:${reactionId}:${Date.now()}`)
       .on('postgres_changes', {
         event: '*', schema: 'public',
         table: 'emoji_reactions',
@@ -189,7 +189,9 @@ export default function WatchReactionScreen({
         fetchEmojiReactions(reactionId).then(setEmojiReactions).catch(() => {});
       })
       .subscribe();
-    return () => { channel.unsubscribe(); };
+    // removeChannel (not unsubscribe) so re-opening the same reaction doesn't reuse
+    // a stale, already-subscribed channel → "cannot add postgres_changes callbacks".
+    return () => { (supabase as any).removeChannel(channel); };
   }, [reactionId]);
 
   const handlePlayPause = useCallback(() => {

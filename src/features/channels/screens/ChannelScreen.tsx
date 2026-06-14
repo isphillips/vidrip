@@ -178,11 +178,17 @@ export default function ChannelhamburderScreen({
   useEffect(() => {
     if (isPublic) { return; }
     const sub = (supabase as any)
-      .channel(`channel-name-${channelId}`)
+      // Unique per mount: re-opening the same channel must NOT reuse a prior
+      // channel object (removeChannel is async, so the old one may still be
+      // registered) — reusing a subscribed channel throws on .on().
+      .channel(`channel-name-${channelId}-${Date.now()}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `id=eq.${channelId}` },
         (p: any) => { if (p.new?.name) { setTitle(p.new.name); } })
       .subscribe();
-    return () => { sub.unsubscribe(); };
+    // removeChannel (not unsubscribe): also drops it from the client registry, so
+    // re-opening the same channel doesn't reuse a stale, already-subscribed channel
+    // (which throws "cannot add postgres_changes callbacks after subscribe()").
+    return () => { (supabase as any).removeChannel(sub); };
   }, [channelId, isPublic]);
 
   const handleShowMembers = useCallback(async () => {
@@ -220,7 +226,7 @@ export default function ChannelhamburderScreen({
   // Realtime: new posts appear live
   useEffect(() => {
     const channel = (supabase as any)
-      .channel(`channel-posts-${channelId}`)
+      .channel(`channel-posts-${channelId}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -244,7 +250,7 @@ export default function ChannelhamburderScreen({
       })
       .subscribe();
 
-    return () => { channel.unsubscribe(); };
+    return () => { (supabase as any).removeChannel(channel); };
   }, [channelId, isPublic, isMembersOnly]);
 
   const handleJoinLeave = useCallback(async () => {
