@@ -37,6 +37,7 @@ export const C = {
   WARNING: '#F59E0B',
 
   // Utility
+  TEAL: '#2DD4BF',
   WHITE: '#FFFFFF',
   BLACK: '#000000',
   TRANSPARENT: 'transparent',

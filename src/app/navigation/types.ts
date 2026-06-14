@@ -38,6 +38,12 @@ export type ChannelsStackParamList = {
 export type ChannelsStackScreenProps<T extends keyof ChannelsStackParamList> =
   NativeStackScreenProps<ChannelsStackParamList, T>;
 
+// The Messages stack reuses every channel screen (so a private-chat conversation
+// behaves like any channel) with the chat list as its root instead of ChannelsHome.
+export type MessagesStackParamList = Omit<ChannelsStackParamList, 'ChannelsHome'> & {
+  MessagesList: undefined;
+};
+
 export type AccountStackParamList = {
   AccountHome: undefined;
   EditProfile: undefined;

@@ -2,9 +2,10 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { C } from '../../theme';
 import { screenLayout } from '../../components/ScreenGradient';
-import type { ChannelsStackParamList } from './types';
+import type { ChannelsStackParamList, MessagesStackParamList } from './types';
 
 import ChannelsHomeScreen from '../../features/channels/screens/ChannelsHomeScreen';
+import PrivateChatsScreen from '../../features/channels/screens/PrivateChatsScreen';
 import ChannelScreen from '../../features/channels/screens/ChannelScreen';
 import ChannelPostScreen from '../../features/channels/screens/ChannelPostScreen';
 import WatchYouTubePostScreen from '../../features/channels/screens/WatchYouTubePostScreen';
@@ -18,8 +19,6 @@ import AddChannelVideoScreen from '../../features/channels/screens/AddChannelVid
 import AddChannelMembersScreen from '../../features/channels/screens/AddChannelMembersScreen';
 import InviteToChannelScreen from '../../features/channels/screens/InviteToChannelScreen';
 
-const Stack = createNativeStackNavigator<ChannelsStackParamList>();
-
 const NAV_OPTS = {
   headerStyle: { backgroundColor: C.BG },
   headerTintColor: C.INK,
@@ -28,74 +27,48 @@ const NAV_OPTS = {
   contentStyle: { backgroundColor: C.BG },
 };
 
+// Every channel screen except the list root. Reused by the Channels tab AND the
+// Messages stack so a private-chat conversation behaves identically and its back
+// button returns to whichever list opened it (channel list vs. messages list).
+function channelScreens(Stack: any) {
+  return (
+    <>
+      <Stack.Screen name="Channel" component={ChannelScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChannelPost" component={ChannelPostScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="WatchYouTubePost" component={WatchYouTubePostScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="WatchChannelClip" component={WatchChannelClipScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
+      <Stack.Screen name="WatchCreatorVideo" component={WatchCreatorVideoScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <Stack.Screen name="RecordReview" component={RecordReviewScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="WatchReview" component={WatchReviewScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="ChannelReviews" component={ChannelReviewsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ChannelVideoRecord" component={ChannelVideoRecordScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="AddChannelVideo" component={AddChannelVideoScreen} options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="AddChannelMembers" component={AddChannelMembersScreen} options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="InviteToChannel" component={InviteToChannelScreen} options={{ headerShown: false, presentation: 'modal' }} />
+    </>
+  );
+}
+
+const Stack = createNativeStackNavigator<ChannelsStackParamList>();
+
 export default function ChannelsNavigator() {
   return (
     <Stack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
-      <Stack.Screen
-        name="ChannelsHome"
-        component={ChannelsHomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Channel"
-        component={ChannelScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="ChannelPost"
-        component={ChannelPostScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="WatchYouTubePost"
-        component={WatchYouTubePostScreen}
-        options={{ headerShown: false, presentation: 'fullScreenModal' }}
-      />
-      <Stack.Screen
-        name="WatchChannelClip"
-        component={WatchChannelClipScreen}
-        options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }}
-      />
-      <Stack.Screen
-        name="WatchCreatorVideo"
-        component={WatchCreatorVideoScreen}
-        options={{ headerShown: false, animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        name="RecordReview"
-        component={RecordReviewScreen}
-        options={{ headerShown: false, presentation: 'fullScreenModal' }}
-      />
-      <Stack.Screen
-        name="WatchReview"
-        component={WatchReviewScreen}
-        options={{ headerShown: false, presentation: 'fullScreenModal' }}
-      />
-      <Stack.Screen
-        name="ChannelReviews"
-        component={ChannelReviewsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="ChannelVideoRecord"
-        component={ChannelVideoRecordScreen}
-        options={{ headerShown: false, presentation: 'fullScreenModal' }}
-      />
-      <Stack.Screen
-        name="AddChannelVideo"
-        component={AddChannelVideoScreen}
-        options={{ headerShown: false, presentation: 'modal' }}
-      />
-      <Stack.Screen
-        name="AddChannelMembers"
-        component={AddChannelMembersScreen}
-        options={{ headerShown: false, presentation: 'modal' }}
-      />
-      <Stack.Screen
-        name="InviteToChannel"
-        component={InviteToChannelScreen}
-        options={{ headerShown: false, presentation: 'modal' }}
-      />
+      <Stack.Screen name="ChannelsHome" component={ChannelsHomeScreen} options={{ headerShown: false }} />
+      {channelScreens(Stack)}
     </Stack.Navigator>
+  );
+}
+
+const MStack = createNativeStackNavigator<MessagesStackParamList>();
+
+// Root-level Messages stack: the chat list, then conversations pushed on top so
+// back returns to the list, and backing out of the list returns to the origin.
+export function MessagesNavigator() {
+  return (
+    <MStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
+      <MStack.Screen name="MessagesList" component={PrivateChatsScreen} options={{ headerShown: false }} />
+      {channelScreens(MStack)}
+    </MStack.Navigator>
   );
 }

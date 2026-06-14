@@ -875,24 +875,19 @@ const styles = StyleSheet.create({
   bottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    gap: SPACE.XL, paddingVertical: SPACE.MD,
+    gap: SPACE.XL, paddingTop: SPACE.MD, paddingBottom: SPACE.XL,
     backgroundColor: C.SURFACE,
     borderTopWidth: 1, borderTopColor: C.BORDER,
   },
   barBtn: {
     width: 52, height: 52, borderRadius: RADIUS.FULL,
     backgroundColor: C.SURFACE_2, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: C.BORDER,
+    borderColor: C.DANGER, borderWidth: 1,
   },
   barBtns: { flexDirection: 'row', justifyContent: 'center', gap: SPACE.XL },
-  gloss: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: '50%',
-    borderTopLeftRadius: RADIUS.FULL, borderTopRightRadius: RADIUS.FULL,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
   barBtnActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
   barBtnIcon: { fontSize: 24 },
-  barIcon: { width: 26, height: 26, tintColor: C.INK },
+  barIcon: { width: 26, height: 26, tintColor: C.TEAL },
   barIconRecording: { tintColor: C.ACCENT_HOT },
   recordingBadge: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

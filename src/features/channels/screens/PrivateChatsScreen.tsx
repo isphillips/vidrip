@@ -28,22 +28,18 @@ export default function PrivateChatsScreen({ navigation }: { navigation: any }) 
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // Opening a chat dismisses this modal and shows the conversation in the Channels tab.
-  const open = (item: ChannelSummary) => navigation.navigate('Main', {
-    screen: 'Channels',
-    params: {
-      screen: 'Channel',
-      params: {
-        channelId: item.id,
-        channelName: item.name,
-        isPublic: false,
-        isJoined: item.is_joined,
-        isOwner: item.created_by === user?.id,
-        isMembersOnly: false,
-        inviteOnly: !!item.invite_only,
-        ownerHandle: item.owner?.handle,
-      },
-    },
+  // Push the conversation onto the Messages stack (this screen is its root), so
+  // backing out of a chat returns here, and backing out of the list returns to the
+  // screen that opened Messages.
+  const open = (item: ChannelSummary) => navigation.navigate('Channel', {
+    channelId: item.id,
+    channelName: item.name,
+    isPublic: false,
+    isJoined: item.is_joined,
+    isOwner: item.created_by === user?.id,
+    isMembersOnly: false,
+    inviteOnly: !!item.invite_only,
+    ownerHandle: item.owner?.handle,
   });
 
   return (
