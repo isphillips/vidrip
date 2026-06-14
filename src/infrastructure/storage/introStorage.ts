@@ -2,18 +2,19 @@ import { supabase } from '../supabase/client';
 import { uploadToCloud } from './reactionStorage';
 
 /**
- * Share-intro clips reuse the private `reactions` bucket. The object path is
- * `intros/{threadId}/intro.mp4` — threadId sits in the same path segment (2) as
- * a reaction's `{userId}/{threadId}/{reactionId}.mp4`, so the existing
- * thread-member read policy covers it and playback signs URLs exactly like
- * reactions do. The path is deterministic (one intro per thread) and uploaded
- * with upsert, so a retry or re-record overwrites it rather than orphaning files.
+ * Share-intro clips reuse the private `reactions` bucket under `intros/…`, so the
+ * existing reactions read policy signs them exactly like reactions. The path is
+ * unique per upload and uploaded WITHOUT upsert: the `reactions` bucket grants
+ * INSERT but has no UPDATE policy, so overwriting an existing object (what upsert
+ * does on a retry / re-record) is rejected by RLS (403, "new row violates row
+ * level security policy"). A fresh INSERT each time always satisfies the policy;
+ * a superseded intro is just an unreferenced object (negligible / TTL-able).
  */
 
 /** Relay-upload an intro clip for a thread; returns its stored (public-form) URL. */
 export async function uploadIntro(threadId: string, localPath: string): Promise<string> {
-  const uploadPath = `intros/${threadId}/intro.mp4`;
-  return uploadToCloud(localPath, uploadPath, true);
+  const uploadPath = `intros/${threadId}/${Date.now()}.mp4`;
+  return uploadToCloud(localPath, uploadPath);
 }
 
 /** Resolve a stored intro URL to a fresh signed URL for playback (1h TTL). */
