@@ -16,6 +16,7 @@ import {
 import { localPathForComment } from '../../../infrastructure/storage/commentStorage';
 import { useAuthStore } from '../../../store/authStore';
 import { usePendingCommentsStore } from '../../../store/pendingCommentsStore';
+import { useUploadStore } from '../../../store/uploadStore';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import type { RootStackParamList } from '../../../app/navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -47,7 +48,6 @@ function CommentVideoModal({ uri, onClose }: { uri: string; onClose: () => void 
             style={StyleSheet.absoluteFill}
             resizeMode="contain"
             controls
-            autoplay
           />
           <TouchableOpacity style={vStyles.close} onPress={onClose}>
             <Text style={vStyles.closeText}>✕</Text>
@@ -280,6 +280,20 @@ export default function VideoCommentsSheet({
     load(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, refreshKey, rootSourceId, sourceType]);
+
+  // Refetch when a background upload finishes, so a just-posted comment appears
+  // as soon as its upload completes (get_video_comments only returns rows whose
+  // video_url is set) — no close/reopen.
+  const uploadJobs = useUploadStore(s => s.jobs);
+  const prevUploadingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!visible) { return; }
+    const nowUploading = new Set(uploadJobs.filter(j => j.status === 'uploading').map(j => j.id));
+    let finished = false;
+    prevUploadingRef.current.forEach(id => { if (!nowUploading.has(id)) { finished = true; } });
+    prevUploadingRef.current = nowUploading;
+    if (finished) { load(true); }
+  }, [uploadJobs, visible, load]);
 
   // Realtime: new emoji reactions
   useEffect(() => {

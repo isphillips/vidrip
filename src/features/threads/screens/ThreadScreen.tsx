@@ -17,6 +17,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import { usePendingReactionsStore } from '../../../store/pendingReactionsStore';
+import { useUploadStore } from '../../../store/uploadStore';
 import {
   fetchThread,
   fetchReactions,
@@ -46,6 +48,9 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Optimistic, just-recorded reactions awaiting their relay upload.
+  const pendingReactions = usePendingReactionsStore(s => s.pending);
+  const reconcilePending = usePendingReactionsStore(s => s.reconcile);
   const [dlStatus, setDlStatus] = useState<Record<string, DlStatus>>({});
   const [dlPct, setDlPct] = useState<Record<string, number>>({});
   const mountedRef = useRef(true);
@@ -63,11 +68,13 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
       if (!mountedRef.current) { return; }
       setThread(t);
       setReactions(r);
+      // Drop optimistic copies that have now landed server-side.
+      reconcilePending(r.map(x => x.id));
       if (t?.my_status === 'pending') { markThreadSeen(threadId); }
     } finally {
       if (mountedRef.current) { setLoading(false); }
     }
-  }, [threadId, user]);
+  }, [threadId, user, reconcilePending]);
 
   const handleEmojiToggle = useCallback(async (reactionId: string, emoji: string) => {
     if (!user?.id) { return; }
@@ -96,6 +103,18 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
 
   useEffect(() => { load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Refetch the moment a background upload finishes, so a just-posted reaction
+  // becomes visible as soon as its relay upload completes — no close/reopen.
+  const uploadJobs = useUploadStore(s => s.jobs);
+  const prevUploadingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const nowUploading = new Set(uploadJobs.filter(j => j.status === 'uploading').map(j => j.id));
+    let finished = false;
+    prevUploadingRef.current.forEach(id => { if (!nowUploading.has(id)) { finished = true; } });
+    prevUploadingRef.current = nowUploading;
+    if (finished) { load(); }
+  }, [uploadJobs, load]);
 
   // Download a reaction from a resolved cloud URL, tracking status + progress.
   const runDownload = useCallback((id: string, uri: string) => {
@@ -152,8 +171,18 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     return <View style={styles.center}><Text style={styles.errorText}>Thread not found</Text></View>;
   }
 
+  // Fold in optimistic reactions for this thread (own just-posted, upload in-flight).
+  const pendingForThread = pendingReactions.filter(
+    p => p.thread_id === threadId && !reactions.some(r => r.id === p.id),
+  );
+  const displayReactions = pendingForThread.length
+    ? [...reactions, ...pendingForThread]
+    : reactions;
+
   const isSender = thread.sender_id === user?.id;
-  const hasReacted = thread.my_status === 'reacted';
+  // pendingForThread is always this device's own just-recorded reaction, so it
+  // also flips the CTA to "You Reacted" before the server status catches up.
+  const hasReacted = thread.my_status === 'reacted' || pendingForThread.length > 0;
   const canReact = !isSender && !hasReacted;
   const obscured = canReact;
   const thumbnail = thread.video_thumbnail ??
@@ -169,7 +198,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
             <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
           </View>
         ) : (
-          <Image source={{ uri: thumbnail }} style={styles.thumb} resizeMode="cover" />
+          <Image source={{ uri: thumbnail ?? undefined }} style={styles.thumb} resizeMode="cover" />
         )}
 
         {/* Overlay — same position for both states */}
@@ -201,13 +230,15 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
 
       {/* All reactions — group inbox */}
       <Text style={styles.sectionTitle}>
-        {reactions.length === 0
+        {displayReactions.length === 0
           ? 'No reactions yet'
-          : `${reactions.length} reaction${reactions.length !== 1 ? 's' : ''}`}
+          : `${displayReactions.length} reaction${displayReactions.length !== 1 ? 's' : ''}`}
       </Text>
 
-      {reactions.map((r) => {
-        const status = dlStatus[r.id] ?? 'unavailable';
+      {displayReactions.map((r) => {
+        // Fall back to the reaction's own resolved state so optimistic (pending)
+        // reactions — not covered by the dlStatus effect — show as watchable.
+        const status = dlStatus[r.id] ?? (r.resolvedUri && !r.needsDownload ? 'local' : 'unavailable');
         const pct = dlPct[r.id] ?? 0;
         const handle = (r.user as any)?.handle ?? '?';
         const canWatch = status === 'local';

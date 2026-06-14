@@ -13,6 +13,9 @@ export interface SaveReactionParams {
   ytStartOffset?: number;
   sourceType?: 'youtube' | 'tiktok' | 'instagram';
   recordedWithHeadphones?: boolean;
+  // Fires once the row is inserted and the local copy is in place (before the
+  // slow relay upload), so the caller can show the reaction immediately.
+  onCommitted?: (reactionId: string) => void;
 }
 
 export interface SaveReactionResult {
@@ -71,18 +74,20 @@ export async function saveReaction({
   ytStartOffset = 0,
   sourceType = 'youtube',
   recordedWithHeadphones = false,
+  onCommitted,
 }: SaveReactionParams): Promise<SaveReactionResult> {
 
   if (mode === 'cloud') {
-    const uploadPath = `${userId}/${threadId}/${Date.now()}.mp4`;
-    const cloudUrl = await uploadToCloud(filePath, uploadPath);
-
-    const { data, error } = await (supabase as any)
+    // Insert the row first (video_url null) so it has an id, and keep a local copy
+    // keyed by that id — the reaction is committed + playable on THIS device before
+    // the (slow) relay upload, so it can show in the thread immediately. Other
+    // devices download it once video_url is set below.
+    const { data, error: insertError } = await (supabase as any)
       .from('reactions')
       .insert({
         thread_id: threadId,
         user_id: userId,
-        video_url: cloudUrl,
+        video_url: null,
         duration: Math.round(duration),
         storage_mode: 'cloud',
         source_type: sourceType,
@@ -91,7 +96,20 @@ export async function saveReaction({
       })
       .select('id')
       .single();
-    if (error) { throw error; }
+    if (insertError) { throw insertError; }
+
+    const reactionId: string = data.id;
+    const localPath = await moveToReactionsDir(filePath, reactionId);
+    onCommitted?.(reactionId);
+
+    let cloudUrl: string | null = null;
+    try {
+      const uploadPath = `${userId}/${threadId}/${reactionId}.mp4`;
+      cloudUrl = await uploadToCloud(localPath, uploadPath);
+      await (supabase as any).from('reactions').update({ video_url: cloudUrl }).eq('id', reactionId);
+    } catch (e) {
+      console.error('[saveReaction] cloud relay upload failed:', JSON.stringify(e));
+    }
 
     await (supabase as any)
       .from('thread_members')
@@ -99,7 +117,7 @@ export async function saveReaction({
       .eq('thread_id', threadId)
       .eq('user_id', userId);
 
-    return { reactionId: data.id, localPath: null, cloudUrl, storageMode: 'cloud' };
+    return { reactionId, localPath, cloudUrl, storageMode: 'cloud' };
   }
 
   // ─── Local (ephemeral relay) mode ───────────────────────────────────────
@@ -126,6 +144,7 @@ export async function saveReaction({
 
   // 2. Move temp file to permanent local location keyed by the reaction UUID
   const localPath = await moveToReactionsDir(filePath, reactionId);
+  onCommitted?.(reactionId);   // local copy ready → caller can show it now
 
   // 3. Upload the relay copy so recipients can fetch it (best-effort; the local
   //    copy is the source of truth for the recorder). Path is deterministic so
