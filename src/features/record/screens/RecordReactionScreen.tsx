@@ -1,7 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { usePendingReactionsStore } from '../../../store/pendingReactionsStore';
+import { useIntroSeenStore } from '../../../store/introSeenStore';
 import { saveReaction } from '../../../infrastructure/storage/reactionStorage';
 import { localPathForReaction } from '../../../infrastructure/storage/localReactionStorage';
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
@@ -18,8 +19,10 @@ export default function RecordReactionScreen({
   const enqueue = useUploadStore(s => s.enqueue);
   const addPendingReaction = usePendingReactionsStore(s => s.add);
 
-  // If the share carries a sender intro, always play it before the recorder.
-  const [introDone, setIntroDone] = useState(false);
+  // Sender intro shares the once-per-session gate with ThreadScreen — if the
+  // recipient already saw it on opening the video, don't replay it here.
+  const introSeen = useIntroSeenStore(s => s.seen);
+  const markIntroSeen = useIntroSeenStore(s => s.markSeen);
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
   const onSave = useCallback(async (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => {
@@ -60,8 +63,8 @@ export default function RecordReactionScreen({
     });
   }, [user, profile, threadId, videoId, sourceType, enqueue, addPendingReaction]);
 
-  if (introUrl && !introDone) {
-    return <IntroPreroll introUrl={introUrl} onDone={() => setIntroDone(true)} />;
+  if (introUrl && !introSeen.has(threadId)) {
+    return <IntroPreroll introUrl={introUrl} onDone={() => markIntroSeen(threadId)} />;
   }
 
   return (

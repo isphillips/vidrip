@@ -19,6 +19,8 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { usePendingReactionsStore } from '../../../store/pendingReactionsStore';
 import { useUploadStore } from '../../../store/uploadStore';
+import { useIntroSeenStore } from '../../../store/introSeenStore';
+import IntroPreroll from '../components/IntroPreroll';
 import {
   fetchThread,
   fetchReactions,
@@ -51,6 +53,9 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   // Optimistic, just-recorded reactions awaiting their relay upload.
   const pendingReactions = usePendingReactionsStore(s => s.pending);
   const reconcilePending = usePendingReactionsStore(s => s.reconcile);
+  // Sender intro: play it once per session before the recipient sees the video.
+  const introSeen = useIntroSeenStore(s => s.seen);
+  const markIntroSeen = useIntroSeenStore(s => s.markSeen);
   const [dlStatus, setDlStatus] = useState<Record<string, DlStatus>>({});
   const [dlPct, setDlPct] = useState<Record<string, number>>({});
   const mountedRef = useRef(true);
@@ -180,6 +185,19 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     : reactions;
 
   const isSender = thread.sender_id === user?.id;
+
+  // If this share carries a sender intro, a recipient sees it full-screen the
+  // moment they open the video — then it reveals the thread. Once per session
+  // (shared introSeenStore), so it doesn't replay when they then record/watch.
+  if (!isSender && thread.intro_url && !introSeen.has(threadId)) {
+    return (
+      <IntroPreroll
+        introUrl={thread.intro_url}
+        onDone={() => markIntroSeen(threadId)}
+      />
+    );
+  }
+
   // pendingForThread is always this device's own just-recorded reaction, so it
   // also flips the CTA to "You Reacted" before the server status catches up.
   const hasReacted = thread.my_status === 'reacted' || pendingForThread.length > 0;
