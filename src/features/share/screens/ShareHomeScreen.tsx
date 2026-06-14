@@ -12,7 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import {
-  fetchShorts, searchShorts, CATEGORIES, type ShortRow, type Category,
+  fetchShorts, searchShorts, CATEGORIES, categoryLabel, type ShortRow, type Category,
 } from '../../../infrastructure/supabase/queries/shorts';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import { sendThread, updateThreadIntro } from '../../../infrastructure/supabase/queries/threads';
@@ -997,7 +997,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   <TouchableOpacity key={cat} style={[styles.tab, active && styles.tabActive]}
                     onPress={() => { setShowFriends(false); setShowForYou(false); setShowRecommended(false); setCategory(cat); setQuery(''); }}>
                     <Text style={[styles.tabTxt, active && styles.tabTxtActive]}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      {categoryLabel(cat)}
                     </Text>
                   </TouchableOpacity>
                 );

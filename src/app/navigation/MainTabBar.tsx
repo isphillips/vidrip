@@ -174,7 +174,7 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
         {canCreate ? (
           <TouchableOpacity style={styles.fabSlot} activeOpacity={0.85} onPress={() => navigation.getParent()?.navigate('Studio' as never)}>
             <LinearGradient colors={['#FF4FA3', '#A05CFF', '#3B82F6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
-              <Text style={styles.fabPlus}>＋</Text>
+              <Ionicons name="camera" size={28} color={C.WHITE} />
             </LinearGradient>
           </TouchableOpacity>
         ) : null}

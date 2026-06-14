@@ -59,5 +59,25 @@ export async function searchShorts(query: string, limit = 50): Promise<ShortRow[
   return (data ?? []).map(mapRow);
 }
 
-export const CATEGORIES = ['latest', 'trending', 'music', 'gaming', 'funny', 'food', 'sports', 'news', 'pets', 'cars'] as const;
+export const CATEGORIES = ['latest', 'trending', 'music', 'gaming', 'funny', 'blogs', 'sports', 'news', 'pets', 'cars'] as const;
 export type Category = typeof CATEGORIES[number];
+
+// Display names for the category pills. Edit these freely — they're UI-only; the
+// keys above stay the stable values used for fetching/storage, so changing a label
+// here never touches the backend.
+export const CATEGORY_LABELS: Record<Category, string> = {
+  latest: 'Latest',
+  trending: 'Trending',
+  music: 'Music',
+  gaming: 'Gaming',
+  funny: 'Comedy',
+  blogs: 'People & Blogs',
+  sports: 'Sports',
+  news: 'News & Politics',
+  pets: 'Pets & Animals',
+  cars: 'Cars & Vehicles',
+};
+
+export function categoryLabel(cat: Category): string {
+  return CATEGORY_LABELS[cat] ?? cat.charAt(0).toUpperCase() + cat.slice(1);
+}
