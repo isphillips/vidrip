@@ -76,6 +76,21 @@ export type ChannelReview = {
   channel_name: string | null;
 };
 
+// A channel-clip reaction (channel_posts row with parent_post_id set) the user
+// recorded, flattened with its parent source-video + channel context. Powers the
+// channel half of the feed's "My Reactions" tab.
+export type MyChannelReaction = {
+  id: string;                 // channel_posts.id (the reaction clip)
+  channel_id: string;
+  created_at: string;
+  duration: number | null;
+  channel_name: string | null;
+  parent_yt_video_id: string | null;
+  parent_yt_video_title: string | null;
+  parent_yt_video_thumbnail: string | null;
+  parent_source_type: 'youtube' | 'tiktok' | 'instagram';
+};
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function fetchPublicChannels(userId: string): Promise<ChannelSummary[]> {
@@ -1114,6 +1129,33 @@ export async function fetchChannelReviews(channelId: string): Promise<ChannelRev
     .order('created_at', { ascending: false });
   if (error) { throw error; }
   return (data ?? []).map(mapReview);
+}
+
+/** Every channel-clip reaction the user has recorded, across all channels, newest
+ *  first. Mirrors fetchMyReviews — powers the channel half of "My Reactions". */
+export async function fetchMyChannelReactions(userId: string): Promise<MyChannelReaction[]> {
+  const { data, error } = await (supabase as any)
+    .from('channel_posts')
+    .select(`
+      id, channel_id, duration, created_at,
+      parent:channel_posts!parent_post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type),
+      channel:groups!channel_id(name)
+    `)
+    .eq('poster_id', userId)
+    .not('parent_post_id', 'is', null)
+    .order('created_at', { ascending: false });
+  if (error) { throw error; }
+  return (data ?? []).map((r: any): MyChannelReaction => ({
+    id: r.id,
+    channel_id: r.channel_id,
+    created_at: r.created_at,
+    duration: r.duration ?? null,
+    channel_name: r.channel?.name ?? null,
+    parent_yt_video_id: r.parent?.yt_video_id ?? null,
+    parent_yt_video_title: r.parent?.yt_video_title ?? null,
+    parent_yt_video_thumbnail: r.parent?.yt_video_thumbnail ?? null,
+    parent_source_type: r.parent?.source_type ?? 'youtube',
+  }));
 }
 
 /** Every review the user has submitted, across all channels, newest first. */

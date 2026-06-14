@@ -24,8 +24,8 @@ import { useAuthStore } from '../../../store/authStore';
 import { useFeedStore } from '../../../store/feedStore';
 import { fetchFeedThreads, type FeedThread } from '../../../infrastructure/supabase/queries/threads';
 import {
-  fetchMyReviews, fetchChannelsToReact,
-  type ChannelReview, type ChannelToReact,
+  fetchMyReviews, fetchChannelsToReact, fetchMyChannelReactions,
+  type ChannelReview, type ChannelToReact, type MyChannelReaction,
 } from '../../../infrastructure/supabase/queries/channels';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
@@ -113,6 +113,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   const [myReviews, setMyReviews] = useState<ChannelReview[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [channelTiles, setChannelTiles] = useState<ChannelToReact[]>([]);
+  const [myChannelReactions, setMyChannelReactions] = useState<MyChannelReaction[]>([]);
 
   const swipeRefs = useRef<Map<string, Swipeable | null>>(new Map());
 
@@ -155,8 +156,14 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     finally { setReviewsLoading(false); }
   }, [user]);
 
-  useEffect(() => { load(); loadChannels(); loadReviews(); }, [load, loadChannels, loadReviews]);
-  useFocusEffect(useCallback(() => { load(); loadChannels(); loadReviews(); }, [load, loadChannels, loadReviews]));
+  // The user's channel-clip reactions — the channel half of "My Reactions".
+  const loadChannelReactions = useCallback(async () => {
+    if (!user) return;
+    try { setMyChannelReactions(await fetchMyChannelReactions(user.id)); } catch { /* swallow */ }
+  }, [user]);
+
+  useEffect(() => { load(); loadChannels(); loadReviews(); loadChannelReactions(); }, [load, loadChannels, loadReviews, loadChannelReactions]);
+  useFocusEffect(useCallback(() => { load(); loadChannels(); loadReviews(); loadChannelReactions(); }, [load, loadChannels, loadReviews, loadChannelReactions]));
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   const addFav = (id: string) => {
@@ -200,6 +207,37 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     }
     return list;
   }, [threads, hidden, favs, tab, filter, user?.id]);
+
+  // "My Reactions" = ALL of the user's reactions, merged + newest first:
+  //  - friend-share reactions (threads I reacted to → open the Thread)
+  //  - channel-clip reactions (channel_posts → open in the channel)
+  const myReactionsList = useMemo(() => {
+    const fromThreads = threads
+      .filter(t => !hidden.has(t.id) && t.my_status === 'reacted')
+      .map(t => ({
+        kind: 'thread' as const,
+        id: t.id,
+        created_at: t.created_at,
+        thumbnail: t.video_thumbnail
+          ?? (t.source_type === 'youtube' ? `https://img.youtube.com/vi/${t.video_id}/hqdefault.jpg` : null),
+        title: t.video_title ?? 'Video',
+        subtitle: t.sender ? `@${t.sender.handle}` : 'Friend',
+        meta: `${t.reaction_count} reaction${t.reaction_count !== 1 ? 's' : ''}`,
+      }));
+    const fromChannels = myChannelReactions.map(r => ({
+      kind: 'channel' as const,
+      id: r.id,
+      created_at: r.created_at,
+      thumbnail: r.parent_yt_video_thumbnail
+        ?? (r.parent_source_type === 'youtube' && r.parent_yt_video_id
+          ? `https://img.youtube.com/vi/${r.parent_yt_video_id}/hqdefault.jpg`
+          : null),
+      title: r.parent_yt_video_title ?? 'Video',
+      subtitle: r.channel_name ?? 'Channel',
+      meta: r.duration ? `▶ ${r.duration}s reaction` : 'Reaction',
+    }));
+    return [...fromThreads, ...fromChannels].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  }, [threads, hidden, myChannelReactions]);
 
   // Pill counts are scoped to the ACTIVE tab's partition (Favorites = favorited
   // threads, Feed = the rest) so the bubbles match the list actually shown.
@@ -314,6 +352,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             const active = filter === f.key;
             const n = f.key === 'channels' ? channelTiles.length
               : f.key === 'reviews' ? myReviews.length
+              : f.key === 'reactions' ? myReactionsList.length
               : f.key === 'all' ? 0 : counts[f.key];
             return (
               <TouchableOpacity
@@ -415,6 +454,43 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             );
           }}
         />
+      ) : filter === 'reactions' ? (
+        <FlatList
+          style={styles.fill}
+          data={myReactionsList}
+          keyExtractor={item => `${item.kind}:${item.id}`}
+          contentContainerStyle={myReactionsList.length === 0 ? styles.emptyContainer : styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); Promise.all([load(), loadChannelReactions()]).finally(() => setRefreshing(false)); }} tintColor={C.ACCENT} />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No reactions yet</Text>
+              <Text style={styles.emptySubtitle}>
+                React to a friend’s video or a channel clip and it shows up here.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.8}
+              onPress={() => item.kind === 'thread'
+                ? navigation.navigate('Thread', { threadId: item.id })
+                : (navigation as any).navigate('Channels', { screen: 'WatchChannelClip', params: { postId: item.id } })}>
+              <View style={styles.thumbnail}>
+                {item.thumbnail ? (
+                  <Image source={{ uri: item.thumbnail }} style={styles.thumbnailImage} />
+                ) : (
+                  <Text style={styles.thumbnailIcon}>▶</Text>
+                )}
+              </View>
+              <View style={styles.info}>
+                <Text style={styles.sender} numberOfLines={1}>{item.subtitle}</Text>
+                <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.meta}>{item.meta}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
       ) : (
       <FlatList
         style={styles.fill}
@@ -427,14 +503,12 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             <Text style={styles.emptyTitle}>
               {tab === 'favorites' ? 'No favorites yet'
                 : filter === 'toreact' ? 'All caught up'
-                : filter === 'reactions' ? 'No reactions yet'
                 : filter === 'requests' ? 'No requests yet'
                 : 'Nothing here yet'}
             </Text>
             <Text style={styles.emptySubtitle}>
               {tab === 'favorites' ? 'Swipe left on any thread to favorite it'
                 : filter === 'toreact' ? 'No friend videos waiting for your reaction'
-                : filter === 'reactions' ? 'React to a friend’s video and it shows up here'
                 : filter === 'requests' ? 'Shorts you send friends to react to show up here'
                 : 'Share a Short with a friend to get started'}
             </Text>
