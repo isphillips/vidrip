@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import EmojiChips from '../../../components/EmojiChips';
 import Handle from '../../../components/Handle';
 import { openProfile } from '../../../store/profileDrawerStore';
+import { formatSourceType } from '../../../utils/sourceType';
 
 // Alias so existing JSX (<ReactionEmojiChips>) keeps working without a rename
 const ReactionEmojiChips = EmojiChips;
@@ -225,6 +226,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
         <View style={styles.blindOverlay}>
           <Text style={styles.posterHandle}>
             Shared by {isSender ? <Text style={styles.handle}>you</Text> : <Handle userId={thread.sender_id} handle={thread.sender?.handle ?? '?'} style={styles.handle} />}
+            {thread.source_type ? ` · ${formatSourceType(thread.source_type)}` : ''}
           </Text>
           {obscured ? (
             <Text style={styles.videoTitleObscured}>React to reveal this video</Text>

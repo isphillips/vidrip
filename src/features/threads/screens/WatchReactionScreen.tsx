@@ -2,16 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
 import { WebView } from 'react-native-webview';
-
-const IG_INJECT_JS = `(function(){
-  var hooked=false;
-  function send(t){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:t}));}}
-  function hook(v){if(hooked){return;}hooked=true;v.addEventListener('play',function(){send('playing');});v.addEventListener('ended',function(){send('ended');});}
-  function tryHook(){var vs=document.querySelectorAll('video');if(vs.length>0){hook(vs[0]);return;}setTimeout(tryHook,300);}
-  tryHook();
-  new MutationObserver(function(){if(!hooked){tryHook();}}).observe(document.documentElement,{childList:true,subtree:true});
-  true;
-})();`;
 import {
   View,
   Text,
@@ -41,6 +31,7 @@ import { shareTextNative } from '../../../infrastructure/share/nativeShare';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
+import { IG_REEL_JS } from '../../shared/igReelPlayer';
 import { supabase } from '../../../infrastructure/supabase/client';
 import { fetchReactionById, fetchReactions, type ReactionItem } from '../../../infrastructure/supabase/queries/threads';
 import { downloadAndCache, recordReactionDownload } from '../../../infrastructure/storage/reactionStorage';
@@ -428,7 +419,7 @@ export default function WatchReactionScreen({
               setSupportMultipleWindows={false}
               onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
               injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
-              injectedJavaScript={IG_INJECT_JS}
+              injectedJavaScript={IG_REEL_JS}
               onMessage={(e) => {
                 try {
                   const msg = JSON.parse(e.nativeEvent.data);

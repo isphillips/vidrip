@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, TextInput, FlatList, StyleSheet,
   TouchableOpacity, Image, ActivityIndicator, Alert, RefreshControl,
-  ScrollView, useWindowDimensions, Animated, Easing, PanResponder, KeyboardAvoidingView, Platform, BackHandler, InteractionManager,
+  ScrollView, useWindowDimensions, Animated, Easing, PanResponder, KeyboardAvoidingView, Keyboard, Platform, BackHandler, InteractionManager,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Video from 'react-native-video';
@@ -12,9 +12,11 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
+import { IG_REEL_JS, TapToPlayHint } from '../../shared/igReelPlayer';
 import {
   fetchShorts, searchShorts, CATEGORIES, categoryLabel, type ShortRow, type Category,
 } from '../../../infrastructure/supabase/queries/shorts';
+import { supabase } from '../../../infrastructure/supabase/client';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import { sendThread, updateThreadIntro } from '../../../infrastructure/supabase/queries/threads';
 import { assertVideoAllowed, ModerationRejected } from '../../../infrastructure/moderation/moderateVideo';
@@ -59,29 +61,23 @@ function extractInstagramId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-// Best-effort metadata for a pasted public Reel — scrape Open Graph tags from the
-// public page (RN fetch has no CORS). Instagram may login-wall, so every field is
-// optional; callers fall back to defaults. og:title is "Author on Instagram: caption".
+// Best-effort metadata for a pasted public Reel via the official Instagram oEmbed API
+// (server-side fn keeps the app secret off the client). Every field is optional —
+// oEmbed may not return a caption, and login-walled posts return nothing — so callers
+// fall back to defaults.
 async function fetchInstagramOg(
   id: string,
 ): Promise<{ title: string; thumbnail: string; author: string }> {
   try {
-    const res = await fetch(`https://www.instagram.com/reel/${id}/`, {
-      headers: { 'User-Agent': 'facebookexternalhit/1.1' },
+    const { data, error } = await supabase.functions.invoke('instagram-oembed', {
+      body: { url: `https://www.instagram.com/reel/${id}/` },
     });
-    const html = await res.text();
-    const decode = (s: string) => s
-      .replace(/&amp;/g, '&').replace(/&#0?39;/g, "'").replace(/&quot;/g, '"')
-      .replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-    const og = (p: string) => {
-      const m = html.match(new RegExp(`<meta property="og:${p}" content="([^"]*)"`, 'i'));
-      return m ? decode(m[1]) : '';
+    if (error || !data?.ok) { return { title: '', thumbnail: '', author: '' }; }
+    return {
+      title: (data.title ?? '').slice(0, 120),
+      thumbnail: data.thumbnail ?? '',
+      author: data.author ?? '',
     };
-    const raw = og('title');
-    const author = raw.match(/^(.*?) on Instagram/)?.[1]?.trim() ?? '';
-    // Prefer the caption portion after the colon when present, else the whole title.
-    const caption = raw.replace(/^.*? on Instagram[:]?\s*/, '').replace(/^["“]|["”]$/g, '').trim();
-    return { title: (caption || raw).slice(0, 120), thumbnail: og('image'), author };
   } catch {
     return { title: '', thumbnail: '', author: '' };
   }
@@ -98,22 +94,6 @@ async function fetchInstagramOg(
 // box (the dead space), and collapse white-card padding. The footer keeps its content
 // (icons, likes, caption, View on Instagram) so attribution stays intact. Re-applied
 // on an interval to survive IG's late re-renders.
-// Reel page (?l=1) renders the video full-screen at mobile width. Just keep the page
-// background black so any letterboxing reads black instead of white. (Direct styles —
-// IG's CSP blocks injected <style> tags.)
-const IG_EMBED_FIT = `
-(function(){
-  function imp(el,k,v){ if(el&&el.style){ el.style.setProperty(k,v,'important'); } }
-  function paint(){
-    imp(document.documentElement,'background-color','#000');
-    imp(document.body,'background-color','#000');
-  }
-  paint();
-  var n=0,iv=setInterval(function(){ n++; paint(); if(n>40){ clearInterval(iv); } },150);
-})();
-true;
-`;
-
 // Refresh button with a live MM:SS countdown while on cooldown. Self-ticking so it
 // re-renders every second without re-rendering the whole share screen. The spinner
 // is scaled down to the text size so the button doesn't change size when pressed.
@@ -301,6 +281,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // 3-slot WebView pool — always keeps prev/current/next video pre-buffering
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [slotVideos, setSlotVideos] = useState<[VideoItem|null, VideoItem|null, VideoItem|null]>([null, null, null]);
+  // IG reels are tap-to-play (autoplay triggers the WKWebView black-video bug). Track
+  // per-SLOT whether the current reel has started — reset on each (re)load — so the
+  // "tap to play" hint reappears every time a slot loads a new reel.
+  const [igSlotStarted, setIgSlotStarted] = useState<[boolean, boolean, boolean]>([false, false, false]);
   const slotAnims     = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
   const slotLogicalX  = useRef([0, 0, 0]);          // tracks position without reading _value
   const activeSlotRef = useRef<0|1|2>(1);
@@ -847,6 +831,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // rawUrl lets the inbound-share handler preview a link directly without first
   // round-tripping through the `url` text-field state.
   const handlePastePreview = async (rawUrl?: string) => {
+    Keyboard.dismiss();
     const link = (rawUrl ?? url).trim();
     // TikTok first — if it parses as a TikTok URL, treat as TikTok.
     const ttId = extractTikTokId(link);
@@ -1117,19 +1102,21 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   gridLoading ? (
                     <ActivityIndicator color={C.ACCENT} style={styles.gridSpinner} />
                   ) : (
-                    <Text style={[styles.emptyText, styles.emptyTextTop]}>
-                      {query.trim()
-                        ? `No results for "${query.trim()}"`
-                        : showFriends
-                        ? 'Nothing from friends yet. When your friends react to or share videos, they show up here.'
-                        : showRecommended
-                        ? 'No recommendations yet. Tap Refresh to pull from your subscriptions.'
-                        : showForYou
-                        ? (hasFeedConnection
-                            ? 'No videos yet. Tap Refresh to pull your liked videos.'
-                            : 'Connect a YouTube account in your profile to see your Liked videos.')
-                        : 'No Shorts yet'}
-                    </Text>
+                    <View style={styles.emptyContainer}>
+                      <Text style={[styles.emptyText, styles.emptyTextTop]}>
+                        {query.trim()
+                          ? `No results for "${query.trim()}"`
+                          : showFriends
+                          ? 'Nothing from friends yet. When your friends react to or share videos, they show up here.'
+                          : showRecommended
+                          ? 'No recommendations yet. Tap Refresh to pull from your subscriptions.'
+                          : showForYou
+                          ? (hasFeedConnection
+                              ? 'No videos yet. Tap Refresh to pull your liked videos.'
+                              : 'Connect a YouTube account in your profile to see your Liked videos.')
+                          : 'No Shorts yet'}
+                      </Text>
+                    </View>
                   )
                 }
                 renderItem={({ item, index }) => (
@@ -1200,7 +1187,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               injectMute(i, sv.sourceType);
             }
           };
-          const onSlotLoadStart = () => { slotReadyRef.current[i] = false; };
+          const onSlotLoadStart = () => {
+            slotReadyRef.current[i] = false;
+            // New reel loading in this slot → show the tap-to-play hint again.
+            setIgSlotStarted(p => (p[i] ? (() => { const n = [...p] as [boolean, boolean, boolean]; n[i] = false; return n; })() : p));
+          };
           // YouTube IFrame API → RN bridge: reset skip-guard on ready; auto-advance
           // past a video the player can't play (onError) when it's the active slot.
           const onSlotMessage = (e: any) => {
@@ -1234,26 +1225,38 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   repeat
                 />
               ) : sv.sourceType === 'instagram' ? (
-                <WebView
-                  ref={el => { wvRefs.current[i] = el; }}
-                  style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
-                  source={{ uri: `https://www.instagram.com/reel/${sv.videoId}/?l=1` }}
-                  opaque={false}
-                  allowsInlineMediaPlayback
-                  mediaPlaybackRequiresUserAction={false}
-                  allowsFullscreenVideo={false}
-                  javaScriptEnabled
-                  // The live IG reel page's "open in app" uses window.open('instagram://…'),
-                  // which spawns a popup WebView that launches the IG app and bounces the
-                  // user out of Vidrip. Disabling multiple windows kills that popup; the
-                  // https guard blocks any main-frame app-redirect too. (Keeps the ?l=1 look.)
-                  setSupportMultipleWindows={false}
-                  onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
-                  injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
-                  injectedJavaScript={IG_EMBED_FIT}
-                  onLoad={onSlotLoad}
-                  onLoadStart={onSlotLoadStart}
-                />
+                <>
+                  <WebView
+                    ref={el => { wvRefs.current[i] = el; }}
+                    style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
+                    source={{ uri: `https://www.instagram.com/reel/${sv.videoId}/?l=1` }}
+                    allowsInlineMediaPlayback
+                    mediaPlaybackRequiresUserAction={false}
+                    allowsFullscreenVideo={false}
+                    javaScriptEnabled
+                    // The live IG reel page's "open in app" uses window.open('instagram://…'),
+                    // which spawns a popup WebView that launches the IG app and bounces the
+                    // user out of Vidrip. Disabling multiple windows kills that popup; the
+                    // https guard blocks any main-frame app-redirect too. (Keeps the ?l=1 look.)
+                    setSupportMultipleWindows={false}
+                    onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
+                    injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
+                    injectedJavaScript={IG_REEL_JS}
+                    onLoad={onSlotLoad}
+                    onLoadStart={onSlotLoadStart}
+                    onMessage={e => {
+                      try {
+                        const m = JSON.parse(e.nativeEvent.data);
+                        if (m?.type === 'playing') {
+                          setIgSlotStarted(p => (p[i] ? p : (() => { const n = [...p] as [boolean, boolean, boolean]; n[i] = true; return n; })()));
+                        }
+                      } catch { /* ignore */ }
+                    }}
+                  />
+                  {/* Tap-to-play hint (pointerEvents none → the tap reaches the reel,
+                      which is the real touch that makes the inline video composite). */}
+                  {!igSlotStarted[i] && <TapToPlayHint />}
+                </>
               ) : sv.sourceType === 'tiktok' ? (
                 <WebView
                   ref={el => { wvRefs.current[i] = el; }}
@@ -1518,6 +1521,7 @@ const styles = StyleSheet.create({
   gridCenter:    { flexGrow: 1, alignItems: 'center', justifyContent: 'center' },
   gridTop:       { alignItems: 'center', paddingTop: SPACE.LG, paddingHorizontal: SPACE.LG },
   emptyTextCenter: { textAlign: 'center', paddingHorizontal: SPACE.XL, height: '100%' },
+  emptyContainer: { display: 'flex', height: '60%', alignItems: 'center', justifyContent: 'center' },
   emptyTextTop:  { textAlign: 'center', paddingHorizontal: SPACE.XL },
   grid:          { paddingHorizontal: SPACE.LG, paddingBottom: SPACE.XXXL },
   row:           { gap: SPACE.MD, marginBottom: SPACE.MD },

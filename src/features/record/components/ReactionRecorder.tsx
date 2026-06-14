@@ -19,24 +19,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
+import { IG_REEL_JS, TapToPlayHint } from '../../shared/igReelPlayer';
 import {
   checkHeadphonesConnected,
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
-
-// Injected into the Instagram reel WebView (?l=1, full-screen video) to bridge
-// <video> play/pause/ended events back to React Native so recording auto-starts/stops
-// like YouTube. Also blackens the page so any letterboxing reads black.
-const IG_INJECT_JS = `(function(){
-  var hooked=false;
-  function send(t){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:t}));}}
-  function paint(){try{document.documentElement.style.setProperty('background-color','#000','important');if(document.body){document.body.style.setProperty('background-color','#000','important');}}catch(e){}}
-  function hook(v){if(hooked){return;}hooked=true;v.addEventListener('play',function(){send('playing');});v.addEventListener('pause',function(){send('paused');});v.addEventListener('ended',function(){send('ended');});}
-  function tryHook(){paint();var vs=document.querySelectorAll('video');if(vs.length>0){hook(vs[0]);return;}setTimeout(tryHook,300);}
-  tryHook();
-  new MutationObserver(function(){paint();if(!hooked){tryHook();}}).observe(document.documentElement,{childList:true,subtree:true});
-  true;
-})();`;
 
 
 function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
@@ -151,6 +138,8 @@ export default function ReactionRecorder({
   // Receding cap bar (1 = full → 0 = time's up) when there's a hard duration limit.
   const capAnim = useRef(new Animated.Value(1)).current;
   const [ytKey, setYtKey] = useState(0);
+  // IG reels are tap-to-play; hide the hint + know playback began once 'playing' fires.
+  const [igStarted, setIgStarted] = useState(false);
 
   useEffect(() => {
     Orientation.lockToPortrait();
@@ -278,6 +267,7 @@ export default function ReactionRecorder({
     StatusBar.setHidden(false, 'fade');
     if (speakerOverrideRef.current) { restoreAudioRoute().catch(() => {}); speakerOverrideRef.current = false; }
     await cameraRef.current?.stopRecording().catch(() => {});
+    setIgStarted(false);   // reel remounts → show tap-to-play again
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
   }, [stopTimer]);
@@ -372,9 +362,9 @@ export default function ReactionRecorder({
       ) : videoId && sourceType === 'instagram' ? (
         <View style={styles.ytCover}>
           <WebView
+            key={ytKey}
             style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
             source={{ uri: `https://www.instagram.com/reel/${videoId}/?l=1` }}
-            opaque={false}
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             allowsFullscreenVideo={false}
@@ -386,17 +376,21 @@ export default function ReactionRecorder({
             setSupportMultipleWindows={false}
             onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
             injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
-            injectedJavaScript={IG_INJECT_JS}
+            injectedJavaScript={IG_REEL_JS}
             onMessage={(e) => {
               try {
                 const msg = JSON.parse(e.nativeEvent.data);
-                // Ignore 'paused' — the IG reel player fires it during buffering, which
-                // would prematurely trigger stop. Only 'playing' and 'ended' drive the
-                // recording lifecycle; the manual Stop button handles early exit.
+                // Tap-to-play: the user's tap starts the reel → 'playing' begins the
+                // recording. Ignore 'paused' (fires during buffering); manual Stop
+                // handles early exit.
+                if (msg.type === 'playing') { setIgStarted(true); }
                 if (msg.type && msg.type !== 'paused') { onYtStateChange(msg.type); }
               } catch { /* ignore non-JSON messages */ }
             }}
           />
+          {/* Tap the reel to start (and begin recording). pointerEvents none so the
+              tap reaches the WebView — the real touch that composites the video. */}
+          {!igStarted && <TapToPlayHint />}
         </View>
       ) : videoId ? (() => {
         const coverW = Math.round(height * (16 / 9));

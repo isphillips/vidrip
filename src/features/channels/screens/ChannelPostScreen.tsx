@@ -28,6 +28,7 @@ import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import EmojiChips from '../../../components/EmojiChips';
 import Handle from '../../../components/Handle';
 import { openProfile } from '../../../store/profileDrawerStore';
+import { formatSourceType } from '../../../utils/sourceType';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 type DlState = 'local' | 'downloading' | 'unavailable';
@@ -178,14 +179,6 @@ export default function ChannelPostScreen({
     setProcessing(prev => { const n = new Set(prev); n.delete(key); return n; });
   }, [user?.id, reactions, processing, load]);
 
-  const getFormattedSourceType = (type: string) => {
-    switch (type) {
-      case 'tiktok': return 'TikTok';
-      case 'youtube': return 'YouTube';
-      case 'bunny': return 'Vidrip';
-      default: return type.charAt(0).toUpperCase() + type.slice(1);
-    }
-  };
 
   if (loading) {
     return (
@@ -229,7 +222,7 @@ export default function ChannelPostScreen({
   // You can review a post once you've reacted to it (and it isn't your own post),
   // and only if the creator allows reviews on this channel.
   const canReview = reviewsAllowed && isJoined && hasReacted && post.poster_id !== user?.id && !hasReviewed;
-  const formattedSourceType = getFormattedSourceType(post.source_type);
+  const formattedSourceType = formatSourceType(post.source_type);
 
   return (
     <View style={styles.container}>
