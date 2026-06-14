@@ -11,6 +11,7 @@ import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/n
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
 import {
   fetchShorts, searchShorts, CATEGORIES, categoryLabel, type ShortRow, type Category,
 } from '../../../infrastructure/supabase/queries/shorts';
@@ -1242,6 +1243,13 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   mediaPlaybackRequiresUserAction={false}
                   allowsFullscreenVideo={false}
                   javaScriptEnabled
+                  // The live IG reel page's "open in app" uses window.open('instagram://…'),
+                  // which spawns a popup WebView that launches the IG app and bounces the
+                  // user out of Vidrip. Disabling multiple windows kills that popup; the
+                  // https guard blocks any main-frame app-redirect too. (Keeps the ?l=1 look.)
+                  setSupportMultipleWindows={false}
+                  onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
+                  injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
                   injectedJavaScript={IG_EMBED_FIT}
                   onLoad={onSlotLoad}
                   onLoadStart={onSlotLoadStart}

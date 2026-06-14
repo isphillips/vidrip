@@ -18,6 +18,7 @@ import {
 } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
 import {
   checkHeadphonesConnected,
   restoreAudioRoute,
@@ -36,6 +37,7 @@ const IG_INJECT_JS = `(function(){
   new MutationObserver(function(){paint();if(!hooked){tryHook();}}).observe(document.documentElement,{childList:true,subtree:true});
   true;
 })();`;
+
 
 function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -377,6 +379,13 @@ export default function ReactionRecorder({
             mediaPlaybackRequiresUserAction={false}
             allowsFullscreenVideo={false}
             javaScriptEnabled
+            // The live IG reel page's "open in app" uses window.open('instagram://…'),
+            // which spawns a popup WebView that launches the IG app and ruins the
+            // reaction. Disabling multiple windows kills that popup; the https guard
+            // blocks any main-frame app-redirect too. (Keeps the ?l=1 look.)
+            setSupportMultipleWindows={false}
+            onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
+            injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
             injectedJavaScript={IG_INJECT_JS}
             onMessage={(e) => {
               try {

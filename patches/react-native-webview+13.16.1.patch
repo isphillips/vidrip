@@ -1,0 +1,34 @@
+diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
+index 0287e1c..ab2a876 100644
+--- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
++++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
+@@ -92,6 +92,29 @@ public class RNCWebViewClient extends WebViewClient {
+ 
+     @Override
+     public boolean shouldOverrideUrlLoading(WebView view, String url) {
++        // Vidrip patch: hard-block external-app deep links (e.g. the Instagram reel page's
++        // "open in app" -> instagram://reels_share/...) SYNCHRONOUSLY, before the async JS
++        // onShouldStartLoadWithRequest bridge is consulted. That bridge has only a 250ms
++        // timeout and "defaults to allow" when it expires, which on slower/busier Android
++        // WebViews (e.g. OnePlus/OxygenOS) lets the launch through and bounces the user out
++        // of the app mid-reaction. Returning true here means "host handled it, do not load",
++        // which stops the launch outright. Scoped to known app-launch schemes so the app's
++        // own custom-scheme redirects (OAuth callbacks, etc.) are untouched.
++        if (url != null) {
++            final String lower = url.toLowerCase(java.util.Locale.ROOT);
++            if (lower.startsWith("instagram:")
++                || lower.startsWith("intent:")
++                || lower.startsWith("fb:")
++                || lower.startsWith("fb-messenger:")
++                || lower.startsWith("whatsapp:")
++                || lower.startsWith("snapchat:")
++                || lower.startsWith("tiktok:")
++                || lower.startsWith("market:")
++                || lower.startsWith("samsungapps:")
++                || lower.contains("reels_share")) {
++                return true;
++            }
++        }
+         final RNCWebView rncWebView = (RNCWebView) view;
+         final boolean isJsDebugging = rncWebView.getReactApplicationContext().getJavaScriptContextHolder().get() == 0;
+ 
