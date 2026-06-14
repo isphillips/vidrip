@@ -141,7 +141,7 @@ const CATEGORY_DESC: Record<string, string> = {
   music:    'Music videos & performances',
   gaming:   'Gaming clips & highlights',
   funny:    'Comedy & funny moments',
-  food:     'Food, cooking & recipes',
+  blogs:    'Video blogs & people content',
   sports:   'Sports highlights & plays',
   news:     'News & current events',
   pets:     'Pets & animals',
