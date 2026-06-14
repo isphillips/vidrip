@@ -63,7 +63,9 @@ export interface ReactionRecorderProps {
   videoId?: string;
   // Instagram has no embed player — its source plays from this re-hosted file URL.
   sourceUri?: string;
-  sourceType?: 'youtube' | 'tiktok' | 'instagram';
+  // Creator (Bunny) videos play from a signed iframe embed URL (token-authed).
+  embedUrl?: string;
+  sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny';
   onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
@@ -79,6 +81,7 @@ const PIP_H = 155;
 export default function ReactionRecorder({
   videoId,
   sourceUri,
+  embedUrl,
   sourceType = 'youtube',
   onSave,
   onBack,
@@ -96,6 +99,12 @@ export default function ReactionRecorder({
   // Instagram thread shortcode — WebView embed has no controllable player, so the
   // user starts/stops recording manually while watching the reel.
   const igWebEmbed = sourceType === 'instagram' && !!videoId && !sourceUri;
+  // Creator (Bunny) source — token-authed iframe embed; recorded manually like the
+  // Instagram web-embed (the embed player isn't RN-controllable for auto-sync).
+  const bunnyEmbed = sourceType === 'bunny' && !!embedUrl;
+  // Camera shows as a PIP corner whenever a source video fills the screen behind it
+  // (includes the manually-recorded Bunny embed), else full-screen (reviews/clips).
+  const pipCamera = sourceDriven || bunnyEmbed;
 
   const device = useCameraDevice('front');
   // Cap the reaction to 720p/30fps so files stay under the 50MB storage upload
@@ -316,7 +325,18 @@ export default function ReactionRecorder({
   return (
     <View style={styles.container}>
       {/* Source-video full-screen background (or black if no source) */}
-      {igSource ? (
+      {bunnyEmbed ? (
+        <View style={styles.ytCover}>
+          <WebView
+            style={StyleSheet.absoluteFill}
+            source={{ uri: embedUrl as string }}
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            allowsFullscreenVideo={false}
+            javaScriptEnabled
+          />
+        </View>
+      ) : igSource ? (
         <View style={styles.ytCover}>
           <InstagramPlayer
             key={ytKey}
@@ -391,7 +411,7 @@ export default function ReactionRecorder({
       {/* Camera — PIP corner when a source video drives the screen, otherwise
           full-screen (private channel clips, reviews). */}
       {ready && device ? (
-        <View style={sourceDriven
+        <View style={pipCamera
           ? [styles.pip, { bottom: bottomInset + 100, right: SPACE.LG }]
           : StyleSheet.absoluteFill}>
           <Camera
@@ -406,7 +426,7 @@ export default function ReactionRecorder({
             // bleeds past the PIP border on Android. TextureView is an ordinary
             // child view and honors overflow:'hidden' + borderRadius. Full-screen
             // has nothing to clip, so it keeps the more efficient surface-view.
-            androidPreviewViewType={sourceDriven ? 'texture-view' : 'surface-view'}
+            androidPreviewViewType={pipCamera ? 'texture-view' : 'surface-view'}
             // 2 Mbps video (+~0.13 audio) keeps a 180s reaction/review at ~48MB,
             // under the 50MB Supabase storage upload limit (60s ≈ 16MB).
             videoBitRate={2}
@@ -414,11 +434,11 @@ export default function ReactionRecorder({
             video={true}
             audio={true}
           />
-          {isRecording && sourceDriven && <View style={styles.pipRecDot} />}
+          {isRecording && pipCamera && <View style={styles.pipRecDot} />}
         </View>
       ) : __DEV__ ? (
         // Simulator placeholder so the source player + controls are still visible.
-        <View style={sourceDriven
+        <View style={pipCamera
           ? [styles.pip, styles.devCam, { bottom: bottomInset + 100, right: SPACE.LG }]
           : [StyleSheet.absoluteFill, styles.devCam]}>
           <Text style={styles.devCamTxt}>DEV cam{isRecording ? ' ●' : ''}</Text>
@@ -465,7 +485,7 @@ export default function ReactionRecorder({
       {/* Controls. Source-driven (reactions): start is driven by the source video,
           but once recording you can restart or stop manually. Otherwise (private
           clips / reviews) the manual record button starts it. */}
-      {!uploading && (!sourceDriven || isRecording || igWebEmbed) && (
+      {!uploading && (!sourceDriven || isRecording || igWebEmbed || bunnyEmbed) && (
         <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
           {isRecording ? (
             <>

@@ -180,6 +180,7 @@ export default function ChannelPostScreen({
     switch (type) {
       case 'tiktok': return 'TikTok';
       case 'youtube': return 'YouTube';
+      case 'bunny': return 'Vidrip';
       default: return type.charAt(0).toUpperCase() + type.slice(1);
     }
   };
@@ -403,6 +404,12 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' },
   muted: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY },
   thumbWrap: { backgroundColor: C.BLACK, overflow: 'hidden' },
+  watchOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  watchBtn: {
+    width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.9)',
+  },
+  watchIcon: { color: C.WHITE, fontSize: 30, marginLeft: 4 },
   thumb: { width: '100%', height: '100%' },
   thumbPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.SURFACE_2 },
   thumbIcon: { fontSize: 48, color: C.SUBTLE },

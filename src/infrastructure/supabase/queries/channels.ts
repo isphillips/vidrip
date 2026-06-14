@@ -36,8 +36,8 @@ export type ChannelPost = {
   channel_id: string;
   poster_id: string;
   poster: { handle: string } | null;
-  post_type: 'youtube' | 'clip' | 'audio' | 'status';
-  source_type: 'youtube' | 'tiktok' | 'instagram';
+  post_type: 'youtube' | 'clip' | 'audio' | 'status' | 'creator';
+  source_type: 'youtube' | 'tiktok' | 'instagram' | 'bunny';
   yt_video_id: string | null;
   yt_video_title: string | null;
   yt_video_thumbnail: string | null;

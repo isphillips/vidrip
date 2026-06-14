@@ -91,7 +91,7 @@ export default function WatchChannelClipScreen({
   const [sessionReady, setSessionReady] = useState(false);
   const [parentYtVideoId, setParentYtVideoId] = useState<string | null>(null);
   const [parentSourceUri, setParentSourceUri] = useState<string | null>(null); // instagram parent file
-  const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok' | 'instagram'>('youtube');
+  const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny'>('youtube');
 
   const videoRef = useRef<any>(null);
   const ytRef = useRef<any>(null);

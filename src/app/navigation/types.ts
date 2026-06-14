@@ -26,6 +26,7 @@ export type ChannelsStackParamList = {
   ChannelPost: { postId: string; channelId: string; isJoined: boolean };
   WatchYouTubePost: { postId: string; channelId: string };
   WatchChannelClip: { postId: string };
+  WatchCreatorVideo: { postId: string; title?: string };
   RecordReview: { postId: string; channelId: string };
   WatchReview: { reviewId: string };
   ChannelReviews: { channelId: string; channelName: string };
@@ -79,8 +80,19 @@ export type RecordStackParamList = {
 };
 
 // Root-level modals
+// Creator Studio stack (presented modally over the tabs)
+export type StudioStackParamList = {
+  StudioHome: undefined;
+  StudioDetails: { fileUri: string; durationSec?: number };
+  StudioPlayer: { postId: string; title: string };
+};
+
+export type StudioStackScreenProps<T extends keyof StudioStackParamList> =
+  NativeStackScreenProps<StudioStackParamList, T>;
+
 export type RootStackParamList = {
   Main: undefined;
+  Studio: undefined;
   RecordReaction: RecordStackParamList['RecordReaction'];
   RecordComment: {
     rootSourceId: string;

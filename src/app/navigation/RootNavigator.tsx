@@ -18,6 +18,7 @@ import {
 } from '../../infrastructure/notifications/pushService';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
+import StudioStack from './StudioStack';
 import MfaChallengeScreen from '../../features/auth/screens/MfaChallengeScreen';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
 import RecordCommentScreen from '../../features/comments/screens/RecordCommentScreen';
@@ -253,6 +254,11 @@ export default function RootNavigator() {
           ) : (
             <>
               <Root.Screen name="Main" component={MainTabs} />
+              <Root.Screen
+                name="Studio"
+                component={StudioStack}
+                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+              />
               <Root.Screen
                 name="RecordReaction"
                 component={RecordReactionScreen}

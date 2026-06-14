@@ -421,5 +421,8 @@ verify_jwt = false
 [functions.fetch-channel-shorts]
 verify_jwt = false
 
+[functions.bunny-webhook]
+verify_jwt = false
+
 [functions.send-push]
 verify_jwt = false

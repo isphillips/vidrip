@@ -363,9 +363,11 @@ export default function ChannelhamburderScreen({
   // Invite-only rooms lock their videos for anyone who isn't the owner or a member.
   const inviteLocked = inviteOnly && !isOwner && !joined;
   // TikTok: ignore the stored (expired) URL — use the freshly resolved one.
-  const ytThumb = (videoId: string | null, source: 'youtube' | 'tiktok' | 'instagram', stored: string | null) =>
+  const ytThumb = (videoId: string | null, source: 'youtube' | 'tiktok' | 'instagram' | 'bunny', stored: string | null) =>
     source === 'tiktok'
       ? (videoId ? ttThumbs[videoId] ?? null : null)
+      : source === 'bunny'
+      ? stored   // Bunny thumbnail URL (stored by the webhook)
       : (stored ?? (videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null));
 
   const gridTiles = useMemo<GridTile[]>(() => {
@@ -417,7 +419,7 @@ export default function ChannelhamburderScreen({
         onPress: () => {
           if (inviteLocked) {
             Alert.alert('Invite only', 'Ask the channel owner for an invite to watch and react.');
-          } else if (item.post_type === 'youtube') {
+          } else if (item.post_type === 'youtube' || item.post_type === 'creator') {
             navigation.navigate('ChannelPost', { postId: item.id, channelId, isJoined: joined });
           } else {
             navigation.navigate('WatchChannelClip', { postId: item.id });

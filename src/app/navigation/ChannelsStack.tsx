@@ -9,6 +9,7 @@ import ChannelScreen from '../../features/channels/screens/ChannelScreen';
 import ChannelPostScreen from '../../features/channels/screens/ChannelPostScreen';
 import WatchYouTubePostScreen from '../../features/channels/screens/WatchYouTubePostScreen';
 import WatchChannelClipScreen from '../../features/channels/screens/WatchChannelClipScreen';
+import WatchCreatorVideoScreen from '../../features/channels/screens/WatchCreatorVideoScreen';
 import RecordReviewScreen from '../../features/channels/screens/RecordReviewScreen';
 import WatchReviewScreen from '../../features/channels/screens/WatchReviewScreen';
 import ChannelReviewsScreen from '../../features/channels/screens/ChannelReviewsScreen';
@@ -54,6 +55,11 @@ export default function ChannelsNavigator() {
         name="WatchChannelClip"
         component={WatchChannelClipScreen}
         options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }}
+      />
+      <Stack.Screen
+        name="WatchCreatorVideo"
+        component={WatchCreatorVideoScreen}
+        options={{ headerShown: false, animation: 'slide_from_right' }}
       />
       <Stack.Screen
         name="RecordReview"

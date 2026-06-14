@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { fetchChannelPost, commitChannelClip, uploadChannelClipRelay } from '../../../infrastructure/supabase/queries/channels';
+import { signCreatorVideo } from '../../../infrastructure/creatorStudio/api';
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
 import { C } from '../../../theme';
@@ -16,14 +17,20 @@ export default function WatchYouTubePostScreen({
   const enqueue = useUploadStore(s => s.enqueue);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [sourceUri, setSourceUri] = useState<string | null>(null);
-  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok' | 'instagram'>('youtube');
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny'>('youtube');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetchChannelPost(postId).then(p => {
+    fetchChannelPost(postId).then(async p => {
+      const st = p?.source_type ?? 'youtube';
       setVideoId(p?.yt_video_id ?? null);
       setSourceUri(p?.video_url ?? null);     // instagram plays from the re-hosted file
-      setSourceType(p?.source_type ?? 'youtube');
+      setSourceType(st);
+      // Creator (Bunny) source plays from a short-lived signed embed URL.
+      if (st === 'bunny') {
+        try { setEmbedUrl(await signCreatorVideo(postId)); } catch { /* leave null → not ready */ }
+      }
       setLoaded(true);
     });
   }, [postId]);
@@ -39,7 +46,9 @@ export default function WatchYouTubePostScreen({
     });
   }, [channelId, postId, user, enqueue]);
 
-  const ready = sourceType === 'instagram' ? !!sourceUri : !!videoId;
+  const ready = sourceType === 'bunny' ? !!embedUrl
+    : sourceType === 'instagram' ? !!sourceUri
+    : !!videoId;
   if (!loaded || !ready) {
     return (
       <View style={styles.center}>
@@ -50,8 +59,9 @@ export default function WatchYouTubePostScreen({
 
   return (
     <ReactionRecorder
-      videoId={sourceType === 'instagram' ? undefined : (videoId ?? undefined)}
+      videoId={(sourceType === 'instagram' || sourceType === 'bunny') ? undefined : (videoId ?? undefined)}
       sourceUri={sourceUri ?? undefined}
+      embedUrl={embedUrl ?? undefined}
       sourceType={sourceType}
       onBack={onBack}
       uploadingText="Posting reaction…"
