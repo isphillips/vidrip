@@ -22,6 +22,7 @@ import { usePendingIntroStore } from '../../../store/pendingIntroStore';
 import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
 import { fetchYouTubeDurationSeconds, MAX_VIDEO_SECONDS } from '../../../infrastructure/youtube/api';
 import { useShareIntentStore } from '../../../store/shareIntentStore';
+import { useShareUiStore } from '../../../store/shareUiStore';
 import { fetchMembersOnlyVideos } from '../../../infrastructure/supabase/queries/channels';
 import {
   fetchConnectedFeed, refreshConnectedFeed, FEED_REFRESH_COOLDOWN_MS,
@@ -418,6 +419,17 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     finally { setRefreshing(false); }
   }, [loadCategory, category]);
 
+  // Default back to Browse each time the tab is (re)entered, so returning users
+  // land on videos rather than being stranded on the Paste Link panel they used
+  // last. (Inbound shared links open the preview overlay on top of Browse, so
+  // this doesn't disrupt that flow.)
+  useFocusEffect(useCallback(() => { setMode('browse'); }, []));
+
+  // Tapping the Browse tab while it's already active also returns to browse — a
+  // plain tab tap doesn't change focus, so the tab button bumps this nonce.
+  const browseNonce = useShareUiStore(s => s.browseNonce);
+  useEffect(() => { setMode('browse'); }, [browseNonce]);
+
   // Members Only videos from channels the user has JOINED — refetch on focus so
   // joining/leaving a channel elsewhere is reflected here.
   useFocusEffect(useCallback(() => {
@@ -558,7 +570,20 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     setSelectedIndex(index ?? null);
     setSentThisSession(new Set());
     setSelectedFriends(new Set());
-    if (index != null) { initSlots(video, index); }
+    if (index != null) {
+      initSlots(video, index);
+    } else {
+      // Pasted / inbound-share URL: there's no feed grid to prev/next through, so
+      // mount this single video straight into the active slot. Without this the
+      // WebView pool stays empty and the preview is just black.
+      activeSlotRef.current = 1;
+      slotVideoIdxRef.current = [-1, -1, -1];
+      slotLogicalX.current = [-width, 0, width];
+      slotAnims[0].setValue(-width);
+      slotAnims[1].setValue(0);
+      slotAnims[2].setValue(width);
+      setSlotVideos([null, video, null]);
+    }
     Animated.spring(playerAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }).start();
   };
 
@@ -763,15 +788,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     }
   };
 
-  // ── Inbound OS share ("Share to Vidrip") → prefill the paste field ───────────
+  // ── Inbound OS share ("Share to Vidrip") ─────────────────────────────────────
+  // The link is consumed by the focus-gated effect just below handlePastePreview,
+  // which jumps STRAIGHT into the preview (no paste field, no keyboard).
   const pendingShareUrl = useShareIntentStore(s => s.pendingUrl);
   const clearPendingShareUrl = useShareIntentStore(s => s.setPendingUrl);
-  useEffect(() => {
-    if (!pendingShareUrl) { return; }
-    setMode('paste');
-    setUrl(pendingShareUrl);
-    clearPendingShareUrl(null);
-  }, [pendingShareUrl, clearPendingShareUrl]);
 
   // ── Reactive link validation (runs as the user pastes/types) ─────────────────
   useEffect(() => {
@@ -795,9 +816,12 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   }, [url, mode]);
 
   // ── Paste flow ──────────────────────────────────────────────────────────────
-  const handlePastePreview = async () => {
+  // rawUrl lets the inbound-share handler preview a link directly without first
+  // round-tripping through the `url` text-field state.
+  const handlePastePreview = async (rawUrl?: string) => {
+    const link = (rawUrl ?? url).trim();
     // TikTok first — if it parses as a TikTok URL, treat as TikTok.
-    const ttId = extractTikTokId(url.trim());
+    const ttId = extractTikTokId(link);
     if (ttId) {
       setPasting(true);
       const meta = await fetchTikTokMeta(ttId);
@@ -812,7 +836,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       return;
     }
 
-    const igId = extractInstagramId(url.trim());
+    const igId = extractInstagramId(link);
     if (igId) {
       setPasting(true);
       const og = await fetchInstagramOg(igId);   // best-effort title + thumbnail
@@ -827,7 +851,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       return;
     }
 
-    const videoId = extractYouTubeId(url.trim());
+    const videoId = extractYouTubeId(link);
     if (!videoId) { Alert.alert('Invalid Link', 'Paste a YouTube Shorts, TikTok, or Instagram Reel link to continue.'); return; }
     setPasting(true);
     let title = 'YouTube Short';
@@ -839,6 +863,17 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     setPasting(false);
     openPlayer({ videoId, title, thumbnail, channelTitle: '' });
   };
+
+  // Inbound shared URL → jump straight to the preview (no paste field / keyboard).
+  // Focus-gated so RootNavigator switches to this tab first, then we consume it.
+  useEffect(() => {
+    if (!pendingShareUrl || !isFocused) { return; }
+    const link = pendingShareUrl;
+    clearPendingShareUrl(null);
+    setUrl(link);                 // keep it in the field for an easy re-preview/edit
+    handlePastePreview(link);     // open the preview directly
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingShareUrl, isFocused]);
 
   // ── Filtered friends ────────────────────────────────────────────────────────
   const filteredFriends = friendFilter.trim()
@@ -907,7 +942,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
           ) : (
             <TouchableOpacity
               style={[styles.pasteBtn, (linkStatus !== 'ok' || pasting) && styles.pasteBtnDisabled]}
-              onPress={handlePastePreview} disabled={linkStatus !== 'ok' || pasting}>
+              onPress={() => handlePastePreview()} disabled={linkStatus !== 'ok' || pasting}>
               {(pasting || linkStatus === 'checking')
                 ? <ActivityIndicator color={C.WHITE} />
                 : <Text style={styles.pasteBtnText}>Preview & Share →</Text>}

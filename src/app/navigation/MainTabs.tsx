@@ -31,6 +31,7 @@ import PasswordSetupScreen from '../../features/account/screens/PasswordSetupScr
 import TwoFactorScreen from '../../features/account/screens/TwoFactorScreen';
 import { Image } from 'react-native';
 import { useFeedStore } from '../../store/feedStore';
+import { useShareUiStore } from '../../store/shareUiStore';
 
 const tabIcon = (source: ReturnType<typeof require>, w = 28, h = 28) =>
   ({ color, focused }: { color: string; focused: boolean }) => (
@@ -144,6 +145,11 @@ export default function MainTabs() {
         })}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Channels' }} />
       <Tab.Screen name="Share" component={ShareNavigator}
+        listeners={() => ({
+          // Tapping Browse always returns to the browse view (even from the Paste
+          // Link panel while the tab is already active).
+          tabPress: () => { useShareUiStore.getState().requestBrowse(); },
+        })}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Browse' }} />
       <Tab.Screen name="Friends" component={FriendsNavigator}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-friends.png')), tabBarLabel: 'Friends' }} />
