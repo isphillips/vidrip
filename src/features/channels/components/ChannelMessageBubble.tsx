@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
-  View, Text, Image, StyleSheet, TouchableOpacity, Alert, Modal,
+  View, Text, StyleSheet, TouchableOpacity, Alert, Modal,
 } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import type { ChannelPost } from '../../../infrastructure/supabase/queries/channels';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import Handle from '../../../components/Handle';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 function formatTime(iso: string): string {
   const date = new Date(iso);
@@ -78,7 +79,7 @@ export default function ChannelMessageBubble({
           {hasReactions && (
             <View style={[styles.emojiTag, isMe ? styles.emojiTagLeft : styles.emojiTagRight]}>
               {shown.map(([emoji]) => (
-                <EmojiGlyph key={emoji} emoji={emoji} size={22} />
+                <EmojiGlyph key={emoji} emoji={emoji} size={32} />
               ))}
               {overflow > 0 && (
                 <Text style={styles.emojiTagOverflow}>+{overflow}</Text>
@@ -95,7 +96,7 @@ export default function ChannelMessageBubble({
             <View style={styles.clipRow}>
               <View style={styles.playCircle}>
                 {post.post_type === 'audio'
-                  ? <Image source={require('../../../assets/icon-audio.png')} style={styles.clipIcon} resizeMode="contain" />
+                  ? <Ionicons name="mic" size={16} color={C.WHITE} />
                   : <Text style={styles.playIcon}>▶</Text>
                 }
               </View>
@@ -125,7 +126,7 @@ export default function ChannelMessageBubble({
                   key={emoji}
                   style={styles.pickerBtn}
                   onPress={() => { onEmojiToggle(emoji); setPickerVisible(false); }}>
-                  <EmojiGlyph emoji={emoji} size={32} />
+                  <EmojiGlyph emoji={emoji} size={42} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -151,12 +152,8 @@ const styles = StyleSheet.create({
   // Emoji reaction badge
   emojiTag: {
     position: 'absolute',
-    top: -SPACE.MD,
+    top: -SPACE.LG,
     flexDirection: 'row', alignItems: 'center', gap: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: RADIUS.FULL,
-    paddingHorizontal: SPACE.XS + 1, paddingVertical: 2,
-    borderWidth: 1, borderColor: C.BORDER,
     zIndex: 1,
   },
   emojiTagLeft: { left: 4 },

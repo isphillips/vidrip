@@ -14,7 +14,7 @@ import {
   type VideoComment, type CommentCursor,
 } from '../../../infrastructure/supabase/queries/videoComments';
 import Handle from '../../../components/Handle';
-import { localPathForComment } from '../../../infrastructure/storage/commentStorage';
+import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import { useAuthStore } from '../../../store/authStore';
 import { usePendingCommentsStore } from '../../../store/pendingCommentsStore';
 import { useUploadStore } from '../../../store/uploadStore';
@@ -24,7 +24,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RootNav = NativeStackNavigationProp<RootStackParamList>;
 
-const EMOJI_OPTIONS = ['❤️', '😂', '🔥', '😮', '👏', '💯'];
+// Reaction set comes from EmojiGlyph (QUICK_EMOJIS) so comment reactions use the
+// same branded glyphs as the rest of the app.
+const EMOJI_OPTIONS = QUICK_EMOJIS;
 const SHEET_HEIGHT = Dimensions.get('window').height * 0.72;
 
 interface Props {
@@ -73,7 +75,7 @@ function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
     <View style={ep.row}>
       {EMOJI_OPTIONS.map(e => (
         <TouchableOpacity key={e} style={ep.btn} onPress={() => onPick(e)}>
-          <Text style={ep.emoji}>{e}</Text>
+          <EmojiGlyph emoji={e} size={26} />
         </TouchableOpacity>
       ))}
     </View>
@@ -153,7 +155,8 @@ function CommentCard({
               key={emoji}
               style={[cc.emojiChip, mine && cc.emojiChipMine]}
               onPress={() => onEmojiTap(comment, emoji)}>
-              <Text style={cc.emojiChipText}>{emoji} {count}</Text>
+              <EmojiGlyph emoji={emoji} size={14} />
+              <Text style={cc.emojiChipText}> {count}</Text>
             </TouchableOpacity>
           ))}
           <TouchableOpacity style={cc.emojiAdd} onLongPress={() => onEmojiLongPress(comment)} onPress={() => onEmojiLongPress(comment)} hitSlop={4}>

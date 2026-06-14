@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import Handle from '../../../components/Handle';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import GradientIcon from '../../../components/GradientIcon';
 import { supabase } from '../../../infrastructure/supabase/client';
 import {
   fetchChannelPosts,
@@ -538,7 +540,7 @@ export default function ChannelhamburderScreen({
           <View style={styles.headerActions}>
             <TouchableOpacity hitSlop={8}
               onPress={() => navigation.navigate('AddChannelMembers', { channelId })}>
-              <Image source={require('../../../assets/icon-addfriend.png')} style={styles.headerActionImg} resizeMode="contain" />
+              <Ionicons name="person-add" size={20} color={C.WHITE} />
             </TouchableOpacity>
             <TouchableOpacity hitSlop={8} onPress={() => {
               Alert.alert('Leave channel?', '', [
@@ -548,7 +550,7 @@ export default function ChannelhamburderScreen({
                 }},
               ]);
             }}>
-              <Image source={require('../../../assets/icon-leave.png')} style={styles.headerActionImg} resizeMode="contain" />
+              <Ionicons name="exit-outline" size={26} color={C.WHITE} />
             </TouchableOpacity>
           </View>
         )}
@@ -694,7 +696,7 @@ export default function ChannelhamburderScreen({
       {/* Private channel: pending audio preview */}
       {!isPublic && pendingAudio && (
         <View style={styles.audioPreview}>
-          <Image source={require('../../../assets/icon-audio.png')} style={styles.audioPreviewIcon} resizeMode="contain" />
+          <GradientIcon name="mic" size={20} />
           <Text style={styles.audioPreviewText}>{pendingAudio.duration.toFixed(1)}s</Text>
           <TouchableOpacity onPress={handleAudioCancel} hitSlop={8}>
             <Text style={styles.audioPreviewCancel}>✕</Text>
@@ -716,18 +718,15 @@ export default function ChannelhamburderScreen({
             <TouchableOpacity style={styles.barBtn}
               onPress={() => navigation.navigate('ChannelVideoRecord', { channelId })}
               activeOpacity={0.8}>
-              <Image source={require('../../../assets/icon-video.png')} style={styles.barIcon} resizeMode="contain" />
-              <View style={styles.gloss} pointerEvents="none" />
+              <GradientIcon name="videocam" size={26} />
             </TouchableOpacity>
             <Pressable
               onPressIn={handleMicPressIn}
               onPressOut={handleMicPressOut}
               style={[styles.barBtn, isHoldingMic && styles.barBtnActive]}>
-              <Image
-                source={require('../../../assets/icon-audio.png')}
-                style={[styles.barIcon, isHoldingMic && styles.barIconRecording]}
-                resizeMode="contain" />
-              <View style={styles.gloss} pointerEvents="none" />
+              {isHoldingMic
+                ? <Ionicons name="mic" size={26} color={C.ACCENT_HOT} />
+                : <GradientIcon name="mic" size={26} />}
             </Pressable>
           </View>
         </View>
@@ -877,7 +876,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     gap: SPACE.XL, paddingTop: SPACE.MD, paddingBottom: SPACE.XL,
     backgroundColor: C.SURFACE,
-    borderTopWidth: 1, borderTopColor: C.BORDER,
+    borderTopWidth: 1, borderTopColor: C.BORDER_STRONG,
   },
   barBtn: {
     width: 52, height: 52, borderRadius: RADIUS.FULL,

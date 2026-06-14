@@ -143,9 +143,7 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
                     onLayout={e => {
                       const { width: w, height: h } = e.nativeEvent.layout;
                       setStudioTextSize(s => (Math.abs(s.w - w) > 1 || Math.abs(s.h - h) > 1) ? { w, h } : s);
-                    }}>
-                    STUDIO
-                  </Text>
+                    }}>STUDIO</Text>
                 }>
                 <AnimatedGradient
                   colors={FLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -235,5 +233,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.MD, paddingVertical: 3,
   },
   // Mask glyphs — color is irrelevant (only alpha matters), the gradient shows through.
-  studioBadgeText: { color: '#000', fontSize: 10, fontFamily: FONT.BODY_BOLD, letterSpacing: 1.5 },
+  studioBadgeText: { color: '#000', fontSize: 10, fontFamily: FONT.BODY_BOLD, letterSpacing: 1.5, width: 45 },
 });
