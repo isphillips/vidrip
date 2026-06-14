@@ -40,6 +40,7 @@ import { configureForMixedPlayback } from '../../../infrastructure/native/audioR
 import { shareTextNative } from '../../../infrastructure/share/nativeShare';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
 import { supabase } from '../../../infrastructure/supabase/client';
 import { fetchReactionById, fetchReactions, type ReactionItem } from '../../../infrastructure/supabase/queries/threads';
 import { downloadAndCache, recordReactionDownload } from '../../../infrastructure/storage/reactionStorage';
@@ -416,11 +417,17 @@ export default function WatchReactionScreen({
           {reaction.source_type === 'instagram' ? (
             <WebView
               style={{ width, height, backgroundColor: '#000' }}
-              source={{ uri: `https://www.instagram.com/reel/${reaction.yt_video_id}/embed/` }}
+              source={{ uri: `https://www.instagram.com/reel/${reaction.yt_video_id}/?l=1` }}
               allowsInlineMediaPlayback
               mediaPlaybackRequiresUserAction={false}
               allowsFullscreenVideo={false}
               javaScriptEnabled
+              // Match the full-screen ?l=1 look used while recording. The native
+              // react-native-webview patch + this in-page blocker keep the reel page from
+              // deep-linking into the IG app. See igBlockLaunch / the IG_BLOCK_LAUNCH_JS docs.
+              setSupportMultipleWindows={false}
+              onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
+              injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
               injectedJavaScript={IG_INJECT_JS}
               onMessage={(e) => {
                 try {
