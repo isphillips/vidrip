@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   toggleBtnActive: { backgroundColor: C.ACCENT, borderColor: C.ACCENT },
   toggleText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED },
   toggleTextActive: { color: C.WHITE },
-  footer: { paddingVertical: SPACE.MD },
+  footer: { paddingVertical: 0, paddingBottom: SPACE.LG },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: C.SURFACE_2, overflow: 'hidden', marginBottom: SPACE.SM },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: C.ACCENT_HOT },
   postBtn: { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, padding: SPACE.LG, alignItems: 'center' },

@@ -26,6 +26,8 @@ import {
 } from '../../../infrastructure/storage/localChannelClipStorage';
 import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import EmojiChips from '../../../components/EmojiChips';
+import Handle from '../../../components/Handle';
+import { openProfile } from '../../../store/profileDrawerStore';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 type DlState = 'local' | 'downloading' | 'unavailable';
@@ -249,7 +251,8 @@ export default function ChannelPostScreen({
         {/* Overlay — same position for both states */}
         <View style={styles.blindOverlay}>
           <Text style={styles.posterHandle}>
-            Posted by <Text style={styles.handle}>@{post.poster?.handle ?? '?'}</Text>
+            Posted by{' '}
+            <Handle userId={post.poster_id} handle={post.poster?.handle ?? '?'} style={styles.handle} />
             {' · via '}{formattedSourceType}
           </Text>
           {obscured ? (
@@ -324,7 +327,11 @@ export default function ChannelPostScreen({
               <Text style={styles.thumbPlayIcon}>★</Text>
             </View>
             <View style={styles.reactionInfo}>
-              <Text style={styles.reactionHandle}>@{rv.reviewer?.handle ?? '?'}</Text>
+              <TouchableOpacity
+                onPress={() => openProfile({ userId: rv.reviewer_id, handle: rv.reviewer?.handle })}
+                hitSlop={8} activeOpacity={0.7}>
+                <Text style={styles.reactionHandle}>@{rv.reviewer?.handle ?? '?'}</Text>
+              </TouchableOpacity>
               {rv.duration ? <Text style={styles.reactionDuration}>{rv.duration}s review</Text> : null}
             </View>
           </TouchableOpacity>
@@ -365,7 +372,11 @@ export default function ChannelPostScreen({
             </View>
 
             <View style={styles.reactionInfo}>
-              <Text style={styles.reactionHandle}>@{(r.user as any)?.handle ?? r.poster?.handle ?? '?'}</Text>
+              <TouchableOpacity
+                onPress={() => openProfile({ userId: r.poster_id, handle: (r as any).user?.handle ?? r.poster?.handle })}
+                hitSlop={8} activeOpacity={0.7}>
+                <Text style={styles.reactionHandle}>@{(r as any).user?.handle ?? r.poster?.handle ?? '?'}</Text>
+              </TouchableOpacity>
               {canWatch && <Text style={styles.reactionDuration}>{r.duration}s reaction</Text>}
               {state === 'downloading' && <Text style={styles.reactionStatus}>Downloading…</Text>}
               {state === 'unavailable' && (
@@ -483,7 +494,7 @@ const styles = StyleSheet.create({
   dlWrap: { alignItems: 'center', gap: 2 },
   dlPct: { fontSize: 10, color: C.MUTED, fontFamily: FONT.BODY },
   reactionInfo: { flex: 1 },
-  reactionHandle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM, color: C.INK },
+  reactionHandle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM, color: C.ACCENT_HOT },
   reactionDuration: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY },
   reactionStatus: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY, fontStyle: 'italic' },
   reactionRetry: { color: C.ACCENT_HOT, fontStyle: 'normal' },

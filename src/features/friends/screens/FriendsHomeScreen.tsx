@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Handle from '../../../components/Handle';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
@@ -101,7 +102,7 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
               </TouchableOpacity>
               <View style={styles.rowInfo}>
                 <Text style={styles.name}>{req.displayName}</Text>
-                <Text style={styles.handle}>@{req.handle}</Text>
+                <Handle userId={req.userId} handle={req.handle} style={styles.handle} />
               </View>
               <View style={styles.requestActions}>
                 <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(req)}>
@@ -140,7 +141,7 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
               </TouchableOpacity>
               <View>
                 <Text style={styles.name}>{item.displayName}</Text>
-                <Text style={styles.handle}>@{item.handle}</Text>
+                <Handle userId={item.userId} handle={item.handle} style={styles.handle} />
               </View>
             </View>
           )}

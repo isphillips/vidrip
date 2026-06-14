@@ -12,7 +12,7 @@ export default function MailboxButton({ style }: { style?: StyleProp<ViewStyle> 
     <TouchableOpacity
       style={[styles.btn, style]} hitSlop={10} activeOpacity={0.7}
       onPress={() => nav.navigate('Messages')}>
-      <Ionicons name="mail-outline" size={22} color={C.ACCENT_HOT} />
+      <Ionicons name="mail-outline" size={24} color={C.ACCENT_HOT} />
     </TouchableOpacity>
   );
 }
@@ -20,6 +20,5 @@ export default function MailboxButton({ style }: { style?: StyleProp<ViewStyle> 
 const styles = StyleSheet.create({
   btn: {
     width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER,
   },
 });

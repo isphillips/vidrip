@@ -92,6 +92,19 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     apply();
   };
 
+  // Opt-in: surface my recent reactions on my public profile.
+  const showReactions = !!(profile as any)?.show_reactions_in_profile;
+  const [savingShowReactions, setSavingShowReactions] = useState(false);
+  const handleToggleShowReactions = async (next: boolean) => {
+    if (!user?.id || savingShowReactions) { return; }
+    setSavingShowReactions(true);
+    const { error } = await (supabase as any)
+      .from('users').update({ show_reactions_in_profile: next }).eq('id', user.id);
+    setSavingShowReactions(false);
+    if (error) { Alert.alert('Error', 'Could not update this setting.'); return; }
+    if (profile) { setProfile({ ...(profile as any), show_reactions_in_profile: next }); }
+  };
+
   // ── Synced accounts (creator connections + personal feed connections) ────────
   const [synced, setSynced] = useState<SyncedAccount[]>([]);       // connection_type 'creator'
   const [feedAccounts, setFeedAccounts] = useState<SyncedAccount[]>([]); // 'feed'
@@ -325,6 +338,25 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
             </TouchableOpacity>
           </>
         )}
+      </View>
+
+      {/* Privacy */}
+      <Text style={styles.sectionLabel}>Privacy</Text>
+      <View style={styles.section}>
+        <View style={styles.row}>
+          <View style={styles.syncInfo}>
+            <Text style={styles.rowLabel}>Show reactions in profile</Text>
+            <Text style={styles.syncHandle} numberOfLines={3}>
+              Let anyone who opens your profile see and play your recent reactions.
+            </Text>
+          </View>
+          <Switch
+            value={showReactions}
+            onValueChange={handleToggleShowReactions}
+            disabled={savingShowReactions}
+            trackColor={{ true: C.ACCENT, false: C.BORDER }}
+          />
+        </View>
       </View>
 
       {/* Connected accounts (creator) — only when creator mode is on */}

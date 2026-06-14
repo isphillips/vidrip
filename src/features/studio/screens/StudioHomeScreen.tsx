@@ -61,7 +61,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   return (
     <View style={[styles.container, { paddingTop: top + SPACE.SM }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Studio</Text>
+        <Text style={styles.title}>Creator Studio</Text>
         <TouchableOpacity onPress={close} hitSlop={10}><Ionicons name="close" size={26} color={C.INK} /></TouchableOpacity>
       </View>
 
@@ -82,7 +82,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={C.ACCENT} />}
         ListEmptyComponent={loading
           ? <ActivityIndicator color={C.ACCENT} style={{ marginTop: SPACE.XXXL }} />
-          : <Text style={styles.empty}>No videos yet — tap “New video” to create your first.</Text>}
+          : <Text style={styles.empty}>No videos yet. Tap “New video” to create your first.</Text>}
         renderItem={({ item }) => {
           const st = STATUS[item.status] ?? STATUS.processing;
           const playable = item.status === 'ready';

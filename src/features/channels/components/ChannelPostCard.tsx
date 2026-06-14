@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import EmojiChips from '../../../components/EmojiChips';
+import Handle from '../../../components/Handle';
 import type { ChannelPost } from '../../../infrastructure/supabase/queries/channels';
 
 type Props = {
@@ -57,7 +58,7 @@ export default function ChannelPostCard({ post, userId, isOwner, onPress, onEmoj
           <View style={styles.info}>
             <Text style={styles.title} numberOfLines={2}>{title}</Text>
             <View style={styles.meta}>
-              <Text style={styles.poster}>@{post.poster?.handle ?? '?'}</Text>
+              <Handle userId={post.poster_id} handle={post.poster?.handle ?? '?'} style={styles.poster} />
               {post.post_type === 'youtube' && post.reaction_count > 0 && (
                 <Text style={styles.reactionCount}>
                   {post.reaction_count} reaction{post.reaction_count !== 1 ? 's' : ''}

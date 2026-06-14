@@ -13,6 +13,7 @@ import {
   addCommentEmoji, removeCommentEmoji,
   type VideoComment, type CommentCursor,
 } from '../../../infrastructure/supabase/queries/videoComments';
+import Handle from '../../../components/Handle';
 import { localPathForComment } from '../../../infrastructure/storage/commentStorage';
 import { useAuthStore } from '../../../store/authStore';
 import { usePendingCommentsStore } from '../../../store/pendingCommentsStore';
@@ -126,7 +127,7 @@ function CommentCard({
           <Text style={cc.avatarText}>{initial}</Text>
         </View>
         <View style={cc.authorInfo}>
-          <Text style={cc.handle}>@{comment.author_handle}</Text>
+          <Handle userId={comment.author_id} handle={comment.author_handle} style={cc.handle} />
           <Text style={cc.time}>{comment.is_friend ? '👤 ' : ''}{ts}</Text>
         </View>
         {comment.author_id === currentUserId && (

@@ -6,6 +6,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import type { ChannelPost } from '../../../infrastructure/supabase/queries/channels';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
+import Handle from '../../../components/Handle';
 
 function formatTime(iso: string): string {
   const date = new Date(iso);
@@ -66,7 +67,7 @@ export default function ChannelMessageBubble({
   return (
     <View style={[styles.row, isMe ? styles.rowMe : styles.rowThem]}>
       <View style={styles.group}>
-        {!isMe && <Text style={styles.handle}>@{post.poster?.handle ?? '?'}</Text>}
+        {!isMe && <Handle userId={post.poster_id} handle={post.poster?.handle ?? '?'} style={styles.handle} />}
         <Text style={[styles.time, isMe && styles.timeMe]}>
           {formatTime(post.created_at)}
         </Text>

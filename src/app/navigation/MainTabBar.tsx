@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, Image, StyleSheet, TouchableOpacity, Animated, Pressable, useWindowDimensions,
+  View, Text, Image, StyleSheet, TouchableOpacity, Animated, Pressable, Easing, useWindowDimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -11,6 +12,8 @@ import { useFeedStore } from '../../store/feedStore';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 const BAR_H = 58;
+// Repeating pink→purple→teal→purple→pink — symmetric ends so a one-period slide loops seamlessly.
+const FLOW = ['#FF4FA3', '#A05CFF', '#2DD4BF', '#A05CFF', '#FF4FA3'];
 
 const ICONS = {
   Feed: require('../../assets/icon-feed.png'),
@@ -33,15 +36,22 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
   const toReact = useFeedStore(s => s.toReactCount);
   const current = state.routes[state.index]?.name;
 
-  // Flowing pink→purple→blue top border (UI-thread translateX loop, seamless).
+  // One slow flow drives every gradient (UI-thread translateX → smooth + seamless).
+  // Each gradient is 2× its element's width; sliding by one width loops with no seam.
+  const [badgeSize, setBadgeSize] = useState({ w: 64, h: 20 });
+  const [studioTextSize, setStudioTextSize] = useState({ w: 48, h: 13 });
   const flow = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!canCreate) { return; }
-    const loop = Animated.loop(Animated.timing(flow, { toValue: 1, duration: 4000, useNativeDriver: true }));
+    const loop = Animated.loop(
+      Animated.timing(flow, { toValue: 1, duration: 7000, easing: Easing.linear, useNativeDriver: true }),
+    );
     loop.start();
     return () => loop.stop();
   }, [flow, canCreate]);
   const borderX = flow.interpolate({ inputRange: [0, 1], outputRange: [0, -width] });
+  const badgeBorderX = flow.interpolate({ inputRange: [0, 1], outputRange: [0, -badgeSize.w] });
+  const studioTextX = flow.interpolate({ inputRange: [0, 1], outputRange: [0, -studioTextSize.w] });
 
   // "More" popup (Friends + Account rise from the bottom-right).
   const [moreOpen, setMoreOpen] = useState(false);
@@ -110,9 +120,40 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
       {/* "Studio" badge — centered, just under the ＋ FAB (acts as its label) */}
       {canCreate && (
         <View style={[styles.studioBadgeWrap, { bottom: bottom + 4 }]} pointerEvents="none">
-          <LinearGradient colors={['#FF4FA3', '#A05CFF', '#3B82F6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.studioBadge}>
-            <Text style={styles.studioBadgeText}>STUDIO</Text>
-          </LinearGradient>
+          <View
+            style={styles.studioBadge}
+            onLayout={e => {
+              const { width: w, height: h } = e.nativeEvent.layout;
+              setBadgeSize(s => (Math.abs(s.w - w) > 1 || Math.abs(s.h - h) > 1) ? { w, h } : s);
+            }}>
+            {/* Flowing gradient border (sits behind the inset solid pill). */}
+            <AnimatedGradient
+              colors={FLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={{
+                position: 'absolute', top: 0, left: 0,
+                width: badgeSize.w * 2, height: badgeSize.h, transform: [{ translateX: badgeBorderX }],
+              }}
+            />
+            <View style={styles.studioBadgeInner}>
+              <MaskedView
+                style={{ width: studioTextSize.w, height: studioTextSize.h }}
+                maskElement={
+                  <Text
+                    style={styles.studioBadgeText}
+                    onLayout={e => {
+                      const { width: w, height: h } = e.nativeEvent.layout;
+                      setStudioTextSize(s => (Math.abs(s.w - w) > 1 || Math.abs(s.h - h) > 1) ? { w, h } : s);
+                    }}>
+                    STUDIO
+                  </Text>
+                }>
+                <AnimatedGradient
+                  colors={FLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={{ width: studioTextSize.w * 2, height: studioTextSize.h, transform: [{ translateX: studioTextX }] }}
+                />
+              </MaskedView>
+            </View>
+          </View>
         </View>
       )}
 
@@ -122,7 +163,7 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
         {canCreate && (
           <View style={styles.borderClip} pointerEvents="none">
             <AnimatedGradient
-              colors={['#FF4FA3', '#A05CFF', '#3B82F6', '#A05CFF', '#FF4FA3']}
+              colors={FLOW}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={{ width: width * 2, height: 3, transform: [{ translateX: borderX }] }}
             />
@@ -160,7 +201,7 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: C.SURFACE, borderTopWidth: 1, borderTopColor: C.BORDER,
+    backgroundColor: C.SURFACE,
   },
   borderClip: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, overflow: 'hidden' },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACE.SM },
@@ -186,7 +227,13 @@ const styles = StyleSheet.create({
   },
   popupLabel: { color: C.INK, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD },
   popupIcon: { width: 20, height: 20, tintColor: C.INK },
-  studioBadgeWrap: { zIndex: 2, position: 'absolute', left: 0, right: 0, alignItems: 'center', marginBottom: -5 },
-  studioBadge: { borderRadius: RADIUS.FULL },
-  studioBadgeText: { color: C.WHITE, fontSize: 10, fontFamily: FONT.BODY_BOLD, letterSpacing: 1.5, paddingHorizontal: SPACE.MD, paddingVertical: 3 },
+  studioBadgeWrap: { zIndex: 2, position: 'absolute', left: 0, right: 0, alignItems: 'center', marginBottom: -17 },
+  // Transparent + clipped so the flowing gradient shows only as a ~1.5px ring around the inset pill.
+  studioBadge: { borderRadius: RADIUS.FULL, overflow: 'hidden', backgroundColor: 'transparent' },
+  studioBadgeInner: {
+    margin: 1.5, borderRadius: RADIUS.FULL, backgroundColor: '#190A33',
+    paddingHorizontal: SPACE.MD, paddingVertical: 3,
+  },
+  // Mask glyphs — color is irrelevant (only alpha matters), the gradient shows through.
+  studioBadgeText: { color: '#000', fontSize: 10, fontFamily: FONT.BODY_BOLD, letterSpacing: 1.5 },
 });

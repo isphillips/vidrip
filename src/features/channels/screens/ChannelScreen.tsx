@@ -8,6 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import Handle from '../../../components/Handle';
 import { supabase } from '../../../infrastructure/supabase/client';
 import {
   fetchChannelPosts,
@@ -741,7 +742,7 @@ export default function ChannelhamburderScreen({
               data={members}
               keyExtractor={m => m.userId}
               renderItem={({ item }) => (
-                <Text style={styles.modalMember}>@{item.handle}</Text>
+                <Handle userId={item.userId} handle={item.handle} style={styles.modalMember} />
               )}
             />
             <TouchableOpacity style={styles.modalClose} onPress={() => setMembersVisible(false)}>

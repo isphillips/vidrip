@@ -20,6 +20,8 @@ import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import StudioStack from './StudioStack';
 import PrivateChatsScreen from '../../features/channels/screens/PrivateChatsScreen';
+import ProfileDrawer from '../../components/ProfileDrawer';
+import ProfileReactionPlayer from '../../components/ProfileReactionPlayer';
 import MfaChallengeScreen from '../../features/auth/screens/MfaChallengeScreen';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
 import RecordCommentScreen from '../../features/comments/screens/RecordCommentScreen';
@@ -286,6 +288,10 @@ export default function RootNavigator() {
           <Root.Screen name="Auth" component={AuthStack} />
         )}
       </Root.Navigator>
+      {/* Global profile drawer — overlays everything; opened from any @handle tap. */}
+      {session && <ProfileDrawer />}
+      {/* Full-screen player for reactions opened from a profile drawer. */}
+      {session && <ProfileReactionPlayer />}
     </NavigationContainer>
   );
 }

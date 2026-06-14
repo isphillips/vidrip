@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import Handle from '../../../components/Handle';
 import type { ChannelSummary } from '../../../infrastructure/supabase/queries/channels';
 
 type Props = {
@@ -51,7 +52,7 @@ export default function ChannelCard({
           </View>
           {/* Owner @handle subtitle (the title now always holds the channel name). */}
           {channel.owner && (
-            <Text style={styles.owner}>@{channel.owner.handle}</Text>
+            <Handle userId={channel.created_by ?? undefined} handle={channel.owner.handle} style={styles.owner} />
           )}
           {channel.description ? (
             <Text style={styles.description} numberOfLines={2}>{channel.description}</Text>

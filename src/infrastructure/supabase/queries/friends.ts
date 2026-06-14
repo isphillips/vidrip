@@ -85,6 +85,19 @@ export async function sendFriendRequest(fromUserId: string, toHandle: string): P
   }
 }
 
+export type FriendStatus = 'none' | 'pending' | 'accepted';
+
+/** Friendship status between the current user and another user (either direction). */
+export async function fetchFriendStatus(myId: string, otherId: string): Promise<FriendStatus> {
+  const { data } = await supabase
+    .from('friendships')
+    .select('status')
+    .or(`and(user_a.eq.${myId},user_b.eq.${otherId}),and(user_a.eq.${otherId},user_b.eq.${myId})`)
+    .maybeSingle();
+  const s = (data as any)?.status;
+  return s === 'accepted' ? 'accepted' : s === 'pending' ? 'pending' : 'none';
+}
+
 export async function acceptFriendRequest(friendshipId: string): Promise<void> {
   const { error } = await supabase
     .from('friendships')

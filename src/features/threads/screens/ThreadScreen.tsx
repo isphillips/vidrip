@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import EmojiChips from '../../../components/EmojiChips';
+import Handle from '../../../components/Handle';
+import { openProfile } from '../../../store/profileDrawerStore';
 
 // Alias so existing JSX (<ReactionEmojiChips>) keeps working without a rename
 const ReactionEmojiChips = EmojiChips;
@@ -222,7 +224,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
         {/* Overlay — same position for both states */}
         <View style={styles.blindOverlay}>
           <Text style={styles.posterHandle}>
-            Shared by <Text style={styles.handle}>{isSender ? 'you' : `@${thread.sender?.handle ?? '?'}`}</Text>
+            Shared by {isSender ? <Text style={styles.handle}>you</Text> : <Handle userId={thread.sender_id} handle={thread.sender?.handle ?? '?'} style={styles.handle} />}
           </Text>
           {obscured ? (
             <Text style={styles.videoTitleObscured}>React to reveal this video</Text>
@@ -290,7 +292,11 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
             </View>
 
             <View style={styles.reactionInfo}>
-              <Text style={styles.reactionHandle}>@{handle}</Text>
+              <TouchableOpacity
+                onPress={() => openProfile({ userId: (r as any).user?.id ?? (r as any).poster_id, handle })}
+                hitSlop={8} activeOpacity={0.7}>
+                <Text style={styles.reactionHandle}>@{handle}</Text>
+              </TouchableOpacity>
               {status === 'local' && (
                 <Text style={styles.reactionDuration}>{r.duration}s reaction</Text>
               )}
@@ -394,7 +400,7 @@ const styles = StyleSheet.create({
   dlProgress: { alignItems: 'center', gap: 2 },
   dlPct: { fontSize: 10, color: C.MUTED },
   reactionInfo: { flex: 1 },
-  reactionHandle: { fontSize: FONT.SIZES.MD, fontWeight: '600', color: C.INK },
+  reactionHandle: { fontSize: FONT.SIZES.MD, fontWeight: '600', color: C.ACCENT_HOT },
   reactionDuration: { fontSize: FONT.SIZES.SM, color: C.MUTED },
   reactionStatusText: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontStyle: 'italic' },
   reactionRetryText: { color: C.ACCENT_HOT, fontStyle: 'normal' },

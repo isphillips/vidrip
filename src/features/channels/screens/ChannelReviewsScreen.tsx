@@ -13,6 +13,7 @@ import {
   setChannelReviewsAllowed,
   type ChannelReview,
 } from '../../../infrastructure/supabase/queries/channels';
+import Handle from '../../../components/Handle';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 // Creator-facing inbox: every review clip across the channel, newest first.
@@ -158,7 +159,7 @@ export default function ChannelReviewsScreen({
                   <View style={styles.playBadge}><Text style={styles.playBadgeIcon}>▶</Text></View>
                 </View>
                 <View style={styles.info}>
-                  <Text style={styles.handle}>@{item.reviewer?.handle ?? '?'}</Text>
+                  <Handle userId={item.reviewer_id} handle={item.reviewer?.handle ?? '?'} style={styles.handle} />
                   <Text style={styles.videoTitle} numberOfLines={1}>
                     {item.post_yt_video_title ?? 'Video'}
                   </Text>

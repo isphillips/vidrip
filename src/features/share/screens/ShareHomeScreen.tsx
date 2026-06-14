@@ -1093,12 +1093,12 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                       {query.trim()
                         ? `No results for "${query.trim()}"`
                         : showFriends
-                        ? 'Nothing from friends yet — when your friends react to or share videos, they show up here.'
+                        ? 'Nothing from friends yet. When your friends react to or share videos, they show up here.'
                         : showRecommended
-                        ? 'No recommendations yet — tap Refresh to pull from your subscriptions.'
+                        ? 'No recommendations yet. Tap Refresh to pull from your subscriptions.'
                         : showForYou
                         ? (hasFeedConnection
-                            ? 'No videos yet — tap Refresh to pull your liked videos.'
+                            ? 'No videos yet. Tap Refresh to pull your liked videos.'
                             : 'Connect a YouTube account in your profile to see your Liked videos.')
                         : 'No Shorts yet'}
                     </Text>
