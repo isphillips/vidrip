@@ -23,15 +23,17 @@ import {
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
 
-// Injected into the Instagram embed WebView to bridge <video> play/pause/ended
-// events back to React Native so recording auto-starts/stops like YouTube.
+// Injected into the Instagram reel WebView (?l=1, full-screen video) to bridge
+// <video> play/pause/ended events back to React Native so recording auto-starts/stops
+// like YouTube. Also blackens the page so any letterboxing reads black.
 const IG_INJECT_JS = `(function(){
   var hooked=false;
   function send(t){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify({type:t}));}}
+  function paint(){try{document.documentElement.style.setProperty('background-color','#000','important');if(document.body){document.body.style.setProperty('background-color','#000','important');}}catch(e){}}
   function hook(v){if(hooked){return;}hooked=true;v.addEventListener('play',function(){send('playing');});v.addEventListener('pause',function(){send('paused');});v.addEventListener('ended',function(){send('ended');});}
-  function tryHook(){var vs=document.querySelectorAll('video');if(vs.length>0){hook(vs[0]);return;}setTimeout(tryHook,300);}
+  function tryHook(){paint();var vs=document.querySelectorAll('video');if(vs.length>0){hook(vs[0]);return;}setTimeout(tryHook,300);}
   tryHook();
-  new MutationObserver(function(){if(!hooked){tryHook();}}).observe(document.documentElement,{childList:true,subtree:true});
+  new MutationObserver(function(){paint();if(!hooked){tryHook();}}).observe(document.documentElement,{childList:true,subtree:true});
   true;
 })();`;
 
@@ -368,8 +370,9 @@ export default function ReactionRecorder({
       ) : videoId && sourceType === 'instagram' ? (
         <View style={styles.ytCover}>
           <WebView
-            style={StyleSheet.absoluteFill}
-            source={{ uri: `https://www.instagram.com/reel/${videoId}/embed/` }}
+            style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
+            source={{ uri: `https://www.instagram.com/reel/${videoId}/?l=1` }}
+            opaque={false}
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             allowsFullscreenVideo={false}
@@ -378,9 +381,9 @@ export default function ReactionRecorder({
             onMessage={(e) => {
               try {
                 const msg = JSON.parse(e.nativeEvent.data);
-                // Ignore 'paused' — Instagram's embed fires it during buffering,
-                // which would prematurely trigger stop. Only 'playing' and 'ended'
-                // drive the recording lifecycle; the manual Stop button handles early exit.
+                // Ignore 'paused' — the IG reel player fires it during buffering, which
+                // would prematurely trigger stop. Only 'playing' and 'ended' drive the
+                // recording lifecycle; the manual Stop button handles early exit.
                 if (msg.type && msg.type !== 'paused') { onYtStateChange(msg.type); }
               } catch { /* ignore non-JSON messages */ }
             }}

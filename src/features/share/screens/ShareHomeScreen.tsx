@@ -86,6 +86,33 @@ async function fetchInstagramOg(
   }
 }
 
+// Fit-only styling for the official IG /embed/ — fills the width and centers the
+// card on black, dropping just the embed's outer card margin/border. The header
+// (username) and footer ("View on Instagram") attribution stay intact, so the embed
+// renders unmodified in substance — this only resizes it to sit better in the window.
+// The white "empty space" is an opaque white box in IG's embed card (the comment
+// area / trailing padding), not the WebView backing. IG's CSP blocks injected <style>
+// tags, so we set styles directly (CSP-safe) and target elements by trait, not by
+// (obfuscated) class: blacken the page, hide the comment composer + any EMPTY white
+// box (the dead space), and collapse white-card padding. The footer keeps its content
+// (icons, likes, caption, View on Instagram) so attribution stays intact. Re-applied
+// on an interval to survive IG's late re-renders.
+// Reel page (?l=1) renders the video full-screen at mobile width. Just keep the page
+// background black so any letterboxing reads black instead of white. (Direct styles —
+// IG's CSP blocks injected <style> tags.)
+const IG_EMBED_FIT = `
+(function(){
+  function imp(el,k,v){ if(el&&el.style){ el.style.setProperty(k,v,'important'); } }
+  function paint(){
+    imp(document.documentElement,'background-color','#000');
+    imp(document.body,'background-color','#000');
+  }
+  paint();
+  var n=0,iv=setInterval(function(){ n++; paint(); if(n>40){ clearInterval(iv); } },150);
+})();
+true;
+`;
+
 // Refresh button with a live MM:SS countdown while on cooldown. Self-ticking so it
 // re-renders every second without re-rendering the whole share screen. The spinner
 // is scaled down to the text size so the button doesn't change size when pressed.
@@ -1208,12 +1235,14 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               ) : sv.sourceType === 'instagram' ? (
                 <WebView
                   ref={el => { wvRefs.current[i] = el; }}
-                  style={StyleSheet.absoluteFill}
-                  source={{ uri: `https://www.instagram.com/reel/${sv.videoId}/embed/` }}
+                  style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
+                  source={{ uri: `https://www.instagram.com/reel/${sv.videoId}/?l=1` }}
+                  opaque={false}
                   allowsInlineMediaPlayback
                   mediaPlaybackRequiresUserAction={false}
                   allowsFullscreenVideo={false}
                   javaScriptEnabled
+                  injectedJavaScript={IG_EMBED_FIT}
                   onLoad={onSlotLoad}
                   onLoadStart={onSlotLoadStart}
                 />
