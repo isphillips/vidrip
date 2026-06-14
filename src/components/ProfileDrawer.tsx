@@ -124,7 +124,7 @@ export default function ProfileDrawer() {
 
             {profile.show_reactions_in_profile && reactions.length > 0 && (
               <View style={styles.reactionsBlock}>
-                <Text style={styles.reactionsLabel}>Reactions</Text>
+                <Text style={styles.reactionsLabel}>Latest Reactions</Text>
                 <View style={styles.grid}>
                   {reactions.map(rx => {
                     const thumb = reactionThumbUrl(rx);
