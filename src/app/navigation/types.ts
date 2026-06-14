@@ -93,6 +93,7 @@ export type StudioStackScreenProps<T extends keyof StudioStackParamList> =
 export type RootStackParamList = {
   Main: undefined;
   Studio: undefined;
+  Messages: undefined;
   RecordReaction: RecordStackParamList['RecordReaction'];
   RecordComment: {
     rootSourceId: string;
@@ -103,6 +104,9 @@ export type RootStackParamList = {
   // Record a personal intro to attach to a share (returned via pendingIntroStore).
   RecordIntro: undefined;
 };
+
+export type RootStackScreenProps<T extends keyof RootStackParamList> =
+  NativeStackScreenProps<RootStackParamList, T>;
 
 export type AuthStackScreenProps<T extends keyof AuthStackParamList> =
   NativeStackScreenProps<AuthStackParamList, T>;

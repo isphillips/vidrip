@@ -27,6 +27,7 @@ import {
   fetchMyReviews, fetchChannelsToReact, fetchMyChannelReactions,
   type ChannelReview, type ChannelToReact, type MyChannelReaction,
 } from '../../../infrastructure/supabase/queries/channels';
+import MailboxButton from '../../channels/components/MailboxButton';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 const FAVS_KEY = 'vidrip_favorites';
@@ -330,6 +331,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
               />
             </MaskedView>
           </View>
+          <MailboxButton style={styles.headerMail} />
         </View>
         <View style={styles.tabRow}>
           <TouchableOpacity
@@ -589,6 +591,7 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     zIndex: 10,
   },
+  headerMail: { marginLeft: 'auto', marginTop: -3 },
   headerLogo: {
     width: 48,
     height: 84,

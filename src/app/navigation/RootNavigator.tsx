@@ -19,6 +19,7 @@ import {
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import StudioStack from './StudioStack';
+import PrivateChatsScreen from '../../features/channels/screens/PrivateChatsScreen';
 import MfaChallengeScreen from '../../features/auth/screens/MfaChallengeScreen';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
 import RecordCommentScreen from '../../features/comments/screens/RecordCommentScreen';
@@ -258,6 +259,11 @@ export default function RootNavigator() {
                 name="Studio"
                 component={StudioStack}
                 options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+              />
+              <Root.Screen
+                name="Messages"
+                component={PrivateChatsScreen}
+                options={{ presentation: 'fullScreenModal', animation: 'slide_from_right' }}
               />
               <Root.Screen
                 name="RecordReaction"

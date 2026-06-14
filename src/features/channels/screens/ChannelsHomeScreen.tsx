@@ -5,12 +5,12 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { supabase } from '../../../infrastructure/supabase/client';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
   fetchPublicChannels,
-  fetchPrivateChannels,
   fetchMembersOnlyChannels,
   fetchSubscribedChannels,
   acceptChannelInvite,
@@ -22,9 +22,10 @@ import {
 import { useShareIntentStore } from '../../../store/shareIntentStore';
 import RadioToggle from '../components/RadioToggle';
 import ChannelCard from '../components/ChannelCard';
+import MailboxButton from '../components/MailboxButton';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
-const TABS = ['Public', 'Private'] as const;
+const TABS = ['Public', 'Exclusive'] as const;
 type Tab = typeof TABS[number];
 
 // Sub-filters within the Public tab.
@@ -47,7 +48,6 @@ export default function ChannelsHomeScreen({
   const [filter, setFilter] = useState<Filter>('curated');
   const [publicChannels, setPublicChannels] = useState<ChannelSummary[]>([]);
   const [membersOnly, setMembersOnly] = useState<ChannelSummary[]>([]);
-  const [privateChannels, setPrivateChannels] = useState<ChannelSummary[]>([]);
   const [subscribed, setSubscribed] = useState<ChannelSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,15 +56,13 @@ export default function ChannelsHomeScreen({
     if (!user) { return; }
     if (!silent) { setLoading(true); }
     try {
-      const [pub, mo, priv, subd] = await Promise.all([
+      const [pub, mo, subd] = await Promise.all([
         fetchPublicChannels(user.id).catch(() => []),
         fetchMembersOnlyChannels(user.id).catch(() => []),
-        fetchPrivateChannels(user.id).catch(() => []),
         fetchSubscribedChannels(user.id).catch(() => []),
       ]);
       setPublicChannels(pub);
       setMembersOnly(mo);
-      setPrivateChannels(priv);
       setSubscribed(subd);
     } catch (e) {
       console.error('[ChannelsHome] load error:', JSON.stringify(e));
@@ -174,11 +172,10 @@ export default function ChannelsHomeScreen({
     : filter === 'invite' ? membersInvite
     : subscribed;
 
-  const data = tab === 'Private' ? privateChannels : publicData;
+  const data = publicData;
 
   const emptyText =
-    tab === 'Private' ? 'Share a video with a friend to start a private channel'
-    : filter === 'mine' ? "You don't own any channels yet"
+    filter === 'mine' ? "You don't own any channels yet"
     : filter === 'curated' ? 'No curated channels yet'
     : filter === 'open' ? 'No open Members channels yet'
     : filter === 'invite' ? 'No invite-only Members channels yet'
@@ -187,9 +184,12 @@ export default function ChannelsHomeScreen({
   return (
     <View style={[styles.container, { paddingTop: top }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Channels</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Channels</Text>
+          <MailboxButton />
+        </View>
         <View style={styles.toggleWrap}>
-          <RadioToggle options={['Public', 'Private']} value={tab} onChange={t => setTab(t as Tab)} />
+          <RadioToggle options={['Public', 'Exclusive']} value={tab} onChange={t => setTab(t as Tab)} />
         </View>
 
         {tab === 'Public' && (
@@ -219,7 +219,15 @@ export default function ChannelsHomeScreen({
         )}
       </View>
 
-      {loading ? (
+      {tab === 'Exclusive' ? (
+        <View style={styles.center}>
+          <Ionicons name="sparkles-outline" size={40} color={C.ACCENT_HOT} style={{ marginBottom: SPACE.MD }} />
+          <Text style={styles.exclusiveTitle}>Exclusive Content</Text>
+          <Text style={styles.emptyText}>
+            Private channels you award to your subscribers will live here. Coming soon.
+          </Text>
+        </View>
+      ) : loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={C.ACCENT_HOT} />
         </View>
@@ -268,14 +276,24 @@ const styles = StyleSheet.create({
     paddingTop: SPACE.SM,
     gap: SPACE.MD,
   },
+  titleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SPACE.LG, marginTop: SPACE.SM,
+  },
   title: {
     fontSize: FONT.SIZES.XL,
     fontFamily: FONT.DISPLAY_BOLD,
     color: C.INK,
-    marginTop: SPACE.SM,
-    paddingHorizontal: SPACE.LG,
     fontWeight: FONT.WEIGHTS.BOLD,
     textTransform: 'uppercase',
+  },
+  mailBtn: {
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER,
+  },
+  exclusiveTitle: {
+    fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK,
+    marginBottom: SPACE.SM, textTransform: 'uppercase',
   },
   toggleWrap: { paddingHorizontal: SPACE.LG },
   filterRow: { gap: SPACE.SM, paddingHorizontal: SPACE.LG, alignItems: 'center' },

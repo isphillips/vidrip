@@ -30,6 +30,7 @@ import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/sy
 import { fetchRecommended, refreshRecommended, RECOMMENDED_COOLDOWN_MS } from '../../../infrastructure/supabase/queries/recommended';
 import { fetchFriendsTrending, fetchPersonalizedShorts, fetchTrending } from '../../../infrastructure/supabase/queries/personalized';
 import { useAuthStore } from '../../../store/authStore';
+import MailboxButton from '../../channels/components/MailboxButton';
 import VideoCommentsSheet from '../../comments/components/VideoCommentsSheet';
 import type { ShareStackScreenProps, RootStackParamList } from '../../../app/navigation/types';
 
@@ -864,14 +865,17 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     <View style={styles.container}>
       <View style={[styles.headerRow, { marginTop: top }]}>
         <Text style={styles.headerTitle}>Browse ✵ Share</Text>
-        {mode === 'browse' && (
-          <TouchableOpacity
-            style={styles.searchToggle}
-            hitSlop={10}
-            onPress={() => { const next = !searchOpen; setSearchOpen(next); if (!next) { setQuery(''); } }}>
-            <Ionicons name={searchOpen ? 'close' : 'search'} size={22} color={C.INK} />
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerActions}>
+          {mode === 'browse' && (
+            <TouchableOpacity
+              style={styles.searchToggle}
+              hitSlop={10}
+              onPress={() => { const next = !searchOpen; setSearchOpen(next); if (!next) { setQuery(''); } }}>
+              <Ionicons name={searchOpen ? 'close' : 'search'} size={22} color={C.INK} />
+            </TouchableOpacity>
+          )}
+          <MailboxButton />
+        </View>
       </View>
 
       {/* Mode toggle */}
@@ -1381,6 +1385,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   searchToggle: { padding: SPACE.XS },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
 
   // mode toggle
   toggle: {
