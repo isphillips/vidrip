@@ -116,6 +116,15 @@ export default function MainTabs() {
           tabBarBadgeStyle: { backgroundColor: C.ACCENT_HOT, color: C.WHITE },
         }} />
       <Tab.Screen name="Channels" component={ChannelsNavigator}
+        listeners={({ navigation }) => ({
+          // Always land on the channels list when the tab is tapped — otherwise the
+          // tab restores wherever its stack was left (e.g. a channel clip opened
+          // from "My Reactions"), which surprises the user.
+          tabPress: (e) => {
+            e.preventDefault();
+            (navigation as any).navigate('Channels', { screen: 'ChannelsHome' });
+          },
+        })}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Channels' }} />
       <Tab.Screen name="Share" component={ShareNavigator}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Browse' }} />
