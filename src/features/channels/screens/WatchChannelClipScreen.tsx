@@ -35,6 +35,9 @@ import {
   localPathForAudio,
 } from '../../../infrastructure/storage/localChannelClipStorage';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
+import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
+import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
+import type { OverlayRecipe } from '../../studio/effectRecipe';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 
@@ -91,6 +94,8 @@ export default function WatchChannelClipScreen({
   const [sessionReady, setSessionReady] = useState(false);
   const [parentYtVideoId, setParentYtVideoId] = useState<string | null>(null);
   const [parentSourceUri, setParentSourceUri] = useState<string | null>(null); // instagram parent file
+  const [parentEmbedUrl, setParentEmbedUrl] = useState<string | null>(null);   // bunny signed embed
+  const [parentRecipe, setParentRecipe] = useState<OverlayRecipe | null>(null); // bunny overlay layer
   const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny'>('youtube');
 
   const videoRef = useRef<any>(null);
@@ -122,6 +127,10 @@ export default function WatchChannelClipScreen({
             setParentSourceType(parent.source_type ?? 'youtube');
             if (parent.source_type === 'instagram') {
               setParentSourceUri(parent.video_url ?? null); // instagram plays the re-hosted file
+            } else if (parent.source_type === 'bunny') {
+              // Creator parent: signed embed + its overlay layer, replayed live in sync.
+              signCreatorVideo(p.parent_post_id!).then(setParentEmbedUrl).catch(() => {});
+              fetchOverlayRecipe(p.parent_post_id!).then(setParentRecipe).catch(() => {});
             } else if (parent.yt_video_id) {
               setParentYtVideoId(parent.yt_video_id);
             }
@@ -403,7 +412,7 @@ export default function WatchChannelClipScreen({
       )}
 
       {/* Source player — full-screen, then animates into the corner on play. */}
-      {sessionReady && (parentYtVideoId || parentSourceUri) && (
+      {sessionReady && (parentYtVideoId || parentSourceUri || parentEmbedUrl) && (
         <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
           {parentSourceType === 'instagram' && parentSourceUri ? (
             <View style={{ width, height }}>
@@ -446,6 +455,23 @@ export default function WatchChannelClipScreen({
                 // drives auto-advance; rewinding it here would loop it.
               }}
             />
+          ) : parentSourceType === 'bunny' && parentEmbedUrl ? (
+            <View style={{ width, height }}>
+              {/* Creator parent: signed embed + live overlay, sync-locked to the reaction.
+                  Muted unless recorded with headphones (else the captured bleed doubles up). */}
+              <BunnyVideoLayer
+                embedUrl={parentEmbedUrl}
+                recipe={parentRecipe}
+                muted={!post?.recorded_with_headphones}
+                onStateChange={(state) => {
+                  if (state === 'playing') {
+                    if (stoppingRef.current) { return; }
+                    setPaused(false); setHasStarted(true);
+                  } else if (state === 'paused') { setPaused(true); }
+                  // 'ended': ignore — the reaction's own onEnd drives auto-advance.
+                }}
+              />
+            </View>
           ) : (
             <View style={{ width, height, overflow: 'hidden' }}>
               <View style={{ position: 'absolute', left: ytOffsetX }}>

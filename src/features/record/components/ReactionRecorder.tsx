@@ -24,6 +24,8 @@ import {
   checkHeadphonesConnected,
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
+import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
+import type { OverlayRecipe } from '../../studio/effectRecipe';
 
 
 function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
@@ -56,6 +58,8 @@ export interface ReactionRecorderProps {
   sourceUri?: string;
   // Creator (Bunny) videos play from a signed iframe embed URL (token-authed).
   embedUrl?: string;
+  // Animated overlay layer for a creator (Bunny) video — replayed live over the embed.
+  recipe?: OverlayRecipe | null;
   sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny';
   onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => Promise<void>;
   onBack: () => void;
@@ -73,6 +77,7 @@ export default function ReactionRecorder({
   videoId,
   sourceUri,
   embedUrl,
+  recipe,
   sourceType = 'youtube',
   onSave,
   onBack,
@@ -85,17 +90,16 @@ export default function ReactionRecorder({
   // With a source video (feed / channel-post reactions) the source's own play /
   // pause / end drives recording — no manual buttons. Without one (private channel
   // clips, reviews) the user records with the manual controls.
-  const sourceDriven = !!videoId || (sourceType === 'instagram' && !!sourceUri);
+  // Creator (Bunny) source — token-authed iframe embed. Its play/pause is now bridged out
+  // (BunnyVideoLayer), so it drives recording like the other sources.
+  const bunnyEmbed = sourceType === 'bunny' && !!embedUrl;
+  const sourceDriven = !!videoId || (sourceType === 'instagram' && !!sourceUri) || bunnyEmbed;
   const igSource = sourceType === 'instagram' && !!sourceUri;
   // Instagram thread shortcode — WebView embed has no controllable player, so the
   // user starts/stops recording manually while watching the reel.
   const igWebEmbed = sourceType === 'instagram' && !!videoId && !sourceUri;
-  // Creator (Bunny) source — token-authed iframe embed; recorded manually like the
-  // Instagram web-embed (the embed player isn't RN-controllable for auto-sync).
-  const bunnyEmbed = sourceType === 'bunny' && !!embedUrl;
-  // Camera shows as a PIP corner whenever a source video fills the screen behind it
-  // (includes the manually-recorded Bunny embed), else full-screen (reviews/clips).
-  const pipCamera = sourceDriven || bunnyEmbed;
+  // Camera shows as a PIP corner whenever a source video fills the screen behind it.
+  const pipCamera = sourceDriven;
 
   const device = useCameraDevice('front');
   // Cap the reaction to 720p/30fps so files stay under the 50MB storage upload
@@ -321,13 +325,13 @@ export default function ReactionRecorder({
       {/* Source-video full-screen background (or black if no source) */}
       {bunnyEmbed ? (
         <View style={styles.ytCover}>
-          <WebView
-            style={StyleSheet.absoluteFill}
-            source={{ uri: embedUrl as string }}
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            allowsFullscreenVideo={false}
-            javaScriptEnabled
+          {/* Signed embed + live overlay replay; play/pause drives recording (source-driven).
+              No autoplay — the user's tap to play is what begins the recording. */}
+          <BunnyVideoLayer
+            embedUrl={embedUrl as string}
+            recipe={recipe}
+            onStateChange={onYtStateChange}
+            autoplay={false}
           />
         </View>
       ) : igSource ? (
