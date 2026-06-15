@@ -47,9 +47,11 @@ Deno.serve(async (req) => {
     const { data: u } = await admin.from("users").select("creator_studio").eq("id", userId).maybeSingle();
     if (!u?.creator_studio) { return json({ error: "Creator Studio is not enabled for this account." }, 403); }
 
-    const { channelId, title, visibility, thumbnailUrl } = await req.json().catch(() => ({}));
+    const { channelId, title, visibility, thumbnailUrl, overlayRecipe } = await req.json().catch(() => ({}));
     if (!channelId) { return json({ error: "channelId required" }, 400); }
     const vis = visibility === "subscribers" ? "subscribers" : "public";
+    // Animated overlay layer, replayed live in-app. Stored as-is (small JSON); null when absent.
+    const recipe = overlayRecipe && typeof overlayRecipe === "object" ? overlayRecipe : null;
 
     // The caller must own / be an admin of the destination channel.
     const { data: grp } = await admin.from("groups").select("created_by").eq("id", channelId).maybeSingle();
@@ -81,6 +83,7 @@ Deno.serve(async (req) => {
       visibility: vis,
       yt_video_title: (title ?? "").slice(0, 200),
       yt_video_thumbnail: typeof thumbnailUrl === "string" ? thumbnailUrl : null,
+      overlay_recipe: recipe,
       is_pinned: false,
     }).select("id").single();
     if (insErr) { return json({ error: insErr.message }, 500); }

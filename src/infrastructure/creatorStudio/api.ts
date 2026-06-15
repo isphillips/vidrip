@@ -1,5 +1,16 @@
 import * as tus from 'tus-js-client';
 import { supabase } from '../supabase/client';
+import type { OverlayRecipe } from '../../features/studio/effectRecipe';
+
+/** The stored animated-overlay recipe for a creator video (null if it has none). */
+export async function fetchOverlayRecipe(postId: string): Promise<OverlayRecipe | null> {
+  // `overlay_recipe` is newer than the generated DB types, so query it untyped.
+  const { data } = await (supabase.from('channel_posts') as any)
+    .select('overlay_recipe')
+    .eq('id', postId)
+    .maybeSingle();
+  return (data?.overlay_recipe as OverlayRecipe | undefined) ?? null;
+}
 
 // Creator Studio client SDK — wraps the three edge functions + the Bunny TUS upload.
 // Flow: createCreatorVideo() → uploadCreatorVideo() (resumable) → (webhook flips the
@@ -46,9 +57,10 @@ export async function createCreatorVideo(
   title: string,
   visibility: Visibility,
   thumbnailUrl?: string,
+  overlayRecipe?: unknown | null,
 ): Promise<CreateVideoResult> {
   const { data, error } = await supabase.functions.invoke('creator-video-create', {
-    body: { channelId, title, visibility, thumbnailUrl },
+    body: { channelId, title, visibility, thumbnailUrl, overlayRecipe },
   });
   if (error) { throw new Error(error.message); }
   if (data?.error) { throw new Error(data.error); }

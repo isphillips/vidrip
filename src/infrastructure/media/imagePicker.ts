@@ -40,6 +40,11 @@ export function pickVideo(): Promise<PickedVideo | null> {
   });
 }
 
+/** Library-only video pick (no camera) — for surfaces with their own in-app camera. */
+export function pickVideoFromLibrary(): Promise<PickedVideo | null> {
+  return launchImageLibrary({ mediaType: 'video', selectionLimit: 1 }).then(firstVideo);
+}
+
 /** Action sheet → camera or library. Returns the raw (uncropped) image. */
 export function pickImage(): Promise<PickedImage | null> {
   return new Promise((resolve, reject) => {

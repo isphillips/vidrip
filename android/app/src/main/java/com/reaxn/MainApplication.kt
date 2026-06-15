@@ -20,6 +20,7 @@ class MainApplication : Application(), ReactApplication {
             PackageList(this).packages.apply {
               add(ReaxnScreenRecorderPackage())
               add(ReaxnAudioPackage())
+              add(StudioExporterPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

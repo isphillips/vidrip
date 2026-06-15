@@ -59,7 +59,7 @@ export async function searchShorts(query: string, limit = 50): Promise<ShortRow[
   return (data ?? []).map(mapRow);
 }
 
-export const CATEGORIES = ['latest', 'trending', 'music', 'gaming', 'funny', 'blogs', 'sports', 'news', 'pets', 'cars'] as const;
+export const CATEGORIES = ['latest', 'trending', 'music', 'gaming', 'funny', 'sports', 'news', 'pets', 'cars'] as const;
 export type Category = typeof CATEGORIES[number];
 
 // Display names for the category pills. Edit these freely — they're UI-only; the
@@ -71,7 +71,6 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   music: 'Music',
   gaming: 'Gaming',
   funny: 'Comedy',
-  blogs: 'People & Blogs',
   sports: 'Sports',
   news: 'News & Politics',
   pets: 'Pets & Animals',

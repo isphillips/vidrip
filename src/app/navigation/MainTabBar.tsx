@@ -30,6 +30,29 @@ const PRIMARY: { route: keyof typeof ICONS; label: string }[] = [
   { route: 'Share', label: 'Browse' },
 ];
 
+type TabBtnProps = {
+  route: keyof typeof ICONS;
+  label: string;
+  active: boolean;
+  toReact: number;
+  onPress: () => void;
+};
+
+function TabBtn({ route, label, active, toReact, onPress }: TabBtnProps) {
+  const color = active ? C.DANGER : C.WHITE;
+  return (
+    <TouchableOpacity style={styles.tab} onPress={onPress} activeOpacity={0.7}>
+      <View>
+        <Image source={ICONS[route]} style={[styles.icon, { tintColor: color, opacity: active ? 1 : 0.5 }]} resizeMode="contain" />
+        {route === 'Feed' && toReact > 0 && (
+          <View style={styles.badge}><Text style={styles.badgeText}>{toReact}</Text></View>
+        )}
+      </View>
+      <Text style={[styles.label, { color, opacity: active ? 1 : 0.6 }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function MainTabBar({ state, navigation, canCreate }: BottomTabBarProps & { canCreate: boolean }) {
   const { bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -63,31 +86,15 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
   const go = (route: string) => { toggleMore(false); navigation.navigate(route as never); };
   const moreActive = current === 'Friends' || current === 'Account';
 
-  const TabBtn = ({ route, label }: { route: keyof typeof ICONS; label: string }) => {
-    const active = current === route;
-    const color = active ? C.DANGER : C.WHITE;
-    return (
-      <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate(route as never)} activeOpacity={0.7}>
-        <View>
-          <Image source={ICONS[route]} style={[styles.icon, { tintColor: color, opacity: active ? 1 : 0.5 }]} resizeMode="contain" />
-          {route === 'Feed' && toReact > 0 && (
-            <View style={styles.badge}><Text style={styles.badgeText}>{toReact}</Text></View>
-          )}
-        </View>
-        <Text style={[styles.label, { color, opacity: active ? 1 : 0.6 }]}>{label}</Text>
-      </TouchableOpacity>
-    );
-  };
-
   // Non-studio users get the plain, flat 5-tab bar — no FAB, More, border, or badge.
   if (!canCreate) {
     return (
       <View style={[styles.bar, { height: BAR_H + bottom, paddingBottom: bottom }]}>
-        <TabBtn route="Feed" label="Feed" />
-        <TabBtn route="Channels" label="Channels" />
-        <TabBtn route="Share" label="Browse" />
-        <TabBtn route="Friends" label="Friends" />
-        <TabBtn route="Account" label="Account" />
+        <TabBtn route="Feed"     label="Feed"     active={current === 'Feed'}     toReact={toReact} onPress={() => navigation.navigate('Feed' as never)} />
+        <TabBtn route="Channels" label="Channels" active={current === 'Channels'} toReact={toReact} onPress={() => navigation.navigate('Channels' as never)} />
+        <TabBtn route="Share"    label="Browse"   active={current === 'Share'}    toReact={toReact} onPress={() => navigation.navigate('Share' as never)} />
+        <TabBtn route="Friends"  label="Friends"  active={current === 'Friends'}  toReact={toReact} onPress={() => navigation.navigate('Friends' as never)} />
+        <TabBtn route="Account"  label="Account"  active={current === 'Account'}  toReact={toReact} onPress={() => navigation.navigate('Account' as never)} />
       </View>
     );
   }
@@ -168,18 +175,20 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
           </View>
         )}
 
-        <TabBtn {...PRIMARY[0]} />
-        <TabBtn {...PRIMARY[1]} />
+        <TabBtn route={PRIMARY[0].route} label={PRIMARY[0].label} active={current === PRIMARY[0].route} toReact={toReact} onPress={() => navigation.navigate(PRIMARY[0].route as never)} />
+        <TabBtn route={PRIMARY[1].route} label={PRIMARY[1].label} active={current === PRIMARY[1].route} toReact={toReact} onPress={() => navigation.navigate(PRIMARY[1].route as never)} />
 
         {canCreate ? (
           <TouchableOpacity style={styles.fabSlot} activeOpacity={0.85} onPress={() => navigation.getParent()?.navigate('Studio' as never)}>
-            <LinearGradient colors={['#FF4FA3', '#A05CFF', '#3B82F6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
-              <Ionicons name="camera" size={28} color={C.WHITE} />
-            </LinearGradient>
+            <View style={styles.fabShadow}>
+              <LinearGradient colors={['#FF4FA3', '#A05CFF', '#3B82F6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
+                <Ionicons name="camera" size={28} color={C.WHITE} />
+              </LinearGradient>
+            </View>
           </TouchableOpacity>
         ) : null}
 
-        <TabBtn {...PRIMARY[2]} />
+        <TabBtn route={PRIMARY[2].route} label={PRIMARY[2].label} active={current === PRIMARY[2].route} toReact={toReact} onPress={() => navigation.navigate(PRIMARY[2].route as never)} />
 
         {/* More (hamburger) */}
         {(() => {
@@ -211,9 +220,14 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: C.WHITE, fontSize: 9, fontFamily: FONT.BODY_BOLD },
   fabSlot: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // Shadow lives on a solid-background wrapper (a gradient layer can't be shadowed efficiently).
+  fabShadow: {
+    borderRadius: 27, marginTop: -20, backgroundColor: '#A05CFF',
+    shadowColor: '#A05CFF', shadowOpacity: 0.6, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 10,
+  },
   fab: {
     width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center',
-    marginTop: -20, shadowColor: '#A05CFF', shadowOpacity: 0.6, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 10,
+    overflow: 'hidden',
   },
   fabPlus: { color: C.WHITE, fontSize: 30, lineHeight: 32, fontWeight: '300', marginTop: -2 },
   backdrop: { position: 'absolute', left: 0, right: 0, top: -1000, bottom: 0 },

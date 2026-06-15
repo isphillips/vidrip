@@ -78,6 +78,11 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    // Media3's APIs are annotated @UnstableApi; we opt in app-wide for the Studio exporter.
+    lint {
+        disable += "UnsafeOptInUsageError"
+    }
+
     namespace "com.reaxn"
     defaultConfig {
         applicationId "com.reaxn"
@@ -122,6 +127,13 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+
+    // Media3 Transformer — the Android side of the Studio exporter (trim + colour matrix +
+    // mirror + overlay bake), mirroring iOS's AVFoundation StudioExporter.
+    def media3Version = "1.5.1"
+    implementation("androidx.media3:media3-transformer:$media3Version")
+    implementation("androidx.media3:media3-effect:$media3Version")
+    implementation("androidx.media3:media3-common:$media3Version")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

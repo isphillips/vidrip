@@ -10,7 +10,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { fetchMyCreatorVideos, type MyCreatorVideo } from '../../../infrastructure/creatorStudio/api';
 import { deleteChannelPost } from '../../../infrastructure/supabase/queries/channels';
-import { pickVideo } from '../../../infrastructure/media/imagePicker';
+import BunnyEmbedPlayer from '../components/BunnyEmbedPlayer';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 const STATUS: Record<string, { label: string; color: string }> = {
@@ -26,6 +26,10 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   const [videos, setVideos] = useState<MyCreatorVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Play inline as an overlay (NOT a separate/nested native screen) — a WKWebView video
+  // nested under react-native-screens inside this modal renders black; an in-place
+  // overlay composites like the reaction recorder's WebView does.
+  const [playing, setPlaying] = useState<{ postId: string; title: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!user?.id) { return; }
@@ -37,14 +41,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   // Refetch on focus so processing → live transitions show without manual refresh.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const startNew = async () => {
-    try {
-      const picked = await pickVideo();
-      if (picked?.uri) {
-        navigation.navigate('StudioDetails', { fileUri: picked.uri, durationSec: picked.durationSec });
-      }
-    } catch (e: any) { Alert.alert('Video', e?.message ?? 'Could not get a video.'); }
-  };
+  const startNew = () => navigation.navigate('StudioCapture');
 
   const onDelete = (item: MyCreatorVideo) => {
     Alert.alert('Delete video?', item.title, [
@@ -59,6 +56,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   const close = () => navigation.getParent()?.goBack();
 
   return (
+    <View style={styles.screen}>
     <View style={[styles.container, { paddingTop: top + SPACE.SM }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Creator Studio</Text>
@@ -89,7 +87,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
           return (
             <TouchableOpacity
               style={styles.row} activeOpacity={playable ? 0.8 : 1}
-              onPress={() => playable && navigation.navigate('StudioPlayer', { postId: item.id, title: item.title })}>
+              onPress={() => playable && setPlaying({ postId: item.id, title: item.title })}>
               {item.thumbnail
                 ? <Image source={{ uri: item.thumbnail }} style={styles.thumb} resizeMode="cover" />
                 : <View style={[styles.thumb, styles.thumbPlaceholder]}><Ionicons name="film-outline" size={20} color={C.SUBTLE} /></View>}
@@ -112,10 +110,20 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
         }}
       />
     </View>
+
+    {/* Full-bleed overlay OUTSIDE the padded container — the padded parent collapsed
+        the WebView to width:0, hiding the (playing) video. */}
+    {playing && (
+      <View style={StyleSheet.absoluteFillObject}>
+        <BunnyEmbedPlayer postId={playing.postId} title={playing.title} onClose={() => setPlaying(null)} />
+      </View>
+    )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.BG },
   container: { flex: 1, backgroundColor: C.BG, paddingHorizontal: SPACE.LG },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACE.LG },
   title: { fontSize: FONT.SIZES.XL, textTransform: 'uppercase', fontFamily: FONT.DISPLAY_BOLD, color: C.INK },

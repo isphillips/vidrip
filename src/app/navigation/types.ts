@@ -89,8 +89,11 @@ export type RecordStackParamList = {
 // Creator Studio stack (presented modally over the tabs)
 export type StudioStackParamList = {
   StudioHome: undefined;
-  StudioDetails: { fileUri: string; durationSec?: number };
-  StudioPlayer: { postId: string; title: string };
+  StudioCapture: undefined;
+  StudioTrim: { fileUri: string; durationSec?: number };
+  StudioFilter: { fileUri: string; durationSec?: number; trimStartMs: number; trimEndMs: number };
+  StudioOverlay: { fileUri: string; durationSec?: number; trimStartMs: number; trimEndMs: number; colorMatrix?: number[] | null; mirror?: boolean };
+  StudioDetails: { fileUri: string; durationSec?: number; recipe?: import('../../features/studio/effectRecipe').OverlayRecipe | null };
 };
 
 export type StudioStackScreenProps<T extends keyof StudioStackParamList> =

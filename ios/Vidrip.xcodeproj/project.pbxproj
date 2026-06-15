@@ -27,6 +27,7 @@
 		3FCD95C82FD180A700A7475B /* RXNSafeAppend.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C62FD180A700A7475B /* RXNSafeAppend.m */; };
 		3FCD95C92FD180A700A7475B /* ReaxnScreenRecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C32FD180A700A7475B /* ReaxnScreenRecorder.m */; };
 		3FCD95CA2FD180A700A7475B /* AudioRecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C22FD180A700A7475B /* AudioRecorder.m */; };
+		3FCD95E12FD180A700A7475B /* StudioExporter.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95E02FD180A700A7475B /* StudioExporter.m */; };
 		4134F38B04234F3EB50EE9AD /* Raleway-SemiBoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 619F602BFE464AC5A7C2EB67 /* Raleway-SemiBoldItalic.ttf */; };
 		435D690E1EAE4C9E99B47C9F /* PlayfairDisplay-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9161CC9660ED45DB989B0D09 /* PlayfairDisplay-BoldItalic.ttf */; };
 		45A010F070604254B71F1386 /* Syne-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 56E5BCA54F1F4EFCBB4F6F51 /* Syne-SemiBold.ttf */; };
@@ -85,7 +86,7 @@
 		19F19A9119EE4D458E2EBA12 /* PlayfairDisplay-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-SemiBold.ttf"; path = "../src/assets/fonts/PlayfairDisplay-SemiBold.ttf"; sourceTree = "<group>"; };
 		19F6CBCC0A4E27FBF8BF4A61 /* libPods-Vidrip-VidripTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Vidrip-VidripTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		243796B3B0DF4A6F94CA20F6 /* Raleway-BoldItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-BoldItalic.ttf"; path = "../src/assets/fonts/Raleway-BoldItalic.ttf"; sourceTree = "<group>"; };
-		24CD2834196447399CCA1916 /* Syne-ExtraBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-ExtraBold.ttf"; path = "../src/assets/fonts/Syne-ExtraBold.ttf"; sourceTree = "<group>"; };
+		24CD2834196447399CCA1916 /* Syne-ExtraBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-ExtraBold.ttf"; path = "../src/assets/fonts/Syne-ExtraBold.ttf"; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-Vidrip.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip.debug.xcconfig"; path = "Target Support Files/Pods-Vidrip/Pods-Vidrip.debug.xcconfig"; sourceTree = "<group>"; };
 		3F31413D2FCCFE920066BB5B /* Vidrip-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Vidrip-Bridging-Header.h"; sourceTree = "<group>"; };
 		3F9787AB2FCE506800F638C2 /* ReaxnDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = ReaxnDebug.entitlements; path = Vidrip/ReaxnDebug.entitlements; sourceTree = "<group>"; };
@@ -95,21 +96,22 @@
 		3FCD95C42FD180A700A7475B /* ReaxnScreenRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaxnScreenRecorder.swift; sourceTree = "<group>"; };
 		3FCD95C52FD180A700A7475B /* RXNSafeAppend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RXNSafeAppend.h; sourceTree = "<group>"; };
 		3FCD95C62FD180A700A7475B /* RXNSafeAppend.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RXNSafeAppend.m; sourceTree = "<group>"; };
-		56E5BCA54F1F4EFCBB4F6F51 /* Syne-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-SemiBold.ttf"; path = "../src/assets/fonts/Syne-SemiBold.ttf"; sourceTree = "<group>"; };
+		3FCD95E02FD180A700A7475B /* StudioExporter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = StudioExporter.m; sourceTree = "<group>"; };
+		56E5BCA54F1F4EFCBB4F6F51 /* Syne-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-SemiBold.ttf"; path = "../src/assets/fonts/Syne-SemiBold.ttf"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-Vidrip.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip.release.xcconfig"; path = "Target Support Files/Pods-Vidrip/Pods-Vidrip.release.xcconfig"; sourceTree = "<group>"; };
 		5B7EB9410499542E8C5724F5 /* Pods-Vidrip-VidripTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip-VidripTests.debug.xcconfig"; path = "Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests.debug.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-Vidrip.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Vidrip.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		619F602BFE464AC5A7C2EB67 /* Raleway-SemiBoldItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-SemiBoldItalic.ttf"; path = "../src/assets/fonts/Raleway-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
 		6DF0C3023D344828AA39600A /* PlayfairDisplay-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-Medium.ttf"; path = "../src/assets/fonts/PlayfairDisplay-Medium.ttf"; sourceTree = "<group>"; };
 		71907B69462442E792D56629 /* PlayfairDisplay-MediumItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-MediumItalic.ttf"; path = "../src/assets/fonts/PlayfairDisplay-MediumItalic.ttf"; sourceTree = "<group>"; };
-		723D377E7D96443EAE27607F /* Syne-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-Medium.ttf"; path = "../src/assets/fonts/Syne-Medium.ttf"; sourceTree = "<group>"; };
+		723D377E7D96443EAE27607F /* Syne-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-Medium.ttf"; path = "../src/assets/fonts/Syne-Medium.ttf"; sourceTree = "<group>"; };
 		7362B429A1FF424FBCB57E6D /* PlayfairDisplay-SemiBoldItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-SemiBoldItalic.ttf"; path = "../src/assets/fonts/PlayfairDisplay-SemiBoldItalic.ttf"; sourceTree = "<group>"; };
 		7589D571FC6F4B33B3A44856 /* PlayfairDisplay-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-Bold.ttf"; path = "../src/assets/fonts/PlayfairDisplay-Bold.ttf"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Vidrip/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		89656EA456BA41EF87D0B352 /* Syne-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-Bold.ttf"; path = "../src/assets/fonts/Syne-Bold.ttf"; sourceTree = "<group>"; };
+		89656EA456BA41EF87D0B352 /* Syne-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-Bold.ttf"; path = "../src/assets/fonts/Syne-Bold.ttf"; sourceTree = "<group>"; };
 		89C6BE57DB24E9ADA2F236DE /* Pods-Vidrip-VidripTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip-VidripTests.release.xcconfig"; path = "Target Support Files/Pods-Vidrip-VidripTests/Pods-Vidrip-VidripTests.release.xcconfig"; sourceTree = "<group>"; };
 		9161CC9660ED45DB989B0D09 /* PlayfairDisplay-BoldItalic.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-BoldItalic.ttf"; path = "../src/assets/fonts/PlayfairDisplay-BoldItalic.ttf"; sourceTree = "<group>"; };
-		9D350F71427F47608FD1B0F4 /* Syne-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-Regular.ttf"; path = "../src/assets/fonts/Syne-Regular.ttf"; sourceTree = "<group>"; };
+		9D350F71427F47608FD1B0F4 /* Syne-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-Regular.ttf"; path = "../src/assets/fonts/Syne-Regular.ttf"; sourceTree = "<group>"; };
 		AE806C071F864BDEB71F10AB /* PlayfairDisplay-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-Regular.ttf"; path = "../src/assets/fonts/PlayfairDisplay-Regular.ttf"; sourceTree = "<group>"; };
 		CA4C5CEB81104AD2A1392A26 /* Raleway-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-Regular.ttf"; path = "../src/assets/fonts/Raleway-Regular.ttf"; sourceTree = "<group>"; };
 		DA7F609925404B1F99116AF3 /* Raleway-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Raleway-Medium.ttf"; path = "../src/assets/fonts/Raleway-Medium.ttf"; sourceTree = "<group>"; };
@@ -218,6 +220,7 @@
 				3FCD95C12FD180A700A7475B /* AudioRecorder.h */,
 				3FCD95C22FD180A700A7475B /* AudioRecorder.m */,
 				3FCD95C32FD180A700A7475B /* ReaxnScreenRecorder.m */,
+				3FCD95E02FD180A700A7475B /* StudioExporter.m */,
 				3FCD95C42FD180A700A7475B /* ReaxnScreenRecorder.swift */,
 				3FCD95C52FD180A700A7475B /* RXNSafeAppend.h */,
 				3FCD95C62FD180A700A7475B /* RXNSafeAppend.m */,
@@ -557,6 +560,7 @@
 				3FCD95C72FD180A700A7475B /* ReaxnScreenRecorder.swift in Sources */,
 				3FCD95C82FD180A700A7475B /* RXNSafeAppend.m in Sources */,
 				3FCD95C92FD180A700A7475B /* ReaxnScreenRecorder.m in Sources */,
+				3FCD95E12FD180A700A7475B /* StudioExporter.m in Sources */,
 				3FCD95CA2FD180A700A7475B /* AudioRecorder.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
