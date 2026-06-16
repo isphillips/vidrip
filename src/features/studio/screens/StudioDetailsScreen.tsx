@@ -14,20 +14,23 @@ import {
   type PostableChannel, type Visibility, type UploadHandle,
 } from '../../../infrastructure/creatorStudio/api';
 import GradientButton from '../components/GradientButton';
+import SaveForLaterButton from '../components/SaveForLaterButton';
 import EffectPlayer from '../components/EffectPlayer';
 import ShareBaker, { type ShareBakerHandle } from '../components/ShareBaker';
 import { isEmptyRecipe } from '../effectRecipe';
+import { useStudioAutosave } from '../useStudioAutosave';
+import { deleteDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 export default function StudioDetailsScreen({ route, navigation }: StudioStackScreenProps<'StudioDetails'>) {
-  const { fileUri, recipe, durationSec } = route.params;
+  const { fileUri, recipe, durationSec, draftId, title: initTitle, channelId: initChannelId, visibility: initVisibility } = route.params;
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
 
-  const [title, setTitle]           = useState('');
+  const [title, setTitle]           = useState(initTitle ?? '');
   const [channels, setChannels]     = useState<PostableChannel[]>([]);
-  const [channelId, setChannelId]   = useState<string | null>(null);
-  const [visibility, setVisibility] = useState<Visibility>('public');
+  const [channelId, setChannelId]   = useState<string | null>(initChannelId ?? null);
+  const [visibility, setVisibility] = useState<Visibility>(initVisibility ?? 'public');
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [uploading, setUploading]     = useState(false);
   const [uploaded, setUploaded]       = useState(false);
@@ -42,13 +45,19 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
     fetchPostableChannels(user.id)
       .then(cs => {
         setChannels(cs);
-        const first = cs[0] ?? null;
-        setChannelId(first?.id ?? null);
-        if (first?.isMembersOnly) { setVisibility('subscribers'); }
+        // When resuming a draft we keep its saved channel; otherwise default to the first.
+        if (!initChannelId) {
+          const first = cs[0] ?? null;
+          setChannelId(first?.id ?? null);
+          if (first?.isMembersOnly) { setVisibility('subscribers'); }
+        }
       })
       .catch(() => {})
       .finally(() => setLoadingChannels(false));
-  }, [user?.id]);
+  }, [user?.id, initChannelId]);
+
+  // Autosave the publish details to the draft.
+  useStudioAutosave(draftId, 'details', { title, channelId, visibility });
 
   useEffect(() => () => uploadRef.current?.abort(), []);
 
@@ -85,9 +94,11 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
       });
       uploadRef.current = handle;
       await promise;
-      // Bytes are up. Bunny encodes server-side (the webhook flips it to 'ready' for the
-      // channel), but the local baked file is identical and plays instantly — so show a
-      // success card with the video playing right away instead of a bare alert.
+      // Bytes are up → the draft is safely published; delete its local backups (raw + snapshot).
+      if (draftId) { await deleteDraft(draftId).catch(() => {}); }
+      // Bunny encodes server-side (the webhook flips it to 'ready' for the channel), but the local
+      // baked file is identical and plays instantly — so show a success card with the video playing
+      // right away instead of a bare alert.
       setUploaded(true);
     } catch (e: any) {
       Alert.alert('Upload failed', e?.message ?? 'Something went wrong. Try again.');
@@ -121,7 +132,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           <Ionicons name="chevron-back" size={26} color={uploading ? C.SUBTLE : C.INK} />
         </TouchableOpacity>
         <Text style={styles.title}>New video</Text>
-        <View style={{ width: 26 }} />
+        {draftId && !uploading && !uploaded ? <SaveForLaterButton onPress={() => navigation.popToTop()} /> : <View style={{ width: 26 }} />}
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">

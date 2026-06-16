@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, useWindowDimensions,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import Video, { type VideoRef } from 'react-native-video';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -11,6 +11,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { MAX_STUDIO_MS } from '../../../infrastructure/creatorStudio/recipe';
 import GradientButton from '../components/GradientButton';
+import SaveForLaterButton from '../components/SaveForLaterButton';
+import { useStudioAutosave } from '../useStudioAutosave';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 const HANDLE_W = 18;
@@ -25,7 +27,7 @@ const fmt = (ms: number) => {
 // Set in/out on a clip (filmstrip + draggable handles), then bake the trim via the
 // native exporter and hand the result to StudioDetails. Window is clamped to 180s.
 export default function StudioTrimScreen({ route, navigation }: StudioStackScreenProps<'StudioTrim'>) {
-  const { fileUri, durationSec } = route.params;
+  const { fileUri, durationSec, draftId, trimStartMs: initTrimStart, trimEndMs: initTrimEnd } = route.params;
   const { top } = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
   const videoRef = useRef<VideoRef>(null);
@@ -49,10 +51,12 @@ export default function StudioTrimScreen({ route, navigation }: StudioStackScree
   useEffect(() => {
     if (!durationMs || seeded.current) { return; }
     seeded.current = true;
-    const end = Math.min(durationMs, MAX_STUDIO_MS);
-    setInMs(0); setOutMs(end);
-    inX.value = 0; outX.value = msToX(end);
-  }, [durationMs, msToX, inX, outX]);
+    // Resume: seed from the draft's saved trim window if present, else default to [0, min(dur,180)].
+    const start = initTrimStart != null ? Math.min(initTrimStart, durationMs) : 0;
+    const end = initTrimEnd != null ? Math.min(initTrimEnd, durationMs) : Math.min(durationMs, MAX_STUDIO_MS);
+    setInMs(start); setOutMs(end);
+    inX.value = msToX(start); outX.value = msToX(end);
+  }, [durationMs, msToX, inX, outX, initTrimStart, initTrimEnd]);
 
   // Filmstrip thumbnails across the full source.
   useEffect(() => {
@@ -127,8 +131,16 @@ export default function StudioTrimScreen({ route, navigation }: StudioStackScree
       durationSec: durationSec ?? Math.round(durationMs / 1000),
       trimStartMs: Math.round(inMs),
       trimEndMs: Math.round(outMs),
+      draftId,
     });
-  }, [navigation, fileUri, durationSec, durationMs, inMs, outMs]);
+  }, [navigation, fileUri, durationSec, durationMs, inMs, outMs, draftId]);
+
+  // Autosave the trim window to the draft as the handles move.
+  useStudioAutosave(draftId, 'trim', {
+    durationSec: durationSec ?? Math.round(durationMs / 1000),
+    trimStartMs: Math.round(inMs),
+    trimEndMs: Math.round(outMs),
+  });
 
   const selSec = Math.round((outMs - inMs) / 1000);
 
@@ -139,7 +151,7 @@ export default function StudioTrimScreen({ route, navigation }: StudioStackScree
           <Ionicons name="chevron-back" size={26} color={C.INK} />
         </TouchableOpacity>
         <Text style={styles.title}>Trim</Text>
-        <View style={{ width: 26 }} />
+        {draftId ? <SaveForLaterButton onPress={() => navigation.popToTop()} /> : <View style={{ width: 26 }} />}
       </View>
 
       <View style={styles.preview}>

@@ -13,6 +13,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { MAX_STUDIO_MS } from '../../../infrastructure/creatorStudio/recipe';
 import { pickVideoFromLibrary } from '../../../infrastructure/media/imagePicker';
+import { createDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import FaceLensOverlay from '../../lens/faceLens';
 import LensPicker from '../../lens/LensPicker';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
@@ -83,7 +84,10 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
         cameraRef.current?.stopRecording().catch(reject);
       });
       const uri = video.path.startsWith('file://') ? video.path : `file://${video.path}`;
-      navigation.navigate('StudioTrim', { fileUri: uri, durationSec: elapsedRef.current });
+      // Persist the raw recording as a draft immediately (survives crash/close); edits autosave
+      // from here on. createDraft copies the temp recording into the draft's local dir.
+      const draft = await createDraft(uri, elapsedRef.current);
+      navigation.navigate('StudioTrim', { fileUri: draft.rawFile, durationSec: elapsedRef.current, draftId: draft.id });
     } catch (e: any) {
       Alert.alert('Recording', e?.message ?? 'Could not save the recording.');
     } finally {
@@ -120,7 +124,8 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
     try {
       const picked = await pickVideoFromLibrary();
       if (picked?.uri) {
-        navigation.navigate('StudioTrim', { fileUri: picked.uri, durationSec: picked.durationSec });
+        const draft = await createDraft(picked.uri, picked.durationSec);
+        navigation.navigate('StudioTrim', { fileUri: draft.rawFile, durationSec: picked.durationSec, draftId: draft.id });
       }
     } catch (e: any) { Alert.alert('Import', e?.message ?? 'Could not import a video.'); }
   }, [recording, navigation]);

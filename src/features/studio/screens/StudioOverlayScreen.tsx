@@ -7,14 +7,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { IDENTITY, type CMatrix } from '../colorMatrix';
-import { STICKERS, stickerByKey, type StickerCategory } from '../stickers';
+import { STICKERS, stickerByKey } from '../stickers';
 import { type StudioRecipe } from '../../../infrastructure/creatorStudio/recipe';
 import { exportRecipe } from '../../../infrastructure/native/studioExporter';
 import { isEmptyRecipe, type OverlayRecipe, type OverlayNode } from '../effectRecipe';
 import SkiaVideoPreview from '../components/SkiaVideoPreview';
 import DraggableOverlay, { type OverlayTransform } from '../components/DraggableOverlay';
 import GradientButton from '../components/GradientButton';
+import SaveForLaterButton from '../components/SaveForLaterButton';
 import EffectText from '../components/EffectText';
+import { useStudioAutosave } from '../useStudioAutosave';
+import { saveSnapshotVideo, updateDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -84,7 +87,7 @@ let _id = 0;
 const nextId = () => `ov_${_id++}`;
 
 export default function StudioOverlayScreen({ route, navigation }: StudioStackScreenProps<'StudioOverlay'>) {
-  const { fileUri, durationSec, trimStartMs, trimEndMs, colorMatrix, mirror } = route.params;
+  const { fileUri, durationSec, trimStartMs, trimEndMs, colorMatrix, mirror, draftId, recipe: initRecipe } = route.params;
   const { top } = useSafeAreaInsets();
   const matrix: CMatrix = (colorMatrix as CMatrix) ?? IDENTITY;
 
@@ -118,6 +121,23 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
     if (h > avail.h) { h = avail.h; w = avail.h * aspect; }
     return { w: Math.floor(w), h: Math.floor(h) };
   }, [avail, aspect]);
+
+  // Resume: rebuild the overlay items from a saved recipe once the canvas box is known (inverse of
+  // buildRecipe — normalized nx/ny → pixel tx/ty against the current box).
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || !initRecipe || !box.w || !box.h) { return; }
+    hydratedRef.current = true;
+    setFsOverlay(initRecipe.fullscreen ?? null);
+    setOverlays((initRecipe.nodes ?? []).map((n): OverlayItem => ({
+      id: nextId(),
+      type: n.kind,
+      ...(n.kind === 'text'
+        ? { text: n.text, color: n.color, font: n.font, fontSize: n.fontSize, bold: n.bold, italic: n.italic, textAnim: n.anim }
+        : { stickerKey: n.stickerKey }),
+      transform: { tx: (n.nx - 0.5) * box.w, ty: (n.ny - 0.5) * box.h, scale: n.scale, rotation: n.rotation },
+    })));
+  }, [initRecipe, box.w, box.h]);
 
   const selected    = overlays.find(o => o.id === selectedId);
   const selectedTxt = selected?.type === 'text' ? selected : null;
@@ -188,16 +208,36 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
         mirror,
       };
       const { uri } = await exportRecipe(baseRecipe, durationSec ? durationSec * 1000 : undefined);
+      const finalRecipe = isEmptyRecipe(recipe) ? null : recipe;
+      const outDur = Math.round((trimEndMs - trimStartMs) / 1000);
+      // Autosave at the processing step: store the baked video as the draft's snapshot + mark it
+      // ready-to-publish, so a crash during Bunny upload can resume straight to Details.
+      if (draftId) {
+        try {
+          await saveSnapshotVideo(draftId, uri);
+          await updateDraft(draftId, { stage: 'details', recipe: finalRecipe, durationSec: outDur });
+        } catch { /* draft persistence is best-effort — never block publishing */ }
+      }
       navigation.navigate('StudioDetails', {
         fileUri: uri,
-        durationSec: Math.round((trimEndMs - trimStartMs) / 1000),
-        recipe: isEmptyRecipe(recipe) ? null : recipe,
+        durationSec: outDur,
+        recipe: finalRecipe,
+        draftId,
       });
     } catch (e: any) {
       Alert.alert('Overlays', e?.message ?? 'Could not finish.');
       setExporting(false);
     }
-  }, [exporting, buildRecipe, fileUri, trimStartMs, trimEndMs, durationSec, matrix, mirror, navigation]);
+  }, [exporting, buildRecipe, fileUri, trimStartMs, trimEndMs, durationSec, matrix, mirror, navigation, draftId]);
+
+  // Autosave overlay edits to the draft (recipe + the look/trim carried so a resume into this
+  // screen restores everything).
+  useStudioAutosave(draftId, 'overlay', {
+    durationSec, trimStartMs, trimEndMs,
+    colorMatrix: matrix === IDENTITY ? null : (matrix as number[]),
+    mirror,
+    recipe: buildRecipe(),
+  });
 
   // Sticker sets per tab
   const stickerStickers  = STICKERS.filter(s => s.category === 'sticker');
@@ -213,7 +253,7 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
           <Ionicons name="chevron-back" size={26} color={C.INK} />
         </TouchableOpacity>
         <Text style={styles.title}>Overlays</Text>
-        <View style={{ width: 26 }} />
+        {draftId ? <SaveForLaterButton onPress={() => navigation.popToTop()} /> : <View style={{ width: 26 }} />}
       </View>
 
       {/* Preview */}

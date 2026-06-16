@@ -11,6 +11,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { fetchMyCreatorVideos, type MyCreatorVideo } from '../../../infrastructure/creatorStudio/api';
 import { deleteChannelPost } from '../../../infrastructure/supabase/queries/channels';
+import { listDrafts, deleteDraft, type StudioDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import BunnyEmbedPlayer from '../components/BunnyEmbedPlayer';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
@@ -21,10 +22,24 @@ const STATUS: Record<string, { label: string; color: string }> = {
   failed:     { label: 'Failed',     color: C.DANGER },
 };
 
+const STAGE_LABEL: Record<StudioDraft['stage'], string> = {
+  trim: 'Trim', filter: 'Looks', overlay: 'Overlays', details: 'Ready to post',
+};
+
+const ago = (ts: number) => {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) { return 'just now'; }
+  const m = Math.floor(s / 60); if (m < 60) { return `${m}m ago`; }
+  const h = Math.floor(m / 60); if (h < 24) { return `${h}h ago`; }
+  return `${Math.floor(h / 24)}d ago`;
+};
+
 export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<'StudioHome'>) {
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const [tab, setTab] = useState<'published' | 'drafts'>('published');
   const [videos, setVideos] = useState<MyCreatorVideo[]>([]);
+  const [drafts, setDrafts] = useState<StudioDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   // Play inline as an overlay (NOT a separate/nested native screen) — a WKWebView video
@@ -33,13 +48,15 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   const [playing, setPlaying] = useState<{ postId: string; title: string } | null>(null);
 
   const load = useCallback(async () => {
-    if (!user?.id) { return; }
-    try { setVideos(await fetchMyCreatorVideos(user.id)); }
-    catch (e) { console.error('[studio] load', e); }
-    finally { setLoading(false); setRefreshing(false); }
+    try { setDrafts(await listDrafts()); } catch { /* local — ignore */ }
+    if (user?.id) {
+      try { setVideos(await fetchMyCreatorVideos(user.id)); }
+      catch (e) { console.error('[studio] load', e); }
+    }
+    setLoading(false); setRefreshing(false);
   }, [user?.id]);
 
-  // Refetch on focus so processing → live transitions show without manual refresh.
+  // Refetch on focus so processing → live transitions (and freshly-saved drafts) show up.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const startNew = () => navigation.navigate('StudioCapture');
@@ -54,7 +71,104 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
     ]);
   };
 
+  const onDeleteDraft = (d: StudioDraft) => {
+    Alert.alert('Delete draft?', d.title?.trim() || 'Untitled draft', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        setDrafts(prev => prev.filter(x => x.id !== d.id));
+        await deleteDraft(d.id).catch(() => {});
+      } },
+    ]);
+  };
+
+  // Resume saved progress at the furthest stage reached, hydrating each screen's editable state.
+  const resumeLastSaved = (d: StudioDraft) => {
+    const trimStartMs = d.trimStartMs ?? 0;
+    const trimEndMs = d.trimEndMs ?? (d.durationSec ?? 0) * 1000;
+    if (d.stage === 'details') {
+      navigation.navigate('StudioDetails', {
+        fileUri: d.snapshotFile ?? d.rawFile, recipe: d.recipe ?? null, durationSec: d.durationSec,
+        draftId: d.id, title: d.title, channelId: d.channelId, visibility: d.visibility,
+      });
+    } else if (d.stage === 'overlay') {
+      navigation.navigate('StudioOverlay', {
+        fileUri: d.rawFile, durationSec: d.durationSec, trimStartMs, trimEndMs,
+        colorMatrix: d.colorMatrix ?? null, mirror: d.mirror, recipe: d.recipe ?? null, draftId: d.id,
+      });
+    } else if (d.stage === 'filter') {
+      navigation.navigate('StudioFilter', {
+        fileUri: d.rawFile, durationSec: d.durationSec, trimStartMs, trimEndMs,
+        filterKey: d.filterKey, adjust: d.adjust, mirror: d.mirror, draftId: d.id,
+      });
+    } else {
+      navigation.navigate('StudioTrim', {
+        fileUri: d.rawFile, durationSec: d.durationSec, trimStartMs: d.trimStartMs, trimEndMs: d.trimEndMs, draftId: d.id,
+      });
+    }
+  };
+
+  const openDraft = (d: StudioDraft) => {
+    Alert.alert(
+      'Resume draft',
+      'Pick up from your last saved progress, or start over from the raw footage?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Raw footage', onPress: () => navigation.navigate('StudioTrim', { fileUri: d.rawFile, durationSec: d.durationSec, draftId: d.id }) },
+        { text: 'Last saved', onPress: () => resumeLastSaved(d) },
+      ],
+    );
+  };
+
   const close = () => navigation.getParent()?.goBack();
+
+  const renderVideo = ({ item }: { item: MyCreatorVideo }) => {
+    const st = STATUS[item.status] ?? STATUS.processing;
+    const playable = item.status === 'ready';
+    return (
+      <TouchableOpacity
+        style={styles.row} activeOpacity={playable ? 0.8 : 1}
+        onPress={() => playable && setPlaying({ postId: item.id, title: item.title })}>
+        {item.thumbnail
+          ? <Image source={{ uri: item.thumbnail }} style={styles.thumb} resizeMode="cover" />
+          : <View style={[styles.thumb, styles.thumbPlaceholder]}><Ionicons name="film-outline" size={20} color={C.SUBTLE} /></View>}
+        <View style={styles.meta}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
+          <View style={styles.rowSub}>
+            <View style={[styles.statusDot, { backgroundColor: st.color }]} />
+            <Text style={[styles.statusText, { color: st.color }]}>{st.label}</Text>
+            <Ionicons
+              name={item.visibility === 'subscribers' ? 'lock-closed' : 'globe-outline'}
+              size={12} color={C.SUBTLE} style={{ marginLeft: SPACE.SM }} />
+            <Text style={styles.visText}>{item.visibility === 'subscribers' ? 'Subscribers' : 'Public'}</Text>
+          </View>
+        </View>
+        <TouchableOpacity onPress={() => onDelete(item)} hitSlop={10} style={styles.del}>
+          <Ionicons name="trash-outline" size={18} color={C.MUTED} />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderDraft = ({ item }: { item: StudioDraft }) => (
+    <TouchableOpacity style={styles.row} activeOpacity={0.8} onPress={() => openDraft(item)}>
+      {item.thumbUri
+        ? <Image source={{ uri: item.thumbUri }} style={styles.thumb} resizeMode="cover" />
+        : <View style={[styles.thumb, styles.thumbPlaceholder]}><Ionicons name="film-outline" size={20} color={C.SUBTLE} /></View>}
+      <View style={styles.meta}>
+        <Text style={styles.rowTitle} numberOfLines={1}>{item.title?.trim() || 'Untitled draft'}</Text>
+        <View style={styles.rowSub}>
+          <Ionicons name="create-outline" size={12} color={C.GOLD} />
+          <Text style={[styles.statusText, { color: C.GOLD, marginLeft: 4 }]}>{STAGE_LABEL[item.stage]}</Text>
+          <Text style={styles.visText}>· edited {ago(item.updatedAt)}</Text>
+        </View>
+      </View>
+      <TouchableOpacity onPress={() => onDeleteDraft(item)} hitSlop={10} style={styles.del}>
+        <Ionicons name="trash-outline" size={18} color={C.MUTED} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
+  const showingDrafts = tab === 'drafts';
 
   return (
     <View style={styles.screen}>
@@ -74,42 +188,28 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
         </LinearGradient>
       </TouchableOpacity>
 
-      <Text style={styles.sectionLabel}>Your videos</Text>
+      {/* Published / Drafts toggle */}
+      <View style={styles.toggle}>
+        {(['published', 'drafts'] as const).map(t => (
+          <TouchableOpacity key={t} style={[styles.toggleBtn, tab === t && styles.toggleBtnOn]} onPress={() => setTab(t)} activeOpacity={0.85}>
+            <Text style={[styles.toggleTxt, tab === t && styles.toggleTxtOn]}>
+              {t === 'published' ? 'Published' : `Drafts${drafts.length ? ` (${drafts.length})` : ''}`}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <FlatList
-        data={videos}
-        keyExtractor={(v) => v.id}
-        contentContainerStyle={videos.length === 0 ? styles.emptyWrap : styles.list}
+        data={showingDrafts ? (drafts as any[]) : (videos as any[])}
+        keyExtractor={(v: any) => v.id}
+        contentContainerStyle={(showingDrafts ? drafts.length : videos.length) === 0 ? styles.emptyWrap : styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={C.ACCENT} />}
         ListEmptyComponent={loading
           ? <ActivityIndicator color={C.ACCENT} style={{ marginTop: SPACE.XXXL }} />
-          : <Text style={styles.empty}>No videos yet. Tap “New video” to create your first.</Text>}
-        renderItem={({ item }) => {
-          const st = STATUS[item.status] ?? STATUS.processing;
-          const playable = item.status === 'ready';
-          return (
-            <TouchableOpacity
-              style={styles.row} activeOpacity={playable ? 0.8 : 1}
-              onPress={() => playable && setPlaying({ postId: item.id, title: item.title })}>
-              {item.thumbnail
-                ? <Image source={{ uri: item.thumbnail }} style={styles.thumb} resizeMode="cover" />
-                : <View style={[styles.thumb, styles.thumbPlaceholder]}><Ionicons name="film-outline" size={20} color={C.SUBTLE} /></View>}
-              <View style={styles.meta}>
-                <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
-                <View style={styles.rowSub}>
-                  <View style={[styles.statusDot, { backgroundColor: st.color }]} />
-                  <Text style={[styles.statusText, { color: st.color }]}>{st.label}</Text>
-                  <Ionicons
-                    name={item.visibility === 'subscribers' ? 'lock-closed' : 'globe-outline'}
-                    size={12} color={C.SUBTLE} style={{ marginLeft: SPACE.SM }} />
-                  <Text style={styles.visText}>{item.visibility === 'subscribers' ? 'Subscribers' : 'Public'}</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => onDelete(item)} hitSlop={10} style={styles.del}>
-                <Ionicons name="trash-outline" size={18} color={C.MUTED} />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          );
-        }}
+          : <Text style={styles.empty}>{showingDrafts
+              ? 'No drafts. Recordings you don’t publish are saved here automatically.'
+              : 'No videos yet. Tap “New video” to create your first.'}</Text>}
+        renderItem={showingDrafts ? (renderDraft as any) : (renderVideo as any)}
       />
     </View>
 
@@ -134,8 +234,15 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.MD,
   },
   newBtnText: { paddingVertical: SPACE.LG, color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
-  sectionLabel: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED, marginTop: SPACE.XL, marginBottom: SPACE.SM },
-  list: { paddingBottom: SPACE.XXXL },
+  toggle: {
+    flexDirection: 'row', backgroundColor: C.SURFACE, borderRadius: RADIUS.FULL,
+    padding: 3, marginTop: SPACE.XL, borderWidth: 1, borderColor: C.BORDER,
+  },
+  toggleBtn: { flex: 1, alignItems: 'center', paddingVertical: SPACE.SM, borderRadius: RADIUS.FULL },
+  toggleBtnOn: { backgroundColor: C.ACCENT },
+  toggleTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED },
+  toggleTxtOn: { color: C.WHITE },
+  list: { paddingTop: SPACE.MD, paddingBottom: SPACE.XXXL },
   emptyWrap: { flexGrow: 1, alignItems: 'center', paddingTop: SPACE.XL },
   empty: { color: C.MUTED, fontFamily: FONT.BODY, textAlign: 'center', paddingHorizontal: SPACE.XL },
   row: {

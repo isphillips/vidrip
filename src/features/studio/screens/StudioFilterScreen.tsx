@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { Canvas, Image as SkImage, ColorMatrix, useImage } from '@shopify/react-native-skia';
 import LinearGradient from 'react-native-linear-gradient';
@@ -14,6 +14,8 @@ import { adjustMatrix, mul, isIdentity, type CMatrix } from '../colorMatrix';
 import SkiaVideoPreview from '../components/SkiaVideoPreview';
 import Slider from '../components/Slider';
 import GradientButton from '../components/GradientButton';
+import SaveForLaterButton from '../components/SaveForLaterButton';
+import { useStudioAutosave } from '../useStudioAutosave';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 const BRAND = ['#FF4FA3', '#A05CFF', '#3B82F6'];
@@ -68,14 +70,15 @@ function Swatch({
 }
 
 export default function StudioFilterScreen({ route, navigation }: StudioStackScreenProps<'StudioFilter'>) {
-  const { fileUri, durationSec, trimStartMs, trimEndMs } = route.params;
+  const { fileUri, durationSec, trimStartMs, trimEndMs, draftId, filterKey: initFilterKey, adjust: initAdjust, mirror: initMirror } = route.params;
   const { top } = useSafeAreaInsets();
 
-  const [filterKey, setFilterKey] = useState('none');
+  // Hydrate from a resumed draft if present.
+  const [filterKey, setFilterKey] = useState(initFilterKey ?? 'none');
   const [filterCat, setFilterCat] = useState('all');
-  const [mirror, setMirror] = useState(false);
+  const [mirror, setMirror] = useState(initMirror ?? false);
   const [adjusting, setAdjusting] = useState(false);
-  const [adjust, setAdjust] = useState<AdjustState>(ADJUST_DEFAULT);
+  const [adjust, setAdjust] = useState<AdjustState>(initAdjust ? { ...ADJUST_DEFAULT, ...initAdjust } : ADJUST_DEFAULT);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [baseThumb, setBaseThumb] = useState<string | null>(null);
 
@@ -83,14 +86,15 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
   const visibleFilters = filterCat === 'all' ? STUDIO_FILTERS : STUDIO_FILTERS.filter(f => f.category === filterCat);
   // Live composed look — recomputes as sliders move, drives the Skia preview in real time.
   const liveMatrix: CMatrix = useMemo(() => mul(adjustMatrix(adjust), preset.matrix), [adjust, preset]);
-  // createThumbnail already returns a file://-prefixed path — don't double-prefix
-  // (file://file:///… fails to decode and the swatches spin forever).
+  // Skia's useImage needs a file://-scheme URI; createThumbnail returns a scheme-less path
+  // (the Trim screen also prefixes it). Normalize without double-prefixing — a bare path leaves
+  // the swatches spinning forever, a doubled file://file://… fails to decode.
   const swatchImg = useImage(baseThumb ?? undefined);
 
   useEffect(() => {
     let alive = true;
     createThumbnail({ url: fileUri, timeStamp: trimStartMs + 50, format: 'jpeg' })
-      .then(({ path }) => { if (alive) { setBaseThumb(path); } })
+      .then(({ path }) => { if (alive) { setBaseThumb(path.startsWith('file://') ? path : `file://${path}`); } })
       .catch(() => {});
     return () => { alive = false; };
   }, [fileUri, trimStartMs]);
@@ -101,8 +105,16 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
       fileUri, durationSec, trimStartMs, trimEndMs,
       colorMatrix: isIdentity(liveMatrix) ? null : liveMatrix,
       mirror,
+      draftId,
     });
-  }, [navigation, fileUri, durationSec, trimStartMs, trimEndMs, liveMatrix, mirror]);
+  }, [navigation, fileUri, durationSec, trimStartMs, trimEndMs, liveMatrix, mirror, draftId]);
+
+  // Autosave the look to the draft. Stores the UI state (filterKey/adjust) for resuming this
+  // screen, plus the derived colorMatrix for resuming straight into overlays/details.
+  useStudioAutosave(draftId, 'filter', {
+    durationSec, trimStartMs, trimEndMs, filterKey, adjust, mirror,
+    colorMatrix: isIdentity(liveMatrix) ? null : (liveMatrix as number[]),
+  });
 
   return (
     <View style={[styles.container, { paddingTop: top + SPACE.SM }]}>
@@ -111,7 +123,7 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
           <Ionicons name="chevron-back" size={26} color={C.INK} />
         </TouchableOpacity>
         <Text style={styles.title}>Looks</Text>
-        <View style={{ width: 26 }} />
+        {draftId ? <SaveForLaterButton onPress={() => navigation.popToTop()} /> : <View style={{ width: 26 }} />}
       </View>
 
       <View style={styles.preview} onLayout={e => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
