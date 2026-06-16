@@ -10067,6 +10067,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-worklets-core@npm:^1.6.0":
+  version: 1.6.3
+  resolution: "react-native-worklets-core@npm:1.6.3"
+  dependencies:
+    string-hash-64: ^1.0.3
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 608a5f06371f61af99d39437d5ea64fa46d8df376e02a09f21b5518a69187c738e02d295d291f00a9fec777851b6fba25c75421744dafc893edfe27bfa4197fc
+  languageName: node
+  linkType: hard
+
 "react-native-youtube-iframe@npm:^2.4.1":
   version: 2.4.1
   resolution: "react-native-youtube-iframe@npm:2.4.1"
@@ -10946,6 +10958,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"string-hash-64@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "string-hash-64@npm:1.0.3"
+  checksum: 79de8431b4fa3e85a2429cd52a34f7948221ff167b7a094e05d6bcfd0173474b232e0c9845c96f74b0d7b6b0c8bbe2c3532a4cacb21635293ef0cf3cc8e77f06
+  languageName: node
+  linkType: hard
+
 "string-length@npm:^4.0.1":
   version: 4.0.2
   resolution: "string-length@npm:4.0.2"
@@ -11733,6 +11752,7 @@ __metadata:
     react-native-view-shot: ^4.0.3
     react-native-vision-camera: 4.7.3
     react-native-webview: ^13.16.1
+    react-native-worklets-core: ^1.6.0
     react-native-youtube-iframe: ^2.4.1
     react-test-renderer: 18.3.1
     tus-js-client: ^4.3.1

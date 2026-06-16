@@ -38,6 +38,7 @@ import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
+import { FaceLensReplay, type FaceLensTrack } from '../../lens/faceLens';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 
@@ -96,6 +97,7 @@ export default function WatchChannelClipScreen({
   const [parentSourceUri, setParentSourceUri] = useState<string | null>(null); // instagram parent file
   const [parentEmbedUrl, setParentEmbedUrl] = useState<string | null>(null);   // bunny signed embed
   const [parentRecipe, setParentRecipe] = useState<OverlayRecipe | null>(null); // bunny overlay layer
+  const [lensTrack, setLensTrack] = useState<FaceLensTrack | null>(null);       // this clip's AR face lens
   const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny'>('youtube');
 
   const videoRef = useRef<any>(null);
@@ -118,6 +120,10 @@ export default function WatchChannelClipScreen({
       const p = await fetchChannelPost(postId).catch(() => null);
       if (!p) { setLoadState('unavailable'); return; }
       setPost(p);
+
+      // This clip's own overlay recipe carries the reactor's AR face-lens track (if any),
+      // replayed over the selfie video below in sync with its playhead.
+      fetchOverlayRecipe(postId).then(r => setLensTrack(r?.faceLens ?? null)).catch(() => {});
 
       // Fetch parent post's YouTube video ID for PIP + sibling reactions for auto-advance
       if (p.parent_post_id) {
@@ -401,6 +407,20 @@ export default function WatchChannelClipScreen({
           {videoEl}
         </TouchableOpacity>
       )}
+
+      {/* AR face lens — replayed over the reaction selfie, synced to its playhead. Mapped to
+          the video's contain-fit rect so the lens lands on the face regardless of screen aspect. */}
+      {lensTrack && (() => {
+        const va = lensTrack.frameAspect ?? 9 / 16;
+        let vw: number, vh: number;
+        if (va > width / height) { vw = width; vh = width / va; } // video wider → fit width
+        else { vh = height; vw = height * va; }                   // video taller → fit height
+        return (
+          <View pointerEvents="none" style={{ position: 'absolute', left: (width - vw) / 2, top: (height - vh) / 2, width: vw, height: vh }}>
+            <FaceLensReplay track={lensTrack} timeSec={progress} width={vw} height={vh} />
+          </View>
+        );
+      })()}
 
       {/* Pause indicator — standalone clips only */}
       {!hasParent && paused && (

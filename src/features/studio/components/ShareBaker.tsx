@@ -5,6 +5,7 @@ import { useSharedValue } from 'react-native-reanimated';
 import { ControlledClockProvider } from '../effectClock';
 import EffectLayer from './EffectLayer';
 import { isEmptyRecipe, type OverlayRecipe } from '../effectRecipe';
+import { FaceLensReplay } from '../../lens/faceLens';
 import { exportRecipe } from '../../../infrastructure/native/studioExporter';
 
 export type BakeOpts = { sourceUri: string; recipe?: OverlayRecipe | null; durationSec: number; fps?: number };
@@ -29,13 +30,19 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
   const clock = useSharedValue(0);
   const stageRef = useRef<View>(null);
   const [job, setJob] = useState<{ recipe: OverlayRecipe; w: number; h: number } | null>(null);
+  // The face-lens replay is a plain time-prop component (not clock-driven), so step it via state.
+  const [bakeTime, setBakeTime] = useState(0);
 
   useImperativeHandle(ref, () => ({
     bake: async ({ sourceUri, recipe, durationSec, fps = 30 }) => {
       // No overlay → nothing to bake; the source already is the final video.
       if (isEmptyRecipe(recipe)) { return sourceUri; }
       const r = recipe!;
-      const aspect = r.canvasW > 0 && r.canvasH > 0 ? r.canvasW / r.canvasH : 9 / 16;
+      // Face-lens clips have no authoring canvas — match the stage to the recorded frame aspect
+      // so the replayed lens maps 1:1 onto the source video (no crop/stretch).
+      const aspect = r.faceLens?.frameAspect
+        ? r.faceLens.frameAspect
+        : (r.canvasW > 0 && r.canvasH > 0 ? r.canvasW / r.canvasH : 9 / 16);
       const h = STAGE_H;
       const w = Math.round(h * aspect);
 
@@ -49,7 +56,9 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
 
       const uris: string[] = [];
       for (let i = 0; i < frameCount; i++) {
-        clock.value = i / effFps;       // step the deterministic clock to this frame's time
+        const t = i / effFps;
+        clock.value = t;                // step the deterministic clock to this frame's time
+        setBakeTime(t);                 // drive the face-lens replay to the same time
         await waitFrames(2);            // let the UI thread recompute the effects, then grab it
         const f = await captureRef(stageRef, { format: 'png', quality: 1, result: 'tmpfile' });
         uris.push(f.startsWith('file://') ? f : `file://${f}`);
@@ -78,6 +87,9 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
       <ControlledClockProvider clock={clock}>
         <EffectLayer recipe={job.recipe} width={job.w} height={job.h} />
       </ControlledClockProvider>
+      {job.recipe.faceLens && (
+        <FaceLensReplay track={job.recipe.faceLens} timeSec={bakeTime} width={job.w} height={job.h} />
+      )}
     </View>
   );
 });

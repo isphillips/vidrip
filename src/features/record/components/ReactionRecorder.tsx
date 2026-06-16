@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Alert, StatusBar, useWindowDimensions, Animated,
+  ActivityIndicator, Alert, StatusBar, useWindowDimensions, Animated, InteractionManager,
 } from 'react-native';
 import Orientation from 'react-native-orientation-locker';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
@@ -26,6 +26,9 @@ import {
 } from '../../../infrastructure/native/audioRecorder';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
+import FaceLensOverlay, { type FaceLensTrack } from '../../lens/faceLens';
+import { MOCK_FACE } from '../../lens/useFaceLandmarks';
+import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 
 
 function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
@@ -61,7 +64,7 @@ export interface ReactionRecorderProps {
   // Animated overlay layer for a creator (Bunny) video — replayed live over the embed.
   recipe?: OverlayRecipe | null;
   sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny';
-  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => Promise<void>;
+  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
   /** Hard cap in seconds — recording auto-stops when reached (e.g. 60s reviews). */
@@ -115,6 +118,26 @@ export default function ReactionRecorder({
   const { hasPermission: hasMic, requestPermission: requestMic } = useMicrophonePermission();
 
   const [ready, setReady] = useState(false);
+  // Start the camera session AFTER the screen-open transition so it doesn't freeze the
+  // navigation animation (starting capture is heavy).
+  const [camActive, setCamActive] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => setCamActive(true));
+    return () => task.cancel();
+  }, []);
+  // Face lenses are disabled in the reaction recorder for now (still being tuned in the studio
+  // camera). lensKey stays null so the whole tracking/overlay pipeline below is inert; re-enable by
+  // restoring the lens picker UI and making this stateful again.
+  const lensKey: string | null = null;
+  const { frameProcessor, landmarks: liveLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true);
+  const lensLandmarks = liveLandmarks ?? (lensKey && !faceTrackingAvailable ? MOCK_FACE : null);
+  // Camera-frame aspect (w/h) — shared by the live overlay and the captured track so replay
+  // cover-crops the same way the preview did.
+  const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
+  // Latest captured lens track, set on stop and handed to onSave.
+  const lensTrackRef = useRef<FaceLensTrack | null>(null);
+  const lensKeyRef = useRef<string | null>(null);
+  useEffect(() => { lensKeyRef.current = lensKey; }, [lensKey]);
   const [ytPlaying, setYtPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -182,6 +205,8 @@ export default function ReactionRecorder({
     if (hasStartedRef.current) { return; }
     hasStartedRef.current = true;
     ytStartOffsetRef.current = 0;
+    // Begin capturing the face-lens track (per-frame landmarks) if a lens is on.
+    if (lensKeyRef.current) { startTrack(lensKeyRef.current, frameAspect); }
 
     // Detect headphones to decide the playback audio model (see ref comment). With
     // headphones we leave the source in the ears so the mic captures voice only;
@@ -209,7 +234,7 @@ export default function ReactionRecorder({
       capAnim.setValue(1);
       Animated.timing(capAnim, { toValue: 0, duration: maxDuration * 1000, useNativeDriver: false }).start();
     }
-  }, [startTimer, stopTimer, maxDuration, capAnim]);
+  }, [startTimer, stopTimer, maxDuration, capAnim, startTrack, frameAspect]);
 
   const handleStop = useCallback(async () => {
     if (!isRecording) { return; }
@@ -218,6 +243,8 @@ export default function ReactionRecorder({
     setIsRecording(false);
     StatusBar.setHidden(false, 'fade');
     setUploading(true);
+    // Finalize the captured lens track (null when no lens was on / no face seen).
+    lensTrackRef.current = lensKeyRef.current ? stopTrack() : null;
 
     if (speakerOverrideRef.current) { restoreAudioRoute().catch(() => {}); speakerOverrideRef.current = false; }
 
@@ -234,13 +261,13 @@ export default function ReactionRecorder({
       // Commit the save first (fast: DB row + local copy) so the reaction shows
       // as watchable the moment we return; the slow upload runs in the background
       // via the upload store and shows progress as a toast.
-      await onSave(video.path, elapsedRef.current, ytStartOffsetRef.current, recordedWithHeadphonesRef.current);
+      await onSave(video.path, elapsedRef.current, ytStartOffsetRef.current, recordedWithHeadphonesRef.current, lensTrackRef.current);
       onBack();
     } catch (e: any) {
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
       setUploading(false);
     }
-  }, [isRecording, stopTimer, onSave, onBack]);
+  }, [isRecording, stopTimer, onSave, onBack, stopTrack]);
 
   // Keep the timer's auto-stop pointed at the current handleStop.
   useEffect(() => { handleStopRef.current = handleStop; }, [handleStop]);
@@ -254,10 +281,11 @@ export default function ReactionRecorder({
       StatusBar.setHidden(false, 'fade');
       if (speakerOverrideRef.current) { restoreAudioRoute().catch(() => {}); speakerOverrideRef.current = false; }
       recordingCallbackRef.current = null;   // drop the result → discard
+      cancelTrack();
       await cameraRef.current?.stopRecording().catch(() => {});
     }
     onBack();
-  }, [isRecording, stopTimer, onBack, capAnim]);
+  }, [isRecording, stopTimer, onBack, capAnim, cancelTrack]);
 
   const handleRestart = useCallback(async () => {
     stopTimer();
@@ -270,11 +298,12 @@ export default function ReactionRecorder({
     setYtPlaying(false);
     StatusBar.setHidden(false, 'fade');
     if (speakerOverrideRef.current) { restoreAudioRoute().catch(() => {}); speakerOverrideRef.current = false; }
+    cancelTrack();         // discard the in-progress lens capture; next start re-begins it
     await cameraRef.current?.stopRecording().catch(() => {});
     setIgStarted(false);   // reel remounts → show tap-to-play again
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
-  }, [stopTimer]);
+  }, [stopTimer, cancelTrack]);
 
   const onYtStateChange = useCallback((state: string) => {
     if (state === 'playing') {
@@ -440,9 +469,20 @@ export default function ReactionRecorder({
             // 2 Mbps video (+~0.13 audio) keeps a 180s reaction/review at ~48MB,
             // under the 50MB Supabase storage upload limit (60s ≈ 16MB).
             videoBitRate={2}
-            isActive={true}
+            isActive={camActive}
             video={true}
             audio={true}
+            // MediaPipe needs BGRA frames; VisionCamera defaults to YUV (→ detect_fail).
+            pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
+            frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
+          />
+          {/* AR lens, tracking the reactor's face (sized to the camera box, cover-crop aware). */}
+          <FaceLensOverlay
+            lens={lensKey}
+            landmarks={lensLandmarks}
+            width={pipCamera ? PIP_W : width}
+            height={pipCamera ? PIP_H : height}
+            frameAspect={frameAspect}
           />
           {isRecording && pipCamera && <View style={styles.pipRecDot} />}
         </View>
@@ -491,6 +531,9 @@ export default function ReactionRecorder({
           </Text>
         </View>
       )}
+
+      {/* Face lenses are disabled in the reaction recorder for now (still being dialed in — see
+          the studio camera). The tracking plumbing stays inert because lensKey is always null. */}
 
       {/* Controls. Source-driven (reactions): start is driven by the source video,
           but once recording you can restart or stop manually. Otherwise (private

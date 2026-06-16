@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, StatusBar, ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import {
   Camera, useCameraDevice, useCameraFormat, useCameraPermission, useMicrophonePermission,
@@ -12,6 +13,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { MAX_STUDIO_MS } from '../../../infrastructure/creatorStudio/recipe';
 import { pickVideoFromLibrary } from '../../../infrastructure/media/imagePicker';
+import FaceLensOverlay from '../../lens/faceLens';
+import LensPicker from '../../lens/LensPicker';
+import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 const MAX_SEC = MAX_STUDIO_MS / 1000; // 180s hard cap (auto-stop)
@@ -22,6 +26,7 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '
 // hands the file to StudioDetails to publish — the same pipeline as an import.
 export default function StudioCaptureScreen({ navigation }: StudioStackScreenProps<'StudioCapture'>) {
   const { top, bottom } = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const [facing, setFacing] = useState<'back' | 'front'>('front');
   const device = useCameraDevice(facing);
   const format = useCameraFormat(device, [
@@ -29,6 +34,11 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
     { fps: 30 },
   ]);
   const targetFps = format ? Math.min(30, format.maxFps) : 30;
+
+  // AR face lens (full-screen test surface for placement). Mirror only for the front camera.
+  const [lensKey, setLensKey] = useState<string | null>(null);
+  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus } = useFaceTracking(facing === 'front');
+  const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
   const { hasPermission: hasCam, requestPermission: reqCam } = useCameraPermission();
   const { hasPermission: hasMic, requestPermission: reqMic } = useMicrophonePermission();
 
@@ -118,17 +128,24 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
   return (
     <View style={styles.container}>
       {device && ready ? (
-        <Camera
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          device={device}
-          format={format}
-          fps={targetFps}
-          videoBitRate={2}
-          isActive
-          video
-          audio
-        />
+        <>
+          <Camera
+            ref={cameraRef}
+            style={StyleSheet.absoluteFill}
+            device={device}
+            format={format}
+            fps={targetFps}
+            videoBitRate={2}
+            isActive
+            video
+            audio
+            // MediaPipe needs BGRA frames; default is YUV. Only attach the processor when a lens is on.
+            pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
+            frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
+          />
+          {/* Full-screen AR lens — the placement test surface. */}
+          <FaceLensOverlay lens={lensKey} landmarks={lensLandmarks} width={width} height={height} frameAspect={frameAspect} />
+        </>
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.placeholder]}>
           {__DEV__
@@ -149,6 +166,19 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
           <Ionicons name="camera-reverse-outline" size={26} color={recording ? C.SUBTLE : C.WHITE} />
         </TouchableOpacity>
       </View>
+
+      {/* DEV diagnostic. Shows transformed (normalized 0..1) L eye, R eye, nose so the exact
+          geometry can be read off: eyes should share ~same y (level), nose centered & below. */}
+      {__DEV__ && (
+        <Text style={[styles.lensDebug, { top: top + 52 }]}>
+          {lensLandmarks
+            ? `L ${lensLandmarks.leftEye.x.toFixed(2)},${lensLandmarks.leftEye.y.toFixed(2)}  R ${lensLandmarks.rightEye.x.toFixed(2)},${lensLandmarks.rightEye.y.toFixed(2)}  N ${lensLandmarks.noseTip.x.toFixed(2)},${lensLandmarks.noseTip.y.toFixed(2)}`
+            : `LM:no  FP:${faceTrackingAvailable ? 'yes' : 'NO'}  ${lensStatus}`}
+        </Text>
+      )}
+
+      {/* Filter pill + slide-down grid (top center; hidden while recording). */}
+      {!recording && <LensPicker lensKey={lensKey} onChange={setLensKey} topInset={top} />}
 
       {/* Bottom controls: import · record · spacer */}
       <View style={[styles.bottomBar, { bottom: bottom + SPACE.XL }]}>
@@ -200,4 +230,5 @@ const styles = StyleSheet.create({
   recOuterActive: { borderColor: C.DANGER },
   recInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: C.DANGER },
   recInnerStop: { width: 30, height: 30, borderRadius: 6, backgroundColor: C.DANGER },
+  lensDebug: { position: 'absolute', alignSelf: 'center', color: '#0f0', fontFamily: FONT.BODY_SEMIBOLD, fontSize: 11, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
 });

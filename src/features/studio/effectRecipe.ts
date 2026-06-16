@@ -1,4 +1,5 @@
 import type { TextAnim } from './components/EffectText';
+import type { FaceLensTrack } from '../lens/faceLens';
 
 // ─── Overlay recipe ───────────────────────────────────────────────────────────
 // The serializable description of a video's overlay layer. Stored with the post and
@@ -22,9 +23,19 @@ export type OverlayRecipe = {
   canvasH: number;
   nodes: OverlayNode[];
   fullscreen?: string | null; // full-screen effect sticker key (fills the frame)
+  // AR face-lens track captured during recording (per-frame landmarks). Present on a recorded
+  // reaction/clip whose reactor wore a lens — replayed over the selfie video (not the source),
+  // consistent with the rest of the replay model. Reused on channel_posts.overlay_recipe (which
+  // is otherwise unused for reaction clips) so no extra column/migration is needed.
+  faceLens?: FaceLensTrack | null;
 };
 
 /** True when there's nothing to replay (so playback can skip the effect layer entirely). */
 export function isEmptyRecipe(r?: OverlayRecipe | null): boolean {
-  return !r || (!r.fullscreen && r.nodes.length === 0);
+  return !r || (!r.fullscreen && r.nodes.length === 0 && (!r.faceLens || r.faceLens.frames.length === 0));
+}
+
+/** Wrap a captured face-lens track as a standalone recipe (no creator overlay nodes). */
+export function faceLensRecipe(track: FaceLensTrack): OverlayRecipe {
+  return { version: 1, canvasW: 9, canvasH: 16, nodes: [], fullscreen: null, faceLens: track };
 }

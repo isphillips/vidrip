@@ -1,5 +1,6 @@
 import RNFS from 'react-native-fs';
 import { supabase } from '../client';
+import type { OverlayRecipe } from '../../../features/studio/effectRecipe';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -894,6 +895,8 @@ interface ChannelClipParams {
   duration: number;
   parentPostId?: string;
   recordedWithHeadphones?: boolean;
+  // Replay layer for this clip (e.g. a captured AR face-lens track) → channel_posts.overlay_recipe.
+  overlayRecipe?: OverlayRecipe | null;
 }
 
 /**
@@ -904,7 +907,7 @@ interface ChannelClipParams {
  * away, while uploadChannelClipRelay() runs the slow upload in the background.
  */
 export async function commitChannelClip({
-  channelId, userId, filePath, duration, parentPostId, recordedWithHeadphones = false,
+  channelId, userId, filePath, duration, parentPostId, recordedWithHeadphones = false, overlayRecipe,
 }: ChannelClipParams): Promise<string> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
@@ -917,6 +920,7 @@ export async function commitChannelClip({
       duration: Math.round(duration),
       recorded_with_headphones: recordedWithHeadphones,
       ...(parentPostId ? { parent_post_id: parentPostId } : {}),
+      ...(overlayRecipe ? { overlay_recipe: overlayRecipe } : {}),
     })
     .select('id')
     .single();

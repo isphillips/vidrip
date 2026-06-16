@@ -1,5 +1,5 @@
-import React from 'react';
-import { StatusBar, View, Text, Image, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { StatusBar, View, Text, Image, StyleSheet, NativeModules } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HotUpdater } from '@hot-updater/react-native';
@@ -10,6 +10,8 @@ import { SUPABASE_ANON_KEY } from './src/infrastructure/supabase/client';
 import { C, FONT } from './src/theme';
 
 function App() {
+  // Preload the MediaPipe face model off the main thread so the first lens selection is instant.
+  useEffect(() => { NativeModules.LensWarmup?.warmUp?.(); }, []);
   return (
     <GestureHandlerRootView style={styles.appRoot}>
       <SafeAreaProvider>

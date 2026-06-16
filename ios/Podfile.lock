@@ -100,6 +100,9 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - MediaPipeTasksCommon (0.10.35)
+  - MediaPipeTasksVision (0.10.35):
+    - MediaPipeTasksCommon (= 0.10.35)
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -1584,6 +1587,27 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - react-native-worklets-core (1.6.3):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.01.01.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - React-nativeconfig (0.76.5)
   - React-NativeModulesApple (0.76.5):
     - glog
@@ -2141,10 +2165,16 @@ PODS:
   - SocketRocket (0.7.1)
   - VisionCamera (4.7.3):
     - VisionCamera/Core (= 4.7.3)
+    - VisionCamera/FrameProcessors (= 4.7.3)
     - VisionCamera/React (= 4.7.3)
   - VisionCamera/Core (4.7.3)
+  - VisionCamera/FrameProcessors (4.7.3):
+    - React
+    - React-callinvoker
+    - react-native-worklets-core
   - VisionCamera/React (4.7.3):
     - React-Core
+    - VisionCamera/FrameProcessors
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2163,6 +2193,7 @@ DEPENDENCIES:
   - GoogleUtilities
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - "HotUpdater (from `../node_modules/@hot-updater/react-native`)"
+  - MediaPipeTasksVision
   - nanopb
   - RCT-Folly (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCT-Folly/Fabric (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
@@ -2204,6 +2235,7 @@ DEPENDENCIES:
   - react-native-video (from `../node_modules/react-native-video`)
   - react-native-view-shot (from `../node_modules/react-native-view-shot`)
   - react-native-webview (from `../node_modules/react-native-webview`)
+  - react-native-worklets-core (from `../node_modules/react-native-worklets-core`)
   - React-nativeconfig (from `../node_modules/react-native/ReactCommon`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-perflogger (from `../node_modules/react-native/ReactCommon/reactperflogger`)
@@ -2255,6 +2287,8 @@ SPEC REPOS:
     - FirebaseMessaging
     - GoogleDataTransport
     - GoogleUtilities
+    - MediaPipeTasksCommon
+    - MediaPipeTasksVision
     - nanopb
     - PromisesObjC
     - SocketRocket
@@ -2353,6 +2387,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-view-shot"
   react-native-webview:
     :path: "../node_modules/react-native-webview"
+  react-native-worklets-core:
+    :path: "../node_modules/react-native-worklets-core"
   React-nativeconfig:
     :path: "../node_modules/react-native/ReactCommon"
   React-NativeModulesApple:
@@ -2451,6 +2487,8 @@ SPEC CHECKSUMS:
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   hermes-engine: 06a9c6900587420b90accc394199527c64259db4
   HotUpdater: 02672edf521280c3d0b34f7dee7cbc68e2111681
+  MediaPipeTasksCommon: ae27d88c4d185db114a1a768c504f8270dda79b5
+  MediaPipeTasksVision: 1d6c3efa89830a131dbd0dc4fb80dea283fac521
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   RCT-Folly: 84578c8756030547307e4572ab1947de1685c599
@@ -2491,6 +2529,7 @@ SPEC CHECKSUMS:
   react-native-video: 4d7beb1e9443ed7b25a70247b8e4fb5c7bb3bcfb
   react-native-view-shot: 60117a0ac87a504a39ee9f079e632011916e7724
   react-native-webview: 0fd07d41896b4bd1da82eeda48fa29dc2c2a1e67
+  react-native-worklets-core: fc853036c14fb4c05d549ec190a7b8aff8291e56
   React-nativeconfig: f7ab6c152e780b99a8c17448f2d99cf5f69a2311
   React-NativeModulesApple: 9aeb901b9bfcc9235e912445fb3cf4780a99baf4
   React-perflogger: 16e049953d21b37e9871ddf0b02f414e12ff14ba
@@ -2530,9 +2569,9 @@ SPEC CHECKSUMS:
   RNScreens: 351f431ef2a042a1887d4d90e1c1024b8ae9d123
   RNVectorIcons: d023ce4b93302120c93666cb0194f48cf4b6ecc5
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
-  VisionCamera: 7187b3dac1ff3071234ead959ce311875748e14f
+  VisionCamera: 0044a94f7489f19e19d5938e97dfc36f4784af3c
   Yoga: fcc198acd4a55599b3468cfb6ebc526baff5f06e
 
-PODFILE CHECKSUM: ccd155d2cac210b44d8a94ccb9f827f4469cf822
+PODFILE CHECKSUM: 56fde902f3a0cad9ce508b8049305ced77701a17
 
 COCOAPODS: 1.16.2

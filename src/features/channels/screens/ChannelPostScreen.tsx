@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import CameraWarmup from '../../lens/CameraWarmup';
 import {
   View, Text, Image, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, useWindowDimensions,
@@ -226,6 +227,7 @@ export default function ChannelPostScreen({
 
   return (
     <View style={styles.container}>
+      <CameraWarmup />
     <ScrollView bounces={false}>
       {/* Thumbnail / blind */}
       <View style={[styles.thumbWrap, { height: Math.max(240, height - belowH - tabBarHeight), width: '100%', marginTop: 0 }]}>

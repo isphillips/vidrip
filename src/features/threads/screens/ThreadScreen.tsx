@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import CameraWarmup from '../../lens/CameraWarmup';
 import EmojiChips from '../../../components/EmojiChips';
 import Handle from '../../../components/Handle';
 import { openProfile } from '../../../store/profileDrawerStore';
@@ -211,6 +212,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
 
   return (
     <View style={styles.container}>
+      <CameraWarmup />
     <ScrollView bounces={false}>
       {/* Thumbnail / blind — full height with bottom overlay */}
       <View style={[styles.thumbWrap, { height: height - 113, width: '100%' }]}>

@@ -27,6 +27,9 @@ target 'Vidrip' do
   pod 'GoogleDataTransport', :modular_headers => true
   pod 'nanopb', :modular_headers => true
 
+  # MediaPipe Face Landmarker — powers the AR face-lens frame processor.
+  pod 'MediaPipeTasksVision'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

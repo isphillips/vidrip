@@ -9,7 +9,7 @@ import com.facebook.react.uimanager.ViewManager
 @UnstableApi
 class StudioExporterPackage : ReactPackage {
     override fun createNativeModules(ctx: ReactApplicationContext): List<NativeModule> =
-        listOf(StudioExporterModule(ctx))
+        listOf(StudioExporterModule(ctx), LensWarmupModule(ctx))
 
     override fun createViewManagers(ctx: ReactApplicationContext): List<ViewManager<*, *>> =
         emptyList()

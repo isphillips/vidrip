@@ -7,7 +7,8 @@ import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/cr
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
 import { C } from '../../../theme';
-import type { OverlayRecipe } from '../../studio/effectRecipe';
+import { faceLensRecipe, type OverlayRecipe } from '../../studio/effectRecipe';
+import type { FaceLensTrack } from '../../lens/faceLens';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 export default function WatchYouTubePostScreen({
@@ -40,12 +41,15 @@ export default function WatchYouTubePostScreen({
   }, [postId]);
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
-  const onSave = useCallback(async (filePath: string, duration: number, _ytStartOffset: number, recordedWithHeadphones: boolean) => {
+  const onSave = useCallback(async (filePath: string, duration: number, _ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null) => {
     // Moderate, then commit (row + local copy) and upload the cloud copy — all in
     // the background queue so a flagged clip is never inserted or published.
     enqueue('Posting reaction…', async () => {
       await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'channel_clip' });
-      const newPostId = await commitChannelClip({ channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones });
+      const newPostId = await commitChannelClip({
+        channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones,
+        overlayRecipe: lensTrack ? faceLensRecipe(lensTrack) : null,
+      });
       await uploadChannelClipRelay(newPostId, user!.id);
     });
   }, [channelId, postId, user, enqueue]);
