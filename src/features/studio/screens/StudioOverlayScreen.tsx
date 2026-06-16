@@ -171,8 +171,9 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState('');
   const [elapsed, setElapsed]     = useState(0);
-  // While an overlay is being dragged/pinched, pause the shared effect clock so the rasterized
-  // sticker texture is frozen and resizing stays smooth (see DraggableOverlay.onGestureChange).
+  // While an overlay is being pinch-resized (Android only — DraggableOverlay only fires there),
+  // pause the shared effect clock so the rasterized sticker texture is frozen and resizing stays
+  // smooth. Plain moves don't pause; iOS never fires this.
   const [gesturing, setGesturing] = useState(0);
   const onOverlayGesture = useCallback((active: boolean) =>
     setGesturing(c => Math.max(0, c + (active ? 1 : -1))), []);

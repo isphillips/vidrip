@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, runOnJS } from 'react-native-reanimated';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -16,9 +16,10 @@ export default function DraggableOverlay({
   onSelect: () => void;
   onDelete: () => void;
   onChange: (t: OverlayTransform) => void;
-  // Fired (true) when a drag/pinch/rotate starts and (false) when it ends. The screen pauses the
-  // shared effect clock while any overlay is being manipulated, so the rasterized sticker texture
-  // is frozen (stable) and resizing is a cheap GPU resample instead of a per-frame re-rasterize.
+  // Fired (true) when a pinch-resize starts and (false) when it ends — Android only. The screen
+  // pauses the shared effect clock during a resize so the rasterized sticker texture is frozen
+  // (stable) and pinching is a cheap GPU resample instead of a per-frame re-rasterize. Not fired for
+  // plain moves (pan stays smooth without freezing) and never on iOS (which isn't laggy).
   onGestureChange?: (active: boolean) => void;
   initial: OverlayTransform;
   children: React.ReactNode;
@@ -41,9 +42,11 @@ export default function DraggableOverlay({
   // is a no-op there) and isn't laggy.
   const active = useSharedValue(0);
   const [dragging, setDragging] = useState(false);
-  const setDrag = (d: boolean) => { setDragging(d); onGestureChange?.(d); };
-  const begin = () => { 'worklet'; active.value += 1; if (active.value === 1) { runOnJS(setDrag)(true); } };
-  const finish = () => { 'worklet'; active.value -= 1; if (active.value <= 0) { active.value = 0; runOnJS(setDrag)(false); } };
+  const begin = () => { 'worklet'; active.value += 1; if (active.value === 1) { runOnJS(setDragging)(true); } };
+  const finish = () => { 'worklet'; active.value -= 1; if (active.value <= 0) { active.value = 0; runOnJS(setDragging)(false); } };
+  // Resize-only clock-freeze signal (Android only) — see onGestureChange prop comment.
+  const ANDROID = Platform.OS === 'android';
+  const notifyResize = (d: boolean) => { onGestureChange?.(d); };
 
   const pan = Gesture.Pan()
     .onBegin(() => { 'worklet'; begin(); runOnJS(onSelect)(); })
@@ -51,10 +54,10 @@ export default function DraggableOverlay({
     .onEnd(() => { 'worklet'; sTx.value = tx.value; sTy.value = ty.value; runOnJS(commit)(); })
     .onFinalize(finish);
   const pinch = Gesture.Pinch()
-    .onBegin(begin)
+    .onBegin(() => { 'worklet'; begin(); if (ANDROID) { runOnJS(notifyResize)(true); } })
     .onChange((e) => { 'worklet'; scale.value = Math.max(0.2, sScale.value * e.scale); })
     .onEnd(() => { 'worklet'; sScale.value = scale.value; runOnJS(commit)(); })
-    .onFinalize(finish);
+    .onFinalize(() => { 'worklet'; finish(); if (ANDROID) { runOnJS(notifyResize)(false); } });
   const rotate = Gesture.Rotation()
     .onBegin(begin)
     .onChange((e) => { 'worklet'; rot.value = sRot.value + e.rotation; })
