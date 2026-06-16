@@ -30,6 +30,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   const [visibility, setVisibility] = useState<Visibility>('public');
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [uploading, setUploading]     = useState(false);
+  const [uploaded, setUploaded]       = useState(false);
   const [fullscreen, setFullscreen]   = useState(false);
   const [sharing, setSharing]         = useState(false);
   const bakerRef = useRef<ShareBakerHandle>(null);
@@ -84,8 +85,10 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
       });
       uploadRef.current = handle;
       await promise;
-      Alert.alert('Uploaded 🎬', 'Your video is processing and will go live shortly.');
-      navigation.navigate('StudioHome');
+      // Bytes are up. Bunny encodes server-side (the webhook flips it to 'ready' for the
+      // channel), but the local baked file is identical and plays instantly — so show a
+      // success card with the video playing right away instead of a bare alert.
+      setUploaded(true);
     } catch (e: any) {
       Alert.alert('Upload failed', e?.message ?? 'Something went wrong. Try again.');
       setUploading(false);
@@ -128,7 +131,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           <EffectPlayer
             uri={fileUri}
             recipe={recipe}
-            paused={fullscreen}
+            paused={fullscreen || uploaded}
             style={StyleSheet.absoluteFill}
           />
           <TouchableOpacity style={styles.fullscreenBtn} onPress={() => setFullscreen(true)} hitSlop={8}>
@@ -229,6 +232,39 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
         </View>
       </Modal>
 
+      {/* Upload-complete confirmation with an instant, looping preview of the finished
+          video (local baked file — plays immediately while Bunny finishes encoding). */}
+      <Modal visible={uploaded} animationType="fade" transparent
+        supportedOrientations={['portrait']}
+        onRequestClose={() => navigation.navigate('StudioHome')}>
+        <View style={styles.successOverlay}>
+          <View style={styles.successCard}>
+            <Ionicons name="checkmark-circle" size={46} color={C.ACCENT_HOT} />
+            <Text style={styles.successTitle}>Uploaded 🎬</Text>
+            <Text style={styles.successSub}>
+              {selectedChannel
+                ? `Processing now — going live in ${selectedChannel.name} shortly.`
+                : 'Processing now — going live shortly.'}
+            </Text>
+            <View style={styles.successPreview}>
+              {uploaded && (
+                <EffectPlayer uri={fileUri} recipe={recipe} paused={false} style={StyleSheet.absoluteFill} />
+              )}
+            </View>
+            <View style={styles.successActions}>
+              <TouchableOpacity style={styles.successShare} onPress={shareWithEffects} disabled={sharing} activeOpacity={0.85}>
+                {sharing
+                  ? <ActivityIndicator size="small" color={C.INK} />
+                  : <><Ionicons name="share-outline" size={18} color={C.INK} /><Text style={styles.successShareTxt}>Share</Text></>}
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <GradientButton label="Done" onPress={() => navigation.navigate('StudioHome')} />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Off-screen; only renders while baking the overlay into a shareable MP4. */}
       <ShareBaker ref={bakerRef} />
     </View>
@@ -287,4 +323,13 @@ const styles = StyleSheet.create({
   fsContainer: { flex: 1, backgroundColor: '#000' },
   fsClose:     { position: 'absolute', top: 52, right: 20 },
   fsCloseBg:   { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, padding: 8 },
+
+  successOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.78)', alignItems: 'center', justifyContent: 'center', padding: SPACE.LG },
+  successCard:    { width: '100%', maxWidth: 360, backgroundColor: C.BG, borderRadius: RADIUS.MD, padding: SPACE.LG, alignItems: 'center', borderWidth: 1, borderColor: C.BORDER },
+  successTitle:   { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, marginTop: SPACE.SM },
+  successSub:     { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', marginTop: SPACE.SM, marginBottom: SPACE.MD },
+  successPreview: { height: 300, aspectRatio: 9 / 16, borderRadius: RADIUS.MD, backgroundColor: '#000', overflow: 'hidden' },
+  successActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, marginTop: SPACE.LG, width: '100%' },
+  successShare:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, backgroundColor: C.SURFACE },
+  successShareTxt:{ color: C.INK, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
 });

@@ -83,7 +83,9 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
   const visibleFilters = filterCat === 'all' ? STUDIO_FILTERS : STUDIO_FILTERS.filter(f => f.category === filterCat);
   // Live composed look — recomputes as sliders move, drives the Skia preview in real time.
   const liveMatrix: CMatrix = useMemo(() => mul(adjustMatrix(adjust), preset.matrix), [adjust, preset]);
-  const swatchImg = useImage(baseThumb ? `file://${baseThumb}` : undefined);
+  // createThumbnail already returns a file://-prefixed path — don't double-prefix
+  // (file://file:///… fails to decode and the swatches spin forever).
+  const swatchImg = useImage(baseThumb ?? undefined);
 
   useEffect(() => {
     let alive = true;

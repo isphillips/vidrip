@@ -10,11 +10,12 @@ import android.os.Looper
 import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.OverlaySettings
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
-import androidx.media3.effect.OverlaySettings
+import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.RgbMatrix
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
@@ -130,7 +131,7 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
 
   @UnstableApi
   private class ColorMatrixRgb(private val matrix: FloatArray) : RgbMatrix {
-    override fun getMatrixArray(presentationTimeUs: Long, useHdr: Boolean): FloatArray = matrix
+    override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray = matrix
   }
 
   // ── Overlay (static PNG or captured frame loop) ───────────────────────────────
@@ -180,7 +181,7 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
     private val overlap: Int,
   ) : BitmapOverlay() {
     private val loopLen = frames.size - overlap
-    private val settings = OverlaySettings.Builder().build()
+    private val settings = StaticOverlaySettings.Builder().build()
 
     override fun getBitmap(presentationTimeUs: Long): Bitmap {
       val t = presentationTimeUs / 1_000_000.0
