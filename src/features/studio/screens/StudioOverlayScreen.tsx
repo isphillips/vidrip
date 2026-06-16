@@ -4,6 +4,8 @@ import {
   ActivityIndicator, ScrollView, InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { IDENTITY, type CMatrix } from '../colorMatrix';
@@ -81,6 +83,32 @@ function TextOverlayContent({ item }: { item: OverlayItem }) {
     />
   );
 }
+
+// ─── EffectTrayItem ─────────────────────────────────────────────────────────────
+// A fullscreen-effect picker button. Uses a gesture-handler Tap (recognized on the native gesture
+// thread) instead of TouchableOpacity: while an effect is already animating it saturates the UI/
+// render thread, and TouchableOpacity's JS-responder taps get dropped under that load — so switching
+// effects took several taps on Android. A native Tap is queued, not dropped, so the first tap lands.
+// Press feedback (opacity) is driven by a UI-thread shared value so it stays instant even when the
+// JS thread is busy.
+const EffectTrayItem = React.memo(function EffectTrayItem({
+  st, active, onToggle,
+}: { st: (typeof STICKERS)[number]; active: boolean; onToggle: () => void }) {
+  const pressed = useSharedValue(0);
+  const tap = Gesture.Tap()
+    .onBegin(() => { pressed.value = 1; })
+    .onFinalize(() => { pressed.value = 0; })
+    .onEnd(() => { runOnJS(onToggle)(); });
+  const aStyle = useAnimatedStyle(() => ({ opacity: pressed.value ? 0.7 : 1 }));
+  return (
+    <GestureDetector gesture={tap}>
+      <Animated.View style={[styles.trayItem, styles.overlayItem, active && styles.overlayItemOn, aStyle]}>
+        {st.render()}
+        <Text style={[styles.overlayLabel, active && styles.overlayLabelOn]}>{st.label}</Text>
+      </Animated.View>
+    </GestureDetector>
+  );
+});
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -412,12 +440,8 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
       {trayTab === 'overlays' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trayBar} contentContainerStyle={styles.tray}>
           {overlayStickers.map(st => (
-            <TouchableOpacity key={st.key} activeOpacity={0.85}
-              onPress={() => setFsOverlay(fsOverlay === st.key ? null : st.key)}
-              style={[styles.trayItem, styles.overlayItem, fsOverlay === st.key && styles.overlayItemOn]}>
-              {st.render()}
-              <Text style={[styles.overlayLabel, fsOverlay === st.key && styles.overlayLabelOn]}>{st.label}</Text>
-            </TouchableOpacity>
+            <EffectTrayItem key={st.key} st={st} active={fsOverlay === st.key}
+              onToggle={() => setFsOverlay(prev => prev === st.key ? null : st.key)} />
           ))}
         </ScrollView>
       )}
