@@ -10,12 +10,16 @@ export type OverlayTransform = { tx: number; ty: number; scale: number; rotation
 // A draggable / pinch-to-scale / rotate overlay. Sits in its own full-screen, centered,
 // box-none container so multiple overlays stack and empty space passes touches through.
 export default function DraggableOverlay({
-  selected, onSelect, onDelete, onChange, initial, children,
+  selected, onSelect, onDelete, onChange, onGestureChange, initial, children,
 }: {
   selected: boolean;
   onSelect: () => void;
   onDelete: () => void;
   onChange: (t: OverlayTransform) => void;
+  // Fired (true) when a drag/pinch/rotate starts and (false) when it ends. The screen pauses the
+  // shared effect clock while any overlay is being manipulated, so the rasterized sticker texture
+  // is frozen (stable) and resizing is a cheap GPU resample instead of a per-frame re-rasterize.
+  onGestureChange?: (active: boolean) => void;
   initial: OverlayTransform;
   children: React.ReactNode;
 }) {
@@ -37,8 +41,9 @@ export default function DraggableOverlay({
   // is a no-op there) and isn't laggy.
   const active = useSharedValue(0);
   const [dragging, setDragging] = useState(false);
-  const begin = () => { 'worklet'; active.value += 1; if (active.value === 1) { runOnJS(setDragging)(true); } };
-  const finish = () => { 'worklet'; active.value -= 1; if (active.value <= 0) { active.value = 0; runOnJS(setDragging)(false); } };
+  const setDrag = (d: boolean) => { setDragging(d); onGestureChange?.(d); };
+  const begin = () => { 'worklet'; active.value += 1; if (active.value === 1) { runOnJS(setDrag)(true); } };
+  const finish = () => { 'worklet'; active.value -= 1; if (active.value <= 0) { active.value = 0; runOnJS(setDrag)(false); } };
 
   const pan = Gesture.Pan()
     .onBegin(() => { 'worklet'; begin(); runOnJS(onSelect)(); })

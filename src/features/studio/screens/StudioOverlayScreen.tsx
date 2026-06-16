@@ -171,6 +171,11 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState('');
   const [elapsed, setElapsed]     = useState(0);
+  // While an overlay is being dragged/pinched, pause the shared effect clock so the rasterized
+  // sticker texture is frozen and resizing stays smooth (see DraggableOverlay.onGestureChange).
+  const [gesturing, setGesturing] = useState(0);
+  const onOverlayGesture = useCallback((active: boolean) =>
+    setGesturing(c => Math.max(0, c + (active ? 1 : -1))), []);
   const layerRef = useRef<View>(null);
 
   // Reset spinner when user navigates back from StudioDetails — success path
@@ -352,7 +357,7 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedId(null)} />
             {/* One shared, play-gated clock for the whole effect layer (instead of a per-component
                 fallback clock each) — also where adaptive-quality frame sampling runs. */}
-            <EffectClockProvider playing>
+            <EffectClockProvider playing={gesturing === 0}>
               <View ref={layerRef} style={StyleSheet.absoluteFill} pointerEvents="box-none" collapsable={false}>
                 {/* Full-screen overlay layer */}
                 {fsOverlay && (() => {
@@ -364,7 +369,7 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
                   <DraggableOverlay
                     key={o.id} selected={o.id === selectedId} initial={o.transform}
                     onSelect={() => setSelectedId(o.id)} onDelete={() => remove(o.id)}
-                    onChange={t => updateTransform(o.id, t)}>
+                    onChange={t => updateTransform(o.id, t)} onGestureChange={onOverlayGesture}>
                     {o.type === 'text'
                       ? <TextOverlayContent item={o} />
                       : stickerByKey(o.stickerKey!)?.render()}
