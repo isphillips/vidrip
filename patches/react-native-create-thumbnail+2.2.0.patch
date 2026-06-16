@@ -1,0 +1,21 @@
+diff --git a/node_modules/react-native-create-thumbnail/android/src/main/java/com/createthumbnail/CreateThumbnailModule.java b/node_modules/react-native-create-thumbnail/android/src/main/java/com/createthumbnail/CreateThumbnailModule.java
+index 0000000..1111111 100644
+--- a/node_modules/react-native-create-thumbnail/android/src/main/java/com/createthumbnail/CreateThumbnailModule.java
++++ b/node_modules/react-native-create-thumbnail/android/src/main/java/com/createthumbnail/CreateThumbnailModule.java
+@@ -58,9 +58,14 @@ public class CreateThumbnailModule extends ReactContextBaseJavaModule {
+                 handler.post(() -> {
+                     promise.resolve(data);
+                 });
+-            } catch (IOException | IllegalStateException e) {
++            } catch (Throwable e) {
++                // Vidrip patch: MediaMetadataRetriever.setDataSource throws a RuntimeException
++                // (not IOException/IllegalStateException) when it can't read a source — e.g. a
++                // remote video URL it can't open. The original narrow catch let that escape the
++                // executor thread as an UNCAUGHT exception and crashed the whole app. Catch any
++                // Throwable and reject the promise so JS can fall back gracefully.
+                 handler.post(() -> {
+-                    promise.reject("CreateThumbnail_ERROR", e);
++                    promise.reject("CreateThumbnail_ERROR", e instanceof Exception ? (Exception) e : new RuntimeException(e));
+                 });
+             }
+         });

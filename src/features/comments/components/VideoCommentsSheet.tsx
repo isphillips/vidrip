@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, Modal, Animated, Dimensions, Alert,
@@ -13,7 +13,6 @@ import {
   addCommentEmoji, removeCommentEmoji,
   type VideoComment, type CommentCursor,
 } from '../../../infrastructure/supabase/queries/videoComments';
-import Handle from '../../../components/Handle';
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import { useAuthStore } from '../../../store/authStore';
 import { usePendingCommentsStore } from '../../../store/pendingCommentsStore';
@@ -21,13 +20,15 @@ import { useUploadStore } from '../../../store/uploadStore';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import type { RootStackParamList } from '../../../app/navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import CommentRow from './CommentRow';
+import { flattenThread, rootCount, findComment, ROOT_KEY } from '../commentTree';
 
 type RootNav = NativeStackNavigationProp<RootStackParamList>;
 
-// Reaction set comes from EmojiGlyph (QUICK_EMOJIS) so comment reactions use the
-// same branded glyphs as the rest of the app.
 const EMOJI_OPTIONS = QUICK_EMOJIS;
 const SHEET_HEIGHT = Dimensions.get('window').height * 0.72;
+const ROOT_PAGE = 20;
+const REPLY_PAGE = 50;
 
 interface Props {
   visible: boolean;
@@ -38,20 +39,15 @@ interface Props {
   onClose: () => void;
 }
 
-// ── Comment video player modal ───────────────────────────────────────────────
-
+// ── Comment video player modal (one per sheet; lifted out of the rows so FlatList
+//    recycling can't unmount a playing clip, and so back returns to the same scroll). ──
 function CommentVideoModal({ uri, onClose }: { uri: string; onClose: () => void }) {
   return (
     <Modal visible animationType="fade" transparent onRequestClose={onClose}>
       <View style={vStyles.backdrop}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} activeOpacity={1} />
         <View style={vStyles.player}>
-          <Video
-            source={{ uri }}
-            style={StyleSheet.absoluteFill}
-            resizeMode="contain"
-            controls
-          />
+          <Video source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="contain" controls />
           <TouchableOpacity style={vStyles.close} onPress={onClose}>
             <Text style={vStyles.closeText}>✕</Text>
           </TouchableOpacity>
@@ -60,7 +56,6 @@ function CommentVideoModal({ uri, onClose }: { uri: string; onClose: () => void 
     </Modal>
   );
 }
-
 const vStyles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.88)', alignItems: 'center', justifyContent: 'center' },
   player:   { width: '100%', height: '80%', backgroundColor: '#000' },
@@ -69,7 +64,6 @@ const vStyles = StyleSheet.create({
 });
 
 // ── Emoji picker ─────────────────────────────────────────────────────────────
-
 function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
   return (
     <View style={ep.row}>
@@ -82,136 +76,11 @@ function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
   );
 }
 const ep = StyleSheet.create({
-  row:  { flexDirection: 'row', paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, gap: SPACE.SM, backgroundColor: C.SURFACE, borderTopWidth: 1, borderColor: C.BORDER },
-  btn:  { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.SM, backgroundColor: C.SURFACE_2 },
-  emoji: { fontSize: 22 },
-});
-
-// ── Comment card ──────────────────────────────────────────────────────────────
-
-function CommentCard({
-  comment, currentUserId, onReply, onDelete, onEmojiTap, onEmojiLongPress,
-}: {
-  comment: VideoComment;
-  currentUserId: string;
-  onReply: (c: VideoComment) => void;
-  onDelete: (c: VideoComment) => void;
-  onEmojiTap: (c: VideoComment, emoji: string) => void;
-  onEmojiLongPress: (c: VideoComment) => void;
-}) {
-  const [playUri, setPlayUri] = useState<string | null>(null);
-
-  const initial = (comment.author_handle ?? '?').charAt(0).toUpperCase();
-  const ts = formatAge(comment.created_at);
-  const dur = comment.duration ? formatDur(comment.duration) : null;
-
-  // Resolve playback URI: prefer cloud URL, fall back to local cache
-  const playableUri = comment.video_url ?? (comment.local_path ?? null);
-
-  const handleVideoTap = () => {
-    if (!playableUri) { return; }
-    setPlayUri(playableUri);
-  };
-
-  // Aggregate emoji reactions (emoji → count, whether current user reacted)
-  const emojiMap = new Map<string, { count: number; mine: boolean }>();
-  (comment as any).emoji_reactions?.forEach((r: { emoji: string; user_id: string }) => {
-    const prev = emojiMap.get(r.emoji) ?? { count: 0, mine: false };
-    emojiMap.set(r.emoji, { count: prev.count + 1, mine: prev.mine || r.user_id === currentUserId });
-  });
-  const emojiEntries = [...emojiMap.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 4);
-
-  return (
-    <View style={cc.card}>
-      {/* Author row */}
-      <View style={cc.authorRow}>
-        <View style={cc.avatar}>
-          <Text style={cc.avatarText}>{initial}</Text>
-        </View>
-        <View style={cc.authorInfo}>
-          <Handle userId={comment.author_id} handle={comment.author_handle} style={cc.handle} />
-          <Text style={cc.time}>{comment.is_friend ? '👤 ' : ''}{ts}</Text>
-        </View>
-        {comment.author_id === currentUserId && (
-          <TouchableOpacity onPress={() => onDelete(comment)} style={cc.deleteBtn} hitSlop={8}>
-            <Ionicons name="trash-outline" size={16} color={C.MUTED} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Video tile */}
-      <TouchableOpacity style={cc.videoTile} onPress={handleVideoTap} activeOpacity={0.85}>
-        <View style={cc.videoTileInner}>
-          <Ionicons name={playableUri ? 'play-circle' : 'hourglass-outline'} size={36} color={C.WHITE} />
-          {dur && <Text style={cc.durText}>{dur}</Text>}
-        </View>
-      </TouchableOpacity>
-
-      {/* Reactions + reply row */}
-      <View style={cc.actionsRow}>
-        <View style={cc.emojisRow}>
-          {emojiEntries.map(([emoji, { count, mine }]) => (
-            <TouchableOpacity
-              key={emoji}
-              style={[cc.emojiChip, mine && cc.emojiChipMine]}
-              onPress={() => onEmojiTap(comment, emoji)}>
-              <EmojiGlyph emoji={emoji} size={14} />
-              <Text style={cc.emojiChipText}> {count}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={cc.emojiAdd} onLongPress={() => onEmojiLongPress(comment)} onPress={() => onEmojiLongPress(comment)} hitSlop={4}>
-            <Ionicons name="happy-outline" size={18} color={C.MUTED} />
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity style={cc.replyBtn} onPress={() => onReply(comment)}>
-          <Ionicons name="chatbubble-outline" size={14} color={C.MUTED} />
-          <Text style={cc.replyCount}>{comment.reply_count > 0 ? comment.reply_count : 'Reply'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {playUri && <CommentVideoModal uri={playUri} onClose={() => setPlayUri(null)} />}
-    </View>
-  );
-}
-
-function formatAge(iso: string): string {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) { return 'just now'; }
-  if (diff < 3600) { return `${Math.floor(diff / 60)}m`; }
-  if (diff < 86400) { return `${Math.floor(diff / 3600)}h`; }
-  return `${Math.floor(diff / 86400)}d`;
-}
-
-function formatDur(s: number): string {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${String(sec).padStart(2, '0')}`;
-}
-
-const cc = StyleSheet.create({
-  card:       { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, marginHorizontal: SPACE.LG, marginBottom: SPACE.MD, overflow: 'hidden' },
-  authorRow:  { flexDirection: 'row', alignItems: 'center', padding: SPACE.MD, gap: SPACE.SM },
-  avatar:     { width: 34, height: 34, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
-  authorInfo: { flex: 1 },
-  handle:     { color: C.INK, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD },
-  time:       { color: C.MUTED, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, marginTop: 1 },
-  deleteBtn:  { padding: SPACE.XS },
-  videoTile:  { marginHorizontal: SPACE.MD, borderRadius: RADIUS.SM, overflow: 'hidden', backgroundColor: '#000', height: 90 },
-  videoTileInner: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: SPACE.XS },
-  durText:    { color: C.WHITE, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_MEDIUM },
-  actionsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.MD, paddingVertical: SPACE.SM, gap: SPACE.SM },
-  emojisRow:  { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.XS, alignItems: 'center' },
-  emojiChip:  { flexDirection: 'row', alignItems: 'center', backgroundColor: C.SURFACE_2, borderRadius: RADIUS.FULL, paddingHorizontal: SPACE.SM, paddingVertical: 3, borderWidth: 1, borderColor: C.BORDER },
-  emojiChipMine: { borderColor: C.ACCENT },
-  emojiChipText: { color: C.INK, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
-  emojiAdd:   { padding: SPACE.XS },
-  replyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SPACE.SM, paddingVertical: SPACE.XS, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE_2, borderWidth: 1, borderColor: C.BORDER },
-  replyCount: { color: C.MUTED, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_MEDIUM },
+  row: { flexDirection: 'row', paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, gap: SPACE.SM, backgroundColor: C.SURFACE, borderTopWidth: 1, borderColor: C.BORDER },
+  btn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.SM, backgroundColor: C.SURFACE_2 },
 });
 
 // ── Main sheet ────────────────────────────────────────────────────────────────
-
 export default function VideoCommentsSheet({
   visible, rootSourceId, sourceType, videoTitle, refreshKey, onClose,
 }: Props) {
@@ -219,23 +88,23 @@ export default function VideoCommentsSheet({
   const navigation = useNavigation<RootNav>();
   const { user } = useAuthStore();
 
-  // Optimistic, just-recorded comments awaiting their cloud upload.
   const pending = usePendingCommentsStore(s => s.pending);
   const reconcilePending = usePendingCommentsStore(s => s.reconcile);
+  const removePending = usePendingCommentsStore(s => s.remove);
 
-  const [comments, setComments] = useState<VideoComment[]>([]);
+  // Lazily-loaded comment tree: children keyed by parent id (roots under ROOT_KEY).
+  const [childrenById, setChildrenById] = useState<Record<string, VideoComment[]>>({});
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [focusRootId, setFocusRootId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [cursor, setCursor] = useState<CommentCursor | null>(null);
-  const hasMoreRef = useRef(true);
-
-  // Replies sub-level
-  const [replyParent, setReplyParent] = useState<VideoComment | null>(null);
-  const [replies, setReplies] = useState<VideoComment[]>([]);
-  const [repliesLoading, setRepliesLoading] = useState(false);
-
-  // Emoji picker
+  const [playUri, setPlayUri] = useState<string | null>(null);
   const [emojiTarget, setEmojiTarget] = useState<VideoComment | null>(null);
+
+  const cursorRef = useRef<CommentCursor | null>(null);
+  const hasMoreRef = useRef(true);
+  const childrenByIdRef = useRef(childrenById);
+  useEffect(() => { childrenByIdRef.current = childrenById; }, [childrenById]);
 
   // Sheet slide-in animation
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
@@ -247,47 +116,84 @@ export default function VideoCommentsSheet({
     }
   }, [visible, slideAnim]);
 
-  // Fetch comments whenever sheet opens or refreshKey changes
-  const load = useCallback(async (reset = true) => {
+  // ── Loaders ──
+  const loadRoots = useCallback(async (reset: boolean) => {
     if (reset) { setLoading(true); hasMoreRef.current = true; }
     else { setLoadingMore(true); }
     try {
       const page = await fetchVideoComments({
-        rootSourceId, sourceType,
-        parentCommentId: null,
-        viewerId: user?.id,
-        cursor: reset ? null : cursor,
-        limit: 20,
+        rootSourceId, sourceType, parentCommentId: null, viewerId: user?.id,
+        cursor: reset ? null : cursorRef.current, limit: ROOT_PAGE,
       });
-      if (reset) {
-        setComments(page);
-      } else {
-        setComments(prev => [...prev, ...page]);
-      }
-      // Drop optimistic copies that have now landed server-side (video_url set).
+      setChildrenById(prev => ({ ...prev, [ROOT_KEY]: reset ? page : [...(prev[ROOT_KEY] ?? []), ...page] }));
       reconcilePending(page.map(p => p.id));
-      hasMoreRef.current = page.length === 20;
-      if (page.length > 0) {
+      hasMoreRef.current = page.length === ROOT_PAGE;
+      if (page.length) {
         const last = page[page.length - 1];
-        setCursor({ emoji_count: last.emoji_count, created_at: last.created_at, id: last.id });
-      }
+        cursorRef.current = { emoji_count: last.emoji_count, created_at: last.created_at, id: last.id };
+      } else if (reset) { cursorRef.current = null; }
     } catch (e) {
-      console.error('[VideoCommentsSheet] load', e);
+      console.error('[VideoCommentsSheet] loadRoots', e);
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      setLoading(false); setLoadingMore(false);
     }
-  }, [rootSourceId, sourceType, user?.id, cursor, reconcilePending]);
+  }, [rootSourceId, sourceType, user?.id, reconcilePending]);
 
+  const loadChildren = useCallback(async (parentId: string) => {
+    try {
+      const page = await fetchVideoComments({
+        rootSourceId, sourceType, parentCommentId: parentId, viewerId: user?.id, limit: REPLY_PAGE,
+      });
+      setChildrenById(prev => ({ ...prev, [parentId]: page }));
+      reconcilePending(page.map(p => p.id));
+    } catch (e) {
+      console.error('[VideoCommentsSheet] loadChildren', e);
+    }
+  }, [rootSourceId, sourceType, user?.id, reconcilePending]);
+
+  // Refresh roots + every currently-loaded reply thread (keeps counts fresh and swaps
+  // optimistic copies for their landed server rows after an upload completes).
+  const reloadAll = useCallback(async () => {
+    try {
+      const ids: string[] = [];
+      const roots = await fetchVideoComments({
+        rootSourceId, sourceType, parentCommentId: null, viewerId: user?.id, limit: ROOT_PAGE,
+      });
+      ids.push(...roots.map(r => r.id));
+      hasMoreRef.current = roots.length === ROOT_PAGE;
+      cursorRef.current = roots.length
+        ? { emoji_count: roots[roots.length - 1].emoji_count, created_at: roots[roots.length - 1].created_at, id: roots[roots.length - 1].id }
+        : null;
+
+      const parentIds = Object.keys(childrenByIdRef.current).filter(k => k !== ROOT_KEY);
+      const childResults = await Promise.all(parentIds.map(pid =>
+        fetchVideoComments({ rootSourceId, sourceType, parentCommentId: pid, viewerId: user?.id, limit: REPLY_PAGE })
+          .then(rows => ({ pid, rows })).catch(() => ({ pid, rows: [] as VideoComment[] })),
+      ));
+      setChildrenById(() => {
+        const next: Record<string, VideoComment[]> = { [ROOT_KEY]: roots };
+        childResults.forEach(({ pid, rows }) => { next[pid] = rows; ids.push(...rows.map(r => r.id)); });
+        return next;
+      });
+      reconcilePending(ids);
+    } catch (e) {
+      console.error('[VideoCommentsSheet] reloadAll', e);
+    }
+  }, [rootSourceId, sourceType, user?.id, reconcilePending]);
+
+  // (Re)load whenever the sheet opens or the target video changes.
   useEffect(() => {
     if (!visible) { return; }
-    load(true);
+    setChildrenById({});
+    setExpanded(new Set());
+    setFocusRootId(null);
+    cursorRef.current = null;
+    loadRoots(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, refreshKey, rootSourceId, sourceType]);
 
-  // Refetch when a background upload finishes, so a just-posted comment appears
-  // as soon as its upload completes (get_video_comments only returns rows whose
-  // video_url is set) — no close/reopen.
+  // When a background upload finishes, a just-posted comment's row gets its video_url —
+  // refresh so it appears (get_video_comments only returns rows whose video_url is set).
   const uploadJobs = useUploadStore(s => s.jobs);
   const prevUploadingRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -296,46 +202,69 @@ export default function VideoCommentsSheet({
     let finished = false;
     prevUploadingRef.current.forEach(id => { if (!nowUploading.has(id)) { finished = true; } });
     prevUploadingRef.current = nowUploading;
-    if (finished) { load(true); }
-  }, [uploadJobs, visible, load]);
+    if (finished) { reloadAll(); }
+  }, [uploadJobs, visible, reloadAll]);
 
-  // Realtime: new emoji reactions
+  // Realtime: refresh on any new/removed emoji reaction so counts stay accurate.
   useEffect(() => {
     if (!visible) { return; }
-    const channel = supabase.channel(`comment-emojis-${rootSourceId}`)
+    const channel = supabase.channel(`comment-emojis-${rootSourceId}-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'video_comment_emoji_reactions' },
-        (payload) => {
-          const commentId = (payload.new as any)?.comment_id ?? (payload.old as any)?.comment_id;
-          if (!commentId) { return; }
-          // Re-fetch that specific comment's emoji reactions would be ideal, but for
-          // Phase 2 just reload the page so counts stay accurate.
-          load(true);
-        })
+        () => { reloadAll(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, rootSourceId]);
 
-  const loadReplies = useCallback(async (parent: VideoComment) => {
-    setReplyParent(parent);
-    setRepliesLoading(true);
-    try {
-      const page = await fetchVideoComments({
-        rootSourceId, sourceType,
-        parentCommentId: parent.id,
-        viewerId: user?.id,
-        limit: 30,
-      });
-      setReplies(page);
-      reconcilePending(page.map(p => p.id));
-    } catch (e) {
-      console.error('[VideoCommentsSheet] loadReplies', e);
-    } finally {
-      setRepliesLoading(false);
-    }
-  }, [rootSourceId, sourceType, user?.id, reconcilePending]);
+  // ── Interactions ──
+  const toggleExpand = useCallback((comment: VideoComment) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(comment.id)) {
+        next.delete(comment.id);
+      } else {
+        next.add(comment.id);
+        if (!childrenByIdRef.current[comment.id]) { loadChildren(comment.id); }
+      }
+      return next;
+    });
+  }, [loadChildren]);
 
-  const handleDelete = (comment: VideoComment) => {
+  const handleContinue = useCallback((commentId: string) => {
+    if (!childrenByIdRef.current[commentId]) { loadChildren(commentId); }
+    setExpanded(prev => new Set(prev).add(commentId));
+    setFocusRootId(commentId);
+  }, [loadChildren]);
+
+  const updateInTree = useCallback((id: string, updater: (c: VideoComment) => VideoComment) => {
+    setChildrenById(prev => {
+      let changed = false;
+      const next: Record<string, VideoComment[]> = {};
+      for (const key of Object.keys(prev)) {
+        const arr = prev[key];
+        const idx = arr.findIndex(c => c.id === id);
+        if (idx === -1) { next[key] = arr; continue; }
+        const copy = arr.slice();
+        copy[idx] = updater(copy[idx]);
+        next[key] = copy;
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const handleEmojiTap = useCallback(async (comment: VideoComment, emoji: string) => {
+    if (!user) { return; }
+    const reactions = (comment as any).emoji_reactions as { emoji: string; user_id: string }[] | undefined;
+    const hasIt = reactions?.some(r => r.emoji === emoji && r.user_id === user.id);
+    updateInTree(comment.id, c => (hasIt
+      ? { ...c, emoji_count: Math.max(0, c.emoji_count - 1), emoji_reactions: ((c as any).emoji_reactions ?? []).filter((r: any) => !(r.emoji === emoji && r.user_id === user.id)) } as any
+      : { ...c, emoji_count: c.emoji_count + 1, emoji_reactions: [...(((c as any).emoji_reactions) ?? []), { emoji, user_id: user.id }] } as any));
+    if (hasIt) { await removeCommentEmoji(comment.id, user.id, emoji).catch(() => {}); }
+    else { await addCommentEmoji(comment.id, user.id, emoji).catch(() => {}); }
+  }, [user, updateInTree]);
+
+  const handleDelete = useCallback((comment: VideoComment) => {
     Alert.alert('Delete comment?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -343,84 +272,44 @@ export default function VideoCommentsSheet({
         onPress: async () => {
           try {
             await deleteVideoComment(comment.id);
-            setComments(prev => prev.filter(c => c.id !== comment.id));
-            setReplies(prev => prev.filter(c => c.id !== comment.id));
+            setChildrenById(prev => {
+              const next: Record<string, VideoComment[]> = {};
+              for (const k of Object.keys(prev)) { next[k] = prev[k].filter(c => c.id !== comment.id); }
+              return next;
+            });
+            removePending(comment.id);
           } catch { Alert.alert('Error', 'Could not delete comment.'); }
         },
       },
     ]);
-  };
+  }, [removePending]);
 
-  const handleEmojiTap = async (comment: VideoComment, emoji: string) => {
-    if (!user) { return; }
-    // Optimistic toggle
-    const hasIt = (comment as any).emoji_reactions?.some(
-      (r: any) => r.emoji === emoji && r.user_id === user.id,
-    );
-    if (hasIt) {
-      setComments(prev => prev.map(c => c.id !== comment.id ? c : {
-        ...c,
-        emoji_count: c.emoji_count - 1,
-        emoji_reactions: (c as any).emoji_reactions?.filter(
-          (r: any) => !(r.emoji === emoji && r.user_id === user.id),
-        ),
-      } as VideoComment));
-      await removeCommentEmoji(comment.id, user.id, emoji).catch(() => {});
-    } else {
-      setComments(prev => prev.map(c => c.id !== comment.id ? c : {
-        ...c,
-        emoji_count: c.emoji_count + 1,
-        emoji_reactions: [...((c as any).emoji_reactions ?? []), { emoji, user_id: user.id }],
-      } as VideoComment));
-      await addCommentEmoji(comment.id, user.id, emoji).catch(() => {});
-    }
-  };
+  const handleRecordComment = useCallback((parentCommentId?: string) => {
+    navigation.navigate('RecordComment', { rootSourceId, sourceType, parentCommentId, videoTitle });
+  }, [navigation, rootSourceId, sourceType, videoTitle]);
 
-  const handleRecordComment = (parentCommentId?: string) => {
-    navigation.navigate('RecordComment', {
-      rootSourceId,
-      sourceType,
-      parentCommentId,
-      videoTitle,
-    });
-  };
+  const rows = useMemo(() => flattenThread({
+    childrenById, expanded, pending, rootSourceId, sourceType, focusRootId,
+  }), [childrenById, expanded, pending, rootSourceId, sourceType, focusRootId]);
 
   if (!visible) { return null; }
 
-  // Fold in optimistic comments for this level (own just-posted, upload in-flight).
-  const mergePending = (real: VideoComment[], level: string | null) => {
-    const extra = pending.filter(p =>
-      p.root_source_id === rootSourceId &&
-      p.source_type === sourceType &&
-      (p.parent_comment_id ?? null) === level &&
-      !real.some(r => r.id === p.id),
-    );
-    return extra.length ? [...extra, ...real] : real;
-  };
-
-  const showReplies = replyParent !== null;
-  const mergedComments = mergePending(comments, null);
-  const mergedReplies = showReplies ? mergePending(replies, replyParent!.id) : replies;
-  const listData = showReplies ? mergedReplies : mergedComments;
-  const listLoading = showReplies ? repliesLoading : loading;
-  const headerTitle = showReplies
-    ? `Replies to @${replyParent!.author_handle}`
-    : `Comments${mergedComments.length > 0 ? ` (${mergedComments.length})` : ''}`;
+  const focused = focusRootId ? findComment(focusRootId, childrenById, pending) : null;
+  const totalRoots = rootCount(childrenById, pending, rootSourceId, sourceType);
+  const headerTitle = focused
+    ? `Thread · @${focused.author_handle}`
+    : `Comments${totalRoots > 0 ? ` (${totalRoots})` : ''}`;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Backdrop */}
       <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={onClose} />
 
-      {/* Sheet */}
       <Animated.View style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}>
-        {/* Handle */}
         <View style={s.handle} />
 
-        {/* Header */}
         <View style={s.header}>
-          {showReplies && (
-            <TouchableOpacity onPress={() => setReplyParent(null)} hitSlop={8} style={s.backBtn}>
+          {focusRootId && (
+            <TouchableOpacity onPress={() => setFocusRootId(null)} hitSlop={8} style={s.backBtn}>
               <Ionicons name="chevron-back" size={22} color={C.INK} />
             </TouchableOpacity>
           )}
@@ -430,76 +319,61 @@ export default function VideoCommentsSheet({
           </TouchableOpacity>
         </View>
 
-        {/* List */}
-        {listLoading ? (
+        {loading && rows.length === 0 ? (
           <View style={s.center}><ActivityIndicator color={C.ACCENT} /></View>
-        ) : listData.length === 0 ? (
+        ) : rows.length === 0 ? (
           <View style={s.center}>
-            <Text style={s.empty}>
-              {showReplies ? 'No replies yet' : 'No comments yet. Be the first!'}
-            </Text>
+            <Text style={s.empty}>No comments yet. Be the first!</Text>
           </View>
         ) : (
           <FlatList
-            data={listData}
-            keyExtractor={c => c.id}
+            data={rows}
+            keyExtractor={r => (r.isContinue ? `continue-${r.comment.id}` : r.comment.id)}
             style={{ flex: 1 }}
-            contentContainerStyle={{ paddingTop: SPACE.MD, paddingBottom: SPACE.MD }}
+            contentContainerStyle={{ paddingVertical: SPACE.SM }}
             onEndReached={() => {
-              if (!showReplies && hasMoreRef.current && !loadingMore) { load(false); }
+              if (!focusRootId && hasMoreRef.current && !loadingMore) { loadRoots(false); }
             }}
             onEndReachedThreshold={0.4}
             ListFooterComponent={loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.LG }} /> : null}
             renderItem={({ item }) => (
-              <CommentCard
-                comment={item}
+              <CommentRow
+                row={item}
                 currentUserId={user?.id ?? ''}
-                onReply={c => {
-                  if (showReplies) {
-                    handleRecordComment(replyParent!.id);
-                  } else {
-                    if (c.reply_count > 0) {
-                      loadReplies(c);
-                    } else {
-                      handleRecordComment(c.id);
-                    }
-                  }
-                }}
+                onPlay={setPlayUri}
+                onReply={c => handleRecordComment(c.id)}
+                onToggleExpand={toggleExpand}
+                onContinue={handleContinue}
                 onDelete={handleDelete}
                 onEmojiTap={handleEmojiTap}
-                onEmojiLongPress={c => setEmojiTarget(c)}
+                onEmojiPick={c => setEmojiTarget(c)}
               />
             )}
           />
         )}
 
-        {/* Emoji picker (floats above footer) */}
         {emojiTarget && (
-          <EmojiPicker onPick={emoji => {
-            handleEmojiTap(emojiTarget, emoji);
-            setEmojiTarget(null);
-          }} />
+          <EmojiPicker onPick={emoji => { handleEmojiTap(emojiTarget, emoji); setEmojiTarget(null); }} />
         )}
 
-        {/* Footer */}
         <View style={[s.footer, { paddingBottom: bottom + SPACE.SM }]}>
           <TouchableOpacity
             style={s.commentBtn}
-            onPress={() => handleRecordComment(showReplies ? replyParent!.id : undefined)}
+            onPress={() => handleRecordComment(focusRootId ?? undefined)}
             activeOpacity={0.85}>
             <Ionicons name="videocam" size={18} color={C.WHITE} />
-            <Text style={s.commentBtnText}>
-              {showReplies ? 'Record Reply' : 'Record Comment'}
-            </Text>
+            <Text style={s.commentBtnText}>{focusRootId ? 'Record Reply' : 'Record Comment'}</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>
+
+      {playUri && <CommentVideoModal uri={playUri} onClose={() => setPlayUri(null)} />}
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 30 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 30 },
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     height: SHEET_HEIGHT,
@@ -514,9 +388,9 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACE.LG, paddingBottom: SPACE.MD },
   backBtn: { padding: SPACE.XS },
   headerTitle: { flex: 1, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
-  center:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  empty:   { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center', paddingHorizontal: SPACE.XL },
-  footer:  { paddingHorizontal: SPACE.LG, paddingTop: SPACE.SM },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  empty: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, textAlign: 'center', paddingHorizontal: SPACE.XL },
+  footer: { paddingHorizontal: SPACE.LG, paddingTop: SPACE.SM },
   commentBtn: { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.LG, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM },
   commentBtnText: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD },
 });

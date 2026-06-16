@@ -1,4 +1,5 @@
 import RNFS from 'react-native-fs';
+import { createThumbnail } from 'react-native-create-thumbnail';
 import { supabase } from '../supabase/client';
 import { postVideoComment, updateVideoCommentUrl } from '../supabase/queries/videoComments';
 
@@ -10,6 +11,19 @@ const COMMENT_DIR = `${RNFS.DocumentDirectoryPath}/comment-videos`;
 
 export function localPathForComment(commentId: string): string {
   return `${COMMENT_DIR}/${commentId}.mp4`;
+}
+
+// Thumbnails live next to the clip in the same public bucket/folder, so every viewer can
+// load `<authorId>/<commentId>.jpg` without a DB column or RPC change — the path is derivable
+// from fields the comment row already carries (author_id + id).
+function commentThumbStoragePath(authorId: string, commentId: string): string {
+  return `${authorId}/${commentId}.jpg`;
+}
+
+/** Public URL for a comment's stored thumbnail (derivable from author + comment id). */
+export function commentThumbPublicUrl(authorId: string, commentId: string): string {
+  return supabase.storage.from('comment-videos')
+    .getPublicUrl(commentThumbStoragePath(authorId, commentId)).data.publicUrl;
 }
 
 async function ensureDir(): Promise<void> {
@@ -45,6 +59,26 @@ async function uploadToCloud(localPath: string, uploadPath: string): Promise<str
 
   const { data: { publicUrl } } = supabase.storage.from('comment-videos').getPublicUrl(uploadPath);
   return publicUrl;
+}
+
+// Generate a frame from the local clip and upload it as the comment's thumbnail. Best-effort
+// — a thumbnail failure must never block the actual video relay; the viewer just falls back
+// to a play tile for that one comment.
+async function uploadThumbnail(localVideoPath: string, authorId: string, commentId: string): Promise<void> {
+  try {
+    const fileUri = localVideoPath.startsWith('file://') ? localVideoPath : `file://${localVideoPath}`;
+    const { path } = await createThumbnail({ url: fileUri, timeStamp: 100, format: 'jpeg' });
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) { return; }
+    const formData = new FormData();
+    (formData as any).append('file', { uri: path, type: 'image/jpeg', name: 'thumb.jpg' });
+    await fetch(`${SUPABASE_URL}/storage/v1/object/comment-videos/${commentThumbStoragePath(authorId, commentId)}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'apikey': ANON_KEY, 'x-upsert': 'true' },
+      body: formData,
+    });
+  } catch { /* best-effort */ }
 }
 
 // ── Two-phase commit + relay ──────────────────────────────────────────────────
@@ -88,6 +122,9 @@ export async function commitVideoComment(params: CommitParams): Promise<string> 
  */
 export async function uploadVideoCommentRelay(commentId: string, authorId: string): Promise<void> {
   const localPath = localPathForComment(commentId);
+  // Upload the thumbnail first so it's already in place by the time video_url is set and the
+  // comment becomes visible to other viewers (best-effort — never blocks the video relay).
+  await uploadThumbnail(localPath, authorId, commentId);
   const cloudUrl = await uploadToCloud(localPath, `${authorId}/${commentId}.mp4`);
   await updateVideoCommentUrl(commentId, cloudUrl);
 }
