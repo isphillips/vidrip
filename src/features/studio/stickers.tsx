@@ -8,6 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { FONT } from '../../theme';
 import { useClock, sawtooth, triangle } from './effectClock';
 import { useStudioQuality, scaleCount } from './studioQuality';
+import { MonsoonCanvas, InfernoCanvas } from './components/SkiaParticles';
 
 const BRAND = ['#FF4FA3', '#A05CFF', '#3B82F6'];
 
@@ -528,7 +529,6 @@ function LightningFlash({ width, height }: { width: number; height: number }) {
 }
 
 // Rain — layered for depth (far = thin/dim/slow, near = thick/bright/fast)
-const RAIN_ANGLE = -18 * Math.PI / 180;
 type RainBase = { seed: number; dur: number; durVar: number; len: number; lenVar: number; thickness: number; opacity: number; color: string };
 function makeRain(count: number, b: RainBase) {
   return Array.from({ length: count }, (_, i) => ({
@@ -547,32 +547,7 @@ const RAIN_FAR  = makeRain(12, { seed: 317, dur: 620, durVar: 160, len: 14, lenV
 const RAIN_MID  = makeRain(14, { seed: 533, dur: 420, durVar: 140, len: 24, lenVar: 16, thickness: 1.5, opacity: 0.32, color: '#B4D4FF' });
 const RAIN_NEAR = makeRain(9,  { seed: 911, dur: 280, durVar: 120, len: 42, lenVar: 24, thickness: 2.5, opacity: 0.48, color: '#D6E8FF' });
 
-function RainStreak({ leftPct, del, dur, lenPx, thickness, opacity, color, frameWidth, frameHeight }: ReturnType<typeof makeRain>[0] & { frameWidth: number; frameHeight: number }) {
-  const clock = useClock();
-  const p = useDerivedValue(() => sawtooth(clock.value, del, dur));
-  const xShift = Math.tan(RAIN_ANGLE) * (frameHeight + lenPx);   // negative → drifts left
-  // Start span widened by the drift so trajectories cover the whole rect,
-  // incl. the bottom-right corner (drops there must start past the right edge).
-  const spread = frameWidth + Math.abs(xShift);
-  const left   = (leftPct / 100) * (spread + 16) - 8;
-  const anim = useAnimatedStyle(() => {
-    const v = p.value;
-    return {
-      opacity: v < 0.06 ? v * 16.7 * opacity : v > 0.9 ? (1 - v) * 10 * opacity : opacity,
-      transform: [
-        { translateX: xShift * v },
-        { translateY: -lenPx + v * (frameHeight + lenPx) },
-      ],
-    };
-  });
-  return (
-    <RAnimated.View style={[anim, {
-      position: 'absolute', top: 0, left,
-      width: thickness, height: lenPx, borderRadius: thickness / 2,
-      backgroundColor: color,
-    }]} />
-  );
-}
+// Rain streaks + splashes now render in MonsoonCanvas (Skia) — see components/SkiaParticles.tsx.
 
 // Splash where a near-layer drop hits the ground
 const SPLASH_CFG = Array.from({ length: 7 }, (_, i) => ({
@@ -580,26 +555,6 @@ const SPLASH_CFG = Array.from({ length: 7 }, (_, i) => ({
   del:     (i * 137 + 11) % 900,
   dur:     420 + ((i * 53) % 220),
 }));
-function RainSplash({ leftPct, del, dur, frameWidth, frameHeight }: typeof SPLASH_CFG[0] & { frameWidth: number; frameHeight: number }) {
-  const clock = useClock();
-  const p = useDerivedValue(() => sawtooth(clock.value, del, dur));
-  const left = leftPct * frameWidth / 100;
-  const top  = frameHeight - 5 - (leftPct % 8);
-  const anim = useAnimatedStyle(() => {
-    const v = p.value;
-    return {
-      opacity: v < 0.55 ? 0 : (1 - v) * 2.2 * 0.6,
-      transform: [{ scaleX: 0.4 + v * 1.3 }],
-    };
-  });
-  return (
-    <RAnimated.View style={[anim, {
-      position: 'absolute', top, left,
-      width: 11, height: 2, borderRadius: 1,
-      backgroundColor: 'rgba(206,222,255,0.7)',
-    }]} />
-  );
-}
 
 // Inferno ember (full-screen, used by InfernoOverlay)
 const INFERNO_CFG = Array.from({ length: 14 }, (_, i) => ({
@@ -609,73 +564,15 @@ const INFERNO_CFG = Array.from({ length: 14 }, (_, i) => ({
   size:     6 + (i % 4) * 3,
   colorIdx: i % 4,
 }));
-const INFERNO_COLORS = ['#FF4500', '#FF6B00', '#FFD700', '#FF2200'];
+// Embers now render in InfernoCanvas (Skia) — see components/SkiaParticles.tsx.
 
-function InfernoEmber({ leftPct, del, dur, size, colorIdx, frameWidth, frameHeight }: typeof INFERNO_CFG[0] & { frameWidth: number; frameHeight: number }) {
-  const clock = useClock();
-  const p    = useDerivedValue(() => sawtooth(clock.value, del, dur));
-  const sway = useDerivedValue(() => triangle(clock.value, 0, Math.round(dur * 0.55) * 2));
-  const left = leftPct * frameWidth / 100;
-  const col  = INFERNO_COLORS[colorIdx];
-  const anim = useAnimatedStyle(() => {
-    const v = p.value;
-    const fade  = v < 0.1 ? v * 10 : Math.pow(1 - v, 1.5);       // ignite fast, cool gradually
-    const swayX = Math.sin((v * 4 + sway.value) * Math.PI) * 18; // organic weave as it rises
-    return {
-      opacity: fade * (0.7 + sway.value * 0.3),                  // subtle per-ember flicker
-      transform: [
-        { translateX: swayX },
-        { translateY: -v * frameHeight * 0.92 },
-        { scale: 1 - v * 0.7 },                                  // shrinks as it dies out
-      ],
-    };
-  });
-  return (
-    <RAnimated.View style={[anim, {
-      position: 'absolute', bottom: 2, left,
-      width: size, height: size, borderRadius: size / 2,
-      backgroundColor: col,
-      shadowColor: col, shadowRadius: 9, shadowOpacity: 1, shadowOffset: { width: 0, height: 0 },
-    }]} />
-  );
-}
-
-// Rising smoke wisp (used by InfernoOverlay for volume)
+// Rising smoke wisp config (rendered in InfernoCanvas)
 const SMOKE_CFG = Array.from({ length: 4 }, (_, i) => ({
   leftPct: ((i * 1399 + 211) % 997) / 997 * 100,
   del:     (i * 620) % 3600,
   dur:     3200 + ((i * 311) % 1600),
   size:    50 + (i % 3) * 26,
 }));
-function SmokeWisp({ leftPct, del, dur, size, frameWidth, frameHeight }: typeof SMOKE_CFG[0] & { frameWidth: number; frameHeight: number }) {
-  const clock = useClock();
-  const p    = useDerivedValue(() => sawtooth(clock.value, del, dur));
-  const curl = useDerivedValue(() => triangle(clock.value, 0, Math.round(dur * 0.6) * 2));
-  const left = leftPct * frameWidth / 100;
-  const anim = useAnimatedStyle(() => {
-    const v = p.value;
-    // disperse: fade in low, then dissipate steadily toward the top
-    const op = v < 0.18 ? (v / 0.18) * 0.32 : 0.32 * (1 - (v - 0.18) / 0.82);
-    return {
-      opacity: op,
-      transform: [
-        { translateX: Math.sin((v * 3 + curl.value) * Math.PI) * 26 }, // curling turbulence
-        { translateY: -v * frameHeight * 0.95 },
-        { scale: 0.4 + v * 2 },                                        // billows out as it climbs
-        { rotate: `${(curl.value * 2 - 1) * 14}deg` },
-      ],
-    };
-  });
-  // a cluster of overlapping puffs reads as soft, billowy smoke
-  return (
-    <RAnimated.View style={[anim, { position: 'absolute', bottom: 0, left, width: size, height: size }]}>
-      <View style={{ position: 'absolute', left: 0,           top: 0,           width: size,        height: size,        borderRadius: size * 0.5,  backgroundColor: 'rgba(66,62,60,0.55)' }} />
-      <View style={{ position: 'absolute', left: size * 0.28, top: -size * 0.2, width: size * 0.8,  height: size * 0.8,  borderRadius: size * 0.4,  backgroundColor: 'rgba(78,74,72,0.5)' }} />
-      <View style={{ position: 'absolute', left: -size * 0.2, top: -size * 0.1, width: size * 0.72, height: size * 0.72, borderRadius: size * 0.36, backgroundColor: 'rgba(54,50,48,0.45)' }} />
-    </RAnimated.View>
-  );
-}
-
 // Heat-haze shimmer bar (used by InfernoOverlay)
 const HAZE_CFG = [
   { leftPct: 18, dur: 1300, amp: 6, w: 60 },
@@ -999,6 +896,7 @@ export function NeonBorderOverlay({ width, height }: { width: number; height: nu
 
 // 6 ── Monsoon (parallax rain layers + splashes + lightning) ───────────────────
 export function SnowSceneOverlay({ width, height }: { width: number; height: number }) {
+  const clock = useClock();
   // Adaptive quality: shed rain/splash particles on devices that can't keep up.
   const q = useStudioQuality(s => s.quality);
   const far = RAIN_FAR.slice(0, scaleCount(RAIN_FAR.length, q));
@@ -1012,16 +910,10 @@ export function SnowSceneOverlay({ width, height }: { width: number; height: num
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: height * 0.5 }}>
         <LinearGradient colors={['rgba(8,12,26,0.5)', 'transparent']} style={{ flex: 1 }} />
       </View>
-      {/* Far rain (behind) */}
-      {far.map((c, i) => <RainStreak key={`f${i}`} {...c} frameWidth={width} frameHeight={height} />)}
-      {/* Mid rain */}
-      {mid.map((c, i) => <RainStreak key={`m${i}`} {...c} frameWidth={width} frameHeight={height} />)}
-      {/* Lightning sits behind the foreground rain for depth */}
+      {/* Lightning behind the rain for depth */}
       <LightningFlash width={width} height={height} />
-      {/* Near rain (front, sharp) */}
-      {near.map((c, i) => <RainStreak key={`n${i}`} {...c} frameWidth={width} frameHeight={height} />)}
-      {/* Ground splashes */}
-      {splash.map((c, i) => <RainSplash key={`s${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {/* All rain layers + ground splashes in a single Skia canvas (one GPU layer vs ~46 Views) */}
+      <MonsoonCanvas width={width} height={height} far={far} mid={mid} near={near} splash={splash} clock={clock} />
       {/* Wet ground sheen */}
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: height * 0.08 }}>
         <LinearGradient colors={['transparent', 'rgba(90,120,180,0.28)']} style={{ flex: 1 }} />
@@ -1052,16 +944,14 @@ export function InfernoOverlay({ width, height }: { width: number; height: numbe
     <View style={{ width, height, position: 'absolute', top: 0, left: 0, overflow: 'hidden' }} pointerEvents="none">
       {/* Heat tint — flickering */}
       <RAnimated.View style={[flickStyle, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,70,0,0.09)' }]} />
-      {/* Smoke wisps (behind embers, add volume) */}
-      {smoke.map((c, i) => <SmokeWisp key={`sm${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Heat-haze shimmer */}
       {HAZE_CFG.map((c, i) => <HeatBar key={`hz${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Bottom fire glow — flickers with the heat */}
       <RAnimated.View style={[glowStyle, { position: 'absolute', bottom: 0, left: 0, right: 0, height: height * 0.34 }]}>
         <LinearGradient colors={['transparent', 'rgba(255,80,0,0.18)', 'rgba(255,40,0,0.4)']} style={{ flex: 1 }} />
       </RAnimated.View>
-      {/* Embers (front) */}
-      {embers.map((c, i) => <InfernoEmber key={`e${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {/* Smoke + embers in one Skia canvas (one GPU layer vs ~31 Views) */}
+      <InfernoCanvas width={width} height={height} embers={embers} smoke={smoke} clock={clock} />
     </View>
   );
 }
