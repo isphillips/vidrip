@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import {
-  useSharedValue, useFrameCallback, type SharedValue,
+  useSharedValue, useFrameCallback, runOnJS, type SharedValue,
 } from 'react-native-reanimated';
+import { reportFrameJank } from './studioQuality';
 
 // ─── Shared, play-gated effect clock ──────────────────────────────────────────
 //
@@ -14,15 +15,38 @@ import {
 
 const ClockContext = createContext<SharedValue<number> | null>(null);
 
-/** Advances a shared clock (seconds) on the UI thread while `playing`. Wrap any surface that
- *  renders effects (editor layer, sticker tray, EffectPlayer) so they share one clock. */
+// Cap effect updates to ~60fps. useFrameCallback fires at the display refresh, so on a 120Hz
+// phone (e.g. OnePlus) the clock — and therefore every dependent useAnimatedStyle + the Android
+// RenderThread compositing ~100 particle Views — would run twice as often as needed. We accumulate
+// the real elapsed time and only advance the clock on ~16ms boundaries, so animations stay
+// time-accurate but high-refresh displays don't pay 2× the compositing cost.
+const MIN_FRAME_MS = 15;
+// A frame slower than this counts as "janky" (a dropped frame at 60fps). The fraction of janky
+// frames over each ~1s window drives the adaptive quality tier (studioQuality).
+const JANK_MS = 24;
+
+/** Advances a shared clock (seconds) on the UI thread while `playing`, and samples frame jank to
+ *  drive adaptive quality. Wrap any surface that renders effects so they share one clock. */
 export function EffectClockProvider({
   playing = true, children,
 }: { playing?: boolean; children: React.ReactNode }) {
   const clock = useSharedValue(0);
+  const acc = useSharedValue(0);
+  const winMs = useSharedValue(0);   // jank window: elapsed ms
+  const winN = useSharedValue(0);    // frames in window
+  const winJank = useSharedValue(0); // long frames in window
   const frame = useFrameCallback((info) => {
     'worklet';
-    clock.value += (info.timeSincePreviousFrame ?? 16.6) / 1000;
+    const dt = info.timeSincePreviousFrame ?? 16.6;
+    acc.value += dt;
+    if (acc.value >= MIN_FRAME_MS) { clock.value += acc.value / 1000; acc.value = 0; }
+    // Sample jank over ~1s windows → adaptive quality.
+    winMs.value += dt; winN.value += 1;
+    if (dt > JANK_MS) { winJank.value += 1; }
+    if (winMs.value >= 1000) {
+      runOnJS(reportFrameJank)(winN.value ? winJank.value / winN.value : 0);
+      winMs.value = 0; winN.value = 0; winJank.value = 0;
+    }
   }, false);
   useEffect(() => { frame.setActive(playing); }, [playing, frame]);
   return <ClockContext.Provider value={clock}>{children}</ClockContext.Provider>;
@@ -39,10 +63,13 @@ export function ControlledClockProvider({ clock, children }: { clock: SharedValu
 export function useClock(): SharedValue<number> {
   const ctx = useContext(ClockContext);
   const fallback = useSharedValue(0);
-  // Only the fallback drives itself; when a provider exists this callback stays inactive.
+  const acc = useSharedValue(0);
+  // Only the fallback drives itself; when a provider exists this callback stays inactive. Same
+  // ~60fps cap as the provider clock.
   useFrameCallback((info) => {
     'worklet';
-    fallback.value += (info.timeSincePreviousFrame ?? 16.6) / 1000;
+    acc.value += info.timeSincePreviousFrame ?? 16.6;
+    if (acc.value >= MIN_FRAME_MS) { fallback.value += acc.value / 1000; acc.value = 0; }
   }, !ctx);
   return ctx ?? fallback;
 }

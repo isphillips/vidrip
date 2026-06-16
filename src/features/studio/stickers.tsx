@@ -7,6 +7,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import LinearGradient from 'react-native-linear-gradient';
 import { FONT } from '../../theme';
 import { useClock, sawtooth, triangle } from './effectClock';
+import { useStudioQuality, scaleCount } from './studioQuality';
 
 const BRAND = ['#FF4FA3', '#A05CFF', '#3B82F6'];
 
@@ -321,8 +322,8 @@ function LavaSticker() {
 
 // ── 8. Matrix (digital rain) ──────────────────────────────────────────────────
 
-const MATRIX_LEFT = [3, 13, 23, 33, 43, 53, 63, 73];
-const MATRIX_DELS = [0, 130, 260, 390, 520, 650, 780, 910];
+const MATRIX_LEFT = [3, 17, 31, 45, 59, 73];
+const MATRIX_DELS = [0, 170, 340, 510, 680, 850];
 
 function MatrixCol({ left, del }: { left: number; del: number }) {
   const clock = useClock();
@@ -540,9 +541,11 @@ function makeRain(count: number, b: RainBase) {
     color:     b.color,
   }));
 }
-const RAIN_FAR  = makeRain(20, { seed: 317, dur: 620, durVar: 160, len: 14, lenVar: 10, thickness: 1,   opacity: 0.16, color: '#9FB4DC' });
-const RAIN_MID  = makeRain(22, { seed: 533, dur: 420, durVar: 140, len: 24, lenVar: 16, thickness: 1.5, opacity: 0.32, color: '#B4D4FF' });
-const RAIN_NEAR = makeRain(14, { seed: 911, dur: 280, durVar: 120, len: 42, lenVar: 24, thickness: 2.5, opacity: 0.48, color: '#D6E8FF' });
+// Particle counts trimmed (~67→~42 Views) — Android RenderThread compositing scales with View
+// count; the density reads near-identical on screen.
+const RAIN_FAR  = makeRain(12, { seed: 317, dur: 620, durVar: 160, len: 14, lenVar: 10, thickness: 1,   opacity: 0.16, color: '#9FB4DC' });
+const RAIN_MID  = makeRain(14, { seed: 533, dur: 420, durVar: 140, len: 24, lenVar: 16, thickness: 1.5, opacity: 0.32, color: '#B4D4FF' });
+const RAIN_NEAR = makeRain(9,  { seed: 911, dur: 280, durVar: 120, len: 42, lenVar: 24, thickness: 2.5, opacity: 0.48, color: '#D6E8FF' });
 
 function RainStreak({ leftPct, del, dur, lenPx, thickness, opacity, color, frameWidth, frameHeight }: ReturnType<typeof makeRain>[0] & { frameWidth: number; frameHeight: number }) {
   const clock = useClock();
@@ -572,7 +575,7 @@ function RainStreak({ leftPct, del, dur, lenPx, thickness, opacity, color, frame
 }
 
 // Splash where a near-layer drop hits the ground
-const SPLASH_CFG = Array.from({ length: 11 }, (_, i) => ({
+const SPLASH_CFG = Array.from({ length: 7 }, (_, i) => ({
   leftPct: ((i * 977 + 53) % 997) / 997 * 100,
   del:     (i * 137 + 11) % 900,
   dur:     420 + ((i * 53) % 220),
@@ -599,7 +602,7 @@ function RainSplash({ leftPct, del, dur, frameWidth, frameHeight }: typeof SPLAS
 }
 
 // Inferno ember (full-screen, used by InfernoOverlay)
-const INFERNO_CFG = Array.from({ length: 22 }, (_, i) => ({
+const INFERNO_CFG = Array.from({ length: 14 }, (_, i) => ({
   leftPct:  ((i * 1493 + 271) % 997) / 997 * 100,
   del:      (i * 157 + 3) % 2800,
   dur:      900 + ((i * 73 + 11) % 700),
@@ -638,7 +641,7 @@ function InfernoEmber({ leftPct, del, dur, size, colorIdx, frameWidth, frameHeig
 }
 
 // Rising smoke wisp (used by InfernoOverlay for volume)
-const SMOKE_CFG = Array.from({ length: 6 }, (_, i) => ({
+const SMOKE_CFG = Array.from({ length: 4 }, (_, i) => ({
   leftPct: ((i * 1399 + 211) % 997) / 997 * 100,
   del:     (i * 620) % 3600,
   dur:     3200 + ((i * 311) % 1600),
@@ -717,7 +720,7 @@ export function VHSOverlay({ width, height }: { width: number; height: number })
       op:   0.28 + ((n * 7 + i) % 5) * 0.12,
     })));
   }, [width, height]);
-  useAnimatedReaction(() => Math.floor(clock.value * 1000 / 90), (t) => runOnJS(regen)(t), [regen]);
+  useAnimatedReaction(() => Math.floor(clock.value * 1000 / 200), (t) => runOnJS(regen)(t), [regen]);
   const trackStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: (trackY.value - 0.1) * height }],
     opacity: Math.sin(trackY.value * Math.PI),
@@ -732,9 +735,10 @@ export function VHSOverlay({ width, height }: { width: number; height: number })
       {/* Chroma bleed — red/blue channels drift apart and wobble */}
       <RAnimated.View style={[redStyle,  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,40,60,0.05)' }]} />
       <RAnimated.View style={[blueStyle, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(50,90,255,0.05)' }]} />
-      {/* Soft interlacing */}
-      {Array.from({ length: Math.floor(height / 3) }, (_, i) => (
-        <View key={i} style={{ position: 'absolute', top: i * 3 + 1, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.06)' }} />
+      {/* Soft interlacing — every 6px instead of 3px (halves a large pile of static Views the
+          Android RenderThread still composites each frame). */}
+      {Array.from({ length: Math.floor(height / 6) }, (_, i) => (
+        <View key={i} style={{ position: 'absolute', top: i * 6 + 1, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.06)' }} />
       ))}
       {/* Tracking band drifting up the frame */}
       <RAnimated.View style={[trackStyle, { position: 'absolute', left: 0, right: 0, height: height * 0.18 }]}>
@@ -790,7 +794,7 @@ export function FilmOverlay({ width, height }: { width: number; height: number }
       op: 0.16 + ((n + i) % 3) * 0.1,
     })));
   }, [width, height]);
-  useAnimatedReaction(() => Math.floor(clock.value * 1000 / 70), (t) => runOnJS(regen)(t), [regen]);
+  useAnimatedReaction(() => Math.floor(clock.value * 1000 / 180), (t) => runOnJS(regen)(t), [regen]);
   const LB = Math.round(height * 0.11); // anamorphic letterbox bar
   const flickStyle = useAnimatedStyle(() => ({ opacity: (1 - flicker.value) * 0.45 }));
   return (
@@ -858,7 +862,7 @@ export function GlitchOverlay({ width, height }: { width: number; height: number
       dx: ((n * 19 + i * 7) % 50) - 25,
     })) : []);
   }, [width, height]);
-  useAnimatedReaction(() => Math.floor(clock.value * 1000 / 120), (t) => runOnJS(regen)(t), [regen]);
+  useAnimatedReaction(() => Math.floor(clock.value * 1000 / 220), (t) => runOnJS(regen)(t), [regen]);
   const sweepStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: sweep.value * height }],
     opacity: sweep.value < 0.05 ? 1 : sweep.value > 0.9 ? 0 : 0.5,
@@ -867,9 +871,9 @@ export function GlitchOverlay({ width, height }: { width: number; height: number
   const blueStyle = useAnimatedStyle(() => ({ opacity: rgb.value * 0.5, transform: [{ translateX: 3 + rgb.value * 4 }] }));
   return (
     <View style={{ width, height, position: 'absolute', top: 0, left: 0, overflow: 'hidden' }} pointerEvents="none">
-      {/* Subtle persistent scanlines */}
-      {Array.from({ length: Math.floor(height / 4) }, (_, i) => (
-        <View key={i} style={{ position: 'absolute', top: i * 4, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.05)' }} />
+      {/* Subtle persistent scanlines — every 8px instead of 4px (fewer static Views to composite). */}
+      {Array.from({ length: Math.floor(height / 8) }, (_, i) => (
+        <View key={i} style={{ position: 'absolute', top: i * 8, left: 0, right: 0, height: 1, backgroundColor: 'rgba(0,0,0,0.05)' }} />
       ))}
       {/* RGB split flash */}
       <RAnimated.View style={[redStyle,  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,0,90,0.4)' }]} />
@@ -995,6 +999,12 @@ export function NeonBorderOverlay({ width, height }: { width: number; height: nu
 
 // 6 ── Monsoon (parallax rain layers + splashes + lightning) ───────────────────
 export function SnowSceneOverlay({ width, height }: { width: number; height: number }) {
+  // Adaptive quality: shed rain/splash particles on devices that can't keep up.
+  const q = useStudioQuality(s => s.quality);
+  const far = RAIN_FAR.slice(0, scaleCount(RAIN_FAR.length, q));
+  const mid = RAIN_MID.slice(0, scaleCount(RAIN_MID.length, q));
+  const near = RAIN_NEAR.slice(0, scaleCount(RAIN_NEAR.length, q));
+  const splash = SPLASH_CFG.slice(0, scaleCount(SPLASH_CFG.length, q));
   return (
     <View style={{ width, height, position: 'absolute', top: 0, left: 0, overflow: 'hidden' }} pointerEvents="none">
       {/* Storm sky — cool grade, darker overhead */}
@@ -1003,15 +1013,15 @@ export function SnowSceneOverlay({ width, height }: { width: number; height: num
         <LinearGradient colors={['rgba(8,12,26,0.5)', 'transparent']} style={{ flex: 1 }} />
       </View>
       {/* Far rain (behind) */}
-      {RAIN_FAR.map((c, i) => <RainStreak key={`f${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {far.map((c, i) => <RainStreak key={`f${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Mid rain */}
-      {RAIN_MID.map((c, i) => <RainStreak key={`m${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {mid.map((c, i) => <RainStreak key={`m${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Lightning sits behind the foreground rain for depth */}
       <LightningFlash width={width} height={height} />
       {/* Near rain (front, sharp) */}
-      {RAIN_NEAR.map((c, i) => <RainStreak key={`n${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {near.map((c, i) => <RainStreak key={`n${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Ground splashes */}
-      {SPLASH_CFG.map((c, i) => <RainSplash key={`s${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {splash.map((c, i) => <RainSplash key={`s${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Wet ground sheen */}
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: height * 0.08 }}>
         <LinearGradient colors={['transparent', 'rgba(90,120,180,0.28)']} style={{ flex: 1 }} />
@@ -1023,6 +1033,10 @@ export function SnowSceneOverlay({ width, height }: { width: number; height: num
 // 7 ── Inferno (rising embers + smoke wisps + heat haze) ────────────────────────
 export function InfernoOverlay({ width, height }: { width: number; height: number }) {
   const clock = useClock();
+  // Adaptive quality: shed embers/smoke on devices that can't keep up.
+  const q = useStudioQuality(s => s.quality);
+  const embers = INFERNO_CFG.slice(0, scaleCount(INFERNO_CFG.length, q));
+  const smoke = SMOKE_CFG.slice(0, scaleCount(SMOKE_CFG.length, q));
   // Heat flicker: 1→0.82→1→0.9→1 over a 425ms cycle.
   const flicker = useDerivedValue(() => {
     'worklet';
@@ -1039,7 +1053,7 @@ export function InfernoOverlay({ width, height }: { width: number; height: numbe
       {/* Heat tint — flickering */}
       <RAnimated.View style={[flickStyle, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,70,0,0.09)' }]} />
       {/* Smoke wisps (behind embers, add volume) */}
-      {SMOKE_CFG.map((c, i) => <SmokeWisp key={`sm${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {smoke.map((c, i) => <SmokeWisp key={`sm${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Heat-haze shimmer */}
       {HAZE_CFG.map((c, i) => <HeatBar key={`hz${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Bottom fire glow — flickers with the heat */}
@@ -1047,7 +1061,7 @@ export function InfernoOverlay({ width, height }: { width: number; height: numbe
         <LinearGradient colors={['transparent', 'rgba(255,80,0,0.18)', 'rgba(255,40,0,0.4)']} style={{ flex: 1 }} />
       </RAnimated.View>
       {/* Embers (front) */}
-      {INFERNO_CFG.map((c, i) => <InfernoEmber key={`e${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {embers.map((c, i) => <InfernoEmber key={`e${i}`} {...c} frameWidth={width} frameHeight={height} />)}
     </View>
   );
 }

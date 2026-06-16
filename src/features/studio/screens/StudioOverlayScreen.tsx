@@ -11,6 +11,7 @@ import { STICKERS, stickerByKey } from '../stickers';
 import { type StudioRecipe } from '../../../infrastructure/creatorStudio/recipe';
 import { exportRecipe } from '../../../infrastructure/native/studioExporter';
 import { isEmptyRecipe, type OverlayRecipe, type OverlayNode } from '../effectRecipe';
+import { EffectClockProvider } from '../effectClock';
 import SkiaVideoPreview from '../components/SkiaVideoPreview';
 import DraggableOverlay, { type OverlayTransform } from '../components/DraggableOverlay';
 import GradientButton from '../components/GradientButton';
@@ -262,24 +263,28 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
           <View style={[styles.preview, { width: box.w, height: box.h }]}>
             <SkiaVideoPreview uri={fileUri} width={box.w} height={box.h} matrix={matrix} mirror={mirror ?? false} onAspect={setAspect} />
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedId(null)} />
-            <View ref={layerRef} style={StyleSheet.absoluteFill} pointerEvents="box-none" collapsable={false}>
-              {/* Full-screen overlay layer */}
-              {fsOverlay && (() => {
-                const def = stickerByKey(fsOverlay);
-                return def?.renderFull ? def.renderFull(box.w, box.h) : null;
-              })()}
-              {/* Draggable items */}
-              {overlays.map(o => (
-                <DraggableOverlay
-                  key={o.id} selected={o.id === selectedId} initial={o.transform}
-                  onSelect={() => setSelectedId(o.id)} onDelete={() => remove(o.id)}
-                  onChange={t => updateTransform(o.id, t)}>
-                  {o.type === 'text'
-                    ? <TextOverlayContent item={o} />
-                    : stickerByKey(o.stickerKey!)?.render()}
-                </DraggableOverlay>
-              ))}
-            </View>
+            {/* One shared, play-gated clock for the whole effect layer (instead of a per-component
+                fallback clock each) — also where adaptive-quality frame sampling runs. */}
+            <EffectClockProvider playing>
+              <View ref={layerRef} style={StyleSheet.absoluteFill} pointerEvents="box-none" collapsable={false}>
+                {/* Full-screen overlay layer */}
+                {fsOverlay && (() => {
+                  const def = stickerByKey(fsOverlay);
+                  return def?.renderFull ? def.renderFull(box.w, box.h) : null;
+                })()}
+                {/* Draggable items */}
+                {overlays.map(o => (
+                  <DraggableOverlay
+                    key={o.id} selected={o.id === selectedId} initial={o.transform}
+                    onSelect={() => setSelectedId(o.id)} onDelete={() => remove(o.id)}
+                    onChange={t => updateTransform(o.id, t)}>
+                    {o.type === 'text'
+                      ? <TextOverlayContent item={o} />
+                      : stickerByKey(o.stickerKey!)?.render()}
+                  </DraggableOverlay>
+                ))}
+              </View>
+            </EffectClockProvider>
           </View>
         )}
       </View>
