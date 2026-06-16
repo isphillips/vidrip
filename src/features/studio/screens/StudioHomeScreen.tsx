@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import CameraWarmup from '../../lens/CameraWarmup';
+import EffectWarmup from '../components/EffectWarmup';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
@@ -173,6 +174,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   return (
     <View style={styles.screen}>
     <CameraWarmup />
+    <EffectWarmup />
     <View style={[styles.container, { paddingTop: top + SPACE.SM }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Creator Studio</Text>

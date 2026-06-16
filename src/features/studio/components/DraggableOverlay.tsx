@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, runOnJS } from 'react-native-reanimated';
@@ -30,16 +30,31 @@ export default function DraggableOverlay({
 
   const commit = () => onChange({ tx: tx.value, ty: ty.value, scale: scale.value, rotation: rot.value });
 
+  // While a gesture is active we rasterize the (often animated, multi-View) sticker subtree to a
+  // single GPU texture on Android, so dragging/pinching is a cheap texture blit instead of
+  // re-compositing every particle View each frame. `active` ref-counts the simultaneous gestures so
+  // the flag clears only when the last one ends. iOS doesn't need it (renderToHardwareTextureAndroid
+  // is a no-op there) and isn't laggy.
+  const active = useSharedValue(0);
+  const [dragging, setDragging] = useState(false);
+  const begin = () => { 'worklet'; active.value += 1; if (active.value === 1) { runOnJS(setDragging)(true); } };
+  const finish = () => { 'worklet'; active.value -= 1; if (active.value <= 0) { active.value = 0; runOnJS(setDragging)(false); } };
+
   const pan = Gesture.Pan()
-    .onBegin(() => { 'worklet'; runOnJS(onSelect)(); })
+    .onBegin(() => { 'worklet'; begin(); runOnJS(onSelect)(); })
     .onChange((e) => { 'worklet'; tx.value = sTx.value + e.translationX; ty.value = sTy.value + e.translationY; })
-    .onEnd(() => { 'worklet'; sTx.value = tx.value; sTy.value = ty.value; runOnJS(commit)(); });
+    .onEnd(() => { 'worklet'; sTx.value = tx.value; sTy.value = ty.value; runOnJS(commit)(); })
+    .onFinalize(finish);
   const pinch = Gesture.Pinch()
+    .onBegin(begin)
     .onChange((e) => { 'worklet'; scale.value = Math.max(0.2, sScale.value * e.scale); })
-    .onEnd(() => { 'worklet'; sScale.value = scale.value; runOnJS(commit)(); });
+    .onEnd(() => { 'worklet'; sScale.value = scale.value; runOnJS(commit)(); })
+    .onFinalize(finish);
   const rotate = Gesture.Rotation()
+    .onBegin(begin)
     .onChange((e) => { 'worklet'; rot.value = sRot.value + e.rotation; })
-    .onEnd(() => { 'worklet'; sRot.value = rot.value; runOnJS(commit)(); });
+    .onEnd(() => { 'worklet'; sRot.value = rot.value; runOnJS(commit)(); })
+    .onFinalize(finish);
   const gesture = Gesture.Simultaneous(pan, pinch, rotate);
 
   const style = useAnimatedStyle(() => ({
@@ -52,9 +67,9 @@ export default function DraggableOverlay({
   return (
     <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="box-none">
       <GestureDetector gesture={gesture}>
-        <Animated.View style={style}>
+        <Animated.View style={style} renderToHardwareTextureAndroid={dragging} collapsable={false}>
           <View style={selected ? styles.selected : styles.idle}>{children}</View>
-          {selected && (
+          {selected && !dragging && (
             <TouchableOpacity onPress={onDelete} style={styles.del} hitSlop={8}>
               <Ionicons name="close" size={14} color={C.WHITE} />
             </TouchableOpacity>

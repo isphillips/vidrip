@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
-  ActivityIndicator, ScrollView,
+  ActivityIndicator, ScrollView, InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -125,19 +125,42 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
 
   // Resume: rebuild the overlay items from a saved recipe once the canvas box is known (inverse of
   // buildRecipe — normalized nx/ny → pixel tx/ty against the current box).
+  //
+  // Mounting a draft's whole effect layer at once was a burst of native-view + Skia-pipeline work
+  // that hitched the screen on resume (the "loading a saved draft with effects is laggy" report). So
+  // we (a) wait for the navigation transition to finish (runAfterInteractions) and (b) reveal the
+  // draggable overlays a couple at a time across frames instead of in one commit. The fullscreen
+  // effect mounts first — its Skia pipelines are already warmed by EffectWarmup. Staggering finishes
+  // well inside the autosave debounce, so a partial layer never gets persisted back.
   const hydratedRef = useRef(false);
   useEffect(() => {
     if (hydratedRef.current || !initRecipe || !box.w || !box.h) { return; }
     hydratedRef.current = true;
-    setFsOverlay(initRecipe.fullscreen ?? null);
-    setOverlays((initRecipe.nodes ?? []).map((n): OverlayItem => ({
+    const items: OverlayItem[] = (initRecipe.nodes ?? []).map((n): OverlayItem => ({
       id: nextId(),
       type: n.kind,
       ...(n.kind === 'text'
         ? { text: n.text, color: n.color, font: n.font, fontSize: n.fontSize, bold: n.bold, italic: n.italic, textAnim: n.anim }
         : { stickerKey: n.stickerKey }),
       transform: { tx: (n.nx - 0.5) * box.w, ty: (n.ny - 0.5) * box.h, scale: n.scale, rotation: n.rotation },
-    })));
+    }));
+    const fs = initRecipe.fullscreen ?? null;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (cancelled) { return; }
+      setFsOverlay(fs);
+      let i = 0;
+      const CHUNK = 2;
+      const step = () => {
+        if (cancelled) { return; }
+        setOverlays(prev => [...prev, ...items.slice(i, i + CHUNK)]);
+        i += CHUNK;
+        if (i < items.length) { timer = setTimeout(step, 32); }
+      };
+      if (items.length) { step(); }
+    });
+    return () => { cancelled = true; if (timer) { clearTimeout(timer); } task.cancel?.(); };
   }, [initRecipe, box.w, box.h]);
 
   const selected    = overlays.find(o => o.id === selectedId);

@@ -36,9 +36,13 @@ const adjustActive = (a: AdjustState) =>
 
 // A swatch renders the still through Skia with the preset's color matrix — instant,
 // GPU, no native round-trip. Selected one pulses with a branded gradient ring.
-function Swatch({
-  def, active, img, onPress,
-}: { def: StudioFilterDef; active: boolean; img: ReturnType<typeof useImage>; onPress: () => void }) {
+// React.memo'd so tapping a filter only re-renders (and re-draws the Skia canvas of) the two
+// swatches whose `active` flips, not all N — on Android each swatch is its own GPU surface, and
+// redrawing the whole strip per tap was a big part of the first-tap lag. Needs a stable `onSelect`
+// (the parent passes one keyed by def.key) and a stable `img` for memo to actually hold.
+const Swatch = React.memo(function Swatch({
+  def, active, img, onSelect,
+}: { def: StudioFilterDef; active: boolean; img: ReturnType<typeof useImage>; onSelect: (key: string) => void }) {
   const pulse = useSharedValue(1);
   useEffect(() => {
     pulse.value = active
@@ -58,7 +62,7 @@ function Swatch({
     </View>
   );
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity onPress={() => onSelect(def.key)} activeOpacity={0.85}>
       <Animated.View style={[styles.swatchCol, aStyle]}>
         {active
           ? <LinearGradient colors={BRAND} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ring}>{inner}</LinearGradient>
@@ -67,7 +71,7 @@ function Swatch({
       </Animated.View>
     </TouchableOpacity>
   );
-}
+});
 
 export default function StudioFilterScreen({ route, navigation }: StudioStackScreenProps<'StudioFilter'>) {
   const { fileUri, durationSec, trimStartMs, trimEndMs, draftId, filterKey: initFilterKey, adjust: initAdjust, mirror: initMirror } = route.params;
@@ -98,6 +102,9 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
       .catch(() => {});
     return () => { alive = false; };
   }, [fileUri, trimStartMs]);
+
+  // Stable so memoized Swatches don't re-render on every tap (see Swatch comment).
+  const selectFilter = useCallback((k: string) => setFilterKey(k), []);
 
   // Non-destructive: carry the look forward to overlays; the single bake happens last.
   const next = useCallback(() => {
@@ -172,7 +179,7 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
             style={styles.swatchBar} contentContainerStyle={styles.swatchRow}>
             {visibleFilters.map(f => (
               <Swatch key={f.key} def={f} active={f.key === filterKey} img={swatchImg}
-                onPress={() => setFilterKey(f.key)} />
+                onSelect={selectFilter} />
             ))}
           </ScrollView>
         </>
