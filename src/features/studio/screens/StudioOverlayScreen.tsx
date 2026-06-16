@@ -110,6 +110,48 @@ const EffectTrayItem = React.memo(function EffectTrayItem({
   );
 });
 
+// Sticker sets per tab — static (STICKERS never changes), so hoisted out of the component to keep
+// stable array references (the animated tray's stagger effect keys off them).
+const STICKER_STICKERS  = STICKERS.filter(s => s.category === 'sticker');
+const EMOJI_STICKERS    = STICKERS.filter(s => s.category === 'emoji');
+const ANIMATED_STICKERS = STICKERS.filter(s => s.category === 'animated');
+const OVERLAY_STICKERS  = STICKERS.filter(s => s.category === 'overlay' && s.isFullscreen);
+
+// ─── AnimatedTray ───────────────────────────────────────────────────────────────
+// The "Animated" tab holds ~10 live particle stickers. Mounting them all in the one commit that the
+// tab switch triggers froze the JS thread for several seconds on Android (each builds its particle
+// arrays + starts a frame loop synchronously). Two fixes: (1) one shared EffectClockProvider drives
+// all thumbnails, so it's a single frame callback instead of ~10 self-advancing fallback clocks;
+// (2) the thumbnails mount a couple at a time across frames after the tab transition, so the tab
+// opens instantly and previews pop in. Empty slots keep their box size so the row doesn't reflow.
+function AnimatedTray({ items, onAdd }: { items: typeof STICKERS; onAdd: (key: string) => void }) {
+  const [ready, setReady] = useState(0);
+  useEffect(() => {
+    setReady(0);
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const step = () => {
+      i += 2;
+      setReady(i);
+      if (i < items.length) { timer = setTimeout(step, 40); }
+    };
+    const task = InteractionManager.runAfterInteractions(step);
+    return () => { task.cancel?.(); if (timer) { clearTimeout(timer); } };
+  }, [items]);
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trayBar} contentContainerStyle={styles.tray}>
+      <EffectClockProvider playing>
+        {items.map((st, idx) => (
+          <TouchableOpacity key={st.key} onPress={() => onAdd(st.key)} style={styles.trayItem} activeOpacity={0.85}>
+            <View style={styles.trayThumb}>{idx < ready ? st.render() : null}</View>
+          </TouchableOpacity>
+        ))}
+      </EffectClockProvider>
+    </ScrollView>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 let _id = 0;
@@ -291,12 +333,6 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
     recipe: buildRecipe(),
   });
 
-  // Sticker sets per tab
-  const stickerStickers  = STICKERS.filter(s => s.category === 'sticker');
-  const emojiStickers    = STICKERS.filter(s => s.category === 'emoji');
-  const animatedStickers = STICKERS.filter(s => s.category === 'animated');
-  const overlayStickers  = STICKERS.filter(s => s.category === 'overlay' && s.isFullscreen);
-
   return (
     <View style={[styles.container, { paddingTop: top + SPACE.SM }]}>
       {/* Header */}
@@ -419,7 +455,7 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
 
       {trayTab === 'stickers' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trayBar} contentContainerStyle={styles.tray}>
-          {stickerStickers.map(st => (
+          {STICKER_STICKERS.map(st => (
             <TouchableOpacity key={st.key} onPress={() => addSticker(st.key)} style={[styles.trayItem, styles.trayItemSticker]} activeOpacity={0.85}>
               {st.render()}
             </TouchableOpacity>
@@ -427,9 +463,9 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
         </ScrollView>
       )}
 
-      {(trayTab === 'emoji' || trayTab === 'animated') && (
+      {trayTab === 'emoji' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trayBar} contentContainerStyle={styles.tray}>
-          {(trayTab === 'emoji' ? emojiStickers : animatedStickers).map(st => (
+          {EMOJI_STICKERS.map(st => (
             <TouchableOpacity key={st.key} onPress={() => addSticker(st.key)} style={styles.trayItem} activeOpacity={0.85}>
               <View style={styles.trayThumb}>{st.render()}</View>
             </TouchableOpacity>
@@ -437,9 +473,13 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
         </ScrollView>
       )}
 
+      {trayTab === 'animated' && (
+        <AnimatedTray items={ANIMATED_STICKERS} onAdd={addSticker} />
+      )}
+
       {trayTab === 'overlays' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trayBar} contentContainerStyle={styles.tray}>
-          {overlayStickers.map(st => (
+          {OVERLAY_STICKERS.map(st => (
             <EffectTrayItem key={st.key} st={st} active={fsOverlay === st.key}
               onToggle={() => setFsOverlay(prev => prev === st.key ? null : st.key)} />
           ))}
