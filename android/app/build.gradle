@@ -145,6 +145,14 @@ dependencies {
     }
 }
 
+android.applicationVariants.all { variant ->
+    variant.outputs.all {
+        if (variant.buildType.name == "release" && variant.flavorName == "prod") {
+            outputFileName = "vidrip.apk"
+        }
+    }
+}
+
 // Bundle react-native-vector-icons fonts into the Android build. iOS registers
 // these via Info.plist (UIAppFonts); Android needs them copied into assets at
 // build time or the glyphs render blank (e.g. the swipe favorite/delete icons).

@@ -26,8 +26,7 @@ import {
 } from '../../../infrastructure/native/audioRecorder';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
-import FaceLensOverlay, { type FaceLensTrack } from '../../lens/faceLens';
-import { MOCK_FACE } from '../../lens/useFaceLandmarks';
+import { LiveFaceLensOverlay, type FaceLensTrack } from '../../lens/faceLens';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 
 
@@ -129,8 +128,7 @@ export default function ReactionRecorder({
   // camera). lensKey stays null so the whole tracking/overlay pipeline below is inert; re-enable by
   // restoring the lens picker UI and making this stateful again.
   const lensKey: string | null = null;
-  const { frameProcessor, landmarks: liveLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true);
-  const lensLandmarks = liveLandmarks ?? (lensKey && !faceTrackingAvailable ? MOCK_FACE : null);
+  const { frameProcessor, landmarksShared, startTrack, stopTrack, cancelTrack } = useFaceTracking(true);
   // Camera-frame aspect (w/h) — shared by the live overlay and the captured track so replay
   // cover-crops the same way the preview did.
   const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
@@ -476,10 +474,10 @@ export default function ReactionRecorder({
             pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
             frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
           />
-          {/* AR lens, tracking the reactor's face (sized to the camera box, cover-crop aware). */}
-          <FaceLensOverlay
+          {/* AR lens — UI-thread animated overlay, no JS re-renders per frame. */}
+          <LiveFaceLensOverlay
             lens={lensKey}
-            landmarks={lensLandmarks}
+            landmarksShared={landmarksShared}
             width={pipCamera ? PIP_W : width}
             height={pipCamera ? PIP_H : height}
             frameAspect={frameAspect}

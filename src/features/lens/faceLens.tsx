@@ -1,5 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import RAnimated, {
+  useAnimatedStyle, useDerivedValue, type SharedValue,
+} from 'react-native-reanimated';
 
 // ─── Face landmarks (the contract the native MediaPipe plugin must satisfy) ────
 // All points normalized 0..1 within the displayed frame (top-left origin). The plugin
@@ -26,6 +29,7 @@ export type FaceFrame = {
 // (the camera frame fills the box and the overflowing dimension is cropped). `frameAspect` is
 // the displayed frame's width/height; without it we assume the frame fills the box exactly.
 export function faceFrame(lm: FaceLandmarks, w: number, h: number, frameAspect?: number): FaceFrame {
+  'worklet';
   const boxAspect = h > 0 ? w / h : 1;
   let sx = w, sy = h, ox = 0, oy = 0;
   if (frameAspect && frameAspect > 0) {
@@ -158,6 +162,183 @@ export const LENSES: Lens[] = [
 ];
 
 export const lensByKey = (k?: string | null) => (k ? LENSES.find(l => l.key === k) : undefined);
+
+// ─── Live (UI-thread) Overlay ─────────────────────────────────────────────────
+// Drives each lens element's position via useAnimatedStyle so landmark updates are applied
+// directly on the UI thread — no React re-renders, no JS bridge round-trip per frame.
+// Use this on the live camera; use FaceLensOverlay for static preview / bake frame stepping.
+
+const HIDDEN_STYLE = { opacity: 0 as const, position: 'absolute' as const, left: 0, top: 0, width: 0, height: 0 } as const;
+// Base size for emoji containers. The outer view is scaled via transform so the inner
+// Text can use a fixed fontSize and avoid Reanimated text-prop complications.
+const BASE = 60;
+
+function LiveDebugLens({ frame }: { frame: SharedValue<FaceFrame | null> }) {
+  const le = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    return { opacity: 1, position: 'absolute', left: f.le.x - 9, top: f.le.y - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: '#22ff22', borderWidth: 2, borderColor: '#fff' };
+  });
+  const re = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    return { opacity: 1, position: 'absolute', left: f.re.x - 9, top: f.re.y - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: '#ff2222', borderWidth: 2, borderColor: '#fff' };
+  });
+  const nose = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    return { opacity: 1, position: 'absolute', left: f.nose.x - 9, top: f.nose.y - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: '#3388ff', borderWidth: 2, borderColor: '#fff' };
+  });
+  const mouth = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    return { opacity: 1, position: 'absolute', left: f.mouth.x - 9, top: f.mouth.y - 9, width: 18, height: 18, borderRadius: 9, backgroundColor: '#ffdd22', borderWidth: 2, borderColor: '#fff' };
+  });
+  return (
+    <>
+      <RAnimated.View pointerEvents="none" style={le} />
+      <RAnimated.View pointerEvents="none" style={re} />
+      <RAnimated.View pointerEvents="none" style={nose} />
+      <RAnimated.View pointerEvents="none" style={mouth} />
+    </>
+  );
+}
+
+function LiveShadesLens({ frame }: { frame: SharedValue<FaceFrame | null> }) {
+  const style = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    const w = f.eyeDist * 2.4, h = f.eyeDist * 0.9;
+    return {
+      opacity: 1, position: 'absolute',
+      left: f.eyeMid.x - w / 2, top: f.eyeMid.y - h / 2,
+      width: w, height: h, borderRadius: h / 2,
+      backgroundColor: '#0a0a0a', borderWidth: 2, borderColor: '#222',
+      transform: [{ rotate: `${f.rollDeg}deg` }],
+    };
+  });
+  return <RAnimated.View pointerEvents="none" style={style} />;
+}
+
+function LiveDogLens({ frame }: { frame: SharedValue<FaceFrame | null> }) {
+  // Ear (🐶 emoji scaled to ear size, centered above eyes)
+  const earStyle = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    const ear = f.faceW * 0.42;
+    return {
+      opacity: 1, position: 'absolute',
+      left: f.eyeMid.x - BASE / 2, top: f.eyeMid.y - f.faceW * 0.55 - BASE / 2,
+      width: BASE, height: BASE,
+      transform: [{ rotate: `${f.rollDeg}deg` }, { scale: ear / BASE }],
+    };
+  });
+  // Nose (dark oval on nose tip)
+  const noseStyle = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    const ear = f.faceW * 0.42;
+    const nw = ear * 0.36, nh = ear * 0.28;
+    return {
+      opacity: 1, position: 'absolute',
+      left: f.nose.x - nw / 2, top: f.nose.y - nh / 2,
+      width: nw, height: nh, borderRadius: ear * 0.18,
+      backgroundColor: '#1a1a1a',
+      transform: [{ rotate: `${f.rollDeg}deg` }],
+    };
+  });
+  return (
+    <>
+      <RAnimated.View pointerEvents="none" style={earStyle}>
+        <Text style={{ position: 'absolute', left: -BASE / 2, top: -BASE / 2, width: BASE, height: BASE, fontSize: BASE * 0.82, lineHeight: BASE, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false }}>🐶</Text>
+      </RAnimated.View>
+      <RAnimated.View pointerEvents="none" style={noseStyle} />
+    </>
+  );
+}
+
+function LiveHeartsLens({ frame }: { frame: SharedValue<FaceFrame | null> }) {
+  const leStyle = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    const sz = f.eyeDist * 0.9;
+    return {
+      opacity: 1, position: 'absolute',
+      left: f.le.x - BASE / 2, top: f.le.y - BASE / 2,
+      width: BASE, height: BASE,
+      transform: [{ rotate: `${f.rollDeg}deg` }, { scale: sz / BASE }],
+    };
+  });
+  const reStyle = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    const sz = f.eyeDist * 0.9;
+    return {
+      opacity: 1, position: 'absolute',
+      left: f.re.x - BASE / 2, top: f.re.y - BASE / 2,
+      width: BASE, height: BASE,
+      transform: [{ rotate: `${f.rollDeg}deg` }, { scale: sz / BASE }],
+    };
+  });
+  const emojiStyle = { position: 'absolute' as const, left: -BASE / 2, top: -BASE / 2, width: BASE, height: BASE, fontSize: BASE * 0.82, lineHeight: BASE, textAlign: 'center' as const, textAlignVertical: 'center' as const, includeFontPadding: false };
+  return (
+    <>
+      <RAnimated.View pointerEvents="none" style={leStyle}>
+        <Text style={emojiStyle}>😍</Text>
+      </RAnimated.View>
+      <RAnimated.View pointerEvents="none" style={reStyle}>
+        <Text style={emojiStyle}>😍</Text>
+      </RAnimated.View>
+    </>
+  );
+}
+
+function LiveCrownLens({ frame }: { frame: SharedValue<FaceFrame | null> }) {
+  const style = useAnimatedStyle(() => {
+    const f = frame.value;
+    if (!f) { return HIDDEN_STYLE; }
+    const sz = f.faceW * 0.7;
+    return {
+      opacity: 1, position: 'absolute',
+      left: f.eyeMid.x - BASE / 2, top: f.eyeMid.y - f.faceW * 0.7 - BASE / 2,
+      width: BASE, height: BASE,
+      transform: [{ rotate: `${f.rollDeg}deg` }, { scale: sz / BASE }],
+    };
+  });
+  return (
+    <RAnimated.View pointerEvents="none" style={style}>
+      <Text style={{ position: 'absolute', left: -BASE / 2, top: -BASE / 2, width: BASE, height: BASE, fontSize: BASE * 0.82, lineHeight: BASE, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false }}>👑</Text>
+    </RAnimated.View>
+  );
+}
+
+// Accepts a SharedValue<FaceLandmarks | null> so landmark updates drive the overlay entirely
+// on the UI thread via Reanimated, with no React re-renders. FaceFrame is computed once per
+// landmark update via useDerivedValue and shared across all lens elements.
+export function LiveFaceLensOverlay({
+  lens, landmarksShared, width, height, frameAspect,
+}: {
+  lens?: string | null;
+  landmarksShared: SharedValue<FaceLandmarks | null>;
+  width: number; height: number; frameAspect?: number;
+}) {
+  const frame = useDerivedValue<FaceFrame | null>(() => {
+    const lm = landmarksShared.value;
+    if (!lm) { return null; }
+    return faceFrame(lm, width, height, frameAspect);
+  });
+
+  if (!lens || width <= 0 || height <= 0) { return null; }
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {lens === 'debug'   && <LiveDebugLens  frame={frame} />}
+      {lens === 'glasses' && <LiveShadesLens frame={frame} />}
+      {lens === 'dog'     && <LiveDogLens    frame={frame} />}
+      {lens === 'hearts'  && <LiveHeartsLens frame={frame} />}
+      {lens === 'crown'   && <LiveCrownLens  frame={frame} />}
+    </View>
+  );
+}
 
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 // Renders the active lens anchored to the current landmarks, sized to the box. Renders

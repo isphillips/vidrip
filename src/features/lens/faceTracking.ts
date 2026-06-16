@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { useSharedValue } from 'react-native-reanimated';
 import { useFrameProcessor, VisionCameraProxy } from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
 import type { FaceLandmarks, FaceLensTrack } from './faceLens';
@@ -101,13 +102,15 @@ function reduce(points: number[][] | null | undefined, mirror: boolean): FaceLan
 export function useFaceTracking(mirror = true) {
   const [landmarks, setLandmarks] = useState<FaceLandmarks | null>(null);
   const [status, setStatus] = useState<string>('init'); // diagnostic: ok | no_model | no_image | detect_fail | no_face
-  // Push every processed frame through to the overlay (the frame processor already paces this to
-  // the camera fps) so the lens tracks the face responsively; createRunOnJS bridges the
-  // frame-processor thread → JS.
+  // Shared value updated at full frame rate — drives LiveFaceLensOverlay on the UI thread with
+  // zero React re-renders. setLandmarks (React state) is throttled to ~15fps for consumers that
+  // need JS-side state (e.g. the DEV debug readout).
+  const landmarksShared = useSharedValue<FaceLandmarks | null>(null);
   const statusRef = useRef('init'); // avoid re-rendering on unchanged status
   const smoothRef = useRef<FaceLandmarks | null>(null); // running EMA-smoothed pose
   const lastGoodRef = useRef(0);    // last frame a face was detected (hide debounce)
   const hiddenRef = useRef(true);   // whether markers are currently hidden (avoid redundant sets)
+  const lastOverlayMs = useRef(0);  // throttle setLandmarks React state to ~15fps
   const recRef = useRef<TrackRec | null>(null); // active capture (during recording)
   const push = useCallback((lm: FaceLandmarks | null, st: string) => {
     if (st !== statusRef.current) { statusRef.current = st; setStatus(st); }
@@ -126,15 +129,22 @@ export function useFaceTracking(mirror = true) {
       if (prev && moved < DEADBAND) { return; } // basically still → hold, don't chase jitter
       const out = prev && moved < SNAP ? ema(prev, lm, SMOOTH) : lm;
       smoothRef.current = out;
-      setLandmarks(out);
+      // Update shared value at full rate so the animated overlay tracks at camera fps with no
+      // React involvement. Only push to React state at ~15fps (enough for the DEV readout).
+      landmarksShared.value = out;
+      if (now - lastOverlayMs.current >= 67) {
+        lastOverlayMs.current = now;
+        setLandmarks(out);
+      }
     } else if (!hiddenRef.current && now - lastGoodRef.current > HIDE_MS) {
       // No face for a sustained moment → hide. The debounce rides single dropped frames so the
       // markers don't strobe (the detector blinks even while a face is plainly present).
       hiddenRef.current = true;
       smoothRef.current = null;
+      landmarksShared.value = null;
       setLandmarks(null);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const pushJs = Worklets.createRunOnJS(push);
 
   const frameProcessor = useFrameProcessor((frame) => {
@@ -182,5 +192,5 @@ export function useFaceTracking(mirror = true) {
     return { lensId: rec.lensId, fps: TRACK_FPS, frames, frameAspect: rec.frameAspect };
   }, []);
 
-  return { frameProcessor, landmarks, status, startTrack, stopTrack, cancelTrack };
+  return { frameProcessor, landmarks, landmarksShared, status, startTrack, stopTrack, cancelTrack };
 }

@@ -13,7 +13,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { MAX_STUDIO_MS } from '../../../infrastructure/creatorStudio/recipe';
 import { pickVideoFromLibrary } from '../../../infrastructure/media/imagePicker';
-import FaceLensOverlay from '../../lens/faceLens';
+import { LiveFaceLensOverlay } from '../../lens/faceLens';
 import LensPicker from '../../lens/LensPicker';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
@@ -37,7 +37,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
 
   // AR face lens (full-screen test surface for placement). Mirror only for the front camera.
   const [lensKey, setLensKey] = useState<string | null>(null);
-  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus } = useFaceTracking(facing === 'front');
+  const { frameProcessor, landmarks: lensLandmarks, landmarksShared, status: lensStatus } = useFaceTracking(facing === 'front');
   const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
   const { hasPermission: hasCam, requestPermission: reqCam } = useCameraPermission();
   const { hasPermission: hasMic, requestPermission: reqMic } = useMicrophonePermission();
@@ -143,8 +143,8 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
             pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
             frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
           />
-          {/* Full-screen AR lens — the placement test surface. */}
-          <FaceLensOverlay lens={lensKey} landmarks={lensLandmarks} width={width} height={height} frameAspect={frameAspect} />
+          {/* Full-screen AR lens — UI-thread animated overlay, no JS re-renders per frame. */}
+          <LiveFaceLensOverlay lens={lensKey} landmarksShared={landmarksShared} width={width} height={height} frameAspect={frameAspect} />
         </>
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.placeholder]}>

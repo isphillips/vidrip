@@ -1,5 +1,7 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, Platform } from 'react-native';
+
+const IS_ANDROID = Platform.OS === 'android';
 import RAnimated, {
   useAnimatedStyle, useDerivedValue, useAnimatedReaction, runOnJS,
 } from 'react-native-reanimated';
@@ -72,9 +74,10 @@ function Ember({ xOff, size, col, dur, del }: typeof EMBER_CFG[0]) {
 }
 
 function EmberSticker() {
+  const cfg = IS_ANDROID ? EMBER_CFG.slice(0, 6) : EMBER_CFG;
   return (
     <View style={{ width: 60, height: 72, overflow: 'hidden' }}>
-      {EMBER_CFG.map((c, i) => <Ember key={i} {...c} />)}
+      {cfg.map((c, i) => <Ember key={i} {...c} />)}
     </View>
   );
 }
@@ -123,9 +126,10 @@ function ElectricSpark({ dx, dy, del, col }: typeof ELECTRIC_CFG[0]) {
 }
 
 function ElectricSticker() {
+  const cfg = IS_ANDROID ? ELECTRIC_CFG.slice(0, 5) : ELECTRIC_CFG;
   return (
     <View style={{ width: 64, height: 64 }}>
-      {ELECTRIC_CFG.map((c, i) => <ElectricSpark key={i} {...c} />)}
+      {cfg.map((c, i) => <ElectricSpark key={i} {...c} />)}
     </View>
   );
 }
@@ -168,9 +172,10 @@ function BlizzardFlake({ left, del, dur, size, drift }: typeof BLIZZARD_CFG[0]) 
 }
 
 function BlizzardSticker() {
+  const cfg = IS_ANDROID ? BLIZZARD_CFG.slice(0, 7) : BLIZZARD_CFG;
   return (
     <View style={{ width: 72, height: 80, overflow: 'hidden' }}>
-      {BLIZZARD_CFG.map((c, i) => <BlizzardFlake key={i} {...c} />)}
+      {cfg.map((c, i) => <BlizzardFlake key={i} {...c} />)}
     </View>
   );
 }
@@ -207,9 +212,10 @@ function BurstParticle({ dx, dy, del, col }: typeof BURST_CFG[0]) {
 }
 
 function StarburstSticker() {
+  const cfg = IS_ANDROID ? BURST_CFG.slice(0, 5) : BURST_CFG;
   return (
     <View style={{ width: 64, height: 64 }}>
-      {BURST_CFG.map((c, i) => <BurstParticle key={i} {...c} />)}
+      {cfg.map((c, i) => <BurstParticle key={i} {...c} />)}
     </View>
   );
 }
@@ -274,7 +280,7 @@ function OrbitSticker() {
       <OrbitOrb col="#FF4FA3" radius={22} speed={1400} del={0}   size={9} />
       <OrbitOrb col="#A05CFF" radius={15} speed={1050} del={200} size={7} />
       <OrbitOrb col="#3B82F6" radius={26} speed={1800} del={400} size={8} />
-      <OrbitOrb col="#00E5FF" radius={11} speed={850}  del={600} size={6} />
+      {!IS_ANDROID && <OrbitOrb col="#00E5FF" radius={11} speed={850} del={600} size={6} />}
     </View>
   );
 }
@@ -312,9 +318,10 @@ function LavaBlob({ left, del, dur, size, col }: typeof LAVA_CFG[0]) {
 }
 
 function LavaSticker() {
+  const cfg = IS_ANDROID ? LAVA_CFG.slice(0, 4) : LAVA_CFG;
   return (
     <View style={{ width: 68, height: 80, overflow: 'hidden' }}>
-      {LAVA_CFG.map((c, i) => <LavaBlob key={i} {...c} />)}
+      {cfg.map((c, i) => <LavaBlob key={i} {...c} />)}
     </View>
   );
 }
@@ -353,9 +360,10 @@ function MatrixCol({ left, del }: { left: number; del: number }) {
 }
 
 function MatrixSticker() {
+  const count = IS_ANDROID ? 5 : MATRIX_LEFT.length;
   return (
     <View style={{ width: 84, height: 72, overflow: 'hidden', backgroundColor: 'rgba(0,8,0,0.45)', borderRadius: 6 }}>
-      {MATRIX_LEFT.map((left, i) => <MatrixCol key={i} left={left} del={MATRIX_DELS[i]} />)}
+      {MATRIX_LEFT.slice(0, count).map((left, i) => <MatrixCol key={i} left={left} del={MATRIX_DELS[i]} />)}
     </View>
   );
 }
@@ -409,9 +417,10 @@ function ConfettiPiece({ xOff, col, isCircle, rad, del }: typeof CONFETTI_CFG[0]
 }
 
 function ConfettiSticker() {
+  const cfg = IS_ANDROID ? CONFETTI_CFG.slice(0, 8) : CONFETTI_CFG;
   return (
     <View style={{ width: 80, height: 80 }}>
-      {CONFETTI_CFG.map((c, i) => <ConfettiPiece key={i} {...c} />)}
+      {cfg.map((c, i) => <ConfettiPiece key={i} {...c} />)}
     </View>
   );
 }
@@ -448,9 +457,10 @@ function PlasmaOrb({ cx, cy, size, col, pulseDur, del, floatAmt }: typeof PLASMA
 }
 
 function PlasmaSticker() {
+  const cfg = IS_ANDROID ? PLASMA_CFG.slice(0, 3) : PLASMA_CFG;
   return (
     <View style={{ width: 64, height: 64 }}>
-      {PLASMA_CFG.map((c, i) => <PlasmaOrb key={i} {...c} />)}
+      {cfg.map((c, i) => <PlasmaOrb key={i} {...c} />)}
     </View>
   );
 }
@@ -995,6 +1005,10 @@ export function NeonBorderOverlay({ width, height }: { width: number; height: nu
 
 // 6 ── Monsoon (parallax rain layers + splashes + lightning) ───────────────────
 export function SnowSceneOverlay({ width, height }: { width: number; height: number }) {
+  const rainFar  = IS_ANDROID ? RAIN_FAR.slice(0, 12)  : RAIN_FAR;
+  const rainMid  = IS_ANDROID ? RAIN_MID.slice(0, 12)  : RAIN_MID;
+  const rainNear = IS_ANDROID ? RAIN_NEAR.slice(0, 8)  : RAIN_NEAR;
+  const splashes = IS_ANDROID ? SPLASH_CFG.slice(0, 6) : SPLASH_CFG;
   return (
     <View style={{ width, height, position: 'absolute', top: 0, left: 0, overflow: 'hidden' }} pointerEvents="none">
       {/* Storm sky — cool grade, darker overhead */}
@@ -1003,15 +1017,15 @@ export function SnowSceneOverlay({ width, height }: { width: number; height: num
         <LinearGradient colors={['rgba(8,12,26,0.5)', 'transparent']} style={{ flex: 1 }} />
       </View>
       {/* Far rain (behind) */}
-      {RAIN_FAR.map((c, i) => <RainStreak key={`f${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {rainFar.map((c, i) => <RainStreak key={`f${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Mid rain */}
-      {RAIN_MID.map((c, i) => <RainStreak key={`m${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {rainMid.map((c, i) => <RainStreak key={`m${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Lightning sits behind the foreground rain for depth */}
       <LightningFlash width={width} height={height} />
       {/* Near rain (front, sharp) */}
-      {RAIN_NEAR.map((c, i) => <RainStreak key={`n${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {rainNear.map((c, i) => <RainStreak key={`n${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Ground splashes */}
-      {SPLASH_CFG.map((c, i) => <RainSplash key={`s${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {splashes.map((c, i) => <RainSplash key={`s${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Wet ground sheen */}
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: height * 0.08 }}>
         <LinearGradient colors={['transparent', 'rgba(90,120,180,0.28)']} style={{ flex: 1 }} />
@@ -1022,6 +1036,8 @@ export function SnowSceneOverlay({ width, height }: { width: number; height: num
 
 // 7 ── Inferno (rising embers + smoke wisps + heat haze) ────────────────────────
 export function InfernoOverlay({ width, height }: { width: number; height: number }) {
+  const emberCfg = IS_ANDROID ? INFERNO_CFG.slice(0, 12) : INFERNO_CFG;
+  const smokeCfg = IS_ANDROID ? SMOKE_CFG.slice(0, 3)   : SMOKE_CFG;
   const clock = useClock();
   // Heat flicker: 1→0.82→1→0.9→1 over a 425ms cycle.
   const flicker = useDerivedValue(() => {
@@ -1039,7 +1055,7 @@ export function InfernoOverlay({ width, height }: { width: number; height: numbe
       {/* Heat tint — flickering */}
       <RAnimated.View style={[flickStyle, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,70,0,0.09)' }]} />
       {/* Smoke wisps (behind embers, add volume) */}
-      {SMOKE_CFG.map((c, i) => <SmokeWisp key={`sm${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {smokeCfg.map((c, i) => <SmokeWisp key={`sm${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Heat-haze shimmer */}
       {HAZE_CFG.map((c, i) => <HeatBar key={`hz${i}`} {...c} frameWidth={width} frameHeight={height} />)}
       {/* Bottom fire glow — flickers with the heat */}
@@ -1047,7 +1063,7 @@ export function InfernoOverlay({ width, height }: { width: number; height: numbe
         <LinearGradient colors={['transparent', 'rgba(255,80,0,0.18)', 'rgba(255,40,0,0.4)']} style={{ flex: 1 }} />
       </RAnimated.View>
       {/* Embers (front) */}
-      {INFERNO_CFG.map((c, i) => <InfernoEmber key={`e${i}`} {...c} frameWidth={width} frameHeight={height} />)}
+      {emberCfg.map((c, i) => <InfernoEmber key={`e${i}`} {...c} frameWidth={width} frameHeight={height} />)}
     </View>
   );
 }
