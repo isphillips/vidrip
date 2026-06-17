@@ -119,7 +119,10 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig keystorePropsFile.exists() ? signingConfigs.release : signingConfigs.debug
+            // Local adb builds (assembleProdRelease) stay DEBUG-signed so `adb install -r` updates
+            // in place without uninstalling. The Play upload AAB must be release-signed: build it
+            // with `bundleProdRelease -PplayRelease` to sign with the upload keystore.
+            signingConfig keystorePropsFile.exists() && project.hasProperty('playRelease') ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
