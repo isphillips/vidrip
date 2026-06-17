@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import { useBlockStore } from '../../../store/blockStore';
 import {
   fetchMyChannelRole, fetchChannelMembersAdmin,
   promoteMember, muteMember, unmuteMember, kickMember, banMember,
@@ -22,6 +23,9 @@ export default function ManageChannelMembersScreen({
   const { channelId, channelName } = route.params;
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const blockedSet = useBlockStore(b => b.blocked);
+  const blockUser = useBlockStore(b => b.block);
+  const unblockUser = useBlockStore(b => b.unblock);
 
   const [myRole, setMyRole] = useState<ChannelRole | null>(null);
   const [members, setMembers] = useState<ChannelMemberAdmin[]>([]);
@@ -76,8 +80,9 @@ export default function ManageChannelMembersScreen({
 
   const renderItem = ({ item }: { item: ChannelMemberAdmin }) => {
     const initial = (item.handle || '?').charAt(0).toUpperCase();
-    const { canModerate, canPromote } = perms(item);
-    const actionable = canModerate || canPromote;
+    // Any non-self member is actionable (at minimum you can personally Block them).
+    const actionable = item.userId !== user?.id;
+    const blocked = blockedSet.has(item.userId);
     return (
       <TouchableOpacity
         style={s.row}
@@ -91,6 +96,7 @@ export default function ManageChannelMembersScreen({
           <Text style={s.name} numberOfLines={1}>{item.displayName || `@${item.handle}`}</Text>
           <Text style={s.handle} numberOfLines={1}>@{item.handle}</Text>
         </View>
+        {blocked && <View style={s.mutedPill}><Text style={s.mutedTxt}>Blocked</Text></View>}
         {isMuted(item.mutedUntil) && <View style={s.mutedPill}><Text style={s.mutedTxt}>Muted</Text></View>}
         {item.role !== 'member' && (
           <View style={[s.rolePill, item.role === 'owner' && s.ownerPill]}>
@@ -176,6 +182,22 @@ export default function ManageChannelMembersScreen({
                       <Ionicons name="ban-outline" size={20} color={C.DANGER} />
                       <Text style={[s.actionTxt, { color: C.DANGER }]}>Ban from channel</Text>
                     </TouchableOpacity>
+                  )}
+                  {target.userId !== user?.id && (
+                    blockedSet.has(target.userId) ? (
+                      <TouchableOpacity style={s.action} disabled={busy}
+                        onPress={() => run('unblock', () => unblockUser(target.userId))}>
+                        <Ionicons name="person-add-outline" size={20} color={C.INK} />
+                        <Text style={s.actionTxt}>Unblock</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={s.action} disabled={busy}
+                        onPress={() => confirmDestructive('Block', `Block @${target.handle}? You won't see each other anywhere in the app.`,
+                          () => run('block', () => blockUser(target.userId)))}>
+                        <Ionicons name="remove-circle-outline" size={20} color={C.DANGER} />
+                        <Text style={[s.actionTxt, { color: C.DANGER }]}>Block user</Text>
+                      </TouchableOpacity>
+                    )
                   )}
                   {busy && <ActivityIndicator color={C.ACCENT} style={{ marginTop: SPACE.SM }} />}
                 </>

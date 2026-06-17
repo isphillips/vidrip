@@ -17,6 +17,7 @@ import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import { useAuthStore } from '../../../store/authStore';
 import { usePendingCommentsStore } from '../../../store/pendingCommentsStore';
 import { useUploadStore } from '../../../store/uploadStore';
+import { useBlockStore } from '../../../store/blockStore';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import type { RootStackParamList } from '../../../app/navigation/types';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -121,10 +122,13 @@ export default function VideoCommentsSheet({
     if (reset) { setLoading(true); hasMoreRef.current = true; }
     else { setLoadingMore(true); }
     try {
-      const page = await fetchVideoComments({
+      const raw = await fetchVideoComments({
         rootSourceId, sourceType, parentCommentId: null, viewerId: user?.id,
         cursor: reset ? null : cursorRef.current, limit: ROOT_PAGE,
       });
+      // App-wide block: hide comments from blocked users (and those who blocked me).
+      const blocked = useBlockStore.getState().blocked;
+      const page = raw.filter(c => !blocked.has(c.author_id));
       setChildrenById(prev => ({ ...prev, [ROOT_KEY]: reset ? page : [...(prev[ROOT_KEY] ?? []), ...page] }));
       reconcilePending(page.map(p => p.id));
       hasMoreRef.current = page.length === ROOT_PAGE;
@@ -141,9 +145,11 @@ export default function VideoCommentsSheet({
 
   const loadChildren = useCallback(async (parentId: string) => {
     try {
-      const page = await fetchVideoComments({
+      const raw = await fetchVideoComments({
         rootSourceId, sourceType, parentCommentId: parentId, viewerId: user?.id, limit: REPLY_PAGE,
       });
+      const blocked = useBlockStore.getState().blocked;
+      const page = raw.filter(c => !blocked.has(c.author_id));
       setChildrenById(prev => ({ ...prev, [parentId]: page }));
       reconcilePending(page.map(p => p.id));
     } catch (e) {

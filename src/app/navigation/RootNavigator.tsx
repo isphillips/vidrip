@@ -6,6 +6,7 @@ import type { NavigationContainerRef } from '@react-navigation/native';
 import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
 import { useAuthStore } from '../../store/authStore';
+import { useBlockStore } from '../../store/blockStore';
 import { useOAuthStore } from '../../store/oauthStore';
 import { useShareIntentStore } from '../../store/shareIntentStore';
 import { parseOAuthDeepLink } from '../../infrastructure/oauth/config';
@@ -134,6 +135,12 @@ export default function RootNavigator() {
     setMfaChecked(false);
     recheckMfa();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
+
+  // Load the app-wide block list once per signed-in user (drives mutual hiding everywhere).
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (uid) { useBlockStore.getState().load(uid); }
   }, [session?.user?.id]);
   const runPendingNavigation = useCallback(() => {
     if (!sessionRef.current || !navRef.current?.isReady()) { return; }
