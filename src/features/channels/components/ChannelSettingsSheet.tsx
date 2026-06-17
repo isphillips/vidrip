@@ -8,7 +8,11 @@ import {
   setChannelInviteOnly,
   setChannelPublic,
   setChannelName,
+  setChannelAdVideo,
+  uploadChannelAdVideo,
 } from '../../../infrastructure/supabase/queries/channels';
+import { pickVideo } from '../../../infrastructure/media/imagePicker';
+import { useUploadStore } from '../../../store/uploadStore';
 
 const CREATOR_STUDIO_URL = 'https://www.vidrip.app/dashboard';
 
@@ -27,6 +31,11 @@ export interface ChannelSettingsSheetProps {
   onPostVideo?: () => void;
   onReviews?: () => void;
   onInvitePeople?: () => void;
+  // Channel intro/advertising video (owner/admin-set, shown on the channel).
+  adVideoUrl?: string | null;
+  onAdVideoChange?: () => void;
+  // Manage members (owner/admins).
+  onManageMembers?: () => void;
 }
 
 /**
@@ -40,7 +49,31 @@ export default function ChannelSettingsSheet({
   inviteOnly, isListed,
   onInviteOnlyChange, onListedChange, onTitleChange,
   onPostVideo, onReviews, onInvitePeople,
+  adVideoUrl, onAdVideoChange, onManageMembers,
 }: ChannelSettingsSheetProps) {
+  const enqueue = useUploadStore(s => s.enqueue);
+  const handleAdVideo = useCallback(() => {
+    const choose = async () => {
+      const picked = await pickVideo();
+      if (!picked) { return; }
+      onClose();
+      // Background upload with the global progress toast.
+      enqueue('Uploading channel intro…', async () => {
+        await uploadChannelAdVideo(channelId, picked.uri, picked.durationSec);
+        onAdVideoChange?.();
+      });
+    };
+    if (adVideoUrl) {
+      Alert.alert('Channel intro video', undefined, [
+        { text: 'Replace', onPress: choose },
+        { text: 'Remove', style: 'destructive', onPress: async () => {
+          try { await setChannelAdVideo(channelId, null, null); onAdVideoChange?.(); } catch { Alert.alert('Error', 'Could not remove it.'); }
+        } },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } else { choose(); }
+  }, [channelId, adVideoUrl, onAdVideoChange, onClose, enqueue]);
+
   const toggleInviteOnly = useCallback(async () => {
     const next = !inviteOnly;
     onInviteOnlyChange(next); // optimistic
@@ -91,6 +124,27 @@ export default function ChannelSettingsSheet({
               <View style={styles.menuRowText}>
                 <Text style={styles.menuRowLabel}>Post a Video</Text>
                 <Text style={styles.menuRowSub}>Add a YouTube or TikTok video for fans to react to</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.menuRow} activeOpacity={0.7} onPress={handleAdVideo}>
+            <Ionicons name="megaphone-outline" size={18} color={C.ACCENT_HOT} style={styles.menuRowIconV} />
+            <View style={styles.menuRowText}>
+              <Text style={styles.menuRowLabel}>Channel Intro Video</Text>
+              <Text style={styles.menuRowSub}>
+                {adVideoUrl ? 'Set — tap to replace or remove' : 'Record or upload a welcome/pitch video for your channel'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {onManageMembers && (
+            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
+              onPress={() => { onClose(); onManageMembers(); }}>
+              <Ionicons name="people-outline" size={18} color={C.ACCENT_HOT} style={styles.menuRowIconV} />
+              <View style={styles.menuRowText}>
+                <Text style={styles.menuRowLabel}>Manage Members</Text>
+                <Text style={styles.menuRowSub}>Search members · mute, kick, ban, promote</Text>
               </View>
             </TouchableOpacity>
           )}

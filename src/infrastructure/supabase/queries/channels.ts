@@ -1,6 +1,8 @@
 import RNFS from 'react-native-fs';
-import { supabase } from '../client';
+import { supabase, SUPABASE_ANON_KEY } from '../client';
 import type { OverlayRecipe } from '../../../features/studio/effectRecipe';
+
+const STORAGE_BASE = 'https://ltpscwticavqutbzrrjb.supabase.co/storage/v1/object';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -449,6 +451,46 @@ export async function fetchChannelName(channelId: string): Promise<string | null
   const { data } = await (supabase as any)
     .from('groups').select('name').eq('id', channelId).single();
   return data?.name ?? null;
+}
+
+// ── Channel advertisement / intro video ────────────────────────────────────────
+
+/** The channel's owner/admin-set intro/advertising video (shown on the channel). */
+export async function fetchChannelAdVideo(channelId: string): Promise<{ url: string | null; duration: number | null }> {
+  const { data } = await (supabase as any)
+    .from('groups').select('ad_video_url, ad_video_duration').eq('id', channelId).single();
+  return { url: data?.ad_video_url ?? null, duration: data?.ad_video_duration ?? null };
+}
+
+/** Set (or clear) the channel ad video via the owner/admin-gated RPC. */
+export async function setChannelAdVideo(channelId: string, url: string | null, duration: number | null): Promise<void> {
+  const { error } = await (supabase as any)
+    .rpc('set_channel_ad_video', { p_channel: channelId, p_url: url, p_duration: duration });
+  if (error) { throw error; }
+}
+
+/** Upload a recorded/picked clip to the public channel-clips bucket and set it as the channel
+ *  ad video. Returns the public URL. */
+export async function uploadChannelAdVideo(channelId: string, localUri: string, durationSec?: number): Promise<string> {
+  // Keep file:// and content:// schemes as-is (RN's uploader reads both on Android); only a
+  // bare path needs a file:// prefix.
+  const fileUri = /^(file|content):\/\//.test(localUri) ? localUri : `file://${localUri}`;
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) { throw new Error('Not authenticated'); }
+  // The channel-clips bucket's insert policy requires the FIRST folder to be the uploader's uid.
+  const path = `${session!.user.id}/channel-ads/${channelId}-${Date.now()}.mp4`;
+  const form = new FormData();
+  (form as any).append('file', { uri: fileUri, type: 'video/mp4', name: 'ad.mp4' });
+  const res = await fetch(`${STORAGE_BASE}/channel-clips/${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY, 'x-upsert': 'true' },
+    body: form,
+  });
+  if (!res.ok) { throw new Error(`ad video upload ${res.status}: ${await res.text().catch(() => '')}`); }
+  const { data: { publicUrl } } = supabase.storage.from('channel-clips').getPublicUrl(path);
+  await setChannelAdVideo(channelId, publicUrl, durationSec ? Math.round(durationSec) : null);
+  return publicUrl;
 }
 
 export async function fetchChannelPostReactions(parentPostId: string): Promise<ChannelPost[]> {

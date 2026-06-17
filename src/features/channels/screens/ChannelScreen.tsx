@@ -10,6 +10,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import Handle from '../../../components/Handle';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import Video from 'react-native-video';
 import GradientIcon from '../../../components/GradientIcon';
 import { supabase } from '../../../infrastructure/supabase/client';
 import {
@@ -29,6 +30,7 @@ import {
   fetchChannelReviews,
   fetchChannelDisplayName,
   fetchChannelAccess,
+  fetchChannelAdVideo,
   type ChannelPost,
   type ChannelClipTile,
   type ChannelReview,
@@ -87,6 +89,13 @@ export default function ChannelhamburderScreen({
   const [title, setTitle] = useState(
     isMembersOnly && ownerHandle ? `${ownerHandle}` : channelName,
   );
+  // Channel intro/advertising video (owner/admin-set; shown to everyone).
+  const [adVideo, setAdVideo] = useState<{ url: string | null; duration: number | null }>({ url: null, duration: null });
+  const [adPlaying, setAdPlaying] = useState(false);
+  const refreshAdVideo = useCallback(() => {
+    fetchChannelAdVideo(channelId).then(setAdVideo).catch(() => {});
+  }, [channelId]);
+  useEffect(() => { refreshAdVideo(); }, [refreshAdVideo]);
   const [membersVisible, setMembersVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [members, setMembers] = useState<{ userId: string; handle: string }[]>([]);
@@ -556,6 +565,16 @@ export default function ChannelhamburderScreen({
         )}
       </View>
 
+      {/* Channel intro/advertising video — big play banner at the top, for everyone. */}
+      {adVideo.url && (
+        <TouchableOpacity style={styles.adBanner} activeOpacity={0.85} onPress={() => setAdPlaying(true)}>
+          <View style={styles.adBannerInner}>
+            <Ionicons name="play-circle" size={40} color={C.WHITE} />
+            <Text style={styles.adBannerTxt}>Watch channel intro</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
       {/* Recording toast — under header, only while holding mic */}
       {isHoldingMic && (
         <View style={styles.recordingToast}>
@@ -765,13 +784,37 @@ export default function ChannelhamburderScreen({
         onPostVideo={() => navigation.navigate('AddChannelVideo', { channelId })}
         onReviews={() => navigation.navigate('ChannelReviews', { channelId, channelName: title })}
         onInvitePeople={() => navigation.navigate('InviteToChannel', { channelId, channelName: title })}
+        adVideoUrl={adVideo.url}
+        onAdVideoChange={refreshAdVideo}
       />
+
+      {/* Channel intro/advertising video — playable by everyone. */}
+      <Modal visible={adPlaying} transparent animationType="fade" onRequestClose={() => setAdPlaying(false)}>
+        <View style={styles.adBackdrop}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setAdPlaying(false)} />
+          <View style={styles.adPlayer}>
+            {adVideo.url && (
+              <Video source={{ uri: adVideo.url }} style={StyleSheet.absoluteFill} resizeMode="contain" controls paused={!adPlaying} />
+            )}
+            <TouchableOpacity style={styles.adClose} onPress={() => setAdPlaying(false)}>
+              <Text style={styles.adCloseTxt}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
+  adBanner: { marginHorizontal: SPACE.LG, marginTop: SPACE.SM, marginBottom: SPACE.XS, height: 92, borderRadius: RADIUS.MD, overflow: 'hidden', backgroundColor: C.SURFACE_2, borderWidth: 1, borderColor: C.ACCENT },
+  adBannerInner: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SPACE.SM },
+  adBannerTxt: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
+  adBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', alignItems: 'center', justifyContent: 'center' },
+  adPlayer: { width: '100%', height: '80%', backgroundColor: '#000' },
+  adClose: { position: 'absolute', top: SPACE.MD, right: SPACE.MD, width: 36, height: 36, borderRadius: RADIUS.FULL, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  adCloseTxt: { color: C.WHITE, fontSize: 16, fontFamily: FONT.BODY_BOLD },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyContainer: { flex: 1 },
   header: {
