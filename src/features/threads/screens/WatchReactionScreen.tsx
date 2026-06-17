@@ -105,6 +105,9 @@ export default function WatchReactionScreen({
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
   const [downloadPct, setDownloadPct] = useState(0);
   const [localUri, setLocalUri] = useState<string | null>(null);
+  // When the main reaction ends and it has an afterthought outro, we swap the player to it
+  // before auto-advancing.
+  const [playingAfterthought, setPlayingAfterthought] = useState(false);
   const [paused, setPaused] = useState(true);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -260,6 +263,16 @@ export default function WatchReactionScreen({
     stoppingRef.current = true;
     setPaused(true);
     ttRef.current?.pause();
+    // If the reaction has an afterthought outro and we haven't played it yet, swap the player
+    // to it (full-screen) before advancing. Its own onEnd brings us back here to advance.
+    if (!playingAfterthought && reaction?.afterthoughtUri) {
+      setPlayingAfterthought(true);
+      stoppingRef.current = false;
+      progressRef.current = 0;
+      setProgress(0);
+      setPaused(false);
+      return;
+    }
     // Auto-advance to the next reaction in the thread; if this is the last one,
     // dismiss back to the thread (card-style pop).
     const ids = siblingIdsRef.current;
@@ -270,7 +283,7 @@ export default function WatchReactionScreen({
     } else {
       navigation.goBack();
     }
-  }, [reactionId, navigation]);
+  }, [reactionId, navigation, playingAfterthought, reaction?.afterthoughtUri]);
 
   const handleEmojiPress = useCallback(async (emoji: string) => {
     if (!reaction || !user?.id) { return; }
@@ -358,7 +371,7 @@ export default function WatchReactionScreen({
       <View style={StyleSheet.absoluteFill}>
         <Video
           ref={videoRef}
-          source={{ uri: localUri }}
+          source={{ uri: (playingAfterthought && reaction?.afterthoughtUri) ? reaction.afterthoughtUri : localUri }}
           style={{ width, height }}
           resizeMode="cover"
           paused={paused}
@@ -402,8 +415,9 @@ export default function WatchReactionScreen({
         </View>
       )}
 
-      {/* Source player — full-screen, then animates into the corner on play. */}
-      {sessionReady && reaction?.yt_video_id && (
+      {/* Source player — full-screen, then animates into the corner on play. Hidden once the
+          afterthought outro takes over (the reaction is finished). */}
+      {sessionReady && reaction?.yt_video_id && !playingAfterthought && (
         <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
           {reaction.source_type === 'instagram' ? (
             <WebView
