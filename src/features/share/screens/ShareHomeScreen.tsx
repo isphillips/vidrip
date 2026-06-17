@@ -1224,7 +1224,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   repeat
                 />
               ) : sv.sourceType === 'instagram' ? (
-                <>
+                <View style={[styles.sourceLetterbox, { top: top + 56, bottom: bottom + 88 }]}>
                   <WebView
                     ref={el => { wvRefs.current[i] = el; }}
                     style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
@@ -1255,8 +1255,9 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   {/* Tap-to-play hint (pointerEvents none → the tap reaches the reel,
                       which is the real touch that makes the inline video composite). */}
                   {!igSlotStarted[i] && <TapToPlayHint />}
-                </>
+                </View>
               ) : sv.sourceType === 'tiktok' ? (
+                <View style={[styles.sourceLetterbox, { top: top + 56, bottom: bottom + 88 }]}>
                 <WebView
                   ref={el => { wvRefs.current[i] = el; }}
                   style={StyleSheet.absoluteFill}
@@ -1268,6 +1269,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   onLoad={onSlotLoad}
                   onLoadStart={onSlotLoadStart}
                 />
+                </View>
               ) : (
                 <WebView
                   ref={el => { wvRefs.current[i] = el; }}
@@ -1447,6 +1449,8 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
+  // Compliance letterbox for IG/TikTok sources — top/bottom set inline from safe insets.
+  sourceLetterbox: { position: 'absolute', left: 0, right: 0, backgroundColor: '#000', overflow: 'hidden' },
 
   headerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
