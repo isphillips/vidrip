@@ -38,19 +38,21 @@ export default function LensPicker({
 }: { lensKey: string | null; onChange: (k: string | null) => void; topInset: number }) {
   const { width } = useWindowDimensions();
   const [open, setOpen] = useState(false);
+  const [gridW, setGridW] = useState(0); // measured inner width of the scroll area (exact, not guessed)
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(anim, { toValue: open ? 1 : 0, duration: 220, useNativeDriver: true }).start();
   }, [open, anim]);
 
-  // 4 per row, uniform spacing all around: the panel is 94% of the screen, and the outer padding
-  // equals the inter-cell gap so the margins between cells and at the edges all match.
+  // 4 per row, uniform spacing all around. Compute the cell from the MEASURED scroll-area width (so
+  // border/rounding/rounding-down can't make the 4th cell overflow and wrap), with the 94% estimate
+  // as the first-frame fallback. Outer padding equals the inter-cell gap so all margins match.
   const COLS = 4;
   const GAP = SPACE.SM;
   const PAD = SPACE.SM;
-  const panelW = width * 0.94;
-  const cellW = Math.floor((panelW - PAD * 2 - GAP * (COLS - 1)) / COLS);
+  const innerW = (gridW || width * 0.94) - PAD * 2;
+  const cellW = Math.floor((innerW - GAP * (COLS - 1)) / COLS);
   const cellH = Math.round(cellW * 1.18);
 
   const select = (k: string | null) => { onChange(k); setOpen(false); };
@@ -79,7 +81,10 @@ export default function LensPicker({
               opacity: anim,
               transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-12, SPACE.SM] }) }],
             }]}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.grid, { padding: PAD, gap: GAP }]}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              onLayout={e => setGridW(e.nativeEvent.layout.width)}
+              contentContainerStyle={[styles.grid, { padding: PAD, gap: GAP }]}>
               {OPTIONS.map(o => {
                 const on = o.key === lensKey;
                 return (
