@@ -25,6 +25,7 @@ import {
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
+import DraggablePip from './DraggablePip';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
 import FaceLensOverlay, { type FaceLensTrack } from '../../lens/faceLens';
 import { MOCK_FACE } from '../../lens/useFaceLandmarks';
@@ -349,6 +350,25 @@ export default function ReactionRecorder({
     );
   }
 
+  // PIP placement: starts on the LEFT (item 1 — third-party icons sit on the right of IG/TikTok),
+  // and is draggable within `pipBounds` (item 4). For IG/TikTok keep a right-edge strip clear so
+  // the PIP can't cover the platform's like/comment/share icons.
+  const isVerticalSource = sourceType === 'instagram' || sourceType === 'tiktok';
+  const RIGHT_ICON_STRIP = isVerticalSource ? 64 : SPACE.LG;
+  const pipBounds = {
+    minX: SPACE.LG,
+    maxX: Math.max(SPACE.LG, width - PIP_W - RIGHT_ICON_STRIP),
+    minY: topInset + SPACE.SM,
+    maxY: Math.max(topInset + SPACE.SM, height - bottomInset - PIP_H - SPACE.SM),
+  };
+  const pipStart = { x: SPACE.LG, y: Math.max(pipBounds.minY, height - bottomInset - 100 - PIP_H) };
+
+  // Compliance letterbox margins for IG/TikTok sources (item 3) — inset the vertical player with
+  // top/bottom black bars instead of full-bleed. YouTube is unchanged.
+  const letterTop = topInset + 56;
+  const letterBottom = bottomInset + 88;
+  const letterH = Math.max(0, height - letterTop - letterBottom);
+
   return (
     <View style={styles.container}>
       {/* Source-video full-screen background (or black if no source) */}
@@ -365,35 +385,40 @@ export default function ReactionRecorder({
         </View>
       ) : igSource ? (
         <View style={styles.ytCover}>
-          <InstagramPlayer
-            key={ytKey}
-            ref={igRef}
-            uri={sourceUri as string}
-            style={{ width, height }}
-            onChangeState={onYtStateChange}
-          />
-          {/* react-native-video has no built-in controls — tap to start (which begins recording). */}
-          {!ytPlaying && (
-            <TouchableOpacity
-              style={[StyleSheet.absoluteFill, styles.igPlayOverlay]}
-              activeOpacity={0.85}
-              onPress={() => igRef.current?.play()}>
-              <View style={styles.igPlayBtn}><Text style={styles.igPlayIcon}>▶</Text></View>
-            </TouchableOpacity>
-          )}
+          <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
+            <InstagramPlayer
+              key={ytKey}
+              ref={igRef}
+              uri={sourceUri as string}
+              style={{ width, height: letterH }}
+              onChangeState={onYtStateChange}
+            />
+            {/* react-native-video has no built-in controls — tap to start (which begins recording). */}
+            {!ytPlaying && (
+              <TouchableOpacity
+                style={[StyleSheet.absoluteFill, styles.igPlayOverlay]}
+                activeOpacity={0.85}
+                onPress={() => igRef.current?.play()}>
+                <View style={styles.igPlayBtn}><Text style={styles.igPlayIcon}>▶</Text></View>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ) : videoId && sourceType === 'tiktok' ? (
         <View style={styles.ytCover}>
-          <TikTokPlayer
-            key={ytKey}
-            ref={ttRef}
-            style={{ width, height, backgroundColor: '#000' }}
-            videoId={videoId}
-            onChangeState={onYtStateChange}
-          />
+          <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
+            <TikTokPlayer
+              key={ytKey}
+              ref={ttRef}
+              style={{ width, height: letterH, backgroundColor: '#000' }}
+              videoId={videoId}
+              onChangeState={onYtStateChange}
+            />
+          </View>
         </View>
       ) : videoId && sourceType === 'instagram' ? (
         <View style={styles.ytCover}>
+          <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
           <WebView
             key={ytKey}
             style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
@@ -424,6 +449,7 @@ export default function ReactionRecorder({
           {/* Tap the reel to start (and begin recording). pointerEvents none so the
               tap reaches the WebView — the real touch that composites the video. */}
           {!igStarted && <TapToPlayHint />}
+          </View>
         </View>
       ) : videoId ? (() => {
         const coverW = Math.round(height * (16 / 9));
@@ -449,44 +475,54 @@ export default function ReactionRecorder({
 
       {/* Camera — PIP corner when a source video drives the screen, otherwise
           full-screen (private channel clips, reviews). */}
-      {ready && device ? (
-        <View style={pipCamera
-          ? [styles.pip, { bottom: bottomInset + 100, right: SPACE.LG }]
-          : StyleSheet.absoluteFill}>
-          <Camera
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            device={device}
-            format={format}
-            fps={targetFps}
-            // In the PIP corner, force a TextureView preview. The default
-            // 'surface-view' renders on its own SurfaceView layer that ignores
-            // the parent's rounded-corner clip, so the square camera frame
-            // bleeds past the PIP border on Android. TextureView is an ordinary
-            // child view and honors overflow:'hidden' + borderRadius. Full-screen
-            // has nothing to clip, so it keeps the more efficient surface-view.
-            androidPreviewViewType={pipCamera ? 'texture-view' : 'surface-view'}
-            // 2 Mbps video (+~0.13 audio) keeps a 180s reaction/review at ~48MB,
-            // under the 50MB Supabase storage upload limit (60s ≈ 16MB).
-            videoBitRate={2}
-            isActive={camActive}
-            video={true}
-            audio={true}
-            // MediaPipe needs BGRA frames; VisionCamera defaults to YUV (→ detect_fail).
-            pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
-            frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
-          />
-          {/* AR lens, tracking the reactor's face (sized to the camera box, cover-crop aware). */}
-          <FaceLensOverlay
-            lens={lensKey}
-            landmarks={lensLandmarks}
-            width={pipCamera ? PIP_W : width}
-            height={pipCamera ? PIP_H : height}
-            frameAspect={frameAspect}
-          />
-          {isRecording && pipCamera && <View style={styles.pipRecDot} />}
-        </View>
-      ) : __DEV__ ? (
+      {ready && device ? (() => {
+        const camInner = (
+          <>
+            <Camera
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              format={format}
+              fps={targetFps}
+              // In the PIP corner, force a TextureView preview — the default 'surface-view'
+              // renders on its own layer that ignores the parent's rounded-corner clip, so the
+              // camera frame bleeds past the PIP border on Android. Full-screen keeps surface-view.
+              androidPreviewViewType={pipCamera ? 'texture-view' : 'surface-view'}
+              // 2 Mbps video keeps a 180s reaction at ~48MB, under the 50MB upload limit.
+              videoBitRate={2}
+              isActive={camActive}
+              video={true}
+              audio={true}
+              // MediaPipe needs BGRA frames; VisionCamera defaults to YUV (→ detect_fail).
+              pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
+              frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
+            />
+            <FaceLensOverlay
+              lens={lensKey}
+              landmarks={lensLandmarks}
+              width={pipCamera ? PIP_W : width}
+              height={pipCamera ? PIP_H : height}
+              frameAspect={frameAspect}
+            />
+            {isRecording && pipCamera && <View style={styles.pipRecDot} />}
+          </>
+        );
+        return pipCamera ? (
+          // Item 1/4: PIP starts on the left, draggable within bounds. Item 2: fades while recording.
+          <DraggablePip
+            width={PIP_W}
+            height={PIP_H}
+            startX={pipStart.x}
+            startY={pipStart.y}
+            bounds={pipBounds}
+            recording={isRecording}
+            style={styles.pip}>
+            {camInner}
+          </DraggablePip>
+        ) : (
+          <View style={StyleSheet.absoluteFill}>{camInner}</View>
+        );
+      })() : __DEV__ ? (
         // Simulator placeholder so the source player + controls are still visible.
         <View style={pipCamera
           ? [styles.pip, styles.devCam, { bottom: bottomInset + 100, right: SPACE.LG }]
@@ -597,6 +633,8 @@ const styles = StyleSheet.create({
   devCam: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   devCamTxt: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
   ytCover: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  // Compliance letterbox for IG/TikTok sources — top/height set inline from safe insets.
+  sourceLetterbox: { position: 'absolute', left: 0, right: 0, backgroundColor: '#000', overflow: 'hidden' },
   ytCoverInner: { position: 'absolute' },
   igPlayOverlay: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
   igPlayBtn: {
