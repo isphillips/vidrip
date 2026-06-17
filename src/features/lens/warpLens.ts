@@ -65,13 +65,52 @@ half4 main(float2 xy) {
   return image.eval(coord);
 }`;
 
+// Chromatic-glitch: split the R/G/B channels and jitter horizontal bands — a broken-screen /
+// cyberpunk aberration. Doesn't need the face; applies to the whole frame.
+const GLITCH = `
+uniform shader image;
+uniform float amount;
+half4 main(float2 xy) {
+  float band = floor(xy.y / 22.0);
+  float r = fract(sin(band * 91.7) * 4391.0);
+  float shift = (r - 0.5) * amount * 8.0 * step(0.72, r);
+  float2 p = xy + float2(shift, 0.0);
+  half4 c;
+  c.r = image.eval(p + float2(amount, 0.0)).r;
+  c.g = image.eval(p).g;
+  c.b = image.eval(p - float2(amount, 0.0)).b;
+  c.a = 1.0;
+  return c;
+}`;
+
+// Kaleidoscope: fold the frame into mirrored radial wedges around the centre.
+const KALEIDO = `
+uniform shader image;
+uniform float2 center;
+uniform float segments;
+half4 main(float2 xy) {
+  float2 d = xy - center;
+  float r = length(d);
+  float a = atan(d.y, d.x);
+  float seg = 6.2831853 / segments;
+  a = mod(a, seg);
+  a = abs(a - seg * 0.5);            // mirror within the wedge for a seamless join
+  float2 p = center + float2(cos(a), sin(a)) * r;
+  return image.eval(p);
+}`;
+
 // Each warp key maps to a compiled effect + a strength-style parameter. `eyes` uses the two-centre
-// shader; the rest use a single centre.
+// shader; bulge/swirl use a single centre; glitch/kaleido are full-frame.
 const EFFECTS: Record<string, SkRuntimeEffect | null> = {
   eyes: Skia.RuntimeEffect.Make(EYE_BULGE),
   bulge: Skia.RuntimeEffect.Make(BULGE),
   swirl: Skia.RuntimeEffect.Make(SWIRL),
+  glitch: Skia.RuntimeEffect.Make(GLITCH),
+  kaleido: Skia.RuntimeEffect.Make(KALEIDO),
 };
+
+// Warps that don't need face keypoints — built from frame size alone (apply with or without a face).
+const FACELESS = new Set<WarpKey>(['glitch', 'kaleido']);
 
 const RIGHT_EYE = 0, LEFT_EYE = 1, NOSE = 2, MOUTH = 3;
 
@@ -84,15 +123,6 @@ export const warpLensAvailable = !!plugin && Object.values(EFFECTS).every(Boolea
 // Build the warp paint for a given warp + face keypoints (JS thread — GC runs here). pts are the 6
 // normalized BlazeFace keypoints; w/h are the raw frame size.
 function buildWarpPaint(warp: WarpKey, pts: number[][], w: number, h: number): SkPaint | null {
-  const lx = pts[LEFT_EYE][0] * w, ly = pts[LEFT_EYE][1] * h;
-  const rx = pts[RIGHT_EYE][0] * w, ry = pts[RIGHT_EYE][1] * h;
-  const nx = pts[NOSE][0] * w, ny = pts[NOSE][1] * h;
-  const moX = pts[MOUTH][0] * w, moY = pts[MOUTH][1] * h;
-  const eyeSpan = Math.hypot(rx - lx, ry - ly);
-  // Face centre ≈ midway between the eye line and the mouth; face span scales the affected radius.
-  const cx = ((lx + rx) / 2 + moX) / 2, cy = ((ly + ry) / 2 + moY) / 2;
-  const faceSpan = Math.max(eyeSpan * 2.2, Math.hypot(moX - (lx + rx) / 2, moY - (ly + ry) / 2) * 2.4);
-
   const make = (effect: SkRuntimeEffect | null, set: (b: ReturnType<typeof Skia.RuntimeShaderBuilder>) => void) => {
     if (!effect) { return null; }
     const b = Skia.RuntimeShaderBuilder(effect);
@@ -101,6 +131,18 @@ function buildWarpPaint(warp: WarpKey, pts: number[][], w: number, h: number): S
     paint.setImageFilter(Skia.ImageFilter.MakeRuntimeShader(b, null, null));
     return paint;
   };
+  // Faceless warps don't touch the keypoints — built from frame size.
+  if (warp === 'glitch') { return make(EFFECTS.glitch, b => { b.setUniform('amount', [4]); }); }
+  if (warp === 'kaleido') { return make(EFFECTS.kaleido, b => { b.setUniform('center', [w / 2, h / 2]); b.setUniform('segments', [8]); }); }
+  if (pts.length < 6) { return null; }
+  const lx = pts[LEFT_EYE][0] * w, ly = pts[LEFT_EYE][1] * h;
+  const rx = pts[RIGHT_EYE][0] * w, ry = pts[RIGHT_EYE][1] * h;
+  const nx = pts[NOSE][0] * w, ny = pts[NOSE][1] * h;
+  const moX = pts[MOUTH][0] * w, moY = pts[MOUTH][1] * h;
+  const eyeSpan = Math.hypot(rx - lx, ry - ly);
+  // Face centre ≈ midway between the eye line and the mouth; face span scales the affected radius.
+  const cx = ((lx + rx) / 2 + moX) / 2, cy = ((ly + ry) / 2 + moY) / 2;
+  const faceSpan = Math.max(eyeSpan * 2.2, Math.hypot(moX - (lx + rx) / 2, moY - (ly + ry) / 2) * 2.4);
 
   switch (warp) {
     case 'eyes':
@@ -143,9 +185,14 @@ export function useWarpFrameProcessor(warp: WarpKey | null) {
   // Drop the paint when the warp changes or unmounts so GC can reclaim it and a stale warp never shows.
   useEffect(() => { paint.value = null; return () => { paint.value = null; }; }, [paint, warp]);
 
+  const faceless = !!warp && FACELESS.has(warp);
+
   return useSkiaFrameProcessor((frame) => {
     'worklet';
-    if (warp) {
+    if (faceless) {
+      // No detection needed — (re)build from the frame size on a throttled cadence (GC'd on JS).
+      runAtTargetFps(8, () => { 'worklet'; setPaint([], frame.width, frame.height); });
+    } else if (warp) {
       runAtTargetFps(15, () => {
         'worklet';
         if (!plugin) { return; }
@@ -156,5 +203,5 @@ export function useWarpFrameProcessor(warp: WarpKey | null) {
     }
     const p = paint.value;
     if (p) { frame.render(p); } else { frame.render(); }
-  }, [warp]);
+  }, [warp, faceless]);
 }

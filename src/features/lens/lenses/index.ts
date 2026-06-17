@@ -24,6 +24,20 @@ import { Petals } from './petals';
 import { WarpGhost } from './warpGhost';
 import { FireBreath } from './fireBreath';
 import { RainbowBreath } from './rainbowBreath';
+import { Bubblegum } from './bubblegum';
+import { MoneyRain } from './moneyRain';
+import { FairyDust } from './fairyDust';
+import { Vampire } from './vampire';
+import { MusicVibe } from './musicVibe';
+import { Alien } from './alien';
+import { Hologram } from './hologram';
+import { Ghost } from './ghost';
+import { Solar } from './solar';
+import { Butterfly } from './butterfly';
+import { Aurora } from './aurora';
+import { StormCloud } from './stormCloud';
+import { Peacock } from './peacock';
+import { Cat } from './cat';
 
 export const LENSES: Lens[] = [
   { key: 'debug', label: 'Debug', icon: 'bug', Comp: Debug },
@@ -32,9 +46,12 @@ export const LENSES: Lens[] = [
   { key: 'bighead', label: 'Big Head', icon: 'happy', Comp: WarpGhost, warp: 'bighead' },
   { key: 'tinyface', label: 'Tiny Face', icon: 'contract', Comp: WarpGhost, warp: 'tinyface' },
   { key: 'swirl', label: 'Swirl', icon: 'sync', Comp: WarpGhost, warp: 'swirl' },
+  { key: 'glitch', label: 'Glitch', icon: 'pulse', Comp: WarpGhost, warp: 'glitch' },
+  { key: 'kaleido', label: 'Kaleidoscope', icon: 'aperture', Comp: WarpGhost, warp: 'kaleido' },
   // ── Mouth-interaction lenses (open your mouth) ──
   { key: 'firebreath', label: 'Fire Breath', icon: 'flame-outline', Comp: FireBreath },
   { key: 'rainbreath', label: 'Rainbow Mouth', icon: 'color-wand', Comp: RainbowBreath },
+  { key: 'bubblegum', label: 'Bubblegum', icon: 'balloon', Comp: Bubblegum },
   // ── Overlay lenses ──
   { key: 'galaxy', label: 'Cosmic', icon: 'planet', Comp: Galaxy },
   { key: 'neon', label: 'Neon', icon: 'glasses-outline', Comp: NeonVisor },
@@ -52,6 +69,19 @@ export const LENSES: Lens[] = [
   { key: 'starstruck', label: 'Starstruck', icon: 'star', Comp: Starstruck },
   { key: 'toxic', label: 'Toxic', icon: 'flask', Comp: Toxic },
   { key: 'petals', label: 'Blossom', icon: 'flower', Comp: Petals },
+  { key: 'money', label: 'Make It Rain', icon: 'cash', Comp: MoneyRain },
+  { key: 'fairy', label: 'Fairy Dust', icon: 'sparkles-outline', Comp: FairyDust },
+  { key: 'vampire', label: 'Vampire', icon: 'moon', Comp: Vampire },
+  { key: 'music', label: 'Vibe', icon: 'musical-notes', Comp: MusicVibe },
+  { key: 'alien', label: 'Abduction', icon: 'planet-outline', Comp: Alien },
+  { key: 'hologram', label: 'Hologram', icon: 'scan', Comp: Hologram },
+  { key: 'ghost', label: 'Haunted', icon: 'skull-outline', Comp: Ghost },
+  { key: 'solar', label: 'Sun God', icon: 'sunny', Comp: Solar },
+  { key: 'butterfly', label: 'Butterflies', icon: 'leaf', Comp: Butterfly },
+  { key: 'aurora', label: 'Aurora', icon: 'cloudy-night', Comp: Aurora },
+  { key: 'storm', label: 'Storm Cloud', icon: 'thunderstorm', Comp: StormCloud },
+  { key: 'peacock', label: 'Peacock', icon: 'leaf-outline', Comp: Peacock },
+  { key: 'cat', label: 'Kitty', icon: 'paw', Comp: Cat },
 ];
 
 export const lensByKey = (k?: string | null) => (k ? LENSES.find(l => l.key === k) : undefined);

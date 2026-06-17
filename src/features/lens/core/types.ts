@@ -38,7 +38,7 @@ export type LensProps = { f: FaceFrame; clock: SharedValue<number>; w: number; h
 // than an overlay — the capture screen renders that shader via the warp frame processor instead of
 // mounting `Comp` (`Comp` is still used for replay, since the warp isn't baked into recordings yet).
 // `icon` is the Ionicons glyph shown in the picker.
-export type WarpKey = 'eyes' | 'bighead' | 'tinyface' | 'swirl';
+export type WarpKey = 'eyes' | 'bighead' | 'tinyface' | 'swirl' | 'glitch' | 'kaleido';
 export type Lens = { key: string; label: string; icon: string; Comp: React.FC<LensProps>; warp?: WarpKey };
 
 // ─── Replay ──────────────────────────────────────────────────────────────────

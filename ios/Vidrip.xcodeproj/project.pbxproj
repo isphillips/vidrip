@@ -23,7 +23,6 @@
 		3350B7D1526743C694BA09EB /* Syne-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9D350F71427F47608FD1B0F4 /* Syne-Regular.ttf */; };
 		3A857CA80878433F9804DE29 /* Syne-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 24CD2834196447399CCA1916 /* Syne-ExtraBold.ttf */; };
 		3E1A0696B3CF4A3AAE36450D /* Raleway-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DA7F609925404B1F99116AF3 /* Raleway-Medium.ttf */; };
-		3F7E04792FE0B5FC00ABA05B /* face_landmarker.task in Resources */ = {isa = PBXBuildFile; fileRef = 3F7E04782FE0B5FC00ABA05B /* face_landmarker.task */; };
 		3F7E04802FE0B90000ABA05B /* FaceLandmarksFrameProcessor.m in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E047E2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.m */; };
 		3F7E04812FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E047F2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift */; };
 		3F7E04842FE0D96500ABA05B /* LensWarmup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E04832FE0D96500ABA05B /* LensWarmup.swift */; };
@@ -95,7 +94,6 @@
 		24CD2834196447399CCA1916 /* Syne-ExtraBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Syne-ExtraBold.ttf"; path = "../src/assets/fonts/Syne-ExtraBold.ttf"; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-Vidrip.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Vidrip.debug.xcconfig"; path = "Target Support Files/Pods-Vidrip/Pods-Vidrip.debug.xcconfig"; sourceTree = "<group>"; };
 		3F31413D2FCCFE920066BB5B /* Vidrip-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Vidrip-Bridging-Header.h"; sourceTree = "<group>"; };
-		3F7E04782FE0B5FC00ABA05B /* face_landmarker.task */ = {isa = PBXFileReference; lastKnownFileType = file; path = face_landmarker.task; sourceTree = "<group>"; };
 		3F7E047E2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FaceLandmarksFrameProcessor.m; sourceTree = "<group>"; };
 		3F7E047F2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceLandmarksFrameProcessor.swift; sourceTree = "<group>"; };
 		3F7E04822FE0D96500ABA05B /* LensWarmup.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LensWarmup.m; sourceTree = "<group>"; };
@@ -231,7 +229,6 @@
 			isa = PBXGroup;
 			children = (
 				3F7E04882FE24C7400ABA05B /* blaze_face_short_range.tflite */,
-				3F7E04782FE0B5FC00ABA05B /* face_landmarker.task */,
 				3FCD95C12FD180A700A7475B /* AudioRecorder.h */,
 				3F7E047E2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.m */,
 				3F7E047F2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift */,
@@ -392,7 +389,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				3F7E04872FE24C5700ABA05B /* blaze_face_short_range.tflite in Resources */,
-				3F7E04792FE0B5FC00ABA05B /* face_landmarker.task in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				8C8BC5E17981FDDD75CDA7B8 /* PrivacyInfo.xcprivacy in Resources */,

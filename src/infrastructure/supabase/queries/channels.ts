@@ -385,6 +385,8 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
     .eq('channel_id', channelId)
     .eq('hidden', false)   // exclude videos from disabled creator accounts
     .is('parent_post_id', null)
+    // Scheduled creator posts stay hidden until their release_date passes (null = publish now).
+    .or(`release_date.is.null,release_date.lte.${new Date().toISOString()}`)
     .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false });
 

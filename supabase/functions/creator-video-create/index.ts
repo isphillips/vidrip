@@ -47,11 +47,18 @@ Deno.serve(async (req) => {
     const { data: u } = await admin.from("users").select("creator_studio").eq("id", userId).maybeSingle();
     if (!u?.creator_studio) { return json({ error: "Creator Studio is not enabled for this account." }, 403); }
 
-    const { channelId, title, visibility, thumbnailUrl, overlayRecipe } = await req.json().catch(() => ({}));
+    const { channelId, title, visibility, thumbnailUrl, overlayRecipe, releaseDate } = await req.json().catch(() => ({}));
     if (!channelId) { return json({ error: "channelId required" }, 400); }
     const vis = visibility === "subscribers" ? "subscribers" : "public";
     // Animated overlay layer, replayed live in-app. Stored as-is (small JSON); null when absent.
     const recipe = overlayRecipe && typeof overlayRecipe === "object" ? overlayRecipe : null;
+    // Scheduled release: a future timestamp hides the post from viewer feeds until it passes (the
+    // bytes still upload now). Ignore anything that isn't a valid future date → publish immediately.
+    let release: string | null = null;
+    if (typeof releaseDate === "string") {
+      const t = Date.parse(releaseDate);
+      if (!Number.isNaN(t) && t > Date.now()) { release = new Date(t).toISOString(); }
+    }
 
     // The caller must own / be an admin of the destination channel.
     const { data: grp } = await admin.from("groups").select("created_by").eq("id", channelId).maybeSingle();
@@ -84,6 +91,7 @@ Deno.serve(async (req) => {
       yt_video_title: (title ?? "").slice(0, 200),
       yt_video_thumbnail: typeof thumbnailUrl === "string" ? thumbnailUrl : null,
       overlay_recipe: recipe,
+      release_date: release,
       is_pinned: false,
     }).select("id").single();
     if (insErr) { return json({ error: insErr.message }, 500); }

@@ -10,7 +10,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
-import { fetchMyCreatorVideos, type MyCreatorVideo } from '../../../infrastructure/creatorStudio/api';
+import { fetchMyCreatorVideos, refreshCreatorVideoStatus, type MyCreatorVideo } from '../../../infrastructure/creatorStudio/api';
 import { deleteChannelPost } from '../../../infrastructure/supabase/queries/channels';
 import { listDrafts, deleteDraft, type StudioDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import BunnyEmbedPlayer from '../components/BunnyEmbedPlayer';
@@ -35,14 +35,18 @@ const ago = (ts: number) => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
+const isScheduled = (v: MyCreatorVideo) => !!v.releaseDate && new Date(v.releaseDate).getTime() > Date.now();
+const fmtRelease = (iso: string) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
 export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<'StudioHome'>) {
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const [tab, setTab] = useState<'published' | 'drafts'>('published');
+  const [tab, setTab] = useState<'published' | 'scheduled' | 'drafts'>('published');
   const [videos, setVideos] = useState<MyCreatorVideo[]>([]);
   const [drafts, setDrafts] = useState<StudioDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [statusBusy, setStatusBusy] = useState<string | null>(null); // postId currently re-checking
   // Play inline as an overlay (NOT a separate/nested native screen) — a WKWebView video
   // nested under react-native-screens inside this modal renders black; an in-place
   // overlay composites like the reaction recorder's WebView does.
@@ -61,6 +65,20 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const startNew = () => navigation.navigate('StudioCapture');
+
+  // On-demand status re-check (fallback when the Bunny webhook is delayed/missing).
+  const onRefreshStatus = async (item: MyCreatorVideo) => {
+    if (statusBusy) { return; }
+    setStatusBusy(item.id);
+    try {
+      const status = await refreshCreatorVideoStatus(item.id);
+      setVideos(prev => prev.map(v => (v.id === item.id ? { ...v, status } : v)));
+    } catch (e: any) {
+      Alert.alert('Couldn’t refresh', e?.message ?? 'Try again in a moment.');
+    } finally {
+      setStatusBusy(null);
+    }
+  };
 
   const onDelete = (item: MyCreatorVideo) => {
     Alert.alert('Delete video?', item.title, [
@@ -123,6 +141,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   const close = () => navigation.getParent()?.goBack();
 
   const renderVideo = ({ item }: { item: MyCreatorVideo }) => {
+    const scheduled = isScheduled(item);
     const st = STATUS[item.status] ?? STATUS.processing;
     const playable = item.status === 'ready';
     return (
@@ -135,14 +154,30 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
         <View style={styles.meta}>
           <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
           <View style={styles.rowSub}>
-            <View style={[styles.statusDot, { backgroundColor: st.color }]} />
-            <Text style={[styles.statusText, { color: st.color }]}>{st.label}</Text>
+            {scheduled ? (
+              <>
+                <Ionicons name="calendar" size={12} color={C.ACCENT_HOT} />
+                <Text style={[styles.statusText, { color: C.ACCENT_HOT, marginLeft: 4 }]}>{fmtRelease(item.releaseDate!)}</Text>
+              </>
+            ) : (
+              <>
+                <View style={[styles.statusDot, { backgroundColor: st.color }]} />
+                <Text style={[styles.statusText, { color: st.color }]}>{st.label}</Text>
+              </>
+            )}
             <Ionicons
               name={item.visibility === 'subscribers' ? 'lock-closed' : 'globe-outline'}
               size={12} color={C.SUBTLE} style={{ marginLeft: SPACE.SM }} />
             <Text style={styles.visText}>{item.visibility === 'subscribers' ? 'Subscribers' : 'Public'}</Text>
           </View>
         </View>
+        {item.status !== 'ready' && (
+          <TouchableOpacity onPress={() => onRefreshStatus(item)} hitSlop={10} style={styles.del} disabled={statusBusy === item.id}>
+            {statusBusy === item.id
+              ? <ActivityIndicator size="small" color={C.MUTED} />
+              : <Ionicons name="refresh" size={18} color={C.MUTED} />}
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => onDelete(item)} hitSlop={10} style={styles.del}>
           <Ionicons name="trash-outline" size={18} color={C.MUTED} />
         </TouchableOpacity>
@@ -170,6 +205,15 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   );
 
   const showingDrafts = tab === 'drafts';
+  // Split the creator's videos into upcoming (future release_date) vs already-published.
+  const scheduledVideos = videos.filter(isScheduled);
+  const publishedVideos = videos.filter(v => !isScheduled(v));
+  const listData = tab === 'drafts' ? drafts : tab === 'scheduled' ? scheduledVideos : publishedVideos;
+  const TABS = [
+    { key: 'published', label: 'Published' },
+    { key: 'scheduled', label: `Scheduled${scheduledVideos.length ? ` (${scheduledVideos.length})` : ''}` },
+    { key: 'drafts', label: `Drafts${drafts.length ? ` (${drafts.length})` : ''}` },
+  ] as const;
 
   return (
     <View style={styles.screen}>
@@ -177,9 +221,39 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
     <EffectWarmup />
     <View style={[styles.container, { paddingTop: top + SPACE.SM }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Creator Studio</Text>
-        <TouchableOpacity onPress={close} hitSlop={10}><Ionicons name="close" size={26} color={C.INK} /></TouchableOpacity>
+        <Text style={styles.title}>Studio</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => navigation.navigate('StudioCalendar')} hitSlop={10}>
+            <Ionicons name="calendar-outline" size={23} color={C.INK} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={close} hitSlop={10}><Ionicons name="close" size={26} color={C.INK} /></TouchableOpacity>
+        </View>
       </View>
+
+      {/* Published / Scheduled / Drafts toggle */}
+      <View style={styles.toggle}>
+        {TABS.map(t => (
+          <TouchableOpacity key={t.key} style={[styles.toggleBtn, tab === t.key && styles.toggleBtnOn]} onPress={() => setTab(t.key)} activeOpacity={0.85}>
+            <Text style={[styles.toggleTxt, tab === t.key && styles.toggleTxtOn]} numberOfLines={1}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <FlatList
+        data={listData as any[]}
+        keyExtractor={(v: any) => v.id}
+        contentContainerStyle={listData.length === 0 ? styles.emptyWrap : styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={C.ACCENT} />}
+        ListEmptyComponent={loading
+          ? <ActivityIndicator color={C.ACCENT} style={{ marginTop: SPACE.XXXL }} />
+          : <Text style={styles.empty}>{
+              tab === 'drafts'
+                ? 'No drafts. Recordings you don’t publish are saved here automatically.'
+                : tab === 'scheduled'
+                  ? 'Nothing scheduled. Pick “Schedule” when posting a video.'
+                  : 'No videos yet. Tap “New video” to create your first.'}</Text>}
+        renderItem={showingDrafts ? (renderDraft as any) : (renderVideo as any)}
+      />
 
       <TouchableOpacity activeOpacity={0.9} onPress={startNew}>
         <LinearGradient
@@ -189,30 +263,6 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
           <Text style={styles.newBtnText}>New video</Text>
         </LinearGradient>
       </TouchableOpacity>
-
-      {/* Published / Drafts toggle */}
-      <View style={styles.toggle}>
-        {(['published', 'drafts'] as const).map(t => (
-          <TouchableOpacity key={t} style={[styles.toggleBtn, tab === t && styles.toggleBtnOn]} onPress={() => setTab(t)} activeOpacity={0.85}>
-            <Text style={[styles.toggleTxt, tab === t && styles.toggleTxtOn]}>
-              {t === 'published' ? 'Published' : `Drafts${drafts.length ? ` (${drafts.length})` : ''}`}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <FlatList
-        data={showingDrafts ? (drafts as any[]) : (videos as any[])}
-        keyExtractor={(v: any) => v.id}
-        contentContainerStyle={(showingDrafts ? drafts.length : videos.length) === 0 ? styles.emptyWrap : styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={C.ACCENT} />}
-        ListEmptyComponent={loading
-          ? <ActivityIndicator color={C.ACCENT} style={{ marginTop: SPACE.XXXL }} />
-          : <Text style={styles.empty}>{showingDrafts
-              ? 'No drafts. Recordings you don’t publish are saved here automatically.'
-              : 'No videos yet. Tap “New video” to create your first.'}</Text>}
-        renderItem={showingDrafts ? (renderDraft as any) : (renderVideo as any)}
-      />
     </View>
 
     {/* Full-bleed overlay OUTSIDE the padded container — the padded parent collapsed
@@ -230,22 +280,23 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.BG },
   container: { flex: 1, backgroundColor: C.BG, paddingHorizontal: SPACE.LG },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACE.LG },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.LG },
   title: { fontSize: FONT.SIZES.XL, textTransform: 'uppercase', fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
   newBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM,
-    borderRadius: RADIUS.MD,
+    borderRadius: RADIUS.MD, marginBottom: 20,
   },
   newBtnText: { paddingVertical: SPACE.LG, color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
   toggle: {
     flexDirection: 'row', backgroundColor: C.SURFACE, borderRadius: RADIUS.FULL,
-    padding: 3, marginTop: SPACE.XL, borderWidth: 1, borderColor: C.BORDER,
+    padding: 3, borderWidth: 1, borderColor: C.BORDER,
   },
   toggleBtn: { flex: 1, alignItems: 'center', paddingVertical: SPACE.SM, borderRadius: RADIUS.FULL },
   toggleBtnOn: { backgroundColor: C.ACCENT },
   toggleTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED },
   toggleTxtOn: { color: C.WHITE },
   list: { paddingTop: SPACE.MD, paddingBottom: SPACE.XXXL },
-  emptyWrap: { flexGrow: 1, alignItems: 'center', paddingTop: SPACE.XL },
+  emptyWrap: { flex: 1, alignItems: 'center', marginTop: '80%' },
   empty: { color: C.MUTED, fontFamily: FONT.BODY, textAlign: 'center', paddingHorizontal: SPACE.XL },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,

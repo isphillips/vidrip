@@ -47,10 +47,16 @@ Deno.serve(async (req) => {
 
     const { data: post } = await admin
       .from("channel_posts")
-      .select("bunny_video_id, media_status, channel_id, visibility, poster_id")
+      .select("bunny_video_id, media_status, channel_id, visibility, poster_id, release_date")
       .eq("id", postId).maybeSingle();
     if (!post?.bunny_video_id) { return json({ error: "not a creator video" }, 404); }
     if (post.media_status !== "ready") { return json({ error: "not ready", media_status: post.media_status }, 409); }
+
+    // Scheduled posts aren't playable until their release_date passes — except by the owner, who
+    // can preview them from the studio calendar.
+    if (post.release_date && post.poster_id !== userId && Date.parse(post.release_date) > Date.now()) {
+      return json({ error: "not released", releaseDate: post.release_date }, 403);
+    }
 
     // Per-video access gate: 'subscribers' posts require channel membership (the owner
     // always passes); 'public' posts are open to any signed-in user.

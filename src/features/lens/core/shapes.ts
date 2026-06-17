@@ -79,6 +79,48 @@ export const PETAL: SkPath = (() => {
   return p;
 })();
 
+// A classic ghost silhouette (unit, centered): rounded dome head, scalloped wavy hem.
+export const GHOST: SkPath = (() => {
+  const p = Skia.Path.Make();
+  p.moveTo(-0.4, 0.46);
+  p.lineTo(-0.4, -0.06);
+  p.cubicTo(-0.4, -0.46, 0.4, -0.46, 0.4, -0.06);
+  p.lineTo(0.4, 0.46);
+  p.cubicTo(0.28, 0.3, 0.22, 0.62, 0.13, 0.46);
+  p.cubicTo(0.05, 0.3, -0.05, 0.62, -0.13, 0.46);
+  p.cubicTo(-0.22, 0.3, -0.28, 0.62, -0.4, 0.46);
+  p.close();
+  return p;
+})();
+
+// One butterfly wing (the RIGHT side; body at the origin, wing reaching to +x). Mirror with
+// scaleX:-1 for the left wing. Two lobes — a large upper and a rounded lower.
+export const WING: SkPath = (() => {
+  const p = Skia.Path.Make();
+  p.moveTo(0, 0);
+  p.cubicTo(0.1, -0.46, 0.52, -0.5, 0.54, -0.12);
+  p.cubicTo(0.55, 0.02, 0.3, 0.06, 0, 0.02);
+  p.cubicTo(0.3, 0.08, 0.44, 0.3, 0.31, 0.47);
+  p.cubicTo(0.19, 0.57, 0.04, 0.42, 0, 0.05);
+  p.close();
+  return p;
+})();
+
+// A bat silhouette (unit, centered, wings spread) for spooky lenses.
+export const BAT: SkPath = (() => {
+  const p = Skia.Path.Make();
+  p.moveTo(0, -0.06);
+  p.cubicTo(-0.14, -0.26, -0.4, -0.22, -0.5, -0.02);
+  p.cubicTo(-0.42, -0.06, -0.34, 0.0, -0.27, 0.12);
+  p.cubicTo(-0.28, 0.0, -0.16, -0.02, -0.08, 0.05);
+  p.cubicTo(-0.04, 0.12, 0.04, 0.12, 0.08, 0.05);
+  p.cubicTo(0.16, -0.02, 0.28, 0.0, 0.27, 0.12);
+  p.cubicTo(0.34, 0.0, 0.42, -0.06, 0.5, -0.02);
+  p.cubicTo(0.4, -0.22, 0.14, -0.26, 0, -0.06);
+  p.close();
+  return p;
+})();
+
 // A 3-spike royal crown (unit, centered; spikes point up, band along the bottom).
 export const CROWN: SkPath = (() => {
   const p = Skia.Path.Make();

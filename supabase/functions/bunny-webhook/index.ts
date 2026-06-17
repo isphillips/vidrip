@@ -52,8 +52,12 @@ Deno.serve(async (req) => {
       }).eq("bunny_video_id", guid);
     } else if (status === 5 || status === 6) {
       await admin.from("channel_posts").update({ media_status: "failed" }).eq("bunny_video_id", guid);
+    } else if (status === 2 || status === 3) {
+      // Bytes received, encoding in progress → surface "Processing" so it doesn't read as stuck on
+      // "Uploading". (Don't clobber a row already flipped to ready by an out-of-order webhook.)
+      await admin.from("channel_posts").update({ media_status: "processing" })
+        .eq("bunny_video_id", guid).neq("media_status", "ready");
     }
-    // Intermediate statuses (processing/transcoding) — leave as-is.
 
     return new Response(JSON.stringify({ ok: true, guid, status }), {
       headers: { "Content-Type": "application/json" },

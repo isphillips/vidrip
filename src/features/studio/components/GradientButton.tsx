@@ -33,7 +33,7 @@ export default function GradientButton({
         ) : (
           <View style={styles.row}>
             {icon && (
-              <Ionicons name={icon} size={20} color={C.WHITE} style={{ marginRight: 8, marginVertical: SPACE.LG }} />
+              <Ionicons name={icon} size={20} color={C.WHITE} style={{ marginRight: 8 }} />
             )}
             <Text style={styles.txt}>{label}</Text>
           </View>

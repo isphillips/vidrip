@@ -51,16 +51,18 @@ export async function uploadCreatorThumbnail(localPath: string): Promise<string>
   return supabase.storage.from('channel-clips').getPublicUrl(path).data.publicUrl;
 }
 
-/** Reserve a Bunny video + post row; returns the TUS upload credentials. */
+/** Reserve a Bunny video + post row; returns the TUS upload credentials. `releaseDate` (ISO) marks
+ * the post as scheduled — the bytes still upload now, but viewer-facing queries hide it until then. */
 export async function createCreatorVideo(
   channelId: string,
   title: string,
   visibility: Visibility,
   thumbnailUrl?: string,
   overlayRecipe?: unknown | null,
+  releaseDate?: string | null,
 ): Promise<CreateVideoResult> {
   const { data, error } = await supabase.functions.invoke('creator-video-create', {
-    body: { channelId, title, visibility, thumbnailUrl, overlayRecipe },
+    body: { channelId, title, visibility, thumbnailUrl, overlayRecipe, releaseDate: releaseDate ?? null },
   });
   if (error) { throw new Error(error.message); }
   if (data?.error) { throw new Error(data.error); }
@@ -81,30 +83,52 @@ export function uploadCreatorVideo(opts: {
   onProgress?: (fraction: number) => void;
 }): { promise: Promise<void>; handle: UploadHandle } {
   const { create, fileUri, title, onProgress } = opts;
-  let upload: tus.Upload;
+  const uri = fileUri.startsWith('file://') || fileUri.startsWith('content://') ? fileUri : `file://${fileUri}`;
+  let upload: tus.Upload | undefined;
   const promise = new Promise<void>((resolve, reject) => {
-    upload = new tus.Upload(
-      // RN: tus-js-client accepts a { uri } file object.
-      { uri: fileUri } as any,
-      {
-        endpoint: create.tusEndpoint,
-        retryDelays: [0, 2000, 5000, 10000, 20000],
-        removeFingerprintOnSuccess: true,
-        headers: {
-          AuthorizationSignature: create.authorizationSignature,
-          AuthorizationExpire: String(create.authorizationExpire),
-          VideoId: create.guid,
-          LibraryId: String(create.libraryId),
-        },
-        metadata: { filetype: 'video/mp4', title },
-        onError: (e) => reject(e),
-        onProgress: (sent, total) => { if (total) { onProgress?.(sent / total); } },
-        onSuccess: () => resolve(),
-      },
-    );
-    upload.start();
+    (async () => {
+      try {
+        // Read the baked file into a real Blob ourselves and hand THAT to tus. Passing `{ uri }`
+        // relies on tus's isReactNative() detection + an XHR file:// read, which silently yields a
+        // 0-byte upload when either misbehaves. A real Blob takes tus's normal slice/size path and
+        // is backed by native storage (not copied into JS heap), so large clips are fine.
+        const res = await fetch(uri);
+        const blob = await res.blob();
+        if (!blob || !blob.size) { throw new Error('Baked video read as 0 bytes — the file may be missing or empty.'); }
+        let lastSent = 0;
+        upload = new tus.Upload(
+          blob,
+          {
+            endpoint: create.tusEndpoint,
+            chunkSize: 5 * 1024 * 1024,
+            retryDelays: [0, 2000, 5000, 10000, 20000],
+            removeFingerprintOnSuccess: true,
+            headers: {
+              AuthorizationSignature: create.authorizationSignature,
+              AuthorizationExpire: String(create.authorizationExpire),
+              VideoId: create.guid,
+              LibraryId: String(create.libraryId),
+            },
+            metadata: { filetype: 'video/mp4', title },
+            onError: (e) => reject(e),
+            onProgress: (sent, total) => { lastSent = sent; if (total) { onProgress?.(sent / total); } },
+            onSuccess: () => resolve(),
+          },
+        );
+        upload.start();
+      } catch (e) { reject(e); }
+    })();
   });
   return { promise, handle: { abort: () => upload?.abort(true).catch(() => {}) } };
+}
+
+/** Re-poll Bunny for a post's encoding state and update the row — owner-only, on-demand fallback
+ * for a delayed/missing webhook. Returns the refreshed media_status. */
+export async function refreshCreatorVideoStatus(postId: string): Promise<MyCreatorVideo['status']> {
+  const { data, error } = await supabase.functions.invoke('creator-video-status', { body: { postId } });
+  if (error) { throw new Error(error.message); }
+  if (data?.error) { throw new Error(data.error); }
+  return (data?.mediaStatus ?? 'processing') as MyCreatorVideo['status'];
 }
 
 /** Short-lived, token-authenticated Bunny embed URL for playing a ready creator post. */
@@ -126,6 +150,17 @@ export type MyCreatorVideo = {
   visibility: Visibility;
   durationSec: number | null;
   createdAt: string;
+  releaseDate: string | null; // ISO; non-null + future = scheduled (hidden from viewers until then)
+};
+
+/** A creator post scheduled for the future (release_date > now). Powers the studio calendar. */
+export type ScheduledPost = {
+  id: string;
+  channelId: string;
+  title: string;
+  thumbnail: string | null;
+  status: MyCreatorVideo['status'];
+  releaseDate: string; // ISO, always in the future for this list
 };
 
 /** Is Creator Studio enabled for this user? (admin-granted flag). */
@@ -154,7 +189,7 @@ export async function fetchPostableChannels(userId: string): Promise<PostableCha
 export async function fetchMyCreatorVideos(userId: string): Promise<MyCreatorVideo[]> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
-    .select('id, channel_id, yt_video_title, yt_video_thumbnail, media_status, visibility, duration, created_at')
+    .select('id, channel_id, yt_video_title, yt_video_thumbnail, media_status, visibility, duration, created_at, release_date')
     .eq('poster_id', userId)
     .eq('post_type', 'creator')
     .order('created_at', { ascending: false });
@@ -168,5 +203,40 @@ export async function fetchMyCreatorVideos(userId: string): Promise<MyCreatorVid
     visibility: (r.visibility ?? 'public') as Visibility,
     durationSec: r.duration ?? null,
     createdAt: r.created_at,
+    releaseDate: r.release_date ?? null,
   }));
+}
+
+/** The creator's posts scheduled for the future (release_date > now), for the studio calendar. */
+export async function fetchScheduledPosts(userId: string): Promise<ScheduledPost[]> {
+  const { data, error } = await (supabase as any)
+    .from('channel_posts')
+    .select('id, channel_id, yt_video_title, yt_video_thumbnail, media_status, release_date')
+    .eq('poster_id', userId)
+    .eq('post_type', 'creator')
+    .gt('release_date', new Date().toISOString())
+    .order('release_date', { ascending: true });
+  if (error) { throw error; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    channelId: r.channel_id,
+    title: r.yt_video_title ?? 'Untitled',
+    thumbnail: r.yt_video_thumbnail ?? null,
+    status: r.media_status ?? 'processing',
+    releaseDate: r.release_date,
+  }));
+}
+
+/** Reschedule a post to a new time (ISO). The bytes are already in Bunny — this just moves the gate. */
+export async function reschedulePost(postId: string, releaseDate: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('channel_posts').update({ release_date: releaseDate }).eq('id', postId);
+  if (error) { throw error; }
+}
+
+/** Cancel a schedule → publish immediately (release_date = null makes it visible right away). */
+export async function unschedulePost(postId: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('channel_posts').update({ release_date: null }).eq('id', postId);
+  if (error) { throw error; }
 }

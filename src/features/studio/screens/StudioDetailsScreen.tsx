@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Alert, Animated, Modal, Share,
+  ActivityIndicator, Alert, Animated, Modal, Share, Platform,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import Video from 'react-native-video';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +23,10 @@ import { useStudioAutosave } from '../useStudioAutosave';
 import { deleteDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
+// "Tue, Jun 17 · 3:30 PM" in the device's locale/timezone.
+const fmtSchedule = (d: Date) =>
+  d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
 export default function StudioDetailsScreen({ route, navigation }: StudioStackScreenProps<'StudioDetails'>) {
   const { fileUri, recipe, durationSec, draftId, title: initTitle, channelId: initChannelId, visibility: initVisibility } = route.params;
   const { top } = useSafeAreaInsets();
@@ -36,6 +41,10 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   const [uploaded, setUploaded]       = useState(false);
   const [fullscreen, setFullscreen]   = useState(false);
   const [sharing, setSharing]         = useState(false);
+  // Publish timing: post immediately, or schedule for a future release_date.
+  const [publishMode, setPublishMode] = useState<'now' | 'schedule'>('now');
+  const [releaseAt, setReleaseAt]     = useState<Date>(() => new Date(Date.now() + 60 * 60 * 1000)); // default +1h
+  const [iosPicker, setIosPicker]     = useState(false);
   const bakerRef = useRef<ShareBakerHandle>(null);
   const progress  = useRef(new Animated.Value(0)).current;
   const uploadRef = useRef<UploadHandle | null>(null);
@@ -70,8 +79,35 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   const selectedChannel = channels.find(c => c.id === channelId) ?? null;
   const subscribersOnly = selectedChannel?.isMembersOnly ?? false;
 
+  // Open the OS date+time picker. iOS shows an inline picker in a modal; Android chains its native
+  // date dialog then time dialog.
+  const pickSchedule = () => {
+    if (Platform.OS === 'ios') { setIosPicker(true); return; }
+    DateTimePickerAndroid.open({
+      value: releaseAt, mode: 'date', minimumDate: new Date(),
+      onChange: (_e, d) => {
+        if (!d) { return; }
+        DateTimePickerAndroid.open({
+          value: d, mode: 'time', is24Hour: false,
+          onChange: (_e2, t) => {
+            if (!t) { return; }
+            const combined = new Date(d);
+            combined.setHours(t.getHours(), t.getMinutes(), 0, 0);
+            setReleaseAt(combined);
+          },
+        });
+      },
+    });
+  };
+
   const post = async () => {
     if (!channelId || uploading) { return; }
+    const scheduling = publishMode === 'schedule';
+    if (scheduling && releaseAt.getTime() <= Date.now()) {
+      Alert.alert('Pick a future time', 'The scheduled time must be in the future.');
+      return;
+    }
+    const releaseDate = scheduling ? releaseAt.toISOString() : null;
     setUploading(true);
     progress.setValue(0);
     try {
@@ -87,7 +123,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error('thumb timeout')), 8000)),
         ]);
       } catch { /* best-effort — proceed without a custom thumbnail */ }
-      const create = await createCreatorVideo(channelId, title.trim() || 'Untitled', visibility, thumbUrl, recipe ?? null);
+      const create = await createCreatorVideo(channelId, title.trim() || 'Untitled', visibility, thumbUrl, recipe ?? null, releaseDate);
       const { promise, handle } = uploadCreatorVideo({
         create, fileUri, title: title.trim() || 'Untitled',
         onProgress: (f) => Animated.timing(progress, { toValue: f, duration: 120, useNativeDriver: false }).start(),
@@ -209,6 +245,29 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
             );
           })}
         </View>
+
+        <Text style={styles.label}>When to publish</Text>
+        <View style={styles.toggle}>
+          {([['now', 'Post now', 'flash-outline'], ['schedule', 'Schedule', 'calendar-outline']] as const).map(([m, lbl, icon]) => {
+            const active = publishMode === m;
+            return (
+              <TouchableOpacity key={m}
+                style={[styles.toggleBtn, active && styles.toggleBtnActive, uploading && styles.toggleBtnDisabled]}
+                onPress={() => { if (!uploading) { setPublishMode(m); } }}
+                activeOpacity={uploading ? 1 : 0.8}>
+                <Ionicons name={icon} size={16} color={active ? C.WHITE : C.MUTED} />
+                <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{lbl}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {publishMode === 'schedule' && (
+          <TouchableOpacity style={styles.scheduleField} onPress={pickSchedule} disabled={uploading} activeOpacity={0.8}>
+            <Ionicons name="time-outline" size={18} color={C.ACCENT_HOT} />
+            <Text style={styles.scheduleText}>{fmtSchedule(releaseAt)}</Text>
+            <Ionicons name="chevron-forward" size={16} color={C.SUBTLE} />
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -218,7 +277,8 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           </View>
         )}
         <GradientButton
-          label={uploading ? 'Uploading…' : 'Post video'}
+          label={uploading ? 'Uploading…' : publishMode === 'schedule' ? 'Schedule post' : 'Post video'}
+          icon={publishMode === 'schedule' ? 'calendar-outline' : undefined}
           onPress={post}
           disabled={uploading || noChannels || !channelId}
         />
@@ -247,15 +307,17 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           video (local baked file — plays immediately while Bunny finishes encoding). */}
       <Modal visible={uploaded} animationType="fade" transparent
         supportedOrientations={['portrait']}
-        onRequestClose={() => navigation.navigate('StudioHome')}>
+        onRequestClose={() => { setUploaded(false); navigation.popToTop(); }}>
         <View style={styles.successOverlay}>
           <View style={styles.successCard}>
-            <Ionicons name="checkmark-circle" size={46} color={C.ACCENT_HOT} />
-            <Text style={styles.successTitle}>Uploaded 🎬</Text>
+            <Ionicons name={publishMode === 'schedule' ? 'calendar' : 'checkmark-circle'} size={46} color={C.ACCENT_HOT} />
+            <Text style={styles.successTitle}>{publishMode === 'schedule' ? 'Scheduled 🗓️' : 'Uploaded 🎬'}</Text>
             <Text style={styles.successSub}>
-              {selectedChannel
-                ? `Processing now — going live in ${selectedChannel.name} shortly.`
-                : 'Processing now — going live shortly.'}
+              {publishMode === 'schedule'
+                ? `Goes live ${fmtSchedule(releaseAt)}${selectedChannel ? ` in ${selectedChannel.name}` : ''}.`
+                : selectedChannel
+                  ? `Processing now — going live in ${selectedChannel.name} shortly.`
+                  : 'Processing now — going live shortly.'}
             </Text>
             <View style={styles.successPreview}>
               {uploaded && (
@@ -269,12 +331,36 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
                   : <><Ionicons name="share-outline" size={18} color={C.INK} /><Text style={styles.successShareTxt}>Share</Text></>}
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
-                <GradientButton label="Done" onPress={() => navigation.navigate('StudioHome')} />
+                <GradientButton label="Done" onPress={() => { setUploaded(false); navigation.popToTop(); }} />
               </View>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* iOS date+time picker sheet (Android uses the native dialogs from pickSchedule). */}
+      {Platform.OS === 'ios' && (
+        <Modal visible={iosPicker} animationType="slide" transparent onRequestClose={() => setIosPicker(false)}>
+          <View style={styles.pickerOverlay}>
+            <View style={styles.pickerSheet}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>Schedule for</Text>
+                <TouchableOpacity onPress={() => setIosPicker(false)} hitSlop={10}>
+                  <Text style={styles.pickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={releaseAt}
+                mode="datetime"
+                display="spinner"
+                minimumDate={new Date()}
+                themeVariant="dark"
+                onChange={(_e, d) => { if (d) { setReleaseAt(d); } }}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* Off-screen; only renders while baking the overlay into a shareable MP4. */}
       <ShareBaker ref={bakerRef} />
@@ -327,6 +413,21 @@ const styles = StyleSheet.create({
   toggleTextActive:   { color: C.WHITE },
   toggleTextDisabled: { color: C.SUBTLE },
 
+  scheduleField: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, marginTop: SPACE.SM,
+    backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.ACCENT_LITE,
+    paddingVertical: SPACE.MD, paddingHorizontal: SPACE.LG,
+  },
+  scheduleText: { flex: 1, color: C.INK, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.MD },
+
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  // Opaque sheet — C.BG is 'transparent' (a screen gradient shows through), which made the spinner
+  // text unreadable. Use a solid surface so the picker is legible.
+  pickerSheet:   { backgroundColor: C.SURFACE_2, borderTopLeftRadius: RADIUS.LG, borderTopRightRadius: RADIUS.LG, paddingBottom: SPACE.XL, borderTopWidth: 1, borderColor: C.BORDER },
+  pickerHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SPACE.LG },
+  pickerTitle:   { color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.MD },
+  pickerDone:    { color: C.ACCENT_HOT, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.MD },
+
   footer:        { paddingBottom: SPACE.LG },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: C.SURFACE_2, overflow: 'hidden', marginBottom: SPACE.SM },
   progressFill:  { height: 6, borderRadius: 3, backgroundColor: C.ACCENT_HOT },
@@ -336,11 +437,11 @@ const styles = StyleSheet.create({
   fsCloseBg:   { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, padding: 8 },
 
   successOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.78)', alignItems: 'center', justifyContent: 'center', padding: SPACE.LG },
-  successCard:    { width: '100%', maxWidth: 360, backgroundColor: C.BG, borderRadius: RADIUS.MD, padding: SPACE.LG, alignItems: 'center', borderWidth: 1, borderColor: C.BORDER },
+  successCard:    { width: '100%', maxWidth: 360, backgroundColor: C.SURFACE_2, borderRadius: RADIUS.MD, padding: SPACE.LG, alignItems: 'center', borderWidth: 1, borderColor: C.BORDER },
   successTitle:   { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, marginTop: SPACE.SM },
   successSub:     { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', marginTop: SPACE.SM, marginBottom: SPACE.MD },
   successPreview: { height: 300, aspectRatio: 9 / 16, borderRadius: RADIUS.MD, backgroundColor: '#000', overflow: 'hidden' },
   successActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, marginTop: SPACE.LG, width: '100%' },
   successShare:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, backgroundColor: C.SURFACE },
-  successShareTxt:{ color: C.INK, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
+  successShareTxt:{ color: C.INK,  paddingVertical: SPACE.MD, fontFamily: FONT.BODY_SEMIBOLD },
 });

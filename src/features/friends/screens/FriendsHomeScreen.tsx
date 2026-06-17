@@ -13,7 +13,10 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import Handle from '../../../components/Handle';
+import { BRAND_GRADIENT } from '../../../components/GradientIcon';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
@@ -80,9 +83,16 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
       <View style={[styles.headerRow, { paddingTop: top }]}>
         <Text style={styles.title}>Friends</Text>
         <TouchableOpacity
-          style={styles.addButton}
+          hitSlop={8}
+          accessibilityLabel="Add friend"
           onPress={() => navigation.navigate('AddFriend')}>
-          <Text style={styles.addButtonText}>+ Add</Text>
+          <LinearGradient
+            colors={BRAND_GRADIENT}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.addButton}>
+            <Ionicons name="add" size={24} color={C.WHITE} />
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -121,7 +131,7 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
       {friends.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>No friends yet</Text>
-          <Text style={styles.emptyHint}>Tap + Add to find people by handle</Text>
+          <Text style={styles.emptyHint}>Tap + to find people by handle</Text>
         </View>
       ) : (
         <FlatList
@@ -177,15 +187,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   addButton: {
-    backgroundColor: C.SURFACE,
+    width: 38,
+    height: 38,
     borderRadius: RADIUS.FULL,
-    paddingHorizontal: SPACE.MD,
-    paddingVertical: SPACE.XS,
-    borderWidth: 1,
-    borderColor: C.BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: SPACE.LG,
   },
-  addButtonText: { color: C.INK, fontSize: FONT.SIZES.SM },
   sectionLabel: {
     fontSize: FONT.SIZES.SM,
     color: C.MUTED,
@@ -248,12 +256,21 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: FONT.SIZES.LG, fontWeight: '600', color: C.INK },
   emptyHint: { fontSize: FONT.SIZES.SM, color: C.MUTED },
   inviteButton: {
-    margin: SPACE.LG,
-    padding: SPACE.MD,
+    backgroundColor: C.ACCENT,
     borderRadius: RADIUS.MD,
-    borderWidth: 1,
-    borderColor: C.BORDER,
+    marginBottom: SPACE.LG,
+    padding: SPACE.LG,
     alignItems: 'center',
   },
-  inviteButtonText: { color: C.MUTED, fontSize: FONT.SIZES.SM },
+  reactBtn: {
+    backgroundColor: C.ACCENT,
+    borderRadius: RADIUS.MD,
+    padding: SPACE.LG,
+    alignItems: 'center',
+  },
+  inviteButtonText: {
+    color: C.WHITE,
+    fontSize: FONT.SIZES.LG,
+    fontFamily: FONT.BODY_BOLD,
+  },
 });
