@@ -18,6 +18,7 @@ import ChannelVideoRecordScreen from '../../features/channels/screens/ChannelVid
 import AddChannelVideoScreen from '../../features/channels/screens/AddChannelVideoScreen';
 import AddChannelMembersScreen from '../../features/channels/screens/AddChannelMembersScreen';
 import InviteToChannelScreen from '../../features/channels/screens/InviteToChannelScreen';
+import ManageChannelMembersScreen from '../../features/channels/screens/ManageChannelMembersScreen';
 
 const NAV_OPTS = {
   headerStyle: { backgroundColor: C.BG },
@@ -45,6 +46,7 @@ function channelScreens(Stack: any) {
       <Stack.Screen name="AddChannelVideo" component={AddChannelVideoScreen} options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="AddChannelMembers" component={AddChannelMembersScreen} options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="InviteToChannel" component={InviteToChannelScreen} options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="ManageChannelMembers" component={ManageChannelMembersScreen} options={{ headerShown: false, presentation: 'modal' }} />
     </>
   );
 }

@@ -453,6 +453,47 @@ export async function fetchChannelName(channelId: string): Promise<string | null
   return data?.name ?? null;
 }
 
+// ── Admin: roles + member moderation ────────────────────────────────────────────
+
+export type ChannelRole = 'owner' | 'admin' | 'member';
+export type ChannelMemberAdmin = {
+  userId: string; handle: string; displayName: string | null; avatarUrl: string | null;
+  role: ChannelRole; joinedAt: string; mutedUntil: string | null;
+};
+
+/** The viewer's effective role in a channel (owner via created_by, else group_members.role). */
+export async function fetchMyChannelRole(channelId: string, userId: string): Promise<ChannelRole | null> {
+  const { data: g } = await (supabase as any).from('groups').select('created_by').eq('id', channelId).maybeSingle();
+  if (g?.created_by === userId) { return 'owner'; }
+  const { data: m } = await (supabase as any).from('group_members').select('role').eq('group_id', channelId).eq('user_id', userId).maybeSingle();
+  return (m?.role as ChannelRole | undefined) ?? null;
+}
+
+/** Full member list with role/profile/mute (owner/admin only — returns [] otherwise). */
+export async function fetchChannelMembersAdmin(channelId: string): Promise<ChannelMemberAdmin[]> {
+  const { data, error } = await (supabase as any).rpc('get_channel_members_admin', { p_channel: channelId });
+  if (error) { throw error; }
+  return (data ?? []).map((m: any) => ({
+    userId: m.user_id, handle: m.handle, displayName: m.display_name ?? null, avatarUrl: m.avatar_url ?? null,
+    role: m.role as ChannelRole, joinedAt: m.joined_at, mutedUntil: m.muted_until ?? null,
+  }));
+}
+
+async function modRpc(fn: string, args: Record<string, unknown>): Promise<void> {
+  const { error } = await (supabase as any).rpc(fn, args);
+  if (error) { throw new Error(error.message ?? 'Action failed'); }
+}
+export const promoteMember = (channelId: string, userId: string, role: 'admin' | 'member') =>
+  modRpc('promote_member', { p_channel: channelId, p_user: userId, p_role: role });
+export const muteMember = (channelId: string, userId: string, hours: number) =>
+  modRpc('mute_member', { p_channel: channelId, p_user: userId, p_hours: hours });
+export const unmuteMember = (channelId: string, userId: string) =>
+  modRpc('unmute_member', { p_channel: channelId, p_user: userId });
+export const kickMember = (channelId: string, userId: string) =>
+  modRpc('kick_member', { p_channel: channelId, p_user: userId });
+export const banMember = (channelId: string, userId: string) =>
+  modRpc('ban_member', { p_channel: channelId, p_user: userId });
+
 // ── Channel advertisement / intro video ────────────────────────────────────────
 
 /** The channel's owner/admin-set intro/advertising video (shown on the channel). */

@@ -786,6 +786,7 @@ export default function ChannelhamburderScreen({
         onInvitePeople={() => navigation.navigate('InviteToChannel', { channelId, channelName: title })}
         adVideoUrl={adVideo.url}
         onAdVideoChange={refreshAdVideo}
+        onManageMembers={() => navigation.navigate('ManageChannelMembers', { channelId, channelName: title })}
       />
 
       {/* Channel intro/advertising video — playable by everyone. */}
