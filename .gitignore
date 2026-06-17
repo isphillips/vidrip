@@ -41,6 +41,8 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+# Release signing creds — NEVER commit. Copy by hand to your other machine.
+keystore.properties
 android/app/google-services.json
 
 # npm lock file (project uses yarn)
