@@ -25,7 +25,10 @@ export default function RecordReactionScreen({
   const markIntroSeen = useIntroSeenStore(s => s.markSeen);
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
-  const onSave = useCallback(async (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean) => {
+  const onSave = useCallback(async (
+    filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean,
+    _lensTrack?: unknown, afterthought?: { path: string; duration: number } | null,
+  ) => {
     enqueue('Saving reaction…', async () => {
       // Gate on automated moderation before anything is uploaded or inserted.
       await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'reaction' });
@@ -39,6 +42,7 @@ export default function RecordReactionScreen({
         ytStartOffset,
         sourceType,
         recordedWithHeadphones,
+        afterthought: afterthought ?? null,
         // Surface the reaction in the thread immediately (plays from the local
         // copy), before the relay upload finishes. Reconciled once it's fetched.
         onCommitted: (reactionId) => {
@@ -75,6 +79,7 @@ export default function RecordReactionScreen({
       uploadingText="Saving reaction…"
       onSave={onSave}
       maxDuration={180}
+      allowAfterthought
     />
   );
 }

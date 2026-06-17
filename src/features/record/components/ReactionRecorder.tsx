@@ -25,6 +25,7 @@ import {
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
+import DraggablePip from './DraggablePip';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
 import FaceLensOverlay, { type FaceLensTrack } from '../../lens/faceLens';
 import { MOCK_FACE } from '../../lens/useFaceLandmarks';
@@ -64,12 +65,18 @@ export interface ReactionRecorderProps {
   // Animated overlay layer for a creator (Bunny) video — replayed live over the embed.
   recipe?: OverlayRecipe | null;
   sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny';
-  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null) => Promise<void>;
+  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
   /** Hard cap in seconds — recording auto-stops when reached (e.g. 60s reviews). */
   maxDuration?: number;
+  /** After the main reaction stops, offer a 5s window to record an "afterthought" outro
+   *  that plays after the video for the viewer (friend-share reactions). */
+  allowAfterthought?: boolean;
 }
+
+const AFTERTHOUGHT_MAX = 30;       // seconds
+const AFTERTHOUGHT_COUNTDOWN = 5;  // decision window after the reaction finishes
 
 const YT_PARAMS = { rel: false as const, controls: true as const };
 const YT_WV_STYLE = { backgroundColor: '#000000' };
@@ -86,6 +93,7 @@ export default function ReactionRecorder({
   onBack,
   uploadingText = 'Saving…',
   maxDuration,
+  allowAfterthought = false,
 }: ReactionRecorderProps) {
   const { width, height } = useWindowDimensions();
   const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
@@ -168,6 +176,18 @@ export default function ReactionRecorder({
   // IG reels are tap-to-play; hide the hint + know playback began once 'playing' fires.
   const [igStarted, setIgStarted] = useState(false);
 
+  // Afterthought outro: after the main reaction stops, a short window to optionally record a
+  // selfie clip that plays after the video for the viewer. 'none' = normal flow.
+  const [afterPhase, setAfterPhase] = useState<'none' | 'countdown' | 'recording'>('none');
+  const [countdown, setCountdown] = useState(AFTERTHOUGHT_COUNTDOWN);
+  const [afterElapsed, setAfterElapsed] = useState(0);
+  const mainVideoRef = useRef<{ path: string; duration: number; ytStartOffset: number; headphones: boolean; lensTrack: FaceLensTrack | null } | null>(null);
+  const afterCallbackRef = useRef<((v: VideoFile) => void) | null>(null);
+  const afterElapsedRef = useRef(0);
+  const afterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finalizeRef = useRef<(a: { path: string; duration: number } | null) => void>(() => {});
+  const stopAfterthoughtRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     Orientation.lockToPortrait();
     return () => {
@@ -236,13 +256,29 @@ export default function ReactionRecorder({
     }
   }, [startTimer, stopTimer, maxDuration, capAnim, startTrack, frameAspect]);
 
+  // Commit the captured main reaction (+ optional afterthought) and exit. The save itself is
+  // fast (DB row + local copy); the slow upload runs in the background via the upload store.
+  const finalize = useCallback(async (afterthought: { path: string; duration: number } | null) => {
+    const m = mainVideoRef.current;
+    if (!m) { onBack(); return; }
+    setAfterPhase('none');
+    setUploading(true);
+    try {
+      await onSave(m.path, m.duration, m.ytStartOffset, m.headphones, m.lensTrack, afterthought);
+      onBack();
+    } catch (e: any) {
+      Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
+      setUploading(false);
+    }
+  }, [onSave, onBack]);
+  useEffect(() => { finalizeRef.current = finalize; }, [finalize]);
+
   const handleStop = useCallback(async () => {
     if (!isRecording) { return; }
     stopTimer();
     capAnim.stopAnimation();
     setIsRecording(false);
     StatusBar.setHidden(false, 'fade');
-    setUploading(true);
     // Finalize the captured lens track (null when no lens was on / no face seen).
     lensTrackRef.current = lensKeyRef.current ? stopTrack() : null;
 
@@ -258,16 +294,73 @@ export default function ReactionRecorder({
           setTimeout(() => reject(new Error('Recording timed out — please try again.')), 15000)
         ),
       ]);
-      // Commit the save first (fast: DB row + local copy) so the reaction shows
-      // as watchable the moment we return; the slow upload runs in the background
-      // via the upload store and shows progress as a toast.
-      await onSave(video.path, elapsedRef.current, ytStartOffsetRef.current, recordedWithHeadphonesRef.current, lensTrackRef.current);
-      onBack();
+      mainVideoRef.current = {
+        path: video.path,
+        duration: elapsedRef.current,
+        ytStartOffset: ytStartOffsetRef.current,
+        headphones: recordedWithHeadphonesRef.current,
+        lensTrack: lensTrackRef.current,
+      };
+      // Friend-share path: offer the afterthought window. Otherwise save straight away.
+      if (allowAfterthought) {
+        setCountdown(AFTERTHOUGHT_COUNTDOWN);
+        setAfterPhase('countdown');
+      } else {
+        await finalize(null);
+      }
     } catch (e: any) {
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
       setUploading(false);
     }
-  }, [isRecording, stopTimer, onSave, onBack, stopTrack]);
+  }, [isRecording, stopTimer, capAnim, stopTrack, allowAfterthought, finalize]);
+
+  // Afterthought decision countdown — auto-sends (no outro) when it hits zero.
+  useEffect(() => {
+    if (afterPhase !== 'countdown') { return; }
+    const iv = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { clearInterval(iv); finalizeRef.current(null); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [afterPhase]);
+
+  const startAfterthought = useCallback(() => {
+    afterElapsedRef.current = 0;
+    setAfterElapsed(0);
+    setAfterPhase('recording');
+    StatusBar.setHidden(true, 'fade');
+    cameraRef.current?.startRecording({
+      fileType: 'mp4',
+      onRecordingFinished: (v) => { afterCallbackRef.current?.(v); afterCallbackRef.current = null; },
+      onRecordingError: () => { afterCallbackRef.current = null; finalizeRef.current(null); },
+    });
+    if (afterTimerRef.current) { clearInterval(afterTimerRef.current); }
+    afterTimerRef.current = setInterval(() => {
+      afterElapsedRef.current += 1;
+      setAfterElapsed(afterElapsedRef.current);
+      if (afterElapsedRef.current >= AFTERTHOUGHT_MAX) { stopAfterthoughtRef.current(); }
+    }, 1000);
+  }, []);
+
+  const stopAfterthought = useCallback(async () => {
+    if (afterTimerRef.current) { clearInterval(afterTimerRef.current); afterTimerRef.current = null; }
+    StatusBar.setHidden(false, 'fade');
+    try {
+      const v = await Promise.race([
+        new Promise<VideoFile>((resolve, reject) => {
+          afterCallbackRef.current = resolve;
+          cameraRef.current?.stopRecording().catch(reject);
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
+      ]);
+      await finalize({ path: v.path, duration: Math.max(1, afterElapsedRef.current) });
+    } catch {
+      await finalize(null);   // afterthought failed → send the reaction without it
+    }
+  }, [finalize]);
+  useEffect(() => { stopAfterthoughtRef.current = stopAfterthought; }, [stopAfterthought]);
 
   // Keep the timer's auto-stop pointed at the current handleStop.
   useEffect(() => { handleStopRef.current = handleStop; }, [handleStop]);
@@ -349,10 +442,33 @@ export default function ReactionRecorder({
     );
   }
 
+  // PIP placement: starts on the LEFT (item 1 — third-party icons sit on the right of IG/TikTok),
+  // and is draggable within `pipBounds` (item 4). For IG/TikTok keep a right-edge strip clear so
+  // the PIP can't cover the platform's like/comment/share icons.
+  const isVerticalSource = sourceType === 'instagram' || sourceType === 'tiktok';
+  const RIGHT_ICON_STRIP = isVerticalSource ? 64 : SPACE.LG;
+  const pipBounds = {
+    minX: SPACE.LG,
+    maxX: Math.max(SPACE.LG, width - PIP_W - RIGHT_ICON_STRIP),
+    minY: topInset + SPACE.SM,
+    maxY: Math.max(topInset + SPACE.SM, height - bottomInset - PIP_H - SPACE.SM),
+  };
+  const pipStart = { x: SPACE.LG, y: Math.max(pipBounds.minY, height - bottomInset - 100 - PIP_H) };
+  // During the afterthought the source video is gone, so the camera goes full-screen.
+  const camAsPip = pipCamera && afterPhase === 'none';
+
+  // Compliance letterbox margins for IG/TikTok sources (item 3) — inset the vertical player with
+  // top/bottom black bars instead of full-bleed. YouTube is unchanged.
+  const letterTop = topInset + 56;
+  const letterBottom = bottomInset + 88;
+  const letterH = Math.max(0, height - letterTop - letterBottom);
+
   return (
     <View style={styles.container}>
-      {/* Source-video full-screen background (or black if no source) */}
-      {bunnyEmbed ? (
+      {/* Source-video full-screen background (or black if no source / during afterthought) */}
+      {afterPhase !== 'none' ? (
+        <View style={styles.ytCover} />
+      ) : bunnyEmbed ? (
         <View style={styles.ytCover}>
           {/* Signed embed + live overlay replay; play/pause drives recording (source-driven).
               No autoplay — the user's tap to play is what begins the recording. */}
@@ -365,35 +481,40 @@ export default function ReactionRecorder({
         </View>
       ) : igSource ? (
         <View style={styles.ytCover}>
-          <InstagramPlayer
-            key={ytKey}
-            ref={igRef}
-            uri={sourceUri as string}
-            style={{ width, height }}
-            onChangeState={onYtStateChange}
-          />
-          {/* react-native-video has no built-in controls — tap to start (which begins recording). */}
-          {!ytPlaying && (
-            <TouchableOpacity
-              style={[StyleSheet.absoluteFill, styles.igPlayOverlay]}
-              activeOpacity={0.85}
-              onPress={() => igRef.current?.play()}>
-              <View style={styles.igPlayBtn}><Text style={styles.igPlayIcon}>▶</Text></View>
-            </TouchableOpacity>
-          )}
+          <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
+            <InstagramPlayer
+              key={ytKey}
+              ref={igRef}
+              uri={sourceUri as string}
+              style={{ width, height: letterH }}
+              onChangeState={onYtStateChange}
+            />
+            {/* react-native-video has no built-in controls — tap to start (which begins recording). */}
+            {!ytPlaying && (
+              <TouchableOpacity
+                style={[StyleSheet.absoluteFill, styles.igPlayOverlay]}
+                activeOpacity={0.85}
+                onPress={() => igRef.current?.play()}>
+                <View style={styles.igPlayBtn}><Text style={styles.igPlayIcon}>▶</Text></View>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ) : videoId && sourceType === 'tiktok' ? (
         <View style={styles.ytCover}>
-          <TikTokPlayer
-            key={ytKey}
-            ref={ttRef}
-            style={{ width, height, backgroundColor: '#000' }}
-            videoId={videoId}
-            onChangeState={onYtStateChange}
-          />
+          <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
+            <TikTokPlayer
+              key={ytKey}
+              ref={ttRef}
+              style={{ width, height: letterH, backgroundColor: '#000' }}
+              videoId={videoId}
+              onChangeState={onYtStateChange}
+            />
+          </View>
         </View>
       ) : videoId && sourceType === 'instagram' ? (
         <View style={styles.ytCover}>
+          <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
           <WebView
             key={ytKey}
             style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
@@ -424,6 +545,7 @@ export default function ReactionRecorder({
           {/* Tap the reel to start (and begin recording). pointerEvents none so the
               tap reaches the WebView — the real touch that composites the video. */}
           {!igStarted && <TapToPlayHint />}
+          </View>
         </View>
       ) : videoId ? (() => {
         const coverW = Math.round(height * (16 / 9));
@@ -449,44 +571,54 @@ export default function ReactionRecorder({
 
       {/* Camera — PIP corner when a source video drives the screen, otherwise
           full-screen (private channel clips, reviews). */}
-      {ready && device ? (
-        <View style={pipCamera
-          ? [styles.pip, { bottom: bottomInset + 100, right: SPACE.LG }]
-          : StyleSheet.absoluteFill}>
-          <Camera
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            device={device}
-            format={format}
-            fps={targetFps}
-            // In the PIP corner, force a TextureView preview. The default
-            // 'surface-view' renders on its own SurfaceView layer that ignores
-            // the parent's rounded-corner clip, so the square camera frame
-            // bleeds past the PIP border on Android. TextureView is an ordinary
-            // child view and honors overflow:'hidden' + borderRadius. Full-screen
-            // has nothing to clip, so it keeps the more efficient surface-view.
-            androidPreviewViewType={pipCamera ? 'texture-view' : 'surface-view'}
-            // 2 Mbps video (+~0.13 audio) keeps a 180s reaction/review at ~48MB,
-            // under the 50MB Supabase storage upload limit (60s ≈ 16MB).
-            videoBitRate={2}
-            isActive={camActive}
-            video={true}
-            audio={true}
-            // MediaPipe needs BGRA frames; VisionCamera defaults to YUV (→ detect_fail).
-            pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
-            frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
-          />
-          {/* AR lens, tracking the reactor's face (sized to the camera box, cover-crop aware). */}
-          <FaceLensOverlay
-            lens={lensKey}
-            landmarks={lensLandmarks}
-            width={pipCamera ? PIP_W : width}
-            height={pipCamera ? PIP_H : height}
-            frameAspect={frameAspect}
-          />
-          {isRecording && pipCamera && <View style={styles.pipRecDot} />}
-        </View>
-      ) : __DEV__ ? (
+      {ready && device ? (() => {
+        const camInner = (
+          <>
+            <Camera
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              device={device}
+              format={format}
+              fps={targetFps}
+              // In the PIP corner, force a TextureView preview — the default 'surface-view'
+              // renders on its own layer that ignores the parent's rounded-corner clip, so the
+              // camera frame bleeds past the PIP border on Android. Full-screen keeps surface-view.
+              androidPreviewViewType={camAsPip ? 'texture-view' : 'surface-view'}
+              // 2 Mbps video keeps a 180s reaction at ~48MB, under the 50MB upload limit.
+              videoBitRate={2}
+              isActive={camActive}
+              video={true}
+              audio={true}
+              // MediaPipe needs BGRA frames; VisionCamera defaults to YUV (→ detect_fail).
+              pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
+              frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
+            />
+            <FaceLensOverlay
+              lens={lensKey}
+              landmarks={lensLandmarks}
+              width={camAsPip ? PIP_W : width}
+              height={camAsPip ? PIP_H : height}
+              frameAspect={frameAspect}
+            />
+            {isRecording && camAsPip && <View style={styles.pipRecDot} />}
+          </>
+        );
+        return camAsPip ? (
+          // Item 1/4: PIP starts on the left, draggable within bounds. Item 2: fades while recording.
+          <DraggablePip
+            width={PIP_W}
+            height={PIP_H}
+            startX={pipStart.x}
+            startY={pipStart.y}
+            bounds={pipBounds}
+            recording={isRecording}
+            style={styles.pip}>
+            {camInner}
+          </DraggablePip>
+        ) : (
+          <View style={StyleSheet.absoluteFill}>{camInner}</View>
+        );
+      })() : __DEV__ ? (
         // Simulator placeholder so the source player + controls are still visible.
         <View style={pipCamera
           ? [styles.pip, styles.devCam, { bottom: bottomInset + 100, right: SPACE.LG }]
@@ -538,7 +670,7 @@ export default function ReactionRecorder({
       {/* Controls. Source-driven (reactions): start is driven by the source video,
           but once recording you can restart or stop manually. Otherwise (private
           clips / reviews) the manual record button starts it. */}
-      {!uploading && (!sourceDriven || isRecording || igWebEmbed || bunnyEmbed) && (
+      {!uploading && afterPhase === 'none' && (!sourceDriven || isRecording || igWebEmbed || bunnyEmbed) && (
         <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
           {isRecording ? (
             <>
@@ -566,10 +698,43 @@ export default function ReactionRecorder({
       )}
 
       {/* Exit — available any time (discards an in-progress recording) */}
-      {!uploading && (
+      {!uploading && afterPhase === 'none' && (
         <TouchableOpacity style={[styles.closeBtn, { top: topInset + SPACE.SM }]} onPress={handleExit}>
           <Text style={styles.closeTxt}>✕</Text>
         </TouchableOpacity>
+      )}
+
+      {/* Afterthought outro — 5s decision window, then an optional short selfie clip. */}
+      {afterPhase === 'countdown' && (
+        <View style={styles.afterOverlay} pointerEvents="box-none">
+          <View style={styles.afterCard}>
+            <Text style={styles.afterTitle}>Add an afterthought?</Text>
+            <Text style={styles.afterSub}>A quick clip that plays after your reaction. Sending in {countdown}s…</Text>
+            <View style={styles.afterRow}>
+              <TouchableOpacity style={styles.afterSkip} onPress={() => finalize(null)} activeOpacity={0.85}>
+                <Text style={styles.afterSkipTxt}>Send now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.afterRecord} onPress={startAfterthought} activeOpacity={0.85}>
+                <View style={styles.afterRecordDot} />
+                <Text style={styles.afterRecordTxt}>Record afterthought</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {afterPhase === 'recording' && (
+        <>
+          <View style={[styles.recBadge, { top: topInset + SPACE.SM }]}>
+            <View style={styles.recDot} />
+            <Text style={styles.recText}>{fmt(Math.max(0, AFTERTHOUGHT_MAX - afterElapsed))}</Text>
+          </View>
+          <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
+            <TouchableOpacity style={styles.stopBtn} onPress={stopAfterthought} activeOpacity={0.8}>
+              <View style={styles.stopInner} />
+            </TouchableOpacity>
+          </View>
+        </>
       )}
 
       {/* DEV: start recording manually when the source video won't play
@@ -597,6 +762,19 @@ const styles = StyleSheet.create({
   devCam: { backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   devCamTxt: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD },
   ytCover: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  // Compliance letterbox for IG/TikTok sources — top/height set inline from safe insets.
+  sourceLetterbox: { position: 'absolute', left: 0, right: 0, backgroundColor: '#000', overflow: 'hidden' },
+  // Afterthought decision overlay
+  afterOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 130 },
+  afterCard: { backgroundColor: 'rgba(0,0,0,0.82)', borderRadius: RADIUS.MD, padding: SPACE.LG, marginHorizontal: SPACE.LG, alignItems: 'center', maxWidth: 380 },
+  afterTitle: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD },
+  afterSub: { color: 'rgba(255,255,255,0.82)', fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, textAlign: 'center', marginTop: SPACE.XS, marginBottom: SPACE.MD },
+  afterRow: { flexDirection: 'row', gap: SPACE.SM, alignItems: 'center' },
+  afterSkip: { paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD, borderRadius: RADIUS.FULL, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+  afterSkipTxt: { color: C.WHITE, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
+  afterRecord: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_HOT },
+  afterRecordDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.WHITE },
+  afterRecordTxt: { color: C.WHITE, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.SM },
   ytCoverInner: { position: 'absolute' },
   igPlayOverlay: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
   igPlayBtn: {

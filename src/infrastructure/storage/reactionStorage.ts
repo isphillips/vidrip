@@ -13,9 +13,27 @@ export interface SaveReactionParams {
   ytStartOffset?: number;
   sourceType?: 'youtube' | 'tiktok' | 'instagram';
   recordedWithHeadphones?: boolean;
+  // Optional "afterthought" outro clip recorded right after the reaction; uploaded to the
+  // same bucket and stored on afterthought_url/afterthought_duration to play as a post-roll.
+  afterthought?: { path: string; duration: number } | null;
   // Fires once the row is inserted and the local copy is in place (before the
   // slow relay upload), so the caller can show the reaction immediately.
   onCommitted?: (reactionId: string) => void;
+}
+
+/** Upload an afterthought clip for an existing reaction and set its columns (best-effort). */
+async function relayAfterthought(
+  userId: string, threadId: string, reactionId: string,
+  afterthought: { path: string; duration: number },
+): Promise<void> {
+  try {
+    const url = await uploadToCloud(afterthought.path, `${userId}/${threadId}/${reactionId}-afterthought.mp4`);
+    await (supabase as any).from('reactions')
+      .update({ afterthought_url: url, afterthought_duration: Math.round(afterthought.duration) })
+      .eq('id', reactionId);
+  } catch (e) {
+    console.error('[saveReaction] afterthought relay failed:', JSON.stringify(e));
+  }
 }
 
 export interface SaveReactionResult {
@@ -74,6 +92,7 @@ export async function saveReaction({
   ytStartOffset = 0,
   sourceType = 'youtube',
   recordedWithHeadphones = false,
+  afterthought = null,
   onCommitted,
 }: SaveReactionParams): Promise<SaveReactionResult> {
 
@@ -110,6 +129,8 @@ export async function saveReaction({
     } catch (e) {
       console.error('[saveReaction] cloud relay upload failed:', JSON.stringify(e));
     }
+
+    if (afterthought) { await relayAfterthought(userId, threadId, reactionId, afterthought); }
 
     await (supabase as any)
       .from('thread_members')
@@ -158,6 +179,8 @@ export async function saveReaction({
     console.error('[saveReaction] relay upload failed:', JSON.stringify(e));
   }
 
+  if (afterthought) { await relayAfterthought(userId, threadId, reactionId, afterthought); }
+
   // 4. Mark thread member as reacted
   await (supabase as any)
     .from('thread_members')
@@ -166,6 +189,14 @@ export async function saveReaction({
     .eq('user_id', userId);
 
   return { reactionId, localPath, cloudUrl, storageMode: 'local' };
+}
+
+/** Sign a reactions-bucket URL for playback (used for afterthought outro clips). */
+export async function signReactionUrl(url: string): Promise<string | null> {
+  const m = url.match(/\/storage\/v1\/object\/(?:public\/)?reactions\/(.+?)(?:\?|$)/);
+  if (!m) { return null; }
+  const { data } = await supabase.storage.from('reactions').createSignedUrl(decodeURIComponent(m[1]), 3600);
+  return data?.signedUrl ?? null;
 }
 
 // ─── Playback resolution ──────────────────────────────────────────────────

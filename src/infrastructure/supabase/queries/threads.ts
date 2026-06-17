@@ -1,5 +1,5 @@
 import { supabase } from '../client';
-import { resolveReactionUri } from '../../storage/reactionStorage';
+import { resolveReactionUri, signReactionUrl } from '../../storage/reactionStorage';
 import { ensurePrivateChannel } from './channels';
 
 export type FeedThread = {
@@ -46,6 +46,10 @@ export type ReactionItem = {
   // Sender intro on the parent thread (plays once before this reaction is watched).
   intro_url?: string | null;
   intro_duration?: number | null;
+  // Afterthought "outro" clip — plays after this reaction finishes.
+  afterthought_url?: string | null;
+  afterthought_duration?: number | null;
+  afterthoughtUri?: string | null;   // resolved (signed) playable URI
   // Resolved at fetch time by resolveReactionUri
   resolvedUri: string | null;
   needsDownload: boolean;         // true = cloud URL available but not yet local
@@ -122,8 +126,12 @@ async function hydrateReaction(raw: any): Promise<ReactionItem> {
     needsDownload: false,
   };
   const resolved = await resolveReactionUri(base);
+  const afterthoughtUri = raw.afterthought_url ? await signReactionUrl(raw.afterthought_url) : null;
   return {
     ...base,
+    afterthought_url: raw.afterthought_url ?? null,
+    afterthought_duration: raw.afterthought_duration ?? null,
+    afterthoughtUri,
     resolvedUri: resolved?.uri ?? null,
     needsDownload: resolved?.needsDownload ?? false,
   };
@@ -134,6 +142,7 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
     .from('reactions')
     .select(`
       id, thread_id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type, recorded_with_headphones,
+      afterthought_url, afterthought_duration,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id),
       thread:threads!thread_id(intro_url, intro_duration)
@@ -154,7 +163,8 @@ export async function fetchReactions(threadId: string): Promise<ReactionItem[]> 
   const { data, error } = await supabase
     .from('reactions')
     .select(`
-      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type,
+      id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type, recorded_with_headphones,
+      afterthought_url, afterthought_duration,
       user:users!user_id(handle, display_name),
       emoji_reactions(emoji, user_id)
     `)
