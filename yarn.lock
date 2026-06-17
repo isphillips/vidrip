@@ -3208,9 +3208,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native-community/datetimepicker@npm:^8.2.0":
-  version: 8.6.0
-  resolution: "@react-native-community/datetimepicker@npm:8.6.0"
+"@react-native-community/datetimepicker@npm:^9.1.0":
+  version: 9.1.0
+  resolution: "@react-native-community/datetimepicker@npm:9.1.0"
   dependencies:
     invariant: ^2.2.4
   peerDependencies:
@@ -3223,7 +3223,7 @@ __metadata:
       optional: true
     react-native-windows:
       optional: true
-  checksum: e4f0312225b9738d28b075fbfadb0be258ce91610abfd7d5728b06c92113d83de414e9708ae980d605594f037c1e4f68e1078923c34adc42b5c6b712520d65fc
+  checksum: 31b37df04613d299b4f107ee2325d4ea25a895bc358c080eca23ea06dc2278393950b632f67b5a27a8b2b801823f1febc201d3a555972c121e3a1f0b559180e3
   languageName: node
   linkType: hard
 
@@ -11730,7 +11730,7 @@ __metadata:
     "@react-native-community/cli": 15.0.1
     "@react-native-community/cli-platform-android": 15.0.1
     "@react-native-community/cli-platform-ios": 15.0.1
-    "@react-native-community/datetimepicker": ^8.2.0
+    "@react-native-community/datetimepicker": ^9.1.0
     "@react-native-community/image-editor": ^4.3.0
     "@react-native-community/push-notification-ios": ^1.12.0
     "@react-native-firebase/app": 24.1.0

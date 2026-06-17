@@ -20,6 +20,7 @@ import Animated, {
   withTiming,
   interpolate,
   Easing,
+  runOnJS,
 } from 'react-native-reanimated';
 
 // Height of the source player when shrunk into the corner (screen-aspect mini).
@@ -108,6 +109,7 @@ export default function WatchReactionScreen({
   // When the main reaction ends and it has an afterthought outro, we swap the player to it
   // before auto-advancing.
   const [playingAfterthought, setPlayingAfterthought] = useState(false);
+  const [srcDismissed, setSrcDismissed] = useState(false);
   const [paused, setPaused] = useState(true);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -248,31 +250,41 @@ export default function WatchReactionScreen({
   useEffect(() => {
     pip.value = withTiming(hasStarted ? 1 : 0, { duration: 650, easing: Easing.inOut(Easing.cubic) });
   }, [hasStarted, pip]);
+  // Slides the pip off-screen to the right when the afterthought takes over.
+  const slideOff = useSharedValue(0);
+  useEffect(() => {
+    if (!playingAfterthought) { return; }
+    slideOff.value = withTiming(1, { duration: 320, easing: Easing.inOut(Easing.cubic) }, () => {
+      runOnJS(setSrcDismissed)(true);
+    });
+  }, [playingAfterthought, slideOff]);
   const srcStyle = useAnimatedStyle(() => {
     const sFinal = PIP_H / height;
     const s = interpolate(pip.value, [0, 1], [1, sFinal]);
     const tx = interpolate(pip.value, [0, 1], [0, (width * (1 - sFinal)) / 2 - SPACE.LG]);
     const ty = interpolate(pip.value, [0, 1], [0, (height * (1 - sFinal)) / 2 - (bottomInset + 100)]);
-    return { transform: [{ translateX: tx }, { translateY: ty }, { scale: s }] };
+    const slideX = interpolate(slideOff.value, [0, 1], [0, width * 2]);
+    return { transform: [{ translateX: tx + slideX }, { translateY: ty }, { scale: s }] };
   });
   const ytCoverW = Math.round(height * (16 / 9));
   const ytOffsetX = -Math.round((ytCoverW - width) / 2);
 
   const handleEnd = useCallback(() => {
-    // Halt the source so it can't keep playing during the transition.
     stoppingRef.current = true;
-    setPaused(true);
-    ttRef.current?.pause();
     // If the reaction has an afterthought outro and we haven't played it yet, swap the player
-    // to it (full-screen) before advancing. Its own onEnd brings us back here to advance.
+    // to it before advancing. Crucially: don't touch paused here — leaving it false means the
+    // Video component seamlessly switches to afterthoughtUri without triggering the TikTok
+    // useEffect (paused→true→false) that would re-start the source player.
     if (!playingAfterthought && reaction?.afterthoughtUri) {
       setPlayingAfterthought(true);
       stoppingRef.current = false;
       progressRef.current = 0;
       setProgress(0);
-      setPaused(false);
       return;
     }
+    // Halt the source now that we're done (no afterthought, or afterthought just finished).
+    setPaused(true);
+    ttRef.current?.pause();
     // Auto-advance to the next reaction in the thread; if this is the last one,
     // dismiss back to the thread (card-style pop).
     const ids = siblingIdsRef.current;
@@ -417,7 +429,7 @@ export default function WatchReactionScreen({
 
       {/* Source player — full-screen, then animates into the corner on play. Hidden once the
           afterthought outro takes over (the reaction is finished). */}
-      {sessionReady && reaction?.yt_video_id && !playingAfterthought && (
+      {sessionReady && reaction?.yt_video_id && !srcDismissed && (
         <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
           {reaction.source_type === 'instagram' ? (
             <WebView
