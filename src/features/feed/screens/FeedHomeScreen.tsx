@@ -28,6 +28,7 @@ import {
   type ChannelReview, type ChannelToReact, type MyChannelReaction,
 } from '../../../infrastructure/supabase/queries/channels';
 import MailboxButton from '../../channels/components/MailboxButton';
+import ExclusiveRail from '../../exclusive/components/ExclusiveRail';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 const FAVS_KEY = 'vidrip_favorites';
@@ -373,6 +374,13 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           })}
         </ScrollView>
       </View>
+
+      {tab === 'feed' && (
+        <ExclusiveRail
+          onOpenGift={awardId => navigation.navigate('GiftReveal', { awardId })}
+          onOpenCollection={collectionId => navigation.navigate('ExclusiveCollection', { collectionId })}
+        />
+      )}
 
       {filter === 'channels' ? (
         <FlatList

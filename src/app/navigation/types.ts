@@ -59,6 +59,9 @@ export type FeedStackParamList = {
   Thread: { threadId: string };
   WatchReaction: { reactionId: string };
   WatchReview: { reviewId: string };
+  GiftReveal: { awardId: string };
+  ExclusiveCollection: { collectionId: string };
+  ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null };
 };
 
 // Friends stack
@@ -98,6 +101,8 @@ export type StudioStackParamList = {
   StudioOverlay: { fileUri: string; durationSec?: number; trimStartMs: number; trimEndMs: number; colorMatrix?: number[] | null; mirror?: boolean; draftId?: string; recipe?: import('../../features/studio/effectRecipe').OverlayRecipe | null };
   StudioDetails: { fileUri: string; durationSec?: number; recipe?: import('../../features/studio/effectRecipe').OverlayRecipe | null; draftId?: string; title?: string; channelId?: string | null; visibility?: 'public' | 'subscribers' };
   StudioCalendar: undefined;
+  StudioCollections: undefined;
+  StudioCollectionEdit: { collectionId?: string };
 };
 
 export type StudioStackScreenProps<T extends keyof StudioStackParamList> =

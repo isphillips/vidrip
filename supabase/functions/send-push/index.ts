@@ -217,7 +217,7 @@ serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const { user_id, title, body, thread_id, channel_id, post_id, channel_name } = await req.json();
+  const { user_id, title, body, thread_id, channel_id, post_id, channel_name, type, award_id, collection_id } = await req.json();
   if (!user_id || !title || !body) {
     return new Response('Missing fields', { status: 400 });
   }
@@ -232,10 +232,12 @@ serve(async (req) => {
     return new Response('No token for user', { status: 200 });
   }
 
-  // Build notification data — thread or channel, not both
-  const data = channel_id
-    ? { channel_id, post_id, channel_name }
-    : { thread_id };
+  // Build notification data — award (gift reveal), channel, or thread.
+  const data = type === 'award'
+    ? { type: 'award', award_id, collection_id, channel_name }
+    : channel_id
+      ? { channel_id, post_id, channel_name }
+      : { thread_id };
   const fcmData = toStringData(data);
 
   const results: { platform: string; ok: boolean }[] = [];

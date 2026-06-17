@@ -88,9 +88,11 @@ export function clearBadge(): void {
 
 type ThreadNotificationHandler = (threadId: string) => void;
 type ChannelNotificationHandler = (channelId: string, channelName: string) => void;
+type AwardNotificationHandler = (awardId: string) => void;
 
 let _onNotificationOpened: ThreadNotificationHandler | null = null;
 let _onChannelNotification: ChannelNotificationHandler | null = null;
+let _onAwardNotification: AwardNotificationHandler | null = null;
 
 export function setNotificationOpenedHandler(handler: ThreadNotificationHandler): void {
   _onNotificationOpened = handler;
@@ -100,35 +102,30 @@ export function setChannelNotificationHandler(handler: ChannelNotificationHandle
   _onChannelNotification = handler;
 }
 
-function handleIOSNotification(notification: PushNotification): void {
-  const data = notification.getData() as {
-    thread_id?: string;
-    channel_id?: string;
-    channel_name?: string;
-  };
+export function setAwardNotificationHandler(handler: AwardNotificationHandler): void {
+  _onAwardNotification = handler;
+}
 
-  if (data?.channel_id && _onChannelNotification) {
+// Route a notification's data payload (shared between iOS/Android). Award > channel > thread.
+function route(data: { type?: string; award_id?: string; channel_id?: string; channel_name?: string; thread_id?: string } | undefined): void {
+  if (!data) { return; }
+  if (data.type === 'award' && data.award_id && _onAwardNotification) {
+    _onAwardNotification(data.award_id);
+  } else if (data.channel_id && _onChannelNotification) {
     _onChannelNotification(data.channel_id, data.channel_name ?? 'Channel');
-  } else if (data?.thread_id && _onNotificationOpened) {
+  } else if (data.thread_id && _onNotificationOpened) {
     _onNotificationOpened(data.thread_id);
   }
+}
 
+function handleIOSNotification(notification: PushNotification): void {
+  route(notification.getData());
   notification.finish(PushNotificationIOS.FetchResult.NoData);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function handleAndroidNotification(remoteMessage: any): void {
-  const data = remoteMessage?.data as {
-    thread_id?: string;
-    channel_id?: string;
-    channel_name?: string;
-  } | undefined;
-
-  if (data?.channel_id && _onChannelNotification) {
-    _onChannelNotification(data.channel_id, data.channel_name ?? 'Channel');
-  } else if (data?.thread_id && _onNotificationOpened) {
-    _onNotificationOpened(data.thread_id);
-  }
+  route(remoteMessage?.data);
 }
 
 // ── Bootstrap — call once at app startup ─────────────────────────────────────

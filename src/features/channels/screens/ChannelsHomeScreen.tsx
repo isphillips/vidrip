@@ -223,7 +223,7 @@ export default function ChannelsHomeScreen({
 
       {tab === 'Exclusive' ? (
         <View style={styles.center}>
-          <Ionicons name="sparkles-outline" size={40} color={C.ACCENT_HOT} style={{ marginBottom: SPACE.MD }} />
+          <Ionicons name="diamond" size={40} color={C.ACCENT_HOT} style={{ marginBottom: SPACE.MD }} />
           <Text style={styles.exclusiveTitle}>Exclusive Content</Text>
           <Text style={styles.emptyText}>
             Private channels you award to your subscribers will live here. Coming soon.

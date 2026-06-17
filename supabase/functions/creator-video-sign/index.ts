@@ -47,10 +47,16 @@ Deno.serve(async (req) => {
 
     const { data: post } = await admin
       .from("channel_posts")
-      .select("bunny_video_id, media_status, channel_id, visibility, poster_id, release_date")
+      .select("bunny_video_id, media_status, channel_id, visibility, poster_id, release_date, is_exclusive")
       .eq("id", postId).maybeSingle();
     if (!post?.bunny_video_id) { return json({ error: "not a creator video" }, 404); }
     if (post.media_status !== "ready") { return json({ error: "not ready", media_status: post.media_status }, 409); }
+
+    // Exclusive posts: only the owner or a user who's been awarded a collection containing the post.
+    if (post.is_exclusive && post.poster_id !== userId) {
+      const { data: ok } = await admin.rpc("has_exclusive_access", { post: postId, uid: userId });
+      if (!ok) { return json({ error: "not entitled" }, 403); }
+    }
 
     // Scheduled posts aren't playable until their release_date passes — except by the owner, who
     // can preview them from the studio calendar.

@@ -16,6 +16,7 @@ import {
   registerPushToken,
   setNotificationOpenedHandler,
   setChannelNotificationHandler,
+  setAwardNotificationHandler,
 } from '../../infrastructure/notifications/pushService';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
@@ -64,6 +65,14 @@ export default function RootNavigator() {
           screen: 'Channel',
           params: { channelId, channelName, isPublic: false, isJoined: true },
         },
+      });
+    });
+
+    // Wire award notification tap → open the gift reveal in the Feed tab.
+    setAwardNotificationHandler((awardId: string) => {
+      navRef.current?.navigate('Main', {
+        screen: 'Feed',
+        params: { screen: 'GiftReveal', params: { awardId } },
       });
     });
 

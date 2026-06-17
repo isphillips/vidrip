@@ -387,6 +387,8 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
     .is('parent_post_id', null)
     // Scheduled creator posts stay hidden until their release_date passes (null = publish now).
     .or(`release_date.is.null,release_date.lte.${new Date().toISOString()}`)
+    // Exclusive posts (in a collection) never appear in the regular feed — only inside their collection.
+    .eq('is_exclusive', false)
     .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false });
 

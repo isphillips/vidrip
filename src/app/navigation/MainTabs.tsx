@@ -20,6 +20,9 @@ import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
 import WatchReactionScreen from '../../features/threads/screens/WatchReactionScreen';
 import WatchReviewScreen from '../../features/channels/screens/WatchReviewScreen';
+import GiftRevealScreen from '../../features/exclusive/screens/GiftRevealScreen';
+import ExclusiveCollectionScreen from '../../features/exclusive/screens/ExclusiveCollectionScreen';
+import ExclusiveWatchScreen from '../../features/exclusive/screens/ExclusiveWatchScreen';
 import FriendsHomeScreen from '../../features/friends/screens/FriendsHomeScreen';
 import UserProfileScreen from '../../features/friends/screens/UserProfileScreen';
 import AddFriendScreen from '../../features/friends/screens/AddFriendScreen';
@@ -63,6 +66,9 @@ function FeedNavigator() {
       <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
       <FeedStack.Screen name="WatchReview" component={WatchReviewScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <FeedStack.Screen name="GiftReveal" component={GiftRevealScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
+      <FeedStack.Screen name="ExclusiveCollection" component={ExclusiveCollectionScreen} options={{ headerShown: false }} />
+      <FeedStack.Screen name="ExclusiveWatch" component={ExclusiveWatchScreen} options={{ headerShown: false }} />
     </FeedStack.Navigator>
   );
 }
