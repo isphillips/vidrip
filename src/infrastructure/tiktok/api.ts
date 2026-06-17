@@ -33,18 +33,46 @@ export function extractTikTokId(input: string): string | null {
   return null;
 }
 
+/** True for any TikTok URL (canonical, player, or a share short link). */
+export function isTikTokUrl(input: string): boolean {
+  return /tiktok\.com/i.test(input);
+}
+
 /**
- * Resolve a TikTok short link (vm.tiktok.com/..., tiktok.com/t/...) to its
- * canonical URL by following the redirect, then extract the id.
- * Returns null if it can't be resolved.
+ * True for TikTok share short links (tiktok.com/t/..., vm./vt.tiktok.com/...) that 302 to the
+ * canonical URL — these have no id in the URL itself and must be resolved over the network.
+ */
+export function isTikTokShortLink(input: string): boolean {
+  const u = input.trim();
+  return /tiktok\.com\/t\//i.test(u) || /(?:vm|vt)\.tiktok\.com\//i.test(u);
+}
+
+/**
+ * Resolve a TikTok short link to its canonical URL by following the redirect, then extract the id.
+ * Tries HEAD first (cheap) and falls back to GET (some short links don't honour HEAD). Null if it
+ * can't be resolved.
  */
 export async function resolveTikTokShortLink(shortUrl: string): Promise<string | null> {
-  try {
-    const res = await fetch(shortUrl, { method: 'HEAD', redirect: 'follow' });
-    return extractTikTokId(res.url);
-  } catch {
-    return null;
+  for (const method of ['HEAD', 'GET'] as const) {
+    try {
+      const res = await fetch(shortUrl, { method, redirect: 'follow' });
+      const id = extractTikTokId(res.url);
+      if (id) { return id; }
+    } catch { /* try the next method */ }
   }
+  return null;
+}
+
+/**
+ * Get the TikTok post id from any TikTok input: extracts it directly from a canonical/player URL or
+ * raw id (sync), or resolves a short link over the network. Returns null if it's not a resolvable
+ * TikTok video. Use this anywhere a user can paste a TikTok URL.
+ */
+export async function resolveTikTokId(input: string): Promise<string | null> {
+  const direct = extractTikTokId(input);
+  if (direct) { return direct; }
+  if (isTikTokShortLink(input)) { return resolveTikTokShortLink(input.trim()); }
+  return null;
 }
 
 /**

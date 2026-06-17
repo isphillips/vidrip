@@ -22,7 +22,7 @@ import { sendThread, updateThreadIntro } from '../../../infrastructure/supabase/
 import { assertVideoAllowed, ModerationRejected } from '../../../infrastructure/moderation/moderateVideo';
 import { uploadIntro } from '../../../infrastructure/storage/introStorage';
 import { usePendingIntroStore } from '../../../store/pendingIntroStore';
-import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl } from '../../../infrastructure/tiktok/api';
+import { extractTikTokId, fetchTikTokMeta, tikTokPlayerUrl, isTikTokUrl, isTikTokShortLink, resolveTikTokId, resolveTikTokShortLink } from '../../../infrastructure/tiktok/api';
 import { fetchYouTubeDurationSeconds, MAX_VIDEO_SECONDS } from '../../../infrastructure/youtube/api';
 import { useShareIntentStore } from '../../../store/shareIntentStore';
 import { useShareUiStore } from '../../../store/shareUiStore';
@@ -812,6 +812,13 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
     if (!trimmed) { setLinkStatus('idle'); return; }
     // TikTok / Instagram: can't fetch duration → allow through.
     if (extractTikTokId(trimmed)) { setLinkStatus('ok'); return; }
+    // TikTok short link (tiktok.com/t/…, vm./vt.…) — resolve the redirect to confirm it's valid.
+    if (isTikTokShortLink(trimmed)) {
+      setLinkStatus('checking');
+      let cancelled = false;
+      resolveTikTokShortLink(trimmed).then(ttId => { if (!cancelled) { setLinkStatus(ttId ? 'ok' : 'invalid'); } });
+      return () => { cancelled = true; };
+    }
     if (extractInstagramId(trimmed)) { setLinkStatus('ok'); return; }
     const ytId = extractYouTubeId(trimmed);
     if (!ytId) { setLinkStatus('invalid'); return; }
@@ -832,10 +839,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const handlePastePreview = async (rawUrl?: string) => {
     Keyboard.dismiss();
     const link = (rawUrl ?? url).trim();
-    // TikTok first — if it parses as a TikTok URL, treat as TikTok.
-    const ttId = extractTikTokId(link);
-    if (ttId) {
+    // TikTok first — if it looks like a TikTok URL (incl. short links), treat as TikTok.
+    if (isTikTokUrl(link)) {
       setPasting(true);
+      const ttId = await resolveTikTokId(link);
+      if (!ttId) { setPasting(false); Alert.alert('Invalid Link', 'Couldn’t resolve that TikTok link.'); return; }
       const meta = await fetchTikTokMeta(ttId);
       setPasting(false);
       openPlayer({

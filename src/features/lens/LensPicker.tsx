@@ -5,41 +5,29 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../theme';
-import FaceLensOverlay, { LENSES } from './faceLens';
-import { MOCK_FACE } from './useFaceLandmarks';
+import { LENSES } from './faceLens';
 
 // Brand gradient (matches the STUDIO nav badge / GradientButton).
 const FLOW = ['#FF4FA3', '#A05CFF', '#2DD4BF'];
 const PANEL_BG = '#190A33';
 
-type Option = { key: string | null; label: string };
-const OPTIONS: Option[] = [{ key: null, label: 'None' }, ...LENSES.map(l => ({ key: l.key, label: l.label }))];
+type Option = { key: string | null; label: string; icon: string };
+const OPTIONS: Option[] = [
+  { key: null, label: 'None', icon: 'ban-outline' },
+  ...LENSES.map(l => ({ key: l.key, label: l.label, icon: l.icon })),
+];
 
 const labelFor = (k: string | null) => OPTIONS.find(o => o.key === k)?.label ?? 'None';
 
-// A tiny neutral face so each lens preview has something to sit on, with features at the same
-// normalized positions as MOCK_FACE so the lens art lands correctly.
-function MiniFace({ lensKey, w, h }: { lensKey: string | null; w: number; h: number }) {
-  const eye = (nx: number) => ({ left: nx * w - 3, top: 0.42 * h - 3 });
+// A single sleek icon per lens — a dark tile with the lens's glyph centered. The selected one
+// lights up with the brand accent + a gradient ring (handled by the cell border below).
+function IconTile({ icon, on, w, h }: { icon: string; on: boolean; w: number; h: number }) {
   return (
     <View style={{ width: w, height: h, alignItems: 'center', justifyContent: 'center' }}>
-      {/* head */}
-      <View style={{
-        position: 'absolute', left: w * 0.22, top: h * 0.12, width: w * 0.56, height: h * 0.74,
-        borderRadius: w * 0.3, backgroundColor: 'rgba(255,255,255,0.10)',
-      }} />
-      {/* faint features (so even "None" reads as a face) */}
-      <View style={[mf.eye, eye(0.40)]} />
-      <View style={[mf.eye, eye(0.60)]} />
-      <View style={{ position: 'absolute', left: 0.44 * w, top: 0.6 * h, width: w * 0.12, height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.25)' }} />
-      <FaceLensOverlay lens={lensKey ?? undefined} landmarks={MOCK_FACE} width={w} height={h} />
+      <Ionicons name={icon as any} size={Math.round(Math.min(w, h) * 0.42)} color={on ? C.ACCENT_HOT : '#EDE6FF'} />
     </View>
   );
 }
-
-const mf = StyleSheet.create({
-  eye: { position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.30)' },
-});
 
 /**
  * Top-center filter pill (gradient border, like the STUDIO badge). Tapping it slides a panel down
@@ -56,11 +44,14 @@ export default function LensPicker({
     Animated.timing(anim, { toValue: open ? 1 : 0, duration: 220, useNativeDriver: true }).start();
   }, [open, anim]);
 
-  const COLS = 3;
+  // 4 per row, uniform spacing all around: the panel is 94% of the screen, and the outer padding
+  // equals the inter-cell gap so the margins between cells and at the edges all match.
+  const COLS = 4;
   const GAP = SPACE.SM;
-  const PAD = SPACE.MD;
-  const cellW = Math.floor((width - PAD * 2 - GAP * (COLS - 1)) / COLS);
-  const cellH = Math.round(cellW * 1.15);
+  const PAD = SPACE.SM;
+  const panelW = width * 0.94;
+  const cellW = Math.floor((panelW - PAD * 2 - GAP * (COLS - 1)) / COLS);
+  const cellH = Math.round(cellW * 1.18);
 
   const select = (k: string | null) => { onChange(k); setOpen(false); };
 
@@ -94,7 +85,7 @@ export default function LensPicker({
                 return (
                   <TouchableOpacity key={o.key ?? 'none'} activeOpacity={0.85} onPress={() => select(o.key)} style={{ width: cellW }}>
                     <View style={[styles.cell, { width: cellW, height: cellH }, on && styles.cellOn]}>
-                      <MiniFace lensKey={o.key} w={cellW} h={cellH} />
+                      <IconTile icon={o.icon} on={on} w={cellW} h={cellH} />
                     </View>
                     <Text style={[styles.cellLabel, on && styles.cellLabelOn]} numberOfLines={1}>{o.label}</Text>
                   </TouchableOpacity>
@@ -118,7 +109,7 @@ const styles = StyleSheet.create({
   },
   pillTxt: { color: C.WHITE, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.SM, letterSpacing: 0.5 },
   panel: {
-    marginTop: SPACE.SM, width: '94%', maxHeight: 360,
+    marginTop: SPACE.SM, width: '94%', maxHeight: 440,
     borderRadius: RADIUS.LG, backgroundColor: 'rgba(13,4,24,0.92)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', overflow: 'hidden',
   },

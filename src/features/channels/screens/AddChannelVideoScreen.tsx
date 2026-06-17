@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { postYouTubeToChannel } from '../../../infrastructure/supabase/queries/channels';
-import { extractTikTokId, fetchTikTokMeta } from '../../../infrastructure/tiktok/api';
+import { extractTikTokId, fetchTikTokMeta, isTikTokUrl, isTikTokShortLink, resolveTikTokId, resolveTikTokShortLink } from '../../../infrastructure/tiktok/api';
 import { fetchYouTubeDurationSeconds, MAX_VIDEO_SECONDS } from '../../../infrastructure/youtube/api';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
@@ -64,6 +64,13 @@ export default function AddChannelVideoScreen({
     const trimmed = input.trim();
     if (!trimmed) { setLinkStatus('idle'); return; }
     if (extractTikTokId(trimmed)) { setLinkStatus('ok'); return; }
+    // TikTok short link (tiktok.com/t/…, vm./vt.…) — resolve the redirect to confirm it's valid.
+    if (isTikTokShortLink(trimmed)) {
+      setLinkStatus('checking');
+      let cancelled = false;
+      resolveTikTokShortLink(trimmed).then(ttId => { if (!cancelled) { setLinkStatus(ttId ? 'ok' : 'invalid'); } });
+      return () => { cancelled = true; };
+    }
     const id = extractVideoId(trimmed);
     if (!id) { setLinkStatus('invalid'); return; }
     setLinkStatus('checking');
@@ -77,10 +84,11 @@ export default function AddChannelVideoScreen({
   }, [input]);
 
   const handlePreview = useCallback(async () => {
-    // TikTok first.
-    const ttId = extractTikTokId(input);
-    if (ttId) {
+    // TikTok first (including short links, which need a redirect resolve).
+    if (isTikTokUrl(input)) {
       setPreviewing(true);
+      const ttId = await resolveTikTokId(input);
+      if (!ttId) { setPreviewing(false); Alert.alert('Invalid URL', 'Couldn’t resolve that TikTok link.'); return; }
       const meta = await fetchTikTokMeta(ttId);
       setVideoId(ttId);
       setTitle(meta?.title ?? 'TikTok');

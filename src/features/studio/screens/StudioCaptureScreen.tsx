@@ -14,9 +14,10 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { MAX_STUDIO_MS } from '../../../infrastructure/creatorStudio/recipe';
 import { pickVideoFromLibrary } from '../../../infrastructure/media/imagePicker';
 import { createDraft } from '../../../infrastructure/storage/studioDraftStorage';
-import FaceLensOverlay from '../../lens/faceLens';
+import FaceLensOverlay, { lensByKey } from '../../lens/faceLens';
 import LensPicker from '../../lens/LensPicker';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
+import { useWarpFrameProcessor, warpLensAvailable } from '../../lens/warpLens';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 const MAX_SEC = MAX_STUDIO_MS / 1000; // 180s hard cap (auto-stop)
@@ -38,8 +39,16 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
 
   // AR face lens (full-screen test surface for placement). Mirror only for the front camera.
   const [lensKey, setLensKey] = useState<string | null>(null);
-  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus } = useFaceTracking(facing === 'front');
-  const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
+  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus, frameAspect: measuredAspect } = useFaceTracking(facing === 'front');
+  // Real camera-warp lens (e.g. Mega Eyes): bends the live pixels via a Skia frame processor. Each
+  // warp lens names its shader in `warp`; non-warp lenses pass null for a passthrough processor.
+  const warpKey = lensByKey(lensKey)?.warp ?? null;
+  const isWarp = !!warpKey && warpLensAvailable;
+  const warpFrameProcessor = useWarpFrameProcessor(isWarp ? warpKey : null);
+  // Prefer the aspect measured from the live frame (ground truth for the keypoint coordinate space);
+  // fall back to the format-derived guess until the first frame lands.
+  const formatAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
+  const frameAspect = measuredAspect > 0 ? measuredAspect : formatAspect;
   const { hasPermission: hasCam, requestPermission: reqCam } = useCameraPermission();
   const { hasPermission: hasMic, requestPermission: reqMic } = useMicrophonePermission();
 
@@ -144,12 +153,23 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
             isActive
             video
             audio
-            // MediaPipe needs BGRA frames; default is YUV. Only attach the processor when a lens is on.
-            pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
-            frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
+            // Keep the buffer format CONSTANT across lens toggles so the session never has to
+            // re-negotiate on iOS (which either kept a stale lossy buffer Skia can't read — "-8f0" —
+            // or failed the AVCaptureSession reconfig — "-11800"). We start in RGB (BGRA) + no
+            // compression up front: MediaPipe needs RGB anyway, and the Skia warp can read BGRA, so
+            // switching to Mega Eyes needs no format change.
+            pixelFormat={faceTrackingAvailable ? 'rgb' : 'yuv'}
+            enableBufferCompression={false}
+            frameProcessor={
+              isWarp ? warpFrameProcessor
+                : faceTrackingAvailable && lensKey ? frameProcessor
+                  : undefined
+            }
           />
-          {/* Full-screen AR lens — the placement test surface. */}
-          <FaceLensOverlay lens={lensKey} landmarks={lensLandmarks} width={width} height={height} frameAspect={frameAspect} />
+          {/* Full-screen AR lens — overlay lenses only; warp lenses are baked into the preview above. */}
+          {!isWarp && (
+            <FaceLensOverlay lens={lensKey} landmarks={lensLandmarks} width={width} height={height} frameAspect={frameAspect} />
+          )}
         </>
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.placeholder]}>
@@ -175,7 +195,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       {/* DEV diagnostic. Shows transformed (normalized 0..1) L eye, R eye, nose so the exact
           geometry can be read off: eyes should share ~same y (level), nose centered & below. */}
       {__DEV__ && (
-        <Text style={[styles.lensDebug, { top: top + 52 }]}>
+        <Text style={[styles.lensDebug, { bottom: top - 22 }]}>
           {lensLandmarks
             ? `L ${lensLandmarks.leftEye.x.toFixed(2)},${lensLandmarks.leftEye.y.toFixed(2)}  R ${lensLandmarks.rightEye.x.toFixed(2)},${lensLandmarks.rightEye.y.toFixed(2)}  N ${lensLandmarks.noseTip.x.toFixed(2)},${lensLandmarks.noseTip.y.toFixed(2)}`
             : `LM:no  FP:${faceTrackingAvailable ? 'yes' : 'NO'}  ${lensStatus}`}

@@ -28,6 +28,7 @@
 		3F7E04812FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E047F2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift */; };
 		3F7E04842FE0D96500ABA05B /* LensWarmup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E04832FE0D96500ABA05B /* LensWarmup.swift */; };
 		3F7E04852FE0D96500ABA05B /* LensWarmup.m in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E04822FE0D96500ABA05B /* LensWarmup.m */; };
+		3F7E04872FE24C5700ABA05B /* blaze_face_short_range.tflite in Resources */ = {isa = PBXBuildFile; fileRef = 3F7E04862FE24C5700ABA05B /* blaze_face_short_range.tflite */; };
 		3FCD95C72FD180A700A7475B /* ReaxnScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C42FD180A700A7475B /* ReaxnScreenRecorder.swift */; };
 		3FCD95C82FD180A700A7475B /* RXNSafeAppend.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C62FD180A700A7475B /* RXNSafeAppend.m */; };
 		3FCD95C92FD180A700A7475B /* ReaxnScreenRecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C32FD180A700A7475B /* ReaxnScreenRecorder.m */; };
@@ -99,6 +100,8 @@
 		3F7E047F2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceLandmarksFrameProcessor.swift; sourceTree = "<group>"; };
 		3F7E04822FE0D96500ABA05B /* LensWarmup.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LensWarmup.m; sourceTree = "<group>"; };
 		3F7E04832FE0D96500ABA05B /* LensWarmup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LensWarmup.swift; sourceTree = "<group>"; };
+		3F7E04862FE24C5700ABA05B /* blaze_face_short_range.tflite */ = {isa = PBXFileReference; lastKnownFileType = file; path = blaze_face_short_range.tflite; sourceTree = "<group>"; };
+		3F7E04882FE24C7400ABA05B /* blaze_face_short_range.tflite */ = {isa = PBXFileReference; lastKnownFileType = file; path = blaze_face_short_range.tflite; sourceTree = "<group>"; };
 		3F9787AB2FCE506800F638C2 /* ReaxnDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = ReaxnDebug.entitlements; path = Vidrip/ReaxnDebug.entitlements; sourceTree = "<group>"; };
 		3FCD95C12FD180A700A7475B /* AudioRecorder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioRecorder.h; sourceTree = "<group>"; };
 		3FCD95C22FD180A700A7475B /* AudioRecorder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AudioRecorder.m; sourceTree = "<group>"; };
@@ -227,12 +230,14 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				3F7E04882FE24C7400ABA05B /* blaze_face_short_range.tflite */,
 				3F7E04782FE0B5FC00ABA05B /* face_landmarker.task */,
 				3FCD95C12FD180A700A7475B /* AudioRecorder.h */,
 				3F7E047E2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.m */,
 				3F7E047F2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift */,
 				3F7E04822FE0D96500ABA05B /* LensWarmup.m */,
 				3F7E04832FE0D96500ABA05B /* LensWarmup.swift */,
+				3F7E04862FE24C5700ABA05B /* blaze_face_short_range.tflite */,
 				3FCD95C22FD180A700A7475B /* AudioRecorder.m */,
 				3FCD95C32FD180A700A7475B /* ReaxnScreenRecorder.m */,
 				3FCD95E02FD180A700A7475B /* StudioExporter.m */,
@@ -386,6 +391,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3F7E04872FE24C5700ABA05B /* blaze_face_short_range.tflite in Resources */,
 				3F7E04792FE0B5FC00ABA05B /* face_landmarker.task in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,

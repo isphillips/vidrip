@@ -2,16 +2,20 @@ package com.reaxn
 
 import com.google.mediapipe.framework.image.MediaImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
-import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
-import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker.FaceLandmarkerOptions
+import com.google.mediapipe.tasks.vision.facedetector.FaceDetector
+import com.google.mediapipe.tasks.vision.facedetector.FaceDetector.FaceDetectorOptions
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.VisionCameraProxy
 
-// Thin VisionCamera frame-processor plugin: runs MediaPipe FaceLandmarker per frame and returns
-// the raw normalized mesh ({ "points": [[x,y], ...] }) or null. Index→anchor reduction is in JS.
-// Requires `com.google.mediapipe:tasks-vision` + the model at assets/face_landmarker.task,
+// Thin VisionCamera frame-processor plugin: runs MediaPipe FaceDetector (BlazeFace, short-range) per
+// frame and returns the 6 normalized keypoints ({ "points": [[x,y], ...] }) or an error. BlazeFace
+// is far lighter than the 478-pt FaceLandmarker mesh — it gives exactly the anchors the lenses use:
+//   [0]=right eye  [1]=left eye  [2]=nose tip  [3]=mouth  [4]=right ear  [5]=left ear
+// Index→anchor reduction (and orientation/mirror) lives in JS (faceTracking.ts).
+// Requires `com.google.mediapipe:tasks-vision` + the model at assets/blaze_face_short_range.tflite,
 // and registration in MainApplication.
 class FaceLandmarksFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>?) :
     FrameProcessorPlugin() {
@@ -19,47 +23,55 @@ class FaceLandmarksFrameProcessor(proxy: VisionCameraProxy, options: Map<String,
   init { warmUp(proxy.context) }
 
   override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
-    val lm = landmarker ?: return mapOf("err" to "no_model")
+    val det = detector ?: return mapOf("err" to "no_model")
     val image = frame.image ?: return mapOf("err" to "no_image")
     val mp = MediaImageBuilder(image).build()
     // VIDEO mode: feed a monotonically-increasing timestamp (uptime ms) so MediaPipe tracks across
-    // frames (far fewer drops → no flashing). uptimeMillis only ever increases for this process.
+    // frames. uptimeMillis only ever increases for this process.
     val ts = android.os.SystemClock.uptimeMillis()
-    val result = try { lm.detectForVideo(mp, ts) } catch (e: Throwable) { return mapOf("err" to "detect_fail") }
-    val faces = result.faceLandmarks()
-    if (faces.isEmpty()) return mapOf("err" to "no_face")
-    val pts = ArrayList<List<Double>>(faces[0].size)
-    for (p in faces[0]) { pts.add(listOf(p.x().toDouble(), p.y().toDouble())) }
+    val result = try { det.detectForVideo(mp, ts) } catch (e: Throwable) { return mapOf("err" to "detect_fail") }
+    val detections = result.detections()
+    if (detections.isEmpty()) return mapOf("err" to "no_face")
+    val kps = detections[0].keypoints()
+    if (!kps.isPresent || kps.get().size < 6) return mapOf("err" to "no_kps")
+    val list = kps.get()
+    val pts = ArrayList<List<Double>>(list.size)
+    for (k in list) { pts.add(listOf(k.x().toDouble(), k.y().toDouble())) }
     return mapOf("points" to pts)
   }
 
   companion object {
-    // One shared landmarker so the launch-time warm-up and the frame processor load the model
-    // once. VIDEO mode tracks the face across frames (smooth, far fewer drops than stateless
-    // IMAGE mode); detectForVideo just needs monotonically-increasing timestamps (uptime ms).
+    // One shared detector so the launch-time warm-up and the frame processor load the model once.
+    // VIDEO mode tracks the face across frames; detectForVideo just needs increasing timestamps.
     @Volatile
-    var landmarker: FaceLandmarker? = null
+    var detector: FaceDetector? = null
       private set
 
     @JvmStatic
     fun warmUp(context: android.content.Context) {
-      if (landmarker != null) { return }
+      if (detector != null) { return }
       synchronized(this) {
-        if (landmarker != null) { return }
-        landmarker = try {
-          val base = BaseOptions.builder().setModelAssetPath("face_landmarker.task").build()
-          val opts = FaceLandmarkerOptions.builder()
-            .setBaseOptions(base)
-            .setRunningMode(RunningMode.VIDEO)
-            .setNumFaces(1)
-            // Lower thresholds → acquires readily; tracking confidence keeps the lock smooth.
-            .setMinFaceDetectionConfidence(0.3f)
-            .setMinFacePresenceConfidence(0.3f)
-            .setMinTrackingConfidence(0.3f)
-            .build()
-          FaceLandmarker.createFromOptions(context.applicationContext, opts)
-        } catch (e: Throwable) { null }
+        if (detector != null) { return }
+        // Prefer the GPU delegate (much cheaper inference); fall back to CPU if GPU init fails.
+        detector = build(context, Delegate.GPU)?.also { android.util.Log.i("FaceDetector", "delegate=GPU") }
+          ?: build(context, Delegate.CPU)?.also { android.util.Log.i("FaceDetector", "delegate=CPU") }
+          ?: run { android.util.Log.w("FaceDetector", "delegate=none (model failed to load)"); null }
       }
+    }
+
+    private fun build(context: android.content.Context, delegate: Delegate): FaceDetector? {
+      return try {
+        val base = BaseOptions.builder()
+          .setModelAssetPath("blaze_face_short_range.tflite")
+          .setDelegate(delegate)
+          .build()
+        val opts = FaceDetectorOptions.builder()
+          .setBaseOptions(base)
+          .setRunningMode(RunningMode.VIDEO)
+          .setMinDetectionConfidence(0.5f)
+          .build()
+        FaceDetector.createFromOptions(context.applicationContext, opts)
+      } catch (e: Throwable) { null }
     }
   }
 }
