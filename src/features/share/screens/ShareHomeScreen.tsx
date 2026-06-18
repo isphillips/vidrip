@@ -449,6 +449,13 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   }, [user?.id]));
 
   // Android back button: close drawer or player overlay before letting navigation pop.
+  // NOTE: closeDrawer/closePlayer are declared further down, so they must NOT appear in
+  // the deps array — reading them here would be a temporal-dead-zone access (Hermes
+  // currently tolerates it by yielding undefined, but that's engine-specific and fragile).
+  // They're referenced only inside the handler, which runs on back-press (long after both
+  // are defined), so omitting them from deps is correct and also stops the listener from
+  // re-subscribing on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (drawerOpen) { closeDrawer(); return true; }
@@ -456,7 +463,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       return false;
     });
     return () => sub.remove();
-  }, [drawerOpen, selectedVideo, closeDrawer, closePlayer]));
+  }, [drawerOpen, selectedVideo]));
 
   // Grid = Members Only videos interleaved into the YouTube shorts feed by recency
   // (newest first), rather than pinned to the top. Search results stay as-is.

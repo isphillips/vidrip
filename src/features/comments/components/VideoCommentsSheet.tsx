@@ -161,10 +161,13 @@ export default function VideoCommentsSheet({
   // optimistic copies for their landed server rows after an upload completes).
   const reloadAll = useCallback(async () => {
     try {
+      // Apply the same app-wide block filter as loadRoots/loadChildren — otherwise a
+      // reloadAll (upload-finished / emoji-realtime) would re-surface blocked users.
+      const blocked = useBlockStore.getState().blocked;
       const ids: string[] = [];
-      const roots = await fetchVideoComments({
+      const roots = (await fetchVideoComments({
         rootSourceId, sourceType, parentCommentId: null, viewerId: user?.id, limit: ROOT_PAGE,
-      });
+      })).filter(c => !blocked.has(c.author_id));
       ids.push(...roots.map(r => r.id));
       hasMoreRef.current = roots.length === ROOT_PAGE;
       cursorRef.current = roots.length
@@ -174,7 +177,8 @@ export default function VideoCommentsSheet({
       const parentIds = Object.keys(childrenByIdRef.current).filter(k => k !== ROOT_KEY);
       const childResults = await Promise.all(parentIds.map(pid =>
         fetchVideoComments({ rootSourceId, sourceType, parentCommentId: pid, viewerId: user?.id, limit: REPLY_PAGE })
-          .then(rows => ({ pid, rows })).catch(() => ({ pid, rows: [] as VideoComment[] })),
+          .then(rows => ({ pid, rows: rows.filter(c => !blocked.has(c.author_id)) }))
+          .catch(() => ({ pid, rows: [] as VideoComment[] })),
       ));
       setChildrenById(() => {
         const next: Record<string, VideoComment[]> = { [ROOT_KEY]: roots };

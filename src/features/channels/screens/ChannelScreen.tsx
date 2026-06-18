@@ -31,6 +31,7 @@ import {
   fetchChannelDisplayName,
   fetchChannelAccess,
   fetchChannelAdVideo,
+  fetchMyChannelRole,
   type ChannelPost,
   type ChannelClipTile,
   type ChannelReview,
@@ -58,8 +59,21 @@ export default function ChannelhamburderScreen({
   route,
   navigation,
 }: ChannelsStackScreenProps<'Channel'>) {
-  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner, isMembersOnly, inviteOnly: inviteOnlyParam, ownerHandle, justSubscribed } = route.params;
+  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner: isOwnerParam, isMembersOnly, inviteOnly: inviteOnlyParam, ownerHandle, justSubscribed } = route.params;
   const { user } = useAuthStore();
+  // Some entry points (notification tap, post-subscribe deep link) navigate here WITHOUT the
+  // `isOwner` route param, so trusting it alone makes an owner render as a non-owner. Derive the
+  // real role and OR it in. Every downstream `isOwner` read picks up this combined value.
+  const [derivedOwner, setDerivedOwner] = useState(false);
+  const isOwner = isOwnerParam || derivedOwner;
+  useEffect(() => {
+    if (isOwnerParam || !user?.id) { return; }
+    let alive = true;
+    fetchMyChannelRole(channelId, user.id)
+      .then(role => { if (alive && role === 'owner') { setDerivedOwner(true); } })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isOwnerParam, channelId, user?.id]);
   const { top } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const cardW = (width - SPACE.LG * 2 - SPACE.MD) / 2;

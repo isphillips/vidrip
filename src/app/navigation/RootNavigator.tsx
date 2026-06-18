@@ -14,6 +14,7 @@ import { ensureReactionsDir } from '../../infrastructure/storage/localReactionSt
 import {
   bootstrapNotifications,
   registerPushToken,
+  unregisterPushToken,
   setNotificationOpenedHandler,
   setChannelNotificationHandler,
   setAwardNotificationHandler,
@@ -82,6 +83,10 @@ export default function RootNavigator() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      // Capture the outgoing user id BEFORE setSession nulls it, so a sign-out can
+      // unregister this device's push token (otherwise a signed-out device keeps
+      // receiving the previous user's notifications).
+      const prevUserId = useAuthStore.getState().user?.id;
       setSession(s);
       setTimeout(async () => {
         try {
@@ -90,7 +95,9 @@ export default function RootNavigator() {
             // Register for push notifications on sign-in
             registerPushToken(s.user.id).catch(() => {});
           } else {
-            // Clear token on sign-out (user id needed — grab from previous session)
+            // Clear the push token on sign-out so this device stops receiving the
+            // signed-out user's notifications.
+            if (prevUserId) { unregisterPushToken(prevUserId).catch(() => {}); }
             setProfile(null);
           }
         } finally {
