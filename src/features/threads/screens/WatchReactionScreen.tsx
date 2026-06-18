@@ -32,7 +32,7 @@ import { shareTextNative } from '../../../infrastructure/share/nativeShare';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
-import { IG_REEL_JS } from '../../shared/igReelPlayer';
+import { igReelJs } from '../../shared/igReelPlayer';
 import { supabase } from '../../../infrastructure/supabase/client';
 import { fetchReactionById, fetchReactions, type ReactionItem } from '../../../infrastructure/supabase/queries/threads';
 import { downloadAndCache, recordReactionDownload } from '../../../infrastructure/storage/reactionStorage';
@@ -445,7 +445,10 @@ export default function WatchReactionScreen({
               setSupportMultipleWindows={false}
               onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
               injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
-              injectedJavaScript={IG_REEL_JS}
+              // Mute the reel unless the reaction was recorded with headphones — matches the
+              // muted YouTube/TikTok source so the reactor's mic is heard (an unmuted reel
+              // steals audio focus on Android and drowns out the mic).
+              injectedJavaScript={igReelJs(!reaction.recorded_with_headphones)}
               onMessage={(e) => {
                 try {
                   const msg = JSON.parse(e.nativeEvent.data);

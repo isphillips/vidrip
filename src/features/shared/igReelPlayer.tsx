@@ -10,19 +10,31 @@ import { C, FONT, SPACE } from '../../theme';
 //     its (composited) poster — pausing any non-user play — until the first real touch,
 //     then explicitly play() inside that gesture (which starts it AND composites it).
 // Posts JSON lifecycle messages: {type:'playing'|'ended'|'paused'}.
-export const IG_REEL_JS = `(function(){
+//
+// `muted` controls the reel's own audio. While RECORDING, the reactor watches AND
+// hears the reel (muted=false). On WATCH screens the reaction clip carries the audio,
+// so the source must be muted (mirroring the muted YouTube/TikTok source) UNLESS the
+// reaction was recorded with headphones — otherwise the reel audio plays and steals
+// audio focus on Android, drowning out the reactor's mic. The mute is re-applied on
+// play/playing too, since IG's own page scripts can toggle it back on.
+export function igReelJs(muted: boolean = false): string {
+  const M = muted ? 'true' : 'false';
+  return `(function(){
+  var MUTED=${M};
   function imp(el,k,v){ if(el&&el.style){ el.style.setProperty(k,v,'important'); } }
   function paint(){ imp(document.documentElement,'background-color','#000'); if(document.body){ imp(document.body,'background-color','#000'); } }
   function post(o){ try{ if(window.ReactNativeWebView){ window.ReactNativeWebView.postMessage(JSON.stringify(o)); } }catch(e){} }
+  function applyMute(v){ if(MUTED&&v){ try{ v.muted=true; }catch(e){} } }
   var tapped=false;
-  function play(){ var v=document.querySelector('video'); if(!v){ return; } try{ v.muted=false; var p=v.play(); if(p&&p.catch){ p.catch(function(){}); } }catch(e){} }
+  function play(){ var v=document.querySelector('video'); if(!v){ return; } try{ v.muted=MUTED; var p=v.play(); if(p&&p.catch){ p.catch(function(){}); } }catch(e){} }
   function onTap(){ tapped=true; play(); setTimeout(play,60); setTimeout(play,250); }
   document.addEventListener('touchend', onTap, true);
   document.addEventListener('click', onTap, true);
   function wire(v){
     if(v.__vwired){ return; } v.__vwired=true;
-    v.addEventListener('play', function(){ if(!tapped){ try{ v.pause(); }catch(e){} } });
-    v.addEventListener('playing', function(){ post({type:'playing'}); });
+    applyMute(v);
+    v.addEventListener('play', function(){ if(!tapped){ try{ v.pause(); }catch(e){} } applyMute(v); });
+    v.addEventListener('playing', function(){ applyMute(v); post({type:'playing'}); });
     v.addEventListener('ended', function(){ post({type:'ended'}); });
     v.addEventListener('pause', function(){ post({type:'paused'}); });
     if(!tapped){ try{ v.pause(); }catch(e){} }
@@ -31,6 +43,10 @@ export const IG_REEL_JS = `(function(){
   scan();
   var n=0, iv=setInterval(function(){ n++; scan(); if(n>120){ clearInterval(iv); } }, 100);
 })(); true;`;
+}
+
+// Record screen (and anywhere the reel audio should play): unmuted.
+export const IG_REEL_JS = igReelJs(false);
 
 // Centered "tap to play" hint. pointerEvents none so the tap passes through to the
 // reel WebView (the real touch that starts + composites the inline video).
