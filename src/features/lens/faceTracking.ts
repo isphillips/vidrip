@@ -11,9 +11,10 @@ import type { FaceLandmarks, FaceLensTrack } from './faceLens';
 //    down, p1 = horizontal eye axis) → only the selfie mirror is needed; the reflection would flip it.
 const IS_ANDROID = Platform.OS === 'android';
 
-// Android only: optional constant horizontal nudge (normalized). With correct orientation de-rotation
-// this should stay 0; only set it if markers sit consistently to one side. NEGATIVE = screen-LEFT.
+// Android only: constant normalized nudges to re-center the constellation after orientation mapping.
+// DX: NEGATIVE = screen-LEFT. DY: NEGATIVE = screen-UP (markers sit low → lift them up).
 const ANDROID_DX = 0;
+const ANDROID_DY = -0.1;
 
 // Replay sampling rate for the captured track — 15fps is plenty for an overlay and keeps the
 // persisted track small.
@@ -110,7 +111,7 @@ function reduce(points: number[][] | null | undefined, aspect: number, orientati
       const p0 = points[i][0], p1 = points[i][1];
       const x = ll ? 1 - p1 : p1;
       const y = ll ? 1 - p0 : p0;
-      return { x: x + ANDROID_DX, y };
+      return { x: x + ANDROID_DX, y: y + ANDROID_DY };
     };
     const le = a(LEFT_EYE), re = a(RIGHT_EYE), nose = a(NOSE_TIP), mouth = a(MOUTH);
     const er = a(EAR_R), el = a(EAR_L);

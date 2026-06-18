@@ -1,5 +1,12 @@
 import type { FaceFrame, FaceLandmarks, Pt } from './types';
 
+// Hysteresis for the head "up" axis. The eyes→mouth vector foreshortens when the head pitches up or
+// down and can briefly INVERT (the mouth crossing the eye line), which snapped lenses a full 180°.
+// We remember the last up direction and (a) hold it while the vector is too short to trust, and
+// (b) refuse a sudden >90° flip (an artifact) — real head roll changes <90° per frame, so it passes.
+let _lastUp: Pt | null = null;
+let _lastEyeMid: Pt | null = null;
+
 // Offset a base anchor by `upD` pixels toward the top of the head and `sideD` pixels along the eye
 // axis (positive = toward the subject's left eye / screen-left when mirrored). Negative `upD` goes
 // down toward the chin. Keeps lens art locked to the face through head roll.
@@ -23,16 +30,25 @@ export function faceFrame(lm: FaceLandmarks, w: number, h: number, frameAspect?:
   const re = { x: mx(lm.rightEye.x), y: my(lm.rightEye.y) };
   const eyeMid = { x: (le.x + re.x) / 2, y: (le.y + re.y) / 2 };
   const mouth = { x: mx(lm.mouthCenter.x), y: my(lm.mouthCenter.y) };
-  // Head "up" axis from the eyes→mouth line. The eye line alone is 180°-ambiguous (which eye is
-  // `le` vs `re` flips it), which flipped every lens upside down; the mouth is reliably *below* the
-  // eyes on the face, so eyeMid→mouth gives an unambiguous down/up. `up` → crown of head, `along` →
-  // head's right axis. `rollDeg` is how far `up` is rotated from screen-up.
+  const eyeDist = Math.hypot(re.x - le.x, re.y - le.y);
+  // Head "up" axis from the eyes→mouth line (mouth is reliably below the eyes → unambiguous down/up).
   const dx = eyeMid.x - mouth.x, dy = eyeMid.y - mouth.y;
-  const dl = Math.hypot(dx, dy) || 1;
-  const up = { x: dx / dl, y: dy / dl };
+  const dl = Math.hypot(dx, dy);
+  let up = dl > 0 ? { x: dx / dl, y: dy / dl } : { x: 0, y: -1 };
+  // Stabilize: reset on re-acquire (face jumped); otherwise hold the prior up when the eyes→mouth
+  // vector is too short to trust (steep pitch) or when the candidate would flip >90° (foreshortening
+  // artifact, not a real head inversion). Real roll moves <90°/frame and passes through.
+  const jumped = !_lastEyeMid || Math.hypot(eyeMid.x - _lastEyeMid.x, eyeMid.y - _lastEyeMid.y) > eyeDist * 1.5;
+  if (!jumped && _lastUp) {
+    const tooShort = dl < eyeDist * 0.25;
+    const flipped = up.x * _lastUp.x + up.y * _lastUp.y < 0;
+    if (tooShort || flipped) { up = _lastUp; }
+  }
+  _lastUp = up;
+  _lastEyeMid = eyeMid;
+  // `up` → crown of head, `along` → head's right axis. `rollDeg` is how far `up` is from screen-up.
   const along = { x: -up.y, y: up.x };
   const nose = { x: mx(lm.noseTip.x), y: my(lm.noseTip.y) };
-  const eyeDist = Math.hypot(re.x - le.x, re.y - le.y);
   // Mouth-open proxy: the nose→mouth gap grows as the jaw drops. Normalize by eye spacing (so it's
   // scale-invariant) and remap the rest→open range to 0..1. Rough/per-person, but enough to trigger.
   const noseMouth = Math.hypot(nose.x - mouth.x, nose.y - mouth.y);
