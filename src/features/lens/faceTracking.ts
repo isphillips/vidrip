@@ -14,7 +14,7 @@ const IS_ANDROID = Platform.OS === 'android';
 // Android only: constant normalized nudges to re-center the constellation after orientation mapping.
 // DX: NEGATIVE = screen-LEFT. DY: NEGATIVE = screen-UP (markers sit low → lift them up).
 const ANDROID_DX = 0;
-const ANDROID_DY = -0.1;
+const ANDROID_DY = -0.05;
 
 // Replay sampling rate for the captured track — 15fps is plenty for an overlay and keeps the
 // persisted track small.
