@@ -9,6 +9,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import { useBlockStore } from '../../../store/blockStore';
 import {
   fetchChannelPost,
   fetchChannelPostReactions,
@@ -39,6 +40,7 @@ export default function ChannelPostScreen({
 }: ChannelsStackScreenProps<'ChannelPost'>) {
   const { postId, channelId, isJoined } = route.params;
   const { user } = useAuthStore();
+  const blocked = useBlockStore(s => s.blocked);
   const { top } = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const { height } = useWindowDimensions();
@@ -85,7 +87,8 @@ export default function ChannelPostScreen({
     }
   }, [postId, channelId]);
 
-  useEffect(() => { load(); }, [load]);
+  // useFocusEffect covers the initial focused mount + every refocus; a separate mount
+  // useEffect would double the load on first open.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // TikTok thumbnails expire — resolve a fresh one by video id.
@@ -216,10 +219,13 @@ export default function ChannelPostScreen({
     : (post.yt_video_thumbnail ??
       (post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null));
   const hasReacted = reactions.some(r => r.poster_id === user?.id);
+  // App-wide block: hide reactions/reviews authored by blocked users from the list/counts.
+  const visReactions = reactions.filter(r => !blocked.has(r.poster_id));
   const obscured = !hasReacted && post.poster_id !== user?.id;
   const isOwner = !!ownerId && ownerId === user?.id;
   const showReviewsTab = reviewsEnabled || isOwner;
   const hasReviewed = reviews.some(r => r.reviewer_id === user?.id);
+  const visReviews = reviews.filter(r => !blocked.has(r.reviewer_id));
   // You can review a post once you've reacted to it (and it isn't your own post),
   // and only if the creator allows reviews on this channel.
   const canReview = reviewsAllowed && isJoined && hasReacted && post.poster_id !== user?.id && !hasReviewed;
@@ -290,29 +296,29 @@ export default function ChannelPostScreen({
             <TouchableOpacity style={[styles.tab, tab === 'reactions' && styles.tabActive]}
               onPress={() => setTab('reactions')} activeOpacity={0.8}>
               <Text style={[styles.tabTxt, tab === 'reactions' && styles.tabTxtActive]}>
-                Reactions{reactions.length ? ` ${reactions.length}` : ''}
+                Reactions{visReactions.length ? ` ${visReactions.length}` : ''}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.tab, tab === 'reviews' && styles.tabActive]}
               onPress={() => setTab('reviews')} activeOpacity={0.8}>
               <Text style={[styles.tabTxt, tab === 'reviews' && styles.tabTxtActive]}>
-                Reviews{reviews.length ? ` ${reviews.length}` : ''}
+                Reviews{visReviews.length ? ` ${visReviews.length}` : ''}
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
           <Text style={styles.sectionTitle}>
-            {reactions.length === 0
+            {visReactions.length === 0
               ? 'No reactions yet'
-              : `${reactions.length} reaction${reactions.length !== 1 ? 's' : ''}`}
+              : `${visReactions.length} reaction${visReactions.length !== 1 ? 's' : ''}`}
           </Text>
         )}
       </View>
 
       {tab === 'reviews' && showReviewsTab ? (
-        reviews.length === 0 ? (
+        visReviews.length === 0 ? (
           <Text style={styles.emptyTabText}>No reviews yet</Text>
-        ) : reviews.map(rv => (
+        ) : visReviews.map(rv => (
           <TouchableOpacity
             key={rv.id}
             style={styles.reactionCard}
@@ -331,10 +337,10 @@ export default function ChannelPostScreen({
             </View>
           </TouchableOpacity>
         ))
-      ) : reactions.length === 0 && showReviewsTab ? (
+      ) : visReactions.length === 0 && showReviewsTab ? (
         <Text style={styles.emptyTabText}>No reactions yet</Text>
       ) : (
-      reactions.map(r => {
+      visReactions.map(r => {
         const state = dlState[r.id] ?? 'unavailable';
         const pct = dlPct[r.id] ?? 0;
         const canWatch = state === 'local';

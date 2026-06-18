@@ -125,9 +125,14 @@ export async function saveReaction({
     try {
       const uploadPath = `${userId}/${threadId}/${reactionId}.mp4`;
       cloudUrl = await uploadToCloud(localPath, uploadPath);
-      await (supabase as any).from('reactions').update({ video_url: cloudUrl }).eq('id', reactionId);
+      const { error: urlErr } = await (supabase as any)
+        .from('reactions').update({ video_url: cloudUrl }).eq('id', reactionId);
+      // The clip is in storage, but if this write is rejected (e.g. a missing column GRANT)
+      // video_url stays null and recipients see "Not available". Surface it loudly instead of
+      // failing silently — and don't report a cloudUrl the row doesn't actually carry.
+      if (urlErr) { cloudUrl = null; throw urlErr; }
     } catch (e) {
-      console.error('[saveReaction] cloud relay upload failed:', JSON.stringify(e));
+      console.error('[saveReaction] cloud relay upload/link failed:', JSON.stringify(e));
     }
 
     if (afterthought) { await relayAfterthought(userId, threadId, reactionId, afterthought); }
@@ -174,9 +179,13 @@ export async function saveReaction({
   try {
     const uploadPath = `${userId}/${threadId}/${reactionId}.mp4`;
     cloudUrl = await uploadToCloud(localPath, uploadPath);
-    await (supabase as any).from('reactions').update({ video_url: cloudUrl }).eq('id', reactionId);
+    const { error: urlErr } = await (supabase as any)
+      .from('reactions').update({ video_url: cloudUrl }).eq('id', reactionId);
+    // See cloud-path note above: a silently-rejected video_url write leaves recipients with
+    // "Not available" while the clip sits in storage. Surface it.
+    if (urlErr) { cloudUrl = null; throw urlErr; }
   } catch (e) {
-    console.error('[saveReaction] relay upload failed:', JSON.stringify(e));
+    console.error('[saveReaction] relay upload/link failed:', JSON.stringify(e));
   }
 
   if (afterthought) { await relayAfterthought(userId, threadId, reactionId, afterthought); }

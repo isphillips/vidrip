@@ -9,6 +9,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import { useBlockStore } from '../../../store/blockStore';
 import {
   fetchChannelPostReactions, fetchPostReviews, addChannelPostEmojiReaction, removeChannelPostEmojiReaction,
   type ChannelPost, type ChannelReview,
@@ -23,6 +24,7 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
   const { postId, channelId, title, thumbnail } = route.params;
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const blocked = useBlockStore(s => s.blocked);
 
   const [reactions, setReactions] = useState<ChannelPost[]>([]);
   const [reviews, setReviews] = useState<ChannelReview[]>([]);
@@ -43,6 +45,9 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
 
   const hasReacted = reactions.some(r => r.poster_id === user?.id);
   const hasReviewed = reviews.some(r => r.reviewer_id === user?.id);
+  // App-wide block: hide reactions/reviews authored by blocked users.
+  const visReactions = reactions.filter(r => !blocked.has(r.poster_id));
+  const visReviews = reviews.filter(r => !blocked.has(r.reviewer_id));
 
   // Reuse the channel recorders (they handle bunny posts + parent_post_id; RLS lets awarded users in).
   const recordReaction = () => (navigation as any).navigate('Channels', { screen: 'WatchYouTubePost', params: { postId, channelId } });
@@ -96,7 +101,7 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
           {(['reactions', 'reviews'] as const).map(t => (
             <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabOn]} onPress={() => setTab(t)} activeOpacity={0.8}>
               <Text style={[styles.tabTxt, tab === t && styles.tabTxtOn]}>
-                {t === 'reactions' ? `Reactions${reactions.length ? ` ${reactions.length}` : ''}` : `Reviews${reviews.length ? ` ${reviews.length}` : ''}`}
+                {t === 'reactions' ? `Reactions${visReactions.length ? ` ${visReactions.length}` : ''}` : `Reviews${visReviews.length ? ` ${visReviews.length}` : ''}`}
               </Text>
             </TouchableOpacity>
           ))}
@@ -104,9 +109,9 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
 
         {loading ? <ActivityIndicator color={C.ACCENT} style={{ marginTop: SPACE.XL }} />
           : tab === 'reactions' ? (
-            reactions.length === 0
+            visReactions.length === 0
               ? <Text style={styles.empty}>No reactions yet. Be the first.</Text>
-              : reactions.map(r => (
+              : visReactions.map(r => (
                 <TouchableOpacity key={r.id} style={styles.row} activeOpacity={r.video_url ? 0.8 : 1}
                   onPress={() => r.video_url && setClip({ url: r.video_url, label: `@${r.poster?.handle ?? 'reaction'}` })}>
                   <View style={styles.rowPlay}><Ionicons name="play" size={14} color="#fff" /></View>
@@ -117,9 +122,9 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
                 </TouchableOpacity>
               ))
           ) : (
-            reviews.length === 0
+            visReviews.length === 0
               ? <Text style={styles.empty}>No reviews yet.</Text>
-              : reviews.map(rv => (
+              : visReviews.map(rv => (
                 <TouchableOpacity key={rv.id} style={styles.row} activeOpacity={rv.video_url ? 0.8 : 1}
                   onPress={() => rv.video_url && setClip({ url: rv.video_url, label: `★ @${rv.reviewer?.handle ?? 'review'}` })}>
                   <View style={[styles.rowPlay, { backgroundColor: C.GOLD }]}><Ionicons name="star" size={13} color="#fff" /></View>

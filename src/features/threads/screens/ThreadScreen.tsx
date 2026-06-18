@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import { useBlockStore } from '../../../store/blockStore';
 import { usePendingReactionsStore } from '../../../store/pendingReactionsStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { useIntroSeenStore } from '../../../store/introSeenStore';
@@ -48,6 +49,7 @@ type DlStatus = 'local' | 'downloading' | 'unavailable';
 export default function ThreadScreen({ route, navigation }: FeedStackScreenProps<'Thread'>) {
   const { threadId } = route.params;
   const { user } = useAuthStore();
+  const blocked = useBlockStore(s => s.blocked);
   const { top } = useSafeAreaInsets();
   const { height } = useWindowDimensions();
 
@@ -110,7 +112,8 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     }
   }, [user?.id, reactions, load]);
 
-  useEffect(() => { load(); }, [load]);
+  // useFocusEffect fires on the initial (focused) mount and on every refocus, so a
+  // separate mount-only useEffect would double the thread+reactions fetch on first open.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // Refetch the moment a background upload finishes, so a just-posted reaction
@@ -180,13 +183,15 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     return <View style={styles.center}><Text style={styles.errorText}>Thread not found</Text></View>;
   }
 
+  // App-wide block: drop reactions from a blocked user (their poster id is on r.user.id).
+  const visibleReactions = reactions.filter(r => !blocked.has((r.user as any)?.id));
   // Fold in optimistic reactions for this thread (own just-posted, upload in-flight).
   const pendingForThread = pendingReactions.filter(
     p => p.thread_id === threadId && !reactions.some(r => r.id === p.id),
   );
   const displayReactions = pendingForThread.length
-    ? [...reactions, ...pendingForThread]
-    : reactions;
+    ? [...visibleReactions, ...pendingForThread]
+    : visibleReactions;
 
   const isSender = thread.sender_id === user?.id;
 
