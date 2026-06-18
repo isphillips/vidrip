@@ -19,6 +19,7 @@ import Handle from '../../../components/Handle';
 import { BRAND_GRADIENT } from '../../../components/GradientIcon';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import { useBlockStore } from '../../../store/blockStore';
 import {
   fetchFriends,
   fetchPendingRequests,
@@ -32,9 +33,13 @@ import type { FriendsStackScreenProps } from '../../../app/navigation/types';
 export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProps<'FriendsHome'>) {
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const blocked = useBlockStore(s => s.blocked);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  // App-wide block: hide blocked users from the friends + requests lists.
+  const visFriends = friends.filter(f => !blocked.has(f.userId));
+  const visPending = pending.filter(p => !blocked.has(p.userId));
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -96,10 +101,10 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
         </TouchableOpacity>
       </View>
 
-      {pending.length > 0 && (
+      {visPending.length > 0 && (
         <>
           <Text style={styles.sectionLabel}>Requests</Text>
-          {pending.map((req) => (
+          {visPending.map((req) => (
             <View key={req.friendshipId} style={styles.requestRow}>
               <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: req.userId })} activeOpacity={0.8}>
                 {req.avatarUrl ? (
@@ -128,14 +133,14 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
         </>
       )}
 
-      {friends.length === 0 ? (
+      {visFriends.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>No friends yet</Text>
           <Text style={styles.emptyHint}>Tap + to find people by handle</Text>
         </View>
       ) : (
         <FlatList
-          data={friends}
+          data={visFriends}
           keyExtractor={(item) => item.userId}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (

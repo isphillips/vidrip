@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { useFeedStore } from '../../../store/feedStore';
+import { useBlockStore } from '../../../store/blockStore';
 import { fetchFeedThreads, type FeedThread } from '../../../infrastructure/supabase/queries/threads';
 import {
   fetchMyReviews, fetchChannelsToReact, fetchMyChannelReactions,
@@ -90,6 +91,8 @@ function ActionBtn({
 export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'FeedHome'>) {
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
+  // App-wide block: hide threads from blocked users (and users who blocked me).
+  const blocked = useBlockStore(s => s.blocked);
 
   // The "drip" gradient is twice the text width with a repeating pink→purple→pink
   // pattern; sliding it left by one text-width loops seamlessly, so the colors flow
@@ -164,7 +167,9 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     try { setMyChannelReactions(await fetchMyChannelReactions(user.id)); } catch { /* swallow */ }
   }, [user]);
 
-  useEffect(() => { load(); loadChannels(); loadReviews(); loadChannelReactions(); }, [load, loadChannels, loadReviews, loadChannelReactions]);
+  // useFocusEffect already fires on the initial (focused) mount AND on every refocus,
+  // so a separate mount-only useEffect would double every query on first load. Rely on
+  // the focus effect alone.
   useFocusEffect(useCallback(() => { load(); loadChannels(); loadReviews(); loadChannelReactions(); }, [load, loadChannels, loadReviews, loadChannelReactions]));
 
   // ── Actions ──────────────────────────────────────────────────────────────────
@@ -187,7 +192,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
 
   // ── Computed list ────────────────────────────────────────────────────────────
   const displayed = useMemo(() => {
-    let list = threads.filter(t => !hidden.has(t.id));
+    let list = threads.filter(t => !hidden.has(t.id) && !blocked.has(t.sender_id));
     // Sub-filter pills: My Reactions = ones I reacted to; My Requests = ones I sent.
     if (filter === 'toreact') { list = list.filter(t => needsReaction(t, user?.id)); }
     else if (filter === 'reactions') { list = list.filter(t => t.my_status === 'reacted'); }
@@ -208,14 +213,14 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         .map(({ t }) => t);
     }
     return list;
-  }, [threads, hidden, favs, tab, filter, user?.id]);
+  }, [threads, hidden, favs, tab, filter, user?.id, blocked]);
 
   // "My Reactions" = ALL of the user's reactions, merged + newest first:
   //  - friend-share reactions (threads I reacted to → open the Thread)
   //  - channel-clip reactions (channel_posts → open in the channel)
   const myReactionsList = useMemo(() => {
     const fromThreads = threads
-      .filter(t => !hidden.has(t.id) && t.my_status === 'reacted')
+      .filter(t => !hidden.has(t.id) && !blocked.has(t.sender_id) && t.my_status === 'reacted')
       .map(t => ({
         kind: 'thread' as const,
         id: t.id,
@@ -239,12 +244,12 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
       meta: r.duration ? `▶ ${r.duration}s reaction` : 'Reaction',
     }));
     return [...fromThreads, ...fromChannels].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-  }, [threads, hidden, myChannelReactions]);
+  }, [threads, hidden, myChannelReactions, blocked]);
 
   // Pill counts are scoped to the ACTIVE tab's partition (Favorites = favorited
   // threads, Feed = the rest) so the bubbles match the list actually shown.
   const counts = useMemo(() => {
-    const visible = threads.filter(t => !hidden.has(t.id));
+    const visible = threads.filter(t => !hidden.has(t.id) && !blocked.has(t.sender_id));
     const base = tab === 'favorites'
       ? visible.filter(t => favs.has(t.id))
       : visible.filter(t => !favs.has(t.id));
@@ -253,13 +258,13 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
       reactions: base.filter(t => t.my_status === 'reacted').length,
       requests: base.filter(t => t.sender_id === user?.id).length,
     } as Record<Filter, number>;
-  }, [threads, hidden, favs, tab, user?.id]);
+  }, [threads, hidden, favs, tab, user?.id, blocked]);
 
   // The bottom-nav Feed badge always reflects the main feed's to-react items
   // (non-favorited), independent of which tab the user is currently viewing.
   const feedToReact = useMemo(
-    () => threads.filter(t => !hidden.has(t.id) && !favs.has(t.id) && needsReaction(t, user?.id)).length,
-    [threads, hidden, favs, user?.id],
+    () => threads.filter(t => !hidden.has(t.id) && !favs.has(t.id) && !blocked.has(t.sender_id) && needsReaction(t, user?.id)).length,
+    [threads, hidden, favs, user?.id, blocked],
   );
   const setToReactCount = useFeedStore(s => s.setToReactCount);
   useEffect(() => { setToReactCount(feedToReact); }, [feedToReact, setToReactCount]);

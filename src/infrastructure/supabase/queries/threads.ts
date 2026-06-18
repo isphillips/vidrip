@@ -143,7 +143,7 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
     .select(`
       id, thread_id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type, recorded_with_headphones,
       afterthought_url, afterthought_duration,
-      user:users!user_id(handle, display_name),
+      user:users!user_id(id, handle, display_name),
       emoji_reactions(emoji, user_id),
       thread:threads!thread_id(intro_url, intro_duration)
     `)
@@ -165,7 +165,7 @@ export async function fetchReactions(threadId: string): Promise<ReactionItem[]> 
     .select(`
       id, video_url, storage_mode, duration, created_at, yt_video_id, yt_start_offset, source_type, recorded_with_headphones,
       afterthought_url, afterthought_duration,
-      user:users!user_id(handle, display_name),
+      user:users!user_id(id, handle, display_name),
       emoji_reactions(emoji, user_id)
     `)
     .eq('thread_id', threadId)

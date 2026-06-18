@@ -24,8 +24,11 @@ export default function CreateProfileScreen({
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
-    const trimmedHandle = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-    if (!email.trim() || !trimmedHandle || !displayName.trim()) return;
+    // `handle` is already normalized on input (lowercase, [a-z0-9_] only), so this
+    // matches exactly what the validation below gated on — no risk of sending an
+    // empty/too-short handle that passed a raw-length check.
+    const trimmedHandle = handle;
+    if (!email.trim() || trimmedHandle.length < 3 || !displayName.trim()) return;
 
     setLoading(true);
     try {
@@ -56,7 +59,7 @@ export default function CreateProfileScreen({
   };
 
   const isValid =
-    email.includes('@') && handle.trim().length >= 3 && displayName.trim().length >= 1;
+    email.includes('@') && handle.length >= 3 && displayName.trim().length >= 1;
 
   return (
     <KeyboardAvoidingView
@@ -83,7 +86,7 @@ export default function CreateProfileScreen({
           <TextInput
             style={styles.input}
             value={handle}
-            onChangeText={setHandle}
+            onChangeText={t => setHandle(t.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
             placeholder="yourhandle"
             placeholderTextColor={C.SUBTLE}
             autoCapitalize="none"
