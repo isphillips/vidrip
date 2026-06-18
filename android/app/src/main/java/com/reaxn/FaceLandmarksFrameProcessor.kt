@@ -26,8 +26,8 @@ class FaceLandmarksFrameProcessor(proxy: VisionCameraProxy, options: Map<String,
     val det = detector ?: return mapOf("err" to "no_model")
     val image = frame.image ?: return mapOf("err" to "no_image")
     val mp = MediaImageBuilder(image).build()
-    // VIDEO mode: feed a monotonically-increasing timestamp (uptime ms) so MediaPipe tracks across
-    // frames. uptimeMillis only ever increases for this process.
+    // Orientation is handled in JS (faceTracking.ts, per frame.orientation) — keypoints are returned
+    // in the raw sensor space.
     val ts = android.os.SystemClock.uptimeMillis()
     val result = try { det.detectForVideo(mp, ts) } catch (e: Throwable) { return mapOf("err" to "detect_fail") }
     val detections = result.detections()

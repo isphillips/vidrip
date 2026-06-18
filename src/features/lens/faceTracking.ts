@@ -94,23 +94,21 @@ const ROLL_FIX_DEG = 4;
 //      jittery mouth keypoint never enters the transform.
 //   3. The eye-midpoint pivot leaves everything one eye→mouth distance low, so LIFT raises it along
 //      the face-up axis (see above) — the only fudge, and a face-relative one so tilt survives.
-function reduce(points: number[][] | null | undefined, aspect: number, orientation: string, mirrored: boolean): FaceLandmarks | null {
+function reduce(points: number[][] | null | undefined, aspect: number, orientation: string, _mirrored: boolean): FaceLandmarks | null {
   'worklet';
   if (!points || points.length < 6) { return null; }
 
-  // Android: the native side passes the RAW sensor buffer (no rotation), so the keypoint convention
-  // depends on the device's sensor mounting — which VARIES by phone. We de-rotate to upright using
-  // the frame's reported orientation, then apply the selfie mirror. Device-independent (no per-device
-  // hacks): on a landscape-left front cam this reduces to (p1, p0), matching the hand-tuned sim case.
+  // Android: native returns RAW sensor keypoints; their convention depends on the camera's mounting,
+  // which a portrait-locked app sees as either 'landscape-left' or 'landscape-right'. Both are
+  // verified empirically from on-device raw data (see face-lens-orientation-calibration memory):
+  //   landscape-right (e.g. emulator): x = p1, y = p0
+  //   landscape-left  (e.g. OnePlus):  x = p0, y = 1 - p1
+  // Already upright + selfie-mirrored — no reflection / lift / roll-fix.
   if (IS_ANDROID) {
     const a = (i: number) => {
-      let x = points[i][0], y = points[i][1];
-      // rotate buffer→upright (normalized, y-down)
-      if (orientation === 'landscape-left') { const nx = 1 - y; y = x; x = nx; }
-      else if (orientation === 'landscape-right') { const nx = y; y = 1 - x; x = nx; }
-      else if (orientation === 'portrait-upside-down') { x = 1 - x; y = 1 - y; }
-      // 'portrait' → identity
-      if (mirrored) { x = 1 - x; }
+      const p0 = points[i][0], p1 = points[i][1];
+      const x = orientation === 'landscape-left' ? p0 : p1;
+      const y = orientation === 'landscape-left' ? 1 - p1 : p0;
       return { x: x + ANDROID_DX, y };
     };
     const le = a(LEFT_EYE), re = a(RIGHT_EYE), nose = a(NOSE_TIP), mouth = a(MOUTH);
