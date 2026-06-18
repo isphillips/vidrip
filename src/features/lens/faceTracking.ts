@@ -101,14 +101,15 @@ function reduce(points: number[][] | null | undefined, aspect: number, orientati
   // Android: native returns RAW sensor keypoints; their convention depends on the camera's mounting,
   // which a portrait-locked app sees as either 'landscape-left' or 'landscape-right'. Both are
   // verified empirically from on-device raw data (see face-lens-orientation-calibration memory):
-  //   landscape-right (e.g. emulator): x = p1, y = p0
-  //   landscape-left  (e.g. OnePlus):  x = p0, y = 1 - p1
+  //   landscape-right (e.g. emulator): x = p1,     y = p0
+  //   landscape-left  (e.g. OnePlus):  x = 1 - p1, y = 1 - p0   (a 180° flip — the two are 180° apart)
   // Already upright + selfie-mirrored — no reflection / lift / roll-fix.
   if (IS_ANDROID) {
+    const ll = orientation === 'landscape-left';
     const a = (i: number) => {
       const p0 = points[i][0], p1 = points[i][1];
-      const x = orientation === 'landscape-left' ? p0 : p1;
-      const y = orientation === 'landscape-left' ? 1 - p1 : p0;
+      const x = ll ? 1 - p1 : p1;
+      const y = ll ? 1 - p0 : p0;
       return { x: x + ANDROID_DX, y };
     };
     const le = a(LEFT_EYE), re = a(RIGHT_EYE), nose = a(NOSE_TIP), mouth = a(MOUTH);
