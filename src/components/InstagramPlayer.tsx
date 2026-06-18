@@ -2,7 +2,7 @@ import React, {
   forwardRef, useCallback, useImperativeHandle, useRef, useState,
 } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
-import Video from 'react-native-video';
+import Video, { ViewType } from 'react-native-video';
 import type { PlayerState } from './TikTokPlayer';
 
 // Mirrors TikTokPlayerHandle so this drops into the same source-player slots on
@@ -58,6 +58,11 @@ const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function Instag
       style={style}
       paused={paused}
       muted={muted}
+      // Render into a TextureView (not the default SurfaceView) on Android so this
+      // native-video source composites in the normal view hierarchy — exactly like
+      // the WebView-based YouTube/TikTok/live-IG sources. This makes the semi-
+      // transparent recording PIP blend identically over every source type.
+      viewType={ViewType.TEXTURE}
       resizeMode="cover"
       mixWithOthers="mix"
       playInBackground={false}

@@ -584,6 +584,12 @@ export default function ReactionRecorder({
               // renders on its own layer that ignores the parent's rounded-corner clip, so the
               // camera frame bleeds past the PIP border on Android. Full-screen keeps surface-view.
               androidPreviewViewType={camAsPip ? 'texture-view' : 'surface-view'}
+              // Force portrait output. Default outputOrientation is 'device', which rotates the
+              // recorded file to the physical device orientation (accelerometer) even though the UI
+              // is locked to portrait — holding the phone in landscape produced landscape reactions.
+              // 'preview' ties the output to the preview view, which is pinned portrait by
+              // Orientation.lockToPortrait(), so reactions always record portrait.
+              outputOrientation="preview"
               // 2 Mbps video keeps a 180s reaction at ~48MB, under the 50MB upload limit.
               videoBitRate={2}
               isActive={camActive}

@@ -133,6 +133,15 @@ export default function MainTabs() {
       tabBar={(props) => <MainTabBar {...props} canCreate={canCreate} />}
     >
       <Tab.Screen name="Feed" component={FeedNavigator}
+        listeners={({ navigation }) => ({
+          // Always land on the feed list when the tab is tapped — otherwise opening a
+          // video (Thread / WatchReview / Exclusive*) leaves the tab parked on that
+          // screen and re-tapping Feed does nothing.
+          tabPress: (e) => {
+            e.preventDefault();
+            (navigation as any).navigate('Feed', { screen: 'FeedHome' });
+          },
+        })}
         options={{
           tabBarIcon: tabIcon(require('../../assets/icon-feed.png')),
           tabBarLabel: 'Feed',
@@ -158,8 +167,24 @@ export default function MainTabs() {
         })}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Browse' }} />
       <Tab.Screen name="Friends" component={FriendsNavigator}
+        listeners={({ navigation }) => ({
+          // Tapping Friends always returns to the friends list, regardless of how
+          // deep the stack is (Profile / AddFriend / InviteManagement).
+          tabPress: (e) => {
+            e.preventDefault();
+            (navigation as any).navigate('Friends', { screen: 'FriendsHome' });
+          },
+        })}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-friends.png')), tabBarLabel: 'Friends' }} />
       <Tab.Screen name="Account" component={AccountNavigator}
+        listeners={({ navigation }) => ({
+          // Tapping Account always returns to the account home, regardless of how
+          // deep the stack is (EditProfile / PasswordSetup / TwoFactor / etc).
+          tabPress: (e) => {
+            e.preventDefault();
+            (navigation as any).navigate('Account', { screen: 'AccountHome' });
+          },
+        })}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-account.png')), tabBarLabel: 'Account' }} />
     </Tab.Navigator>
   );

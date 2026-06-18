@@ -13,6 +13,9 @@ export type FeedThread = {
   sender: { handle: string; display_name: string } | null;
   my_status: 'pending' | 'seen' | 'reacted' | null; // null = I am the sender
   reaction_count: number;
+  // Entry point for "My Reactions" → opens the reaction viewer directly (my own
+  // reaction if present, else the first one) instead of the chat thread.
+  my_reaction_id: string | null;
 };
 
 export type ThreadDetail = {
@@ -62,7 +65,7 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
       id, video_id, video_title, video_thumbnail, source_type, sender_id, created_at,
       sender:users!sender_id(handle, display_name),
       thread_members(user_id, status),
-      reactions(id)
+      reactions(id, user_id)
     `)
     .order('created_at', { ascending: false });
 
@@ -70,6 +73,7 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
 
   return (data ?? []).map((t: any) => {
     const myMembership = t.thread_members?.find((m: any) => m.user_id === userId);
+    const myReaction = t.reactions?.find((r: any) => r.user_id === userId);
     return {
       id: t.id,
       video_id: t.video_id,
@@ -81,6 +85,7 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
       sender: t.sender,
       my_status: myMembership?.status ?? null,
       reaction_count: t.reactions?.length ?? 0,
+      my_reaction_id: myReaction?.id ?? t.reactions?.[0]?.id ?? null,
     };
   });
 }

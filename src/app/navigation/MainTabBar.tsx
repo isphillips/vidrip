@@ -59,6 +59,22 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
   const toReact = useFeedStore(s => s.toReactCount);
   const current = state.routes[state.index]?.name;
 
+  // Emit the standard `tabPress` event (respecting preventDefault) instead of calling
+  // navigate() directly — otherwise the per-tab `tabPress` listeners in MainTabs (which
+  // reset each stack to its home screen) never fire and tapping a tab while deep in its
+  // stack does nothing.
+  const handleTabPress = (routeName: string) => {
+    const route = state.routes.find(r => r.name === routeName);
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: route?.key,
+      canPreventDefault: true,
+    });
+    if (!event.defaultPrevented) {
+      navigation.navigate(routeName as never);
+    }
+  };
+
   // One slow flow drives every gradient (UI-thread translateX → smooth + seamless).
   // Each gradient is 2× its element's width; sliding by one width loops with no seam.
   const [badgeSize, setBadgeSize] = useState({ w: 64, h: 20 });
@@ -83,18 +99,18 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
     setMoreOpen(open);
     Animated.timing(more, { toValue: open ? 1 : 0, duration: 200, useNativeDriver: true }).start();
   };
-  const go = (route: string) => { toggleMore(false); navigation.navigate(route as never); };
+  const go = (route: string) => { toggleMore(false); handleTabPress(route); };
   const moreActive = current === 'Friends' || current === 'Account';
 
   // Non-studio users get the plain, flat 5-tab bar — no FAB, More, border, or badge.
   if (!canCreate) {
     return (
       <View style={[styles.bar, { height: BAR_H + bottom, paddingBottom: bottom }]}>
-        <TabBtn route="Feed"     label="Feed"     active={current === 'Feed'}     toReact={toReact} onPress={() => navigation.navigate('Feed' as never)} />
-        <TabBtn route="Channels" label="Channels" active={current === 'Channels'} toReact={toReact} onPress={() => navigation.navigate('Channels' as never)} />
-        <TabBtn route="Share"    label="Browse"   active={current === 'Share'}    toReact={toReact} onPress={() => navigation.navigate('Share' as never)} />
-        <TabBtn route="Friends"  label="Friends"  active={current === 'Friends'}  toReact={toReact} onPress={() => navigation.navigate('Friends' as never)} />
-        <TabBtn route="Account"  label="Account"  active={current === 'Account'}  toReact={toReact} onPress={() => navigation.navigate('Account' as never)} />
+        <TabBtn route="Feed"     label="Feed"     active={current === 'Feed'}     toReact={toReact} onPress={() => handleTabPress('Feed')} />
+        <TabBtn route="Channels" label="Channels" active={current === 'Channels'} toReact={toReact} onPress={() => handleTabPress('Channels')} />
+        <TabBtn route="Share"    label="Browse"   active={current === 'Share'}    toReact={toReact} onPress={() => handleTabPress('Share')} />
+        <TabBtn route="Friends"  label="Friends"  active={current === 'Friends'}  toReact={toReact} onPress={() => handleTabPress('Friends')} />
+        <TabBtn route="Account"  label="Account"  active={current === 'Account'}  toReact={toReact} onPress={() => handleTabPress('Account')} />
       </View>
     );
   }
@@ -175,8 +191,8 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
           </View>
         )}
 
-        <TabBtn route={PRIMARY[0].route} label={PRIMARY[0].label} active={current === PRIMARY[0].route} toReact={toReact} onPress={() => navigation.navigate(PRIMARY[0].route as never)} />
-        <TabBtn route={PRIMARY[1].route} label={PRIMARY[1].label} active={current === PRIMARY[1].route} toReact={toReact} onPress={() => navigation.navigate(PRIMARY[1].route as never)} />
+        <TabBtn route={PRIMARY[0].route} label={PRIMARY[0].label} active={current === PRIMARY[0].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[0].route)} />
+        <TabBtn route={PRIMARY[1].route} label={PRIMARY[1].label} active={current === PRIMARY[1].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[1].route)} />
 
         {canCreate ? (
           <TouchableOpacity style={styles.fabSlot} activeOpacity={0.85} onPress={() => navigation.getParent()?.navigate('Studio' as never)}>
@@ -188,7 +204,7 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
           </TouchableOpacity>
         ) : null}
 
-        <TabBtn route={PRIMARY[2].route} label={PRIMARY[2].label} active={current === PRIMARY[2].route} toReact={toReact} onPress={() => navigation.navigate(PRIMARY[2].route as never)} />
+        <TabBtn route={PRIMARY[2].route} label={PRIMARY[2].label} active={current === PRIMARY[2].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[2].route)} />
 
         {/* More (hamburger) */}
         {(() => {

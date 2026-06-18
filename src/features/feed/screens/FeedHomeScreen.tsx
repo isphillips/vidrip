@@ -224,6 +224,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
       .map(t => ({
         kind: 'thread' as const,
         id: t.id,
+        reactionId: t.my_reaction_id,
         created_at: t.created_at,
         thumbnail: t.video_thumbnail
           ?? (t.source_type === 'youtube' ? `https://img.youtube.com/vi/${t.video_id}/hqdefault.jpg` : null),
@@ -489,7 +490,11 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
               style={styles.card}
               activeOpacity={0.8}
               onPress={() => item.kind === 'thread'
-                ? navigation.navigate('Thread', { threadId: item.id })
+                // Open the reaction viewer directly (Back → My Reactions). Fall back to
+                // the chat only if no reaction id resolved.
+                ? item.reactionId
+                  ? navigation.navigate('WatchReaction', { reactionId: item.reactionId })
+                  : navigation.navigate('Thread', { threadId: item.id })
                 : (navigation as any).navigate('Channels', { screen: 'WatchChannelClip', params: { postId: item.id } })}>
               <View style={styles.thumbnail}>
                 {item.thumbnail ? (
