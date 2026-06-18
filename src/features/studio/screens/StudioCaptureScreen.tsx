@@ -153,11 +153,9 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
             isActive
             video
             audio
-            // Keep the buffer format CONSTANT across lens toggles so the session never has to
-            // re-negotiate on iOS (which either kept a stale lossy buffer Skia can't read — "-8f0" —
-            // or failed the AVCaptureSession reconfig — "-11800"). We start in RGB (BGRA) + no
-            // compression up front: MediaPipe needs RGB anyway, and the Skia warp can read BGRA, so
-            // switching to Mega Eyes needs no format change.
+            // Keep the buffer format CONSTANT (RGB) across lens toggles so the session never has to
+            // re-negotiate on iOS ("-8f0"/"-11800"). RGB is also required by MediaPipe's MediaImage on
+            // Android here — switching to YUV made detectForVideo throw (detect_fail).
             pixelFormat={faceTrackingAvailable ? 'rgb' : 'yuv'}
             enableBufferCompression={false}
             frameProcessor={
