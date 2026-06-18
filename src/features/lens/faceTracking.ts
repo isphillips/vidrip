@@ -11,9 +11,9 @@ import type { FaceLandmarks, FaceLensTrack } from './faceLens';
 //    down, p1 = horizontal eye axis) → only the selfie mirror is needed; the reflection would flip it.
 const IS_ANDROID = Platform.OS === 'android';
 
-// Android only: a small constant horizontal nudge (normalized) to re-center the markers, which sit a
-// touch to one side of the face. NEGATIVE moves them toward screen-LEFT, positive toward screen-RIGHT.
-const ANDROID_DX = -0.27;
+// Android only: optional constant horizontal nudge (normalized). With correct orientation de-rotation
+// this should stay 0; only set it if markers sit consistently to one side. NEGATIVE = screen-LEFT.
+const ANDROID_DX = 0;
 
 // Replay sampling rate for the captured track — 15fps is plenty for an overlay and keeps the
 // persisted track small.
@@ -94,14 +94,25 @@ const ROLL_FIX_DEG = 4;
 //      jittery mouth keypoint never enters the transform.
 //   3. The eye-midpoint pivot leaves everything one eye→mouth distance low, so LIFT raises it along
 //      the face-up axis (see above) — the only fudge, and a face-relative one so tilt survives.
-function reduce(points: number[][] | null | undefined, aspect: number): FaceLandmarks | null {
+function reduce(points: number[][] | null | undefined, aspect: number, orientation: string, mirrored: boolean): FaceLandmarks | null {
   'worklet';
   if (!points || points.length < 6) { return null; }
 
-  // Android: raw coords are already ~upright and the selfie preview's mirror matches the raw x, so
-  // x = p1 directly (1 - p1 tracked reversed). y = p0 (vertical). No reflection / lift / roll-fix.
+  // Android: the native side passes the RAW sensor buffer (no rotation), so the keypoint convention
+  // depends on the device's sensor mounting — which VARIES by phone. We de-rotate to upright using
+  // the frame's reported orientation, then apply the selfie mirror. Device-independent (no per-device
+  // hacks): on a landscape-left front cam this reduces to (p1, p0), matching the hand-tuned sim case.
   if (IS_ANDROID) {
-    const a = (i: number) => ({ x: points[i][1] + ANDROID_DX, y: points[i][0] });
+    const a = (i: number) => {
+      let x = points[i][0], y = points[i][1];
+      // rotate buffer→upright (normalized, y-down)
+      if (orientation === 'landscape-left') { const nx = 1 - y; y = x; x = nx; }
+      else if (orientation === 'landscape-right') { const nx = y; y = 1 - x; x = nx; }
+      else if (orientation === 'portrait-upside-down') { x = 1 - x; y = 1 - y; }
+      // 'portrait' → identity
+      if (mirrored) { x = 1 - x; }
+      return { x: x + ANDROID_DX, y };
+    };
     const le = a(LEFT_EYE), re = a(RIGHT_EYE), nose = a(NOSE_TIP), mouth = a(MOUTH);
     const er = a(EAR_R), el = a(EAR_L);
     return {
@@ -200,10 +211,12 @@ export function useFaceTracking(mirror = true) {
   }, []);
   const setAspectJs = Worklets.createRunOnJS(setAspect);
 
-  // TEMP DIAGNOSTIC: log raw keypoints ~1/sec to calibrate the Android orientation convention.
+  // TEMP DIAGNOSTIC: log the frame orientation + raw keypoints ~1/sec to calibrate per-device.
   const dbgRef = useRef(0);
-  const logRaw = useCallback((pts: number[][]) => {
+  const logRaw = useCallback((pts: number[][], orientation: string, mirrored: boolean, w: number, h: number) => {
     if (dbgRef.current++ % 30 !== 0) { return; }
+    console.log('[faceTracking] ori', orientation, 'mirrored', mirrored, 'size', `${w}x${h}`,
+      '| RE', pts[0].map(r3), 'LE', pts[1].map(r3), 'nose', pts[2].map(r3), 'mouth', pts[3].map(r3));
   }, []);
   const logRawJs = Worklets.createRunOnJS(logRaw);
 
@@ -216,9 +229,13 @@ export function useFaceTracking(mirror = true) {
       // orientation — the true space the keypoints live in.
       const aspect = Math.min(frame.width, frame.height) / Math.max(frame.width, frame.height);
       setAspectJs(aspect);
+      const ori = String(frame.orientation);
+      const mir = !!frame.isMirrored;
       const res = plugin!.call(frame) as unknown as { points?: number[][]; err?: string } | null;
-      if (res && res.points) { logRawJs(res.points); pushJs(reduce(res.points, aspect), 'ok'); }
-      else { pushJs(null, (res && res.err) || 'null'); }
+      if (res && res.points) {
+        logRawJs(res.points, ori, mir, frame.width, frame.height);
+        pushJs(reduce(res.points, aspect, ori, mir), 'ok');
+      } else { pushJs(null, (res && res.err) || 'null'); }
     });
   }, [pushJs, setAspectJs, logRawJs, mirror]);
 
