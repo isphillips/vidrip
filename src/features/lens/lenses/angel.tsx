@@ -1,14 +1,29 @@
 import React from 'react';
-import { Group, Circle, RadialGradient, SweepGradient, BlurMask, vec } from '@shopify/react-native-skia';
+import { Group, Path, Skia, SweepGradient, BlurMask, vec } from '@shopify/react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
-import { off, rnd, Drifter, ScreenTint, WorldVignette, GodRays, Motes, type LensProps } from '../core';
+import { off, rnd, Drifter, Bloom, ScreenTint, WorldVignette, GodRays, Motes, type LensProps } from '../core';
+
+const HALO_GOLD = ['#FFE680', '#FFFBE0', '#FFC93C', '#FFFBE0', '#FFE680'];
 
 // The heavens: a soft golden-white bloom, divine light pouring from above, drifting feathers/motes,
-// a glowing halo, and rising sparkles.
+// a halo worn around the head, and rising sparkles.
 export function Angel({ f, clock, w, h }: LensProps) {
-  const halo = off(f, f.eyeMid, f.faceW * 0.95, 0);
-  const ringR = useDerivedValue(() => f.faceW * 0.45 * (1 + 0.03 * Math.sin(clock.value * 2)));
-  const bob = useDerivedValue(() => [{ translateY: Math.sin(clock.value * 1.5) * f.faceW * 0.03 }]);
+  const rad = (f.rollDeg * Math.PI) / 180;
+  // The halo is a perspective ring (flattened ellipse) seated just above the crown, tilted to follow
+  // the head. Its back arc passes behind the head (dimmer/thinner); its front arc crosses the brow
+  // (bright/thick) — so it reads as worn rather than a flat disc on screen.
+  const halo = off(f, f.eyeMid, f.faceW * 0.82, 0);
+  const rx = f.faceW * 0.62, ry = f.faceW * 0.2;
+  const oval = Skia.XYWHRect(-rx, -ry, rx * 2, ry * 2);
+  const backArc = (() => { const p = Skia.Path.Make(); p.addArc(oval, 180, 180); return p; })();  // top (behind)
+  const frontArc = (() => { const p = Skia.Path.Make(); p.addArc(oval, 0, 180); return p; })();    // bottom (front)
+  const haloTf = useDerivedValue(() => [
+    { translateX: halo.x },
+    { translateY: halo.y + Math.sin(clock.value * 1.5) * f.faceW * 0.03 },
+    { rotate: rad },
+    { scale: 1 + 0.03 * Math.sin(clock.value * 2) },
+  ]);
+  const breath = useDerivedValue(() => 0.7 + 0.3 * Math.abs(Math.sin(clock.value * 1.2)));
   const c = { x: f.nose.x, y: f.eyeMid.y };
   return (
     <>
@@ -17,15 +32,23 @@ export function Angel({ f, clock, w, h }: LensProps) {
       <WorldVignette w={w} h={h} colors={['rgba(255,250,220,0)', 'rgba(255,240,190,0.25)', 'rgba(255,225,150,0.5)']} />
       <GodRays w={w} h={h} x={w * 0.5} y={-h * 0.1} color="rgba(255,248,210,0.6)" count={7} spread={1.3} clock={clock} opacity={0.5} />
       <Motes w={w} h={h} count={18} color="rgba(255,250,225,0.9)" clock={clock} dir={1} sizeMin={1.5} sizeMax={4} star seed={4} />
-      <Circle cx={c.x} cy={c.y} r={f.faceW * 1.3} opacity={0.35}>
-        <RadialGradient c={vec(c.x, c.y)} r={f.faceW * 1.3} colors={['#FFF6CF', 'rgba(255,240,180,0)']} />
-        <BlurMask blur={26} style="normal" />
-      </Circle>
-      <Group transform={bob}>
-        <Circle cx={halo.x} cy={halo.y} r={ringR} style="stroke" strokeWidth={f.faceW * 0.1}>
-          <SweepGradient c={vec(halo.x, halo.y)} colors={['#FFE680', '#FFFBE0', '#FFC93C', '#FFFBE0', '#FFE680']} />
+      <Group opacity={breath}>
+        <Bloom x={c.x} y={c.y} r={f.faceW * 1.45} inner="rgba(255,246,207,0.7)" outer="rgba(255,240,180,0)" opacity={0.5} />
+      </Group>
+      <Group transform={haloTf}>
+        {/* back of the ring — behind the head, so dimmer and thinner */}
+        <Path path={backArc} style="stroke" strokeWidth={f.faceW * 0.055} strokeCap="round" opacity={0.5} color="#FFE9A8">
           <BlurMask blur={6} style="solid" />
-        </Circle>
+        </Path>
+        {/* glow under the ring */}
+        <Path path={frontArc} style="stroke" strokeWidth={f.faceW * 0.18} strokeCap="round" opacity={0.35} color="#FFE680">
+          <BlurMask blur={f.faceW * 0.12} style="normal" />
+        </Path>
+        {/* front of the ring — worn across the brow, bright and thick */}
+        <Path path={frontArc} style="stroke" strokeWidth={f.faceW * 0.09} strokeCap="round">
+          <SweepGradient c={vec(0, 0)} colors={HALO_GOLD} />
+          <BlurMask blur={4} style="solid" />
+        </Path>
       </Group>
       {Array.from({ length: 12 }).map((_, i) => {
         const sx = off(f, f.eyeMid, -f.faceW * 0.2, (rnd(i) - 0.5) * f.faceW * 1.4);

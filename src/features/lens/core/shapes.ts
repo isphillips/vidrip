@@ -1,4 +1,4 @@
-import { Skia, type SkPath } from '@shopify/react-native-skia';
+import { Skia, FillType, type SkPath } from '@shopify/react-native-skia';
 
 // ─── Reusable Skia shapes ────────────────────────────────────────────────────
 // Built once in JS at unit scale (centered on the origin), then placed/sized/animated by each lens
@@ -134,6 +134,24 @@ export const CROWN: SkPath = (() => {
   p.lineTo(0.5, -0.05);
   p.lineTo(0.5, 0.25);
   p.close();
+  return p;
+})();
+
+// The biohazard trefoil (unit, centred): three interlocking rings around a centre, carved with an
+// even-odd fill so the open interlock reads. Recognisable as the hazard symbol at sign or stencil
+// scale. The lobes sit one-up / two-down (the canonical orientation).
+export const BIOHAZARD: SkPath = (() => {
+  const p = Skia.Path.Make();
+  p.setFillType(FillType.EvenOdd);
+  const R = 0.26, D = 0.27, ri = 0.115;
+  const angles = [-Math.PI / 2, Math.PI / 6, (Math.PI * 5) / 6]; // up, lower-right, lower-left
+  for (const a of angles) {
+    const cx = Math.cos(a) * D, cy = Math.sin(a) * D;
+    p.addCircle(cx, cy, R);   // outer ring
+    p.addCircle(cx, cy, ri);  // carved inner hole
+  }
+  p.addCircle(0, 0, 0.135);   // centre disc
+  p.addCircle(0, 0, 0.06);    // carved centre hole
   return p;
 })();
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Group, Circle, Path, LinearGradient, RadialGradient, BlurMask, vec } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
-import { off, rnd, HEART, Sparkle, ScreenTint, WorldVignette, GlowOrb, Motes, type LensProps } from '../core';
+import { rnd, HEART, Sparkle, ScreenTint, WorldVignette, GlowOrb, Motes, type LensProps } from '../core';
 
 // A gradient heart that can pulse — used as the heart-eyes.
 function GradientHeart({ x, y, size, roll, base, pulse, colors, clock }: {
@@ -17,6 +17,9 @@ function GradientHeart({ x, y, size, roll, base, pulse, colors, clock }: {
         <LinearGradient start={vec(0, -0.5)} end={vec(0, 0.5)} colors={colors} />
         <BlurMask blur={0.03} style="solid" />
       </Path>
+      {/* glossy candy highlights on the upper lobes */}
+      <Circle cx={-0.2} cy={-0.16} r={0.13} color="rgba(255,255,255,0.55)"><BlurMask blur={0.04} style="normal" /></Circle>
+      <Circle cx={0.16} cy={-0.04} r={0.06} color="rgba(255,255,255,0.4)"><BlurMask blur={0.03} style="normal" /></Circle>
     </Group>
   );
 }

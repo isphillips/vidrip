@@ -83,6 +83,13 @@ android {
         disable += "UnsafeOptInUsageError"
     }
 
+    // Keep the MediaPipe model files UNCOMPRESSED in the APK. The 3.6MB face_landmarker.task is a
+    // bundle MediaPipe memory-maps from assets; if AAPT compresses it, the FaceLandmarker fails to
+    // load and the mesh track silently falls back to BlazeFace (blank mesh lenses).
+    androidResources {
+        noCompress += ["task", "tflite"]
+    }
+
     namespace "com.reaxn"
     defaultConfig {
         applicationId "com.reaxn"

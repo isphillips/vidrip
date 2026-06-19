@@ -1,9 +1,10 @@
 import React from 'react';
-import { Group, Path, LinearGradient, BlurMask, vec } from '@shopify/react-native-skia';
+import { Group, Circle, Path, LinearGradient, RadialGradient, BlurMask, vec } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { off, rnd, STAR5, Sparkle, ScreenTint, WorldVignette, GlowOrb, Motes, type LensProps } from '../core';
 
-// A spinning, pulsing gold star centered on an eye.
+// A spinning, pulsing gold star centred on an eye — a golden bloom behind it, a beveled body (dark
+// rim + bright inner facet), and a twinkling cross-flare so it catches the light like real metal.
 function StarEye({ x, y, size, base, clock }: {
   x: number; y: number; size: number; base: number; clock: SharedValue<number>;
 }) {
@@ -11,13 +12,35 @@ function StarEye({ x, y, size, base, clock }: {
     const pulse = 1 + 0.12 * Math.sin(clock.value * 5 + base);
     return [{ translateX: x }, { translateY: y }, { rotate: clock.value * 1.2 + base }, { scale: size * pulse }];
   });
+  const glowOp = useDerivedValue(() => 0.45 + 0.3 * Math.abs(Math.sin(clock.value * 4 + base)));
+  const flare = useDerivedValue(() => {
+    const tw = 0.25 + 0.45 * Math.abs(Math.sin(clock.value * 6 + base));
+    return [{ translateX: x }, { translateY: y }, { rotate: clock.value * 1.2 + base + Math.PI / 5 }, { scale: size * tw }];
+  });
   return (
-    <Group transform={tf}>
-      <Path path={STAR5}>
-        <LinearGradient start={vec(0, -0.5)} end={vec(0, 0.5)} colors={['#FFF7C8', '#FFD23C', '#FF9D00']} />
-        <BlurMask blur={0.03} style="solid" />
-      </Path>
-    </Group>
+    <>
+      {/* golden bloom behind the star */}
+      <Circle cx={x} cy={y} r={size * 0.75} opacity={glowOp}>
+        <RadialGradient c={vec(x, y)} r={size * 0.75} colors={['rgba(255,225,140,0.7)', 'rgba(255,180,40,0)']} />
+        <BlurMask blur={size * 0.25} style="normal" />
+      </Circle>
+      <Group transform={tf}>
+        {/* dark rim for relief */}
+        <Path path={STAR5} color="#B86A00" />
+        {/* beveled gold face */}
+        <Group transform={[{ scale: 0.9 }]}>
+          <Path path={STAR5}><LinearGradient start={vec(0, -0.5)} end={vec(0, 0.5)} colors={['#FFFBE0', '#FFD23C', '#E8860F']} /></Path>
+        </Group>
+        {/* bright inner facet */}
+        <Group transform={[{ scale: 0.45 }]}>
+          <Path path={STAR5} color="rgba(255,250,220,0.85)" />
+        </Group>
+      </Group>
+      {/* twinkling white glint on the star's face */}
+      <Group transform={flare} opacity={0.9}>
+        <Path path={STAR5} color="#FFFFFF" />
+      </Group>
+    </>
   );
 }
 

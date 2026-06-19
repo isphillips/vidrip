@@ -14,10 +14,12 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { MAX_STUDIO_MS } from '../../../infrastructure/creatorStudio/recipe';
 import { pickVideoFromLibrary } from '../../../infrastructure/media/imagePicker';
 import { createDraft } from '../../../infrastructure/storage/studioDraftStorage';
+import ShareBaker, { type ShareBakerHandle } from '../components/ShareBaker';
+import { faceLensRecipe } from '../effectRecipe';
 import FaceLensOverlay, { lensByKey } from '../../lens/faceLens';
 import LensPicker from '../../lens/LensPicker';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
-import { useWarpFrameProcessor, warpLensAvailable } from '../../lens/warpLens';
+import { useWarpFrameProcessor, warpAvailable } from '../../lens/warpLens';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 const MAX_SEC = MAX_STUDIO_MS / 1000; // 180s hard cap (auto-stop)
@@ -39,11 +41,13 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
 
   // AR face lens (full-screen test surface for placement). Mirror only for the front camera.
   const [lensKey, setLensKey] = useState<string | null>(null);
-  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus, frameAspect: measuredAspect } = useFaceTracking(facing === 'front');
+  // Pull the full 478-pt mesh only for mesh lenses (Debug + the face-mesh effects); every other lens
+  // stays on the cheap 6-anchor bridge.
+  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus, frameAspect: measuredAspect, startTrack, stopTrack, cancelTrack } = useFaceTracking(facing === 'front', !!lensByKey(lensKey)?.mesh);
   // Real camera-warp lens (e.g. Mega Eyes): bends the live pixels via a Skia frame processor. Each
   // warp lens names its shader in `warp`; non-warp lenses pass null for a passthrough processor.
   const warpKey = lensByKey(lensKey)?.warp ?? null;
-  const isWarp = !!warpKey && warpLensAvailable;
+  const isWarp = !!warpKey && warpAvailable(warpKey);
   const warpFrameProcessor = useWarpFrameProcessor(isWarp ? warpKey : null);
   // Prefer the aspect measured from the live frame (ground truth for the keypoint coordinate space);
   // fall back to the format-derived guess until the first frame lands.
@@ -62,6 +66,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
   const elapsedRef = useRef(0);
   const finishRef = useRef<((v: VideoFile) => void) | null>(null);
   const stopRef = useRef<() => void>(() => {});
+  const bakerRef = useRef<ShareBakerHandle>(null);
 
   useEffect(() => {
     Orientation.lockToPortrait();
@@ -93,16 +98,25 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
         cameraRef.current?.stopRecording().catch(reject);
       });
       const uri = video.path.startsWith('file://') ? video.path : `file://${video.path}`;
-      // Persist the raw recording as a draft immediately (survives crash/close); edits autosave
-      // from here on. createDraft copies the temp recording into the draft's local dir.
-      const draft = await createDraft(uri, elapsedRef.current);
+      // Capture-bake: if a lens was worn, bake it into the recording NOW (before editing) so it's in
+      // the pixels for the whole flow — no track to thread, lens visible through trim/filter/overlay.
+      // Falls back to the un-lensed footage if the bake fails (never lose the recording).
+      let finalUri = uri;
+      const track = lensKey ? stopTrack() : null;
+      if (track) {
+        try { finalUri = await bakerRef.current!.bake({ sourceUri: uri, recipe: faceLensRecipe(track), durationSec: elapsedRef.current }); }
+        catch { finalUri = uri; }
+      }
+      // Persist the (lens-baked) recording as a draft immediately (survives crash/close); edits
+      // autosave from here on. createDraft copies the recording into the draft's local dir.
+      const draft = await createDraft(finalUri, elapsedRef.current);
       navigation.navigate('StudioTrim', { fileUri: draft.rawFile, durationSec: elapsedRef.current, draftId: draft.id });
     } catch (e: any) {
       Alert.alert('Recording', e?.message ?? 'Could not save the recording.');
     } finally {
       setBusy(false);
     }
-  }, [recording, navigation]);
+  }, [recording, navigation, lensKey, stopTrack]);
   stopRef.current = stop;
 
   const start = useCallback(() => {
@@ -114,11 +128,14 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       onRecordingFinished: (v) => { finishRef.current?.(v); finishRef.current = null; },
       onRecordingError: () => {
         finishRef.current = null;
+        cancelTrack();
         setRecording(false); setBusy(false);
         if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
         StatusBar.setHidden(false, 'fade');
       },
     });
+    // Begin capturing the AR lens track in lock-step with the recording (no-op if no lens worn).
+    if (lensKey) { startTrack(lensKey, measuredAspect); }
     setRecording(true);
     StatusBar.setHidden(true, 'fade');
     timerRef.current = setInterval(() => {
@@ -126,7 +143,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       setElapsed(elapsedRef.current);
       if (elapsedRef.current >= MAX_SEC) { stopRef.current(); } // hard 180s cap
     }, 1000);
-  }, [recording, ready]);
+  }, [recording, ready, lensKey, startTrack, measuredAspect, cancelTrack]);
 
   const importLibrary = useCallback(async () => {
     if (recording) { return; }
@@ -177,14 +194,12 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
         </View>
       )}
 
-      {/* Top bar: close + flip */}
+      {/* Top bar: close + flip (timer moved above the record button so the lens picker can own the top) */}
       <View style={[styles.topBar, { top: top + SPACE.SM }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={10} style={styles.iconBtn}>
           <Ionicons name="close" size={26} color={C.WHITE} />
         </TouchableOpacity>
-        {recording
-          ? <View style={styles.timerPill}><View style={styles.recDot} /><Text style={styles.timerTxt}>{fmt(elapsed)} / {fmt(MAX_SEC)}</Text></View>
-          : <View />}
+        <View />
         <TouchableOpacity onPress={() => setFacing(f => (f === 'back' ? 'front' : 'back'))} hitSlop={10} style={styles.iconBtn} disabled={recording}>
           <Ionicons name="camera-reverse-outline" size={26} color={recording ? C.SUBTLE : C.WHITE} />
         </TouchableOpacity>
@@ -200,8 +215,15 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
         </Text>
       )}
 
-      {/* Filter pill + slide-down grid (top center; hidden while recording). */}
-      {!recording && <LensPicker lensKey={lensKey} onChange={setLensKey} topInset={top} />}
+      {/* Filter pill + slide-down grid (top center) — available while recording too. */}
+      <LensPicker lensKey={lensKey} onChange={setLensKey} topInset={top} />
+
+      {/* Recording timer — sits just above the record button so the lens picker owns the top. */}
+      {recording && (
+        <View style={[styles.recTimerWrap, { bottom: bottom + SPACE.XL + 90 }]} pointerEvents="none">
+          <View style={styles.timerPill}><View style={styles.recDot} /><Text style={styles.timerTxt}>{fmt(elapsed)} / {fmt(MAX_SEC)}</Text></View>
+        </View>
+      )}
 
       {/* Bottom controls: import · record · spacer */}
       <View style={[styles.bottomBar, { bottom: bottom + SPACE.XL }]}>
@@ -218,6 +240,9 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
 
         <View style={styles.sideBtn} />
       </View>
+
+      {/* Off-screen Skia→MP4 baker: composites the AR lens into the recording at capture-stop. */}
+      <ShareBaker ref={bakerRef} />
     </View>
   );
 }
@@ -238,6 +263,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SPACE.SM,
     backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
   },
+  recTimerWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   recDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.DANGER },
   timerTxt: { color: C.WHITE, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
   bottomBar: {

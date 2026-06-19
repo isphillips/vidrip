@@ -2,7 +2,7 @@
 // shown in the picker. To add a lens: create lenses/<name>.tsx exporting a component, import it, and
 // add an entry. `warp: true` lenses bend the live camera pixels (handled by the capture screen) and
 // only use `Comp` for the static picker preview.
-import type { Lens } from '../core';
+import type { Lens, LensCategory } from '../core';
 import { Debug } from './debug';
 import { BigEyes } from './bigEyes';
 import { Galaxy } from './galaxy';
@@ -25,6 +25,10 @@ import { WarpGhost } from './warpGhost';
 import { FireBreath } from './fireBreath';
 import { RainbowBreath } from './rainbowBreath';
 import { Bubblegum } from './bubblegum';
+import { CelestialBloom } from './celestialBloom';
+import { PhoenixAscendant } from './phoenixAscendant';
+import { ThirdEye } from './thirdEye';
+import { NaturalLook, GlamLook } from './beautyLooks';
 import { MoneyRain } from './moneyRain';
 import { FairyDust } from './fairyDust';
 import { Vampire } from './vampire';
@@ -38,9 +42,73 @@ import { Aurora } from './aurora';
 import { StormCloud } from './stormCloud';
 import { Peacock } from './peacock';
 import { Cat } from './cat';
+import { CyberMesh } from './cyberMesh';
+import { StarMap } from './starMap';
+import { Gilded } from './gilded';
+import { Circuit } from './circuit';
+import { Lava } from './lava';
+import { Frostbite } from './frostbite';
+import { Nebula } from './nebula';
+import { Biohazard } from './biohazard';
+import { Bejeweled } from './bejeweled';
+import { Wildfire } from './wildfire';
+import { Voltage } from './voltage';
+import { HoloMesh } from './holoMesh';
+import { Prism } from './prism';
+import { Web } from './web';
+import { Reef } from './reef';
+import { Bloom } from './bloom';
+import { Blizzard } from './blizzard';
+import { Flutter } from './flutter';
+import { Spectre } from './spectre';
+import { DemonMesh } from './demonMesh';
+import { Seraph } from './seraph';
+import { Pixel } from './pixel';
+import { Chrome } from './chrome';
+import { Scuba } from './scuba';
+import { Astronaut } from './astronaut';
+import { Knight } from './knight';
+import { Hud } from './hud';
+import { Aviator } from './aviator';
+import { Steampunk } from './steampunk';
 
 export const LENSES: Lens[] = [
-  { key: 'debug', label: 'Debug', icon: 'bug', Comp: Debug },
+  { key: 'debug', label: 'Debug', icon: 'bug', Comp: Debug, mesh: true },
+  // ── Beauty (skin retouch via the warp pixel pipeline; makeup via the mesh overlay) ──
+  { key: 'smooth', label: 'Smooth', icon: 'sparkles-outline', Comp: WarpGhost, warp: 'smooth', beauty: true },
+  { key: 'glow', label: 'Glow', icon: 'sunny-outline', Comp: WarpGhost, warp: 'glow', beauty: true },
+  { key: 'natural', label: 'Natural', icon: 'color-palette-outline', Comp: NaturalLook, mesh: true, beauty: true },
+  { key: 'glam', label: 'Glam', icon: 'diamond-outline', Comp: GlamLook, mesh: true, beauty: true },
+  // ── Face-mesh lenses (full 478-pt mesh) ──
+  { key: 'cyber', label: 'Cyber Mesh', icon: 'grid', Comp: CyberMesh, mesh: true },
+  { key: 'starmap', label: 'Star Map', icon: 'star-outline', Comp: StarMap, mesh: true },
+  { key: 'gilded', label: 'Gilded', icon: 'diamond-outline', Comp: Gilded, mesh: true },
+  { key: 'circuit', label: 'Circuit', icon: 'hardware-chip-outline', Comp: Circuit, mesh: true },
+  { key: 'lava', label: 'Lava', icon: 'thermometer', Comp: Lava, mesh: true },
+  { key: 'frostbite', label: 'Frostbite', icon: 'snow-sharp', Comp: Frostbite, mesh: true },
+  { key: 'nebula', label: 'Nebula', icon: 'planet-outline', Comp: Nebula, mesh: true },
+  { key: 'biohazard', label: 'Biohazard', icon: 'nuclear-outline', Comp: Biohazard, mesh: true },
+  { key: 'bejeweled', label: 'Bejeweled', icon: 'diamond-sharp', Comp: Bejeweled, mesh: true },
+  { key: 'wildfire', label: 'Wildfire', icon: 'bonfire-outline', Comp: Wildfire, mesh: true },
+  { key: 'voltage', label: 'Voltage', icon: 'flash-outline', Comp: Voltage, mesh: true },
+  { key: 'holomesh', label: 'Holo Mesh', icon: 'scan-outline', Comp: HoloMesh, mesh: true },
+  { key: 'prism', label: 'Prism', icon: 'color-filter-outline', Comp: Prism, mesh: true },
+  { key: 'web', label: 'Web', icon: 'git-network-outline', Comp: Web, mesh: true },
+  { key: 'reef', label: 'Reef', icon: 'water-outline', Comp: Reef, mesh: true },
+  { key: 'bloom', label: 'Bloom', icon: 'flower-outline', Comp: Bloom, mesh: true },
+  { key: 'blizzard', label: 'Blizzard', icon: 'snow-outline', Comp: Blizzard, mesh: true },
+  { key: 'flutter', label: 'Flutter', icon: 'leaf-outline', Comp: Flutter, mesh: true },
+  { key: 'spectre', label: 'Spectre', icon: 'skull-outline', Comp: Spectre, mesh: true },
+  { key: 'demonmesh', label: 'Demon', icon: 'flame-outline', Comp: DemonMesh, mesh: true },
+  { key: 'seraph', label: 'Seraph', icon: 'sunny-outline', Comp: Seraph, mesh: true },
+  { key: 'pixel', label: 'Pixel', icon: 'apps-outline', Comp: Pixel, mesh: true },
+  { key: 'chrome', label: 'Chrome', icon: 'ellipse-outline', Comp: Chrome, mesh: true },
+  { key: 'scuba', label: 'Scuba', icon: 'glasses', Comp: Scuba, mesh: true },
+  { key: 'astronaut', label: 'Astronaut', icon: 'rocket-outline', Comp: Astronaut, mesh: true },
+  { key: 'knight', label: 'Knight', icon: 'shield-half-outline', Comp: Knight, mesh: true },
+  { key: 'hud', label: 'HUD', icon: 'scan-circle-outline', Comp: Hud, mesh: true },
+  { key: 'aviator', label: 'Aviator', icon: 'airplane-outline', Comp: Aviator, mesh: true },
+  { key: 'steampunk', label: 'Steampunk', icon: 'cog-outline', Comp: Steampunk, mesh: true },
   // ── Camera-warp lenses (bend the real pixels) ──
   { key: 'megaeyes', label: 'Mega Eyes', icon: 'eye', Comp: BigEyes, warp: 'eyes' },
   { key: 'bighead', label: 'Big Head', icon: 'happy', Comp: WarpGhost, warp: 'bighead' },
@@ -48,10 +116,16 @@ export const LENSES: Lens[] = [
   { key: 'swirl', label: 'Swirl', icon: 'sync', Comp: WarpGhost, warp: 'swirl' },
   { key: 'glitch', label: 'Glitch', icon: 'pulse', Comp: WarpGhost, warp: 'glitch' },
   { key: 'kaleido', label: 'Kaleidoscope', icon: 'aperture', Comp: WarpGhost, warp: 'kaleido' },
-  // ── Mouth-interaction lenses (open your mouth) ──
-  { key: 'firebreath', label: 'Fire Breath', icon: 'flame-outline', Comp: FireBreath },
-  { key: 'rainbreath', label: 'Rainbow Mouth', icon: 'color-wand', Comp: RainbowBreath },
-  { key: 'bubblegum', label: 'Bubblegum', icon: 'balloon', Comp: Bubblegum },
+  // ── Expression-interaction lenses (driven by face-mesh blendshapes) ──
+  // mesh:true requests the Face Landmarker track so smile/brow/jaw blendshapes are reliable; they
+  // still show in the Gesture tab (lensCategory checks `gesture` first) and degrade to a faint idle
+  // state when blendshapes are absent (BlazeFace builds / replay).
+  { key: 'firebreath', label: 'Fire Breath', icon: 'flame-outline', Comp: FireBreath, gesture: true },
+  { key: 'rainbreath', label: 'Rainbow Mouth', icon: 'color-wand', Comp: RainbowBreath, gesture: true },
+  { key: 'bubblegum', label: 'Bubblegum', icon: 'balloon', Comp: Bubblegum, gesture: true },
+  { key: 'phoenix', label: 'Phoenix', icon: 'flame', Comp: PhoenixAscendant, gesture: true, mesh: true },
+  { key: 'celestial', label: 'Celestial', icon: 'happy-outline', Comp: CelestialBloom, gesture: true, mesh: true },
+  { key: 'thirdeye', label: 'Third Eye', icon: 'eye-outline', Comp: ThirdEye, gesture: true, mesh: true },
   // ── Overlay lenses ──
   { key: 'galaxy', label: 'Cosmic', icon: 'planet', Comp: Galaxy },
   { key: 'neon', label: 'Neon', icon: 'glasses-outline', Comp: NeonVisor },
@@ -85,3 +159,13 @@ export const LENSES: Lens[] = [
 ];
 
 export const lensByKey = (k?: string | null) => (k ? LENSES.find(l => l.key === k) : undefined);
+
+// Which picker tab a lens belongs to. Warp lenses bend pixels; gesture lenses react to a facial
+// action; mesh lenses render from the 478-pt mesh; everything else is a plain overlay.
+export function lensCategory(l: Lens): LensCategory {
+  if (l.beauty) { return 'beauty'; } // checked first: beauty lenses also set warp/mesh as their render mechanism
+  if (l.warp) { return 'warp'; }
+  if (l.gesture) { return 'gesture'; }
+  if (l.mesh) { return 'mesh'; }
+  return 'overlay';
+}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Group, Circle, Path, Skia, RadialGradient, BlurMask, vec, type SkPath } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
-import { off, rnd, Drifter, ScreenTint, WorldVignette, type LensProps } from '../core';
+import { off, rnd, Drifter, Bloom, ScreenTint, WorldVignette, type LensProps } from '../core';
 
 // Unit sun-ray: a tapering blade, apex outward at y=-1, base at the centre.
 const RAY: SkPath = (() => {
@@ -44,11 +44,8 @@ export function Solar({ f, clock, w, h }: LensProps) {
       {/* corona rays */}
       <Corona cx={c.x} cy={c.y} count={28} len={f.faceW * 2.0} speed={0.18} colors={['#FFF3B0', '#FFB000', 'rgba(255,90,0,0)']} clock={clock} />
       <Corona cx={c.x} cy={c.y} count={20} len={f.faceW * 1.6} speed={-0.26} colors={['#FFE070', '#FF7A00', 'rgba(220,40,0,0)']} clock={clock} />
-      {/* solar disc bloom behind the head */}
-      <Circle cx={c.x} cy={c.y} r={f.faceW * 1.3} opacity={0.4}>
-        <RadialGradient c={vec(c.x, c.y)} r={f.faceW * 1.3} colors={['#FFF6D0', '#FFA000', 'rgba(255,90,0,0)']} />
-        <BlurMask blur={28} style="normal" />
-      </Circle>
+      {/* solar disc — volumetric bloom behind the head + a pulsing inner disc */}
+      <Bloom x={c.x} y={c.y} r={f.faceW * 1.5} inner="rgba(255,236,170,0.7)" outer="rgba(255,110,0,0)" opacity={0.55} />
       <Circle cx={c.x} cy={c.y} r={discR} opacity={0.32}>
         <RadialGradient c={vec(c.x, c.y)} r={f.faceW} colors={['rgba(255,240,180,0.5)', 'rgba(255,150,0,0)']} />
       </Circle>

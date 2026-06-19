@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import { useFrameProcessor, runAtTargetFps, VisionCameraProxy } from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
 import type { FaceLandmarks, FaceLensTrack } from './faceLens';
+import type { FaceBlendshapes } from './core/types';
+import { MESH_TRACK_INDICES, quantizeMesh } from './core/meshContours';
 
 // The two platforms feed MediaPipe differently, so the keypoints arrive in different conventions:
 //  • iOS pins frame.orientation → coords are pre-rotated (rotated 90° + upside-down + mirrored vs the
@@ -24,16 +26,17 @@ const TRACK_FPS = 15;
 const LIVE_FPS = 30;
 const r3 = (n: number) => Math.round(n * 1000) / 1000; // trim serialized track size
 
+// Orientation fed to MediaPipe on iOS. Calibrated: feeding 'up' makes the FaceLandmarker output a
+// clean upright face (p0 = vertical, p1 = eye axis), so reduce()'s iOS map is a plain axis swap. (The
+// pinned frame.orientation default produced a 180°-rotated output that needed a reflection hack.)
+const IOS_MESH_ORI = 'up';
+
 type TrackSample = { t: number; lm: FaceLandmarks | null };
 type TrackRec = { t0: number; lensId: string; frameAspect?: number; samples: TrackSample[] };
 
-// Smoothing: EMA toward each new detection to kill BlazeFace's frame-to-frame flicker. iOS's
-// centroid-reflection roughly doubles landmark jitter so it needs heavy easing; the Android path
-// has no reflection AND a lower detection rate (CPU delegate), so heavy easing reads as "slow
-// motion" — it runs much snappier to track each fresh detection directly.
-const SMOOTH = IS_ANDROID ? 0.55 : 0.18;
 const SNAP = 0.22;       // a jump bigger than this snaps instead of easing (re-acquire / fast move)
-const DEADBAND = 0.008;  // below this much motion, hold the pose (don't chase micro-jitter)
+// SMOOTH (EMA factor) and DEADBAND are track-aware — the mesh is far less jittery than BlazeFace, so
+// it eases far less (snappier, less lag). Declared just below, after faceTrackKind is known.
 // Hide debounce: when detection drops, hold the last pose and only hide once the face has been gone
 // this long. Rides blinks / brief turns / single missed frames without strobing.
 const HIDE_MS = 2000;
@@ -41,6 +44,17 @@ const HIDE_MS = 2000;
 function ema(prev: FaceLandmarks, cur: FaceLandmarks, a: number): FaceLandmarks {
   const mix = (p: number, c: number) => p + (c - p) * a;
   const mixPt = (p: { x: number; y: number }, c: { x: number; y: number }) => ({ x: mix(p.x, c.x), y: mix(p.y, c.y) });
+  // Blendshapes (mesh track only): ease toward the new values so jawOpen/blink don't strobe; reset to
+  // the fresh set when one side lacks them (track switch / first frame).
+  const bs = cur.bs && prev.bs
+    ? {
+        jawOpen: mix(prev.bs.jawOpen, cur.bs.jawOpen),
+        smile: mix(prev.bs.smile, cur.bs.smile),
+        blinkL: mix(prev.bs.blinkL, cur.bs.blinkL),
+        blinkR: mix(prev.bs.blinkR, cur.bs.blinkR),
+        browUp: mix(prev.bs.browUp, cur.bs.browUp),
+      }
+    : cur.bs;
   return {
     leftEye: mixPt(prev.leftEye, cur.leftEye),
     rightEye: mixPt(prev.rightEye, cur.rightEye),
@@ -48,16 +62,43 @@ function ema(prev: FaceLandmarks, cur: FaceLandmarks, a: number): FaceLandmarks 
     mouthCenter: mixPt(prev.mouthCenter, cur.mouthCenter),
     faceWidth: mix(prev.faceWidth, cur.faceWidth),
     roll: mix(prev.roll, cur.roll),
+    bs,
+    mesh: cur.mesh, // take the latest mesh (478 pts — too many to smooth, and it's debug-only)
   };
 }
 
-// The native plugin runs MediaPipe FaceDetector (BlazeFace) and returns 6 normalized keypoints:
-//   { points: number[][] }  // [[x,y]×6], 0..1 in the raw buffer's coordinate space
-let plugin: ReturnType<typeof VisionCameraProxy.initFrameProcessorPlugin> | undefined;
-try { plugin = VisionCameraProxy.initFrameProcessorPlugin('faceLandmarks', {}); } catch { plugin = undefined; }
+// SPIKE FLAG. true → use the 478-pt Face Landmarker ('faceMesh' plugin: richer, jitter-resistant
+// anchors + blendshapes + transform matrix, heavier inference). false → the lightweight BlazeFace
+// 6-keypoint detector ('faceLandmarks'). Both return the same { points: [[x,y]×6] } anchor contract,
+// so the reduce()/orientation path below is shared; the mesh additionally returns { bs, m }. Flip
+// this to A/B the two on-device. Falls back to BlazeFace automatically if the mesh plugin/model is
+// missing from the build.
+const USE_FACE_MESH = true;
 
-/** Whether the native MediaPipe plugin is present in this build (gate Camera frameProcessor on it). */
+// Two native plugins. Each returns { points: number[][] } ([[x,y]×6], 0..1 in the raw buffer space);
+// the mesh one also returns { bs: {...}, m: number[16] }.
+let blazePlugin: ReturnType<typeof VisionCameraProxy.initFrameProcessorPlugin> | undefined;
+let meshPlugin: ReturnType<typeof VisionCameraProxy.initFrameProcessorPlugin> | undefined;
+try { blazePlugin = VisionCameraProxy.initFrameProcessorPlugin('faceLandmarks', {}); } catch { blazePlugin = undefined; }
+try { meshPlugin = VisionCameraProxy.initFrameProcessorPlugin('faceMesh', {}); } catch { meshPlugin = undefined; }
+// Prefer the mesh when requested AND built; otherwise BlazeFace.
+const useMesh = USE_FACE_MESH && !!meshPlugin;
+const plugin = useMesh ? meshPlugin : blazePlugin;
+// DIAGNOSTIC: which native plugins this build actually registered. mesh:false → the faceMesh native
+// plugin isn't in the running app (stale/failed build) → mesh lenses can't work. Remove once sorted.
+console.log('[lens] native plugins → blaze:', !!blazePlugin, 'mesh:', !!meshPlugin, '| track:', useMesh ? 'mesh' : 'blaze');
+
+/** Whether a native MediaPipe plugin is present in this build (gate Camera frameProcessor on it). */
 export const faceTrackingAvailable = !!plugin;
+/** Which face track is live ('mesh' = Face Landmarker, 'blaze' = BlazeFace). Exposed for diagnostics. */
+export const faceTrackKind: 'mesh' | 'blaze' = useMesh ? 'mesh' : 'blaze';
+
+// EMA factor toward each new detection. BlazeFace needs heavy easing (0.18 on iOS) to mask its
+// flicker — but that easing is exactly what reads as lag/choppiness. The mesh is far cleaner, so it
+// can chase each fresh detection much harder → snappier, tighter tracking. DEADBAND is the motion
+// below which we hold the pose; tighter for the mesh so small moves still register.
+const SMOOTH = faceTrackKind === 'mesh' ? 0.6 : (IS_ANDROID ? 0.55 : 0.18);
+const DEADBAND = faceTrackKind === 'mesh' ? 0.004 : 0.008;
 
 // BlazeFace keypoint indices (right/left as seen in the image).
 const RIGHT_EYE = 0;
@@ -67,35 +108,16 @@ const MOUTH = 3;
 const EAR_R = 4;
 const EAR_L = 5;
 
-// iOS PATH ONLY (the Android branch in reduce() returns before any of this).
-// Markers sit one eye→mouth distance too low after the eye-midpoint un-flip (the eyes land where the
-// mouth is). LIFT raises every anchor along the face-up axis to seat them on the eyes. It's a
-// fraction of the inter-eye distance, applied perpendicular to the eye line (so it rotates with head
-// tilt) — NOT in screen space, which would slide off-face on a tilt. Bigger = markers move UP toward
-// the forehead, smaller = down toward the chin. ~1.0 ≈ one eye-spacing up.
-const LIFT = 0.2;
-
-// iOS PATH ONLY. BlazeFace's two eye keypoints have a small, consistent vertical offset (measured: a
-// level face still reports the left eye ~0.02 lower than the right), which the portrait aspect
-// amplifies into a visible ~10° lean — every filter looks crooked. ROLL_FIX rotates the whole
-// constellation about the pivot (in screen-proportional space) to null it. It's a CONSTANT, so real
-// head tilts still track on top of it. Degrees; flip the sign if it leans the wrong way.
-const ROLL_FIX_DEG = 4;
-
-// Map the 6 keypoints into preview-space anchors. roll stays 0 here — faceFrame() derives tilt from
-// the eyeMid→mouth line, so getting the anchor positions right is all that's needed.
+// Map the keypoints into preview-space anchors. roll stays 0 here — faceFrame() derives tilt from the
+// eyeMid→mouth line, so getting the anchor positions right is all that's needed.
 //
-// HARD-WON CALIBRATION (don't re-derive — see face-lens-orientation-calibration memory):
-// MediaPipe is fed the image WITH an orientation, so it returns coords in a fixed convention that's
-// rotated 90° + upside-down + mirrored vs the preview (measured: move head right → raw p1 down; move
-// up → raw p0 down).
-//   1. Base map `x = 1 - p1, y = p0` tracks correctly.
-//   2. Reflect both axes about the EYE MIDPOINT (2·c − v): un-inverts the upside-down arrangement +
-//      applies the selfie mirror, while pivoting on the stable eye line so tilt tracks and the
-//      jittery mouth keypoint never enters the transform.
-//   3. The eye-midpoint pivot leaves everything one eye→mouth distance low, so LIFT raises it along
-//      the face-up axis (see above) — the only fudge, and a face-relative one so tilt survives.
-function reduce(points: number[][] | null | undefined, aspect: number, orientation: string, _mirrored: boolean): FaceLandmarks | null {
+// iOS CALIBRATION (see face-lens-orientation-calibration). The native plugin is fed orientation 'up'
+// (IOS_MESH_ORI), which makes MediaPipe output a clean upright face: p0 = vertical (forehead small →
+// chin large), p1 = horizontal eye axis. So the map is an axis swap + selfie mirror — x = 1 - p1,
+// y = p0 — with NO reflection/lift/roll-fix. Earlier hacks (eye-line reflection, centroid reflection)
+// were fighting a 180°-rotated output from the pinned-frame.orientation default; feeding 'up' fixes it
+// at the source so position, structure, AND pitch are all correct from one trivial map.
+function reduce(points: number[][] | null | undefined, _aspect: number, orientation: string, _mirrored: boolean, _isMesh: boolean, meshRaw?: number[][]): FaceLandmarks | null {
   'worklet';
   if (!points || points.length < 6) { return null; }
 
@@ -107,59 +129,44 @@ function reduce(points: number[][] | null | undefined, aspect: number, orientati
   // Already upright + selfie-mirrored — no reflection / lift / roll-fix.
   if (IS_ANDROID) {
     const ll = orientation === 'landscape-left';
-    const a = (i: number) => {
-      const p0 = points[i][0], p1 = points[i][1];
+    const am = (p: number[]) => {
+      const p0 = p[0], p1 = p[1];
       const x = ll ? 1 - p1 : p1;
       const y = ll ? 1 - p0 : p0;
       return { x: x + ANDROID_DX, y: y + ANDROID_DY };
     };
-    const le = a(LEFT_EYE), re = a(RIGHT_EYE), nose = a(NOSE_TIP), mouth = a(MOUTH);
-    const er = a(EAR_R), el = a(EAR_L);
+    const le = am(points[LEFT_EYE]), re = am(points[RIGHT_EYE]), nose = am(points[NOSE_TIP]), mouth = am(points[MOUTH]);
+    const er = am(points[EAR_R]), el = am(points[EAR_L]);
     return {
       leftEye: le, rightEye: re, noseTip: nose, mouthCenter: mouth,
       faceWidth: Math.hypot(el.x - er.x, el.y - er.y), roll: 0,
+      mesh: meshRaw ? meshRaw.map(am) : undefined,
     };
   }
 
-  const base = (i: number) => ({ x: 1 - points[i][1], y: points[i][0] });
-  const le = base(LEFT_EYE), re = base(RIGHT_EYE), nose = base(NOSE_TIP), mouth = base(MOUTH);
-  const earR = base(EAR_R), earL = base(EAR_L);
-  const cx = (le.x + re.x) / 2, cy = (le.y + re.y) / 2; // eye-midpoint pivot
-  const ref = (p: { x: number; y: number }) => ({ x: 2 * cx - p.x, y: 2 * cy - p.y });
-  const le2 = ref(le), re2 = ref(re), nose2 = ref(nose), mouth2 = ref(mouth);
-  // Face-up lift, computed in SCREEN-PROPORTIONAL space. The frame is portrait, so normalized x is
-  // squished vs y by `aspect`; a perpendicular taken in normalized space isn't perpendicular on
-  // screen, and the squish skews it OPPOSITE ways for left vs right tilt (one side reads low).
-  // Multiply x by `aspect` to undo the squish, do the perpendicular there, then divide x back out.
-  const A = aspect > 0 ? aspect : 1;
-  const ex = (re2.x - le2.x) * A, ey = re2.y - le2.y;          // eye vector, screen-proportional
-  const elen = Math.hypot(ex, ey) || 1;
-  let ux = -ey / elen, uy = ex / elen;                        // perpendicular (screen space)
-  if (ux * (nose2.x - cx) * A + uy * (nose2.y - cy) > 0) { ux = -ux; uy = -uy; } // away from nose
-  const lx = (ux * elen * LIFT) / A, ly = uy * elen * LIFT;   // back to normalized (undo x squish)
-  // Lift, then rotate by the constant ROLL_FIX about the (lifted) pivot to null BlazeFace's eye-line
-  // lean. Rotation is done in screen-proportional space (×A on x) so the leveling is true on screen.
-  const pcx = cx + lx, pcy = cy + ly;
-  const th = (ROLL_FIX_DEG * Math.PI) / 180;
-  const cs = Math.cos(th), sn = Math.sin(th);
-  const place = (p: { x: number; y: number }) => {
-    const dx = (p.x + lx - pcx) * A, dy = p.y + ly - pcy;     // lift, then to pivot-relative screen space
-    return { x: pcx + (dx * cs - dy * sn) / A, y: pcy + (dx * sn + dy * cs) };
-  };
+  // Image→preview map. With the orientation pinned to 'up' (fed to MediaPipe natively), the output is
+  // a clean upright face: p0 = vertical (forehead small → chin large), p1 = horizontal eye axis. So
+  // the map is an axis swap plus the selfie mirror — x = 1 - p1, y = p0 — no reflection/lift/roll-fix.
+  // Applied identically to anchors AND mesh so they stay aligned.
+  const map = (p: number[]) => ({ x: 1 - p[1], y: p[0] });
+  const le = map(points[LEFT_EYE]), re = map(points[RIGHT_EYE]);
+  const nose = map(points[NOSE_TIP]), mouth = map(points[MOUTH]);
+  const earR = map(points[EAR_R]), earL = map(points[EAR_L]);
   return {
-    leftEye: place(le2),
-    rightEye: place(re2),
-    noseTip: place(nose2),
-    mouthCenter: place(mouth2),
-    faceWidth: Math.hypot(earL.x - earR.x, earL.y - earR.y), // distance is reflection-invariant
+    leftEye: le,
+    rightEye: re,
+    noseTip: nose,
+    mouthCenter: mouth,
+    faceWidth: Math.hypot(earL.x - earR.x, earL.y - earR.y),
     roll: 0,
+    mesh: meshRaw ? meshRaw.map(map) : undefined,
   };
 }
 
 // Returns a frame processor (attach to <Camera frameProcessor={...}>) and the latest reduced
 // landmarks. `mirror` true for the front camera. Returns landmarks=null (and a no-op processor) if
 // the plugin isn't built yet.
-export function useFaceTracking(mirror = true) {
+export function useFaceTracking(mirror = true, withMesh = false) {
   const [landmarks, setLandmarks] = useState<FaceLandmarks | null>(null);
   const [status, setStatus] = useState<string>('init'); // diagnostic: ok | null | <err>
   // The aspect (w/h, <1 for portrait) of the actual frame the keypoints are normalized to — measured
@@ -211,15 +218,6 @@ export function useFaceTracking(mirror = true) {
   }, []);
   const setAspectJs = Worklets.createRunOnJS(setAspect);
 
-  // TEMP DIAGNOSTIC: log the frame orientation + raw keypoints ~1/sec to calibrate per-device.
-  const dbgRef = useRef(0);
-  const logRaw = useCallback((pts: number[][], orientation: string, mirrored: boolean, w: number, h: number) => {
-    if (dbgRef.current++ % 30 !== 0) { return; }
-    console.log('[faceTracking] ori', orientation, 'mirrored', mirrored, 'size', `${w}x${h}`,
-      '| RE', pts[0].map(r3), 'LE', pts[1].map(r3), 'nose', pts[2].map(r3), 'mouth', pts[3].map(r3));
-  }, []);
-  const logRawJs = Worklets.createRunOnJS(logRaw);
-
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     if (!plugin) { return; }
@@ -230,14 +228,22 @@ export function useFaceTracking(mirror = true) {
       const aspect = Math.min(frame.width, frame.height) / Math.max(frame.width, frame.height);
       setAspectJs(aspect);
       const ori = String(frame.orientation);
-      const mir = !!frame.isMirrored;
-      const res = plugin!.call(frame) as unknown as { points?: number[][]; err?: string } | null;
+      // Only ask the native side for the full 478-pt mesh when a mesh-rendering lens needs it — keeps
+      // the bridge to 6 anchors otherwise. `ori` pins the orientation fed to MediaPipe (see reduce()).
+      const wantMesh = withMesh && useMesh;
+      // VisionCamera throws "expected an Object" if the 2nd arg is explicitly undefined — always pass a
+      // real object.
+      const res = (wantMesh ? plugin!.call(frame, { mesh: true, ori: IOS_MESH_ORI }) : plugin!.call(frame, { ori: IOS_MESH_ORI })) as unknown as
+        { points?: number[][]; bs?: FaceBlendshapes; mesh?: number[][]; err?: string } | null;
       if (res && res.points) {
-        logRawJs(res.points, ori, mir, frame.width, frame.height);
-        pushJs(reduce(res.points, aspect, ori, mir), 'ok');
+        const lm = reduce(res.points, aspect, ori, false, useMesh, res.mesh);
+        // Carry the mesh blendshapes through (BlazeFace returns none). faceFrame() prefers jawOpen
+        // over the geometric mouth-open proxy and exposes blink/smile/browRaise when present.
+        if (lm && res.bs) { lm.bs = res.bs; }
+        pushJs(lm, 'ok');
       } else { pushJs(null, (res && res.err) || 'null'); }
     });
-  }, [pushJs, setAspectJs, logRawJs, mirror]);
+  }, [pushJs, setAspectJs, mirror, withMesh]);
 
   // ── Track capture ──────────────────────────────────────────────────────────
   // Start when recording begins; stop returns a time-sampled FaceLensTrack to persist with the clip;
@@ -254,6 +260,8 @@ export function useFaceTracking(mirror = true) {
     const durMs = rec.samples[rec.samples.length - 1].t;
     const n = Math.max(1, Math.ceil((durMs / 1000) * TRACK_FPS));
     const frames: (FaceLandmarks | null)[] = new Array(n).fill(null);
+    const meshFrames: (number[] | null)[] = new Array(n).fill(null);
+    let hasMesh = false;
     let si = 0;
     for (let i = 0; i < n; i++) {
       const tMs = (i / TRACK_FPS) * 1000;
@@ -270,8 +278,12 @@ export function useFaceTracking(mirror = true) {
         faceWidth: r3(lm.faceWidth),
         roll: r3(lm.roll),
       };
+      // Mesh lenses: persist the compact contour-subset mesh so the lens replays (full 478 is too big).
+      if (lm?.mesh) { meshFrames[i] = quantizeMesh(lm.mesh, MESH_TRACK_INDICES); hasMesh = true; }
     }
-    return { lensId: rec.lensId, fps: TRACK_FPS, frames, frameAspect: rec.frameAspect };
+    const track: FaceLensTrack = { lensId: rec.lensId, fps: TRACK_FPS, frames, frameAspect: rec.frameAspect };
+    if (hasMesh) { track.meshIdx = MESH_TRACK_INDICES; track.meshFrames = meshFrames; }
+    return track;
   }, []);
 
   return { frameProcessor, landmarks, status, frameAspect, startTrack, stopTrack, cancelTrack };

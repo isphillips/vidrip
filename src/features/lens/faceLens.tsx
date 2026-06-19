@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Canvas } from '@shopify/react-native-skia';
-import { faceFrame, useLensClock, type FaceLandmarks, type FaceLensTrack } from './core';
+import { faceFrame, useLensClock, dequantizeMesh, type FaceLandmarks, type FaceLensTrack } from './core';
 import { lensByKey } from './lenses';
 
 // Public entry point for the AR face-lens system. The lens infrastructure lives in ./core (types,
@@ -11,7 +11,8 @@ import { lensByKey } from './lenses';
 
 export type { Pt, FaceLandmarks, FaceFrame, Lens, LensProps, FaceLensTrack } from './core';
 export { faceFrame, off } from './core';
-export { LENSES, lensByKey } from './lenses';
+export { LENSES, lensByKey, lensCategory } from './lenses';
+export type { LensCategory } from './core';
 
 // ─── Overlay ─────────────────────────────────────────────────────────────────
 // Renders the active lens into one Skia <Canvas> over the camera/video, anchored to the current
@@ -46,10 +47,16 @@ export function FaceLensReplay({
   let i = Math.round(timeSec * track.fps);
   if (i < 0) { i = 0; }
   if (i >= track.frames.length) { i = track.frames.length - 1; }
+  // Rebuild the sparse mesh for this frame (mesh lenses) from the compact quantized track.
+  let landmarks = track.frames[i];
+  const meshQ = track.meshFrames?.[i];
+  if (landmarks && meshQ && track.meshIdx) {
+    landmarks = { ...landmarks, mesh: dequantizeMesh(meshQ, track.meshIdx) };
+  }
   return (
     <FaceLensOverlay
       lens={track.lensId}
-      landmarks={track.frames[i]}
+      landmarks={landmarks}
       width={width}
       height={height}
       frameAspect={frameAspect ?? track.frameAspect}

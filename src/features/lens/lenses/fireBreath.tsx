@@ -8,13 +8,17 @@ export function FireBreath({ f, clock }: LensProps) {
   const g = f.mouthOpen;
   const rad = (f.rollDeg * Math.PI) / 180;
   const down = rad + Math.PI;           // FLAME points up at rest → +π aims it down out of the mouth
-  const N = 5;
+  const N = 6;
   return (
     <Group opacity={g}>
-      {/* hot glow at the mouth */}
+      {/* hot glow at the mouth + a white-hot blast core that flares as the jaw opens */}
       <Circle cx={f.mouth.x} cy={f.mouth.y} r={f.faceW * 0.45} opacity={0.55}>
         <RadialGradient c={vec(f.mouth.x, f.mouth.y)} r={f.faceW * 0.45} colors={['#FFE08A', '#FF6B00', 'rgba(255,45,0,0)']} />
         <BlurMask blur={10} style="normal" />
+      </Circle>
+      <Circle cx={f.mouth.x} cy={f.mouth.y} r={f.faceW * (0.12 + g * 0.22)} opacity={0.85}>
+        <RadialGradient c={vec(f.mouth.x, f.mouth.y)} r={f.faceW * (0.12 + g * 0.22)} colors={['#FFFFFF', '#FFD24A', 'rgba(255,120,0,0)']} />
+        <BlurMask blur={6} style="normal" />
       </Circle>
       {Array.from({ length: N }).map((_, i) => {
         const t = i / (N - 1) - 0.5;                                  // -0.5..0.5 across the cone

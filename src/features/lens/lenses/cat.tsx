@@ -1,18 +1,34 @@
 import React from 'react';
-import { Group, Path, Line, Skia, LinearGradient, vec, type SkPath } from '@shopify/react-native-skia';
+import { Group, Path, Skia, LinearGradient, RadialGradient, vec, type SkPath } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { off, rnd, Sparkle, ScreenTint, WorldVignette, type LensProps } from '../core';
 
-// Unit ear triangle (apex up).
+// Unit ear: a soft, rounded furry triangle (apex up, curved sides, rounded base).
 const EAR: SkPath = (() => {
   const p = Skia.Path.Make();
-  p.moveTo(-0.5, 0.5); p.lineTo(0, -0.5); p.lineTo(0.5, 0.5); p.close();
+  p.moveTo(-0.5, 0.5);
+  p.quadTo(-0.34, -0.32, 0, -0.5);   // left edge curving to a rounded tip
+  p.quadTo(0.34, -0.32, 0.5, 0.5);   // right edge
+  p.quadTo(0, 0.34, -0.5, 0.5);      // rounded base
+  p.close();
   return p;
 })();
 // Inner ear (smaller, sits low inside the ear).
 const EAR_IN: SkPath = (() => {
   const p = Skia.Path.Make();
-  p.moveTo(-0.3, 0.4); p.lineTo(0, -0.28); p.lineTo(0.3, 0.4); p.close();
+  p.moveTo(-0.28, 0.42);
+  p.quadTo(-0.18, -0.16, 0, -0.3);
+  p.quadTo(0.18, -0.16, 0.28, 0.42);
+  p.quadTo(0, 0.3, -0.28, 0.42);
+  p.close();
+  return p;
+})();
+// Fur tufts poking out of the inner ear.
+const TUFTS: SkPath = (() => {
+  const p = Skia.Path.Make();
+  for (const dx of [-0.16, 0, 0.16]) {
+    p.moveTo(dx - 0.05, 0.4); p.lineTo(dx, -0.1); p.lineTo(dx + 0.05, 0.4);
+  }
   return p;
 })();
 // Cat nose (rounded downward triangle).
@@ -25,7 +41,8 @@ const NOSE: SkPath = (() => {
   return p;
 })();
 
-// A twitching ear that tilts with the head and flicks now and then.
+// A twitching ear that tilts with the head and flicks now and then. Shaded (top-lit grey fur), with a
+// soft pink inner ear and pale fur tufts.
 function Ear({ x, y, size, angle, base, clock }: {
   x: number; y: number; size: number; angle: number; base: number; clock: SharedValue<number>;
 }) {
@@ -36,13 +53,15 @@ function Ear({ x, y, size, angle, base, clock }: {
   ]);
   return (
     <Group transform={tf}>
-      <Path path={EAR}><LinearGradient start={vec(0, -0.5)} end={vec(0, 0.5)} colors={['#3A333E', '#1C181F']} /></Path>
-      <Path path={EAR_IN} color="#FF9ECb" />
+      <Path path={EAR}><LinearGradient start={vec(0, -0.5)} end={vec(0, 0.5)} colors={['#4A424F', '#2A2530', '#15121A']} /></Path>
+      <Path path={EAR} style="stroke" strokeWidth={0.03} color="rgba(0,0,0,0.35)" />
+      <Path path={EAR_IN}><RadialGradient c={vec(0, 0.1)} r={0.4} colors={['#FFC2DE', '#F07AB0', '#C84E88']} /></Path>
+      <Path path={TUFTS} style="stroke" strokeWidth={0.025} strokeCap="round" color="rgba(245,235,240,0.8)" />
     </Group>
   );
 }
 
-// Playful kitty: soft pink world, twitchy cat ears, a pink nose, and whiskers.
+// Playful kitty: soft pink world, twitchy shaded cat ears, a shaded pink nose, and curved whiskers.
 export function Cat({ f, clock, w, h }: LensProps) {
   const rad = (f.rollDeg * Math.PI) / 180;
   const earL = off(f, f.le, f.faceW * 0.72, f.faceW * 0.05);
@@ -52,7 +71,15 @@ export function Cat({ f, clock, w, h }: LensProps) {
   // whisker roots just beside the nose, three per side fanning out (tilt-aware via off()).
   const rootL = off(f, f.nose, -f.eyeDist * 0.05, f.eyeDist * 0.45);
   const rootR = off(f, f.nose, -f.eyeDist * 0.05, -f.eyeDist * 0.45);
-  const spread = [0.18, 0, -0.18];
+  const droop = [0.22, 0.04, -0.16]; // each whisker rises/droops differently
+  // A whisker as a gently drooping curve from a root toward a tip (mirrored per side).
+  const whisker = (root: typeof rootL, dir: 1 | -1, d: number) => {
+    const tip = off(f, root, f.faceW * d, dir * f.faceW * 0.78);
+    const ctrl = off(f, root, f.faceW * (d - 0.12), dir * f.faceW * 0.42); // sag below the chord
+    const p = Skia.Path.Make();
+    p.moveTo(root.x, root.y); p.quadTo(ctrl.x, ctrl.y, tip.x, tip.y);
+    return p;
+  };
   return (
     <>
       <ScreenTint w={w} h={h} colors={['rgba(255,225,240,0.32)', 'rgba(255,210,235,0.08)', 'rgba(255,200,230,0.28)']} opacity={0.42} />
@@ -62,22 +89,21 @@ export function Cat({ f, clock, w, h }: LensProps) {
       <Ear x={earL.x} y={earL.y} size={earSz} angle={rad - 0.18} base={0} clock={clock} />
       <Ear x={earR.x} y={earR.y} size={earSz} angle={rad + 0.18} base={1.5} clock={clock} />
 
-      {/* nose */}
+      {/* nose — shaded with a highlight + nostril shadows */}
       <Group transform={[{ translateX: f.nose.x }, { translateY: f.nose.y }, { rotate: rad }, { scale: noseSz }]}>
-        <Path path={NOSE}><LinearGradient start={vec(0, -0.5)} end={vec(0, 0.5)} colors={['#FF8FC0', '#E85AA0']} /></Path>
+        <Path path={NOSE}><LinearGradient start={vec(0, -0.5)} end={vec(0, 0.5)} colors={['#FFA8CF', '#F06AAA', '#C84684']} /></Path>
+        <Path path={NOSE} style="stroke" strokeWidth={0.04} color="rgba(150,40,90,0.5)" />
+        {/* glossy highlight on the bridge */}
+        <Path path={(() => { const p = Skia.Path.Make(); p.moveTo(-0.18, -0.22); p.quadTo(0, -0.32, 0.18, -0.22); return p; })()} style="stroke" strokeWidth={0.08} strokeCap="round" color="rgba(255,255,255,0.6)" />
       </Group>
 
-      {/* whiskers */}
-      {spread.map((s, i) => {
-        const tL = off(f, rootL, f.faceW * s, f.faceW * 0.7);
-        const tR = off(f, rootR, f.faceW * s, -f.faceW * 0.7);
-        return (
-          <Group key={i}>
-            <Line p1={vec(rootL.x, rootL.y)} p2={vec(tL.x, tL.y)} style="stroke" strokeWidth={2} color="rgba(255,255,255,0.85)" strokeCap="round" />
-            <Line p1={vec(rootR.x, rootR.y)} p2={vec(tR.x, tR.y)} style="stroke" strokeWidth={2} color="rgba(255,255,255,0.85)" strokeCap="round" />
-          </Group>
-        );
-      })}
+      {/* whiskers — drooping curves, thin and tapered-looking */}
+      {droop.map((d, i) => (
+        <Group key={i}>
+          <Path path={whisker(rootL, 1, d)} style="stroke" strokeWidth={f.faceW * 0.012} strokeCap="round" color="rgba(255,255,255,0.85)" />
+          <Path path={whisker(rootR, -1, d)} style="stroke" strokeWidth={f.faceW * 0.012} strokeCap="round" color="rgba(255,255,255,0.85)" />
+        </Group>
+      ))}
 
       {/* a couple of cute twinkles */}
       {Array.from({ length: 5 }).map((_, i) => {

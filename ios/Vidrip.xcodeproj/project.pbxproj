@@ -28,6 +28,9 @@
 		3F7E04842FE0D96500ABA05B /* LensWarmup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E04832FE0D96500ABA05B /* LensWarmup.swift */; };
 		3F7E04852FE0D96500ABA05B /* LensWarmup.m in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E04822FE0D96500ABA05B /* LensWarmup.m */; };
 		3F7E04872FE24C5700ABA05B /* blaze_face_short_range.tflite in Resources */ = {isa = PBXBuildFile; fileRef = 3F7E04862FE24C5700ABA05B /* blaze_face_short_range.tflite */; };
+		3F7E048A2FE4C5D800ABA05B /* face_landmarker.task in Resources */ = {isa = PBXBuildFile; fileRef = 3F7E04892FE4C5D800ABA05B /* face_landmarker.task */; };
+		3F7E048D2FE4C64B00ABA05B /* FaceMeshFrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E048B2FE4C64B00ABA05B /* FaceMeshFrameProcessor.swift */; };
+		3F7E048E2FE4C64B00ABA05B /* FaceMeshFrameProcessor.m in Sources */ = {isa = PBXBuildFile; fileRef = 3F7E048C2FE4C64B00ABA05B /* FaceMeshFrameProcessor.m */; };
 		3FCD95C72FD180A700A7475B /* ReaxnScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C42FD180A700A7475B /* ReaxnScreenRecorder.swift */; };
 		3FCD95C82FD180A700A7475B /* RXNSafeAppend.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C62FD180A700A7475B /* RXNSafeAppend.m */; };
 		3FCD95C92FD180A700A7475B /* ReaxnScreenRecorder.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FCD95C32FD180A700A7475B /* ReaxnScreenRecorder.m */; };
@@ -100,6 +103,9 @@
 		3F7E04832FE0D96500ABA05B /* LensWarmup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LensWarmup.swift; sourceTree = "<group>"; };
 		3F7E04862FE24C5700ABA05B /* blaze_face_short_range.tflite */ = {isa = PBXFileReference; lastKnownFileType = file; path = blaze_face_short_range.tflite; sourceTree = "<group>"; };
 		3F7E04882FE24C7400ABA05B /* blaze_face_short_range.tflite */ = {isa = PBXFileReference; lastKnownFileType = file; path = blaze_face_short_range.tflite; sourceTree = "<group>"; };
+		3F7E04892FE4C5D800ABA05B /* face_landmarker.task */ = {isa = PBXFileReference; lastKnownFileType = file; path = face_landmarker.task; sourceTree = "<group>"; };
+		3F7E048B2FE4C64B00ABA05B /* FaceMeshFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceMeshFrameProcessor.swift; sourceTree = "<group>"; };
+		3F7E048C2FE4C64B00ABA05B /* FaceMeshFrameProcessor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FaceMeshFrameProcessor.m; sourceTree = "<group>"; };
 		3F9787AB2FCE506800F638C2 /* ReaxnDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = ReaxnDebug.entitlements; path = Vidrip/ReaxnDebug.entitlements; sourceTree = "<group>"; };
 		3FCD95C12FD180A700A7475B /* AudioRecorder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioRecorder.h; sourceTree = "<group>"; };
 		3FCD95C22FD180A700A7475B /* AudioRecorder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AudioRecorder.m; sourceTree = "<group>"; };
@@ -228,6 +234,9 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				3F7E048C2FE4C64B00ABA05B /* FaceMeshFrameProcessor.m */,
+				3F7E048B2FE4C64B00ABA05B /* FaceMeshFrameProcessor.swift */,
+				3F7E04892FE4C5D800ABA05B /* face_landmarker.task */,
 				3F7E04882FE24C7400ABA05B /* blaze_face_short_range.tflite */,
 				3FCD95C12FD180A700A7475B /* AudioRecorder.h */,
 				3F7E047E2FE0B90000ABA05B /* FaceLandmarksFrameProcessor.m */,
@@ -388,6 +397,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3F7E048A2FE4C5D800ABA05B /* face_landmarker.task in Resources */,
 				3F7E04872FE24C5700ABA05B /* blaze_face_short_range.tflite in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
@@ -591,6 +601,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3F7E048D2FE4C64B00ABA05B /* FaceMeshFrameProcessor.swift in Sources */,
+				3F7E048E2FE4C64B00ABA05B /* FaceMeshFrameProcessor.m in Sources */,
 				3F7E04802FE0B90000ABA05B /* FaceLandmarksFrameProcessor.m in Sources */,
 				3F7E04812FE0B90000ABA05B /* FaceLandmarksFrameProcessor.swift in Sources */,
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,

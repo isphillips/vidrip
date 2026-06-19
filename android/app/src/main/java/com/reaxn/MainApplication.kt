@@ -38,9 +38,14 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     SoLoader.init(this, OpenSourceMergedSoMapping)
-    // Register the MediaPipe face-landmarks frame-processor plugin (used by the lens feature).
+    // Register the MediaPipe face frame-processor plugins (used by the lens feature). `faceLandmarks`
+    // = lightweight BlazeFace (6 keypoints); `faceMesh` = full 478-pt Face Landmarker (+ blendshapes
+    // + transform matrix). JS picks between them via the USE_FACE_MESH flag in faceTracking.ts.
     FrameProcessorPluginRegistry.addFrameProcessorPlugin("faceLandmarks") { proxy, options ->
       FaceLandmarksFrameProcessor(proxy, options)
+    }
+    FrameProcessorPluginRegistry.addFrameProcessorPlugin("faceMesh") { proxy, options ->
+      FaceMeshFrameProcessor(proxy, options)
     }
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.

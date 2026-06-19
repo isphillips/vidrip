@@ -7,6 +7,18 @@ import type { SharedValue } from 'react-native-reanimated';
 
 export type Pt = { x: number; y: number };
 
+// Curated face blendshapes (0..1), only present when the Face Landmarker (mesh) track is active —
+// BlazeFace can't produce these. They drive expression-triggered lenses far more reliably than the
+// geometric nose↔mouth proxy. Names map to MediaPipe's ARKit-style categories (smile/brow are
+// averaged across left+right on the native side).
+export type FaceBlendshapes = {
+  jawOpen: number;
+  smile: number;
+  blinkL: number;
+  blinkR: number;
+  browUp: number;
+};
+
 export type FaceLandmarks = {
   leftEye: Pt;       // subject's left eye (screen-right when facing camera, mirror handled upstream)
   rightEye: Pt;
@@ -14,6 +26,11 @@ export type FaceLandmarks = {
   mouthCenter: Pt;
   faceWidth: number; // normalized cheek-to-cheek width
   roll: number;      // head tilt in radians (atan2 across the eyes)
+  bs?: FaceBlendshapes; // mesh track only; undefined for BlazeFace and replay
+  // Full 478-pt mesh in the SAME normalized preview space as the anchors (orientation/mirror already
+  // applied). Opt-in (mesh lenses) — undefined unless useFaceTracking(_, withMesh) requested it. Dense
+  // (all 478) live; sparse (only contour indices populated) when rebuilt from a replay track.
+  mesh?: (Pt | undefined)[];
 };
 
 // Pixel-space anchors for a given box, derived from normalized landmarks.
@@ -24,10 +41,20 @@ export type FaceFrame = {
   // right eye toward the left eye, `up` points toward the top of the head. Lenses offset their
   // art along these (via `off`) so hats/ears/cheeks stay glued as the head rolls.
   up: Pt; along: Pt;
-  // Mouth-open estimate, 0 (closed) → 1 (wide). Derived from the nose↔mouth gap vs eye spacing — the
-  // only facial-interaction signal BlazeFace's 6 keypoints afford. Lenses use it to trigger effects
-  // (fire/rainbow breath) and scale their intensity.
+  // Mouth-open estimate, 0 (closed) → 1 (wide). On the mesh track this is the `jawOpen` blendshape
+  // (reliable); on BlazeFace it falls back to the nose↔mouth gap vs eye spacing. Lenses use it to
+  // trigger effects (fire/rainbow breath) and scale their intensity.
   mouthOpen: number;
+  // Expression signals (0..1), present only on the mesh track (undefined on BlazeFace/replay). Lenses
+  // should treat undefined as "unsupported" and degrade gracefully.
+  blink?: number;     // both eyes closed
+  smile?: number;     // mouth smile
+  browRaise?: number; // eyebrows raised
+  // Mesh in box-pixel space (cover-crop applied), when requested. `mesh` keeps canonical indexing
+  // (sparse on replay) for contour lookups; `meshPts` is the dense list of present points for drawing
+  // a node cloud (Skia Points can't take holes).
+  mesh?: (Pt | undefined)[];
+  meshPts?: Pt[];
 };
 
 // The props every lens component receives: the live FaceFrame, the shared animation clock, and the
@@ -38,8 +65,20 @@ export type LensProps = { f: FaceFrame; clock: SharedValue<number>; w: number; h
 // than an overlay — the capture screen renders that shader via the warp frame processor instead of
 // mounting `Comp` (`Comp` is still used for replay, since the warp isn't baked into recordings yet).
 // `icon` is the Ionicons glyph shown in the picker.
-export type WarpKey = 'eyes' | 'bighead' | 'tinyface' | 'swirl' | 'glitch' | 'kaleido';
-export type Lens = { key: string; label: string; icon: string; Comp: React.FC<LensProps>; warp?: WarpKey };
+// Shader programs routed through the camera-pixel pipeline (warpLens.ts). `eyes`…`kaleido` are the
+// fun-house warps; `smooth`/`glow` are beauty skin-retouch passes (no face needed). The pipeline only
+// cares that each names a compiled effect — the `beauty` flag decides which picker tab it shows in.
+export type WarpKey = 'eyes' | 'bighead' | 'tinyface' | 'swirl' | 'glitch' | 'kaleido' | 'smooth' | 'glow';
+// `mesh: true` lenses render from the full 478-pt face mesh (FaceFrame.mesh) — the capture screen
+// requests the heavier mesh payload only while one of these (or Debug) is active. `gesture: true`
+// marks lenses driven by a facial action (open mouth, etc.). `beauty: true` marks face-flattering
+// retouch/makeup lenses (skin-smooth via `warp`, or makeup via the mesh overlay). These flags drive
+// the picker tabs (see lensCategory).
+export type Lens = { key: string; label: string; icon: string; Comp: React.FC<LensProps>; warp?: WarpKey; mesh?: boolean; gesture?: boolean; beauty?: boolean };
+
+// Picker grouping. Derived from the flags above (see lensCategory): beauty retouch/makeup, warp
+// pixels, mesh-driven, gesture-driven, or a plain overlay.
+export type LensCategory = 'beauty' | 'mesh' | 'warp' | 'overlay' | 'gesture';
 
 // ─── Replay ──────────────────────────────────────────────────────────────────
 // A recorded reaction stores its lens as { lensId + a per-frame landmark track } captured during
@@ -50,4 +89,9 @@ export type FaceLensTrack = {
   fps: number;
   frames: (FaceLandmarks | null)[]; // null where no face was detected that frame
   frameAspect?: number;             // recorded camera-frame aspect (w/h) for cover-crop mapping
+  // Mesh lenses only: the canonical contour indices captured (constant) + per-frame quantized points
+  // (aligned with `frames`; null where no mesh). Rebuilt into a sparse mesh on replay. Kept compact —
+  // only the contour subset, ×1000 ints — so it survives in the per-clip recipe JSON column.
+  meshIdx?: number[];
+  meshFrames?: (number[] | null)[];
 };

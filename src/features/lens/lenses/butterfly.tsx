@@ -1,7 +1,25 @@
 import React from 'react';
-import { Group, Path, RoundedRect, Line, LinearGradient, vec } from '@shopify/react-native-skia';
+import { Group, Circle, Path, RoundedRect, Line, LinearGradient, vec } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { rnd, WING, ScreenTint, WorldVignette, GodRays, Motes, type LensProps } from '../core';
+
+// One wing's art: the membrane gradient, a dark scalloped edge, radiating veins, and two pale-cored
+// eyespot markings — so the wings read as patterned, not flat colour fields.
+function WingArt({ colors }: { colors: string[] }) {
+  return (
+    <>
+      <Path path={WING}><LinearGradient start={vec(0, -0.5)} end={vec(0.5, 0.5)} colors={colors} /></Path>
+      <Path path={WING} style="stroke" strokeWidth={0.022} color="rgba(24,12,32,0.55)" />
+      {[[0.5, -0.12], [0.46, 0.04], [0.34, 0.32]].map((v, i) => (
+        <Line key={i} p1={vec(0, 0)} p2={vec(v[0], v[1])} style="stroke" strokeWidth={0.012} color="rgba(24,12,32,0.4)" strokeCap="round" />
+      ))}
+      <Circle cx={0.4} cy={-0.18} r={0.07} color="rgba(24,12,32,0.55)" />
+      <Circle cx={0.4} cy={-0.18} r={0.034} color="rgba(255,255,255,0.85)" />
+      <Circle cx={0.33} cy={0.27} r={0.05} color="rgba(24,12,32,0.5)" />
+      <Circle cx={0.33} cy={0.27} r={0.022} color="rgba(255,255,255,0.8)" />
+    </>
+  );
+}
 
 // A butterfly orbiting the face: two flapping wings (the right wing path + a mirrored left), a body,
 // and antennae. The wings squash on their X axis to fake the flap; it banks along its orbit.
@@ -23,10 +41,10 @@ function Flutter({ cx, cy, rx, ry, base, speed, size, colors, clock }: {
   return (
     <Group transform={tf}>
       <Group transform={flapL} origin={vec(0, 0)}>
-        <Path path={WING}><LinearGradient start={vec(0, -0.5)} end={vec(0.5, 0.5)} colors={colors} /></Path>
+        <WingArt colors={colors} />
       </Group>
       <Group transform={flapR} origin={vec(0, 0)}>
-        <Path path={WING}><LinearGradient start={vec(0, -0.5)} end={vec(0.5, 0.5)} colors={colors} /></Path>
+        <WingArt colors={colors} />
       </Group>
       {/* body */}
       <RoundedRect x={-0.03} y={-0.2} width={0.06} height={0.46} r={0.03} color="#2E2018" />

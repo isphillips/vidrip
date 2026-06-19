@@ -1,5 +1,5 @@
 import React from 'react';
-import { Group, Circle, Path, Skia, LinearGradient, BlurMask, vec, type SkPath } from '@shopify/react-native-skia';
+import { Group, Circle, Path, Skia, LinearGradient, vec, type SkPath } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { off, ScreenTint, WorldVignette, GlowOrb, type LensProps } from '../core';
 
@@ -10,6 +10,20 @@ const PLUME: SkPath = (() => {
   p.cubicTo(0.12, -0.3, 0.1, -0.85, 0, -1);
   p.cubicTo(-0.1, -0.85, -0.12, -0.3, 0, 0);
   p.close();
+  return p;
+})();
+
+// The feather's barbs: a central rachis with fine filaments combing out to each side, giving the
+// plume real texture instead of a flat blade.
+const BARBS: SkPath = (() => {
+  const p = Skia.Path.Make();
+  p.moveTo(0, 0); p.lineTo(0, -0.92); // rachis
+  for (let i = 1; i <= 8; i++) {
+    const y = -i * 0.105;
+    const len = 0.11 * (1 - i * 0.06);
+    p.moveTo(0, y); p.lineTo(len, y - 0.07);
+    p.moveTo(0, y); p.lineTo(-len, y - 0.07);
+  }
   return p;
 })();
 
@@ -28,6 +42,8 @@ function Feather({ px, py, baseAngle, fw, fl, eyeR, speed, base, clock }: {
         <Path path={PLUME}>
           <LinearGradient start={vec(0, 0)} end={vec(0, -1)} colors={['#0A6E5A', '#13A07A', '#2BD4C0']} />
         </Path>
+        {/* barb filaments */}
+        <Path path={BARBS} style="stroke" strokeWidth={0.03} color="rgba(6,70,58,0.55)" />
       </Group>
       {/* eye-spot at the tip (drawn unscaled so the rings stay round) */}
       <Group>

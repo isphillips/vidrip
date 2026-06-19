@@ -7,12 +7,16 @@ import { rnd, BOLTS, Sparkle, ScreenTint, WorldVignette, GlowOrb, Motes, type Le
 function Bolt({ x, y, len, angle, idx, base, clock }: {
   x: number; y: number; len: number; angle: number; idx: number; base: number; clock: SharedValue<number>;
 }) {
-  const op = useDerivedValue(() => (Math.sin(clock.value * 12 + base) > 0.3 ? 0.9 : 0.12));
+  const op = useDerivedValue(() => (Math.sin(clock.value * 12 + base) > 0.3 ? 0.95 : 0.1));
+  const B = BOLTS[idx % BOLTS.length];
   return (
     <Group transform={[{ translateX: x }, { translateY: y }, { rotate: angle }, { scaleX: len }, { scaleY: len }]} opacity={op}>
-      <Path path={BOLTS[idx % BOLTS.length]} style="stroke" strokeWidth={0.045} color="#9FE8FF" strokeCap="round">
-        <BlurMask blur={0.05} style="solid" />
+      {/* blue glow halo */}
+      <Path path={B} style="stroke" strokeWidth={0.16} color="rgba(90,200,255,0.45)" strokeCap="round" strokeJoin="round">
+        <BlurMask blur={0.16} style="normal" />
       </Path>
+      {/* white-hot core */}
+      <Path path={B} style="stroke" strokeWidth={0.04} color="#EAFBFF" strokeCap="round" strokeJoin="round" />
     </Group>
   );
 }

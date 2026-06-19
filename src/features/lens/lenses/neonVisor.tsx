@@ -26,6 +26,10 @@ export function NeonVisor({ f, clock, w: cw, h: ch }: LensProps) {
       <RoundedRect x={x} y={y} width={w} height={h} r={h * 0.5}>
         <LinearGradient start={vec(x, y)} end={vec(x + w, y + h)} colors={['#0a0a16', '#13132a', '#0a0a16']} />
       </RoundedRect>
+      {/* curved glass reflection across the top of the visor */}
+      <RoundedRect x={x + h * 0.32} y={y + h * 0.12} width={w - h * 0.7} height={h * 0.2} r={h * 0.1} color="rgba(180,210,255,0.16)">
+        <BlurMask blur={3} style="normal" />
+      </RoundedRect>
       <RoundedRect x={x + h * 0.12} y={y + h * 0.28} width={w - h * 0.24} height={h * 0.44} r={h * 0.22}>
         <LinearGradient start={vec(x, y)} end={vec(x + w, y)} colors={neon} />
         <BlurMask blur={4} style="solid" />

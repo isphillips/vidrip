@@ -17,14 +17,17 @@ function Spectre({ x0, y0, sway, rise, size, dur, base, clock }: {
       { scaleX: size / wob }, { scaleY: size * wob },
     ];
   });
-  const op = useDerivedValue(() => { const t = v.value; return (t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85) * 0.7; });
+  const op = useDerivedValue(() => { const t = v.value; return (t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85) * 0.62; });
   return (
     <Group transform={tf} opacity={op}>
-      <Path path={GHOST} color="rgba(225,240,255,0.9)" />
-      {/* hollow eyes + mouth */}
-      <Circle cx={-0.13} cy={-0.12} r={0.07} color="#26384A" />
-      <Circle cx={0.13} cy={-0.12} r={0.07} color="#26384A" />
-      <Circle cx={0} cy={0.06} r={0.06} color="#26384A" />
+      {/* a soft outer aura so the apparition glows rather than reads as a hard sticker */}
+      <Path path={GHOST} color="rgba(200,225,255,0.5)"><BlurMask blur={0.12} style="normal" /></Path>
+      {/* wispy translucent body with soft edges */}
+      <Path path={GHOST} color="rgba(225,240,255,0.82)"><BlurMask blur={0.035} style="solid" /></Path>
+      {/* hollow eyes + mouth, softened */}
+      <Circle cx={-0.13} cy={-0.12} r={0.065} color="rgba(30,46,62,0.85)"><BlurMask blur={0.015} style="normal" /></Circle>
+      <Circle cx={0.13} cy={-0.12} r={0.065} color="rgba(30,46,62,0.85)"><BlurMask blur={0.015} style="normal" /></Circle>
+      <Circle cx={0} cy={0.06} r={0.055} color="rgba(30,46,62,0.8)"><BlurMask blur={0.015} style="normal" /></Circle>
     </Group>
   );
 }

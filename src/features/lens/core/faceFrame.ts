@@ -56,7 +56,17 @@ export function faceFrame(lm: FaceLandmarks, w: number, h: number, frameAspect?:
   // Remap the closed→open ratio to 0..1. REST/RANGE are rough (per-person): a closed mouth sits near
   // ~0.4× eye-spacing, wide open ~0.7×. Tune these two if breath effects trigger too early/late.
   const OPEN_REST = 0.45, OPEN_RANGE = 0.25;
-  const mouthOpen = Math.max(0, Math.min(1, (openRaw - OPEN_REST) / OPEN_RANGE));
+  let mouthOpen = Math.max(0, Math.min(1, (openRaw - OPEN_REST) / OPEN_RANGE));
+  // Mesh track: blendshapes beat the geometric proxy. jawOpen rarely exceeds ~0.5 even wide-open, so
+  // remap (rest ~0.05 → open ~0.5) to a full 0..1. blink/smile/browRaise pass through for lenses that
+  // want them (undefined on BlazeFace/replay).
+  let blink: number | undefined, smile: number | undefined, browRaise: number | undefined;
+  if (lm.bs) {
+    mouthOpen = Math.max(0, Math.min(1, (lm.bs.jawOpen - 0.05) / 0.45));
+    blink = (lm.bs.blinkL + lm.bs.blinkR) / 2;
+    smile = lm.bs.smile;
+    browRaise = lm.bs.browUp;
+  }
   return {
     le, re,
     eyeMid,
@@ -68,5 +78,12 @@ export function faceFrame(lm: FaceLandmarks, w: number, h: number, frameAspect?:
     along,
     up,
     mouthOpen,
+    blink,
+    smile,
+    browRaise,
+    // Map into box pixels; keep canonical indexing (sparse on replay → guard holes), and a dense list
+    // of present points for Skia Points (which can't take holes).
+    mesh: lm.mesh ? lm.mesh.map((p) => (p ? { x: mx(p.x), y: my(p.y) } : undefined)) : undefined,
+    meshPts: lm.mesh ? (lm.mesh.filter(Boolean) as Pt[]).map((p) => ({ x: mx(p.x), y: my(p.y) })) : undefined,
   };
 }

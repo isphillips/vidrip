@@ -27,7 +27,8 @@ import {
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import DraggablePip from './DraggablePip';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
-import FaceLensOverlay, { type FaceLensTrack } from '../../lens/faceLens';
+import FaceLensOverlay, { lensByKey, type FaceLensTrack } from '../../lens/faceLens';
+import LensPicker from '../../lens/LensPicker';
 import { MOCK_FACE } from '../../lens/useFaceLandmarks';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 
@@ -133,11 +134,11 @@ export default function ReactionRecorder({
     const task = InteractionManager.runAfterInteractions(() => setCamActive(true));
     return () => task.cancel();
   }, []);
-  // Face lenses are disabled in the reaction recorder for now (still being tuned in the studio
-  // camera). lensKey stays null so the whole tracking/overlay pipeline below is inert; re-enable by
-  // restoring the lens picker UI and making this stateful again.
-  const lensKey: string | null = null;
-  const { frameProcessor, landmarks: liveLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true);
+  // AR face lens for the reaction (null = none). Replayed/baked the same as the studio.
+  const [lensKey, setLensKey] = useState<string | null>(null);
+  // Request the full 478-pt mesh only when the active lens is a mesh lens (so its track captures the
+  // mesh for replay). Inert while lensKey is null.
+  const { frameProcessor, landmarks: liveLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true, !!lensByKey(lensKey)?.mesh);
   const lensLandmarks = liveLandmarks ?? (lensKey && !faceTrackingAvailable ? MOCK_FACE : null);
   // Camera-frame aspect (w/h) — shared by the live overlay and the captured track so replay
   // cover-crops the same way the preview did.
@@ -595,8 +596,9 @@ export default function ReactionRecorder({
               isActive={camActive}
               video={true}
               audio={true}
-              // MediaPipe needs BGRA frames; VisionCamera defaults to YUV (→ detect_fail).
-              pixelFormat={faceTrackingAvailable && lensKey ? 'rgb' : 'yuv'}
+              // MediaPipe needs RGB frames; keep the format CONSTANT across lens toggles (don't key it
+              // on lensKey) so switching a lens on/off mid-session never re-negotiates the buffer.
+              pixelFormat={faceTrackingAvailable ? 'rgb' : 'yuv'}
               frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
             />
             <FaceLensOverlay
@@ -660,9 +662,9 @@ export default function ReactionRecorder({
         </View>
       ) : null}
 
-      {/* Recording timer badge — counts down to the cap when one is set */}
+      {/* Recording timer badge — sits just above the record button so the lens picker owns the top. */}
       {isRecording && (
-        <View style={[styles.recBadge, { top: topInset + SPACE.SM }]}>
+        <View style={[styles.recBadge, { bottom: bottomInset + SPACE.XL + 88 }]}>
           <View style={styles.recDot} />
           <Text style={styles.recText}>
             {maxDuration ? fmt(Math.max(0, maxDuration - elapsed)) : fmt(elapsed)}
@@ -670,8 +672,10 @@ export default function ReactionRecorder({
         </View>
       )}
 
-      {/* Face lenses are disabled in the reaction recorder for now (still being dialed in — see
-          the studio camera). The tracking plumbing stays inert because lensKey is always null. */}
+      {/* AR lens picker (top center) — available before AND during recording. */}
+      {!uploading && afterPhase === 'none' && (
+        <LensPicker lensKey={lensKey} onChange={setLensKey} topInset={topInset} />
+      )}
 
       {/* Controls. Source-driven (reactions): start is driven by the source video,
           but once recording you can restart or stop manually. Otherwise (private

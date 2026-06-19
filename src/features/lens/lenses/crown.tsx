@@ -35,12 +35,21 @@ const PENNANT = make(p => {
 
 const GOLD = ['#FFF6C8', '#FFD24A', '#E8951E', '#A86A12'];
 
-// A glossy jewel: faceted radial + a bright highlight.
+// A cut gemstone: a dark setting bezel, a faceted radial body (highlight pushed off-centre so it reads
+// as a polished dome), a bright table facet, a crescent rim catch-light, and a sharp specular glint.
 function Jewel({ x, y, r, colors }: { x: number; y: number; r: number; colors: string[] }) {
   return (
     <>
-      <Circle cx={x} cy={y} r={r}><RadialGradient c={vec(x, y)} r={r} colors={colors} /></Circle>
-      <Circle cx={x - r * 0.3} cy={y - r * 0.3} r={r * 0.28} color="rgba(255,255,255,0.85)" />
+      {/* gold bezel setting */}
+      <Circle cx={x} cy={y} r={r * 1.12} color="#A86A12" />
+      <Circle cx={x} cy={y} r={r * 1.12} style="stroke" strokeWidth={r * 0.05} color="#FFE98C" />
+      {/* faceted stone */}
+      <Circle cx={x} cy={y} r={r}><RadialGradient c={vec(x - r * 0.28, y - r * 0.32)} r={r * 1.5} colors={colors} /></Circle>
+      {/* bright rim catch-light (bottom-right, opposite the highlight) */}
+      <Circle cx={x + r * 0.18} cy={y + r * 0.2} r={r * 0.78} style="stroke" strokeWidth={r * 0.12} color="rgba(255,255,255,0.28)" />
+      {/* table facet + sharp glint */}
+      <Circle cx={x - r * 0.28} cy={y - r * 0.3} r={r * 0.3} color="rgba(255,255,255,0.8)" />
+      <Circle cx={x - r * 0.34} cy={y - r * 0.36} r={r * 0.1} color="#FFFFFF" />
     </>
   );
 }
@@ -64,6 +73,10 @@ function CrownArt() {
         <LinearGradient start={vec(0, -0.55)} end={vec(0, 0.12)} colors={GOLD} />
       </Path>
       <Path path={SPIKES} style="stroke" strokeWidth={0.012} color="#7A4A0A" />
+      {/* polished-metal sheen raking diagonally across the gold */}
+      <Group transform={[{ rotate: -0.5 }]}>
+        <RoundedRect x={-0.07} y={-0.62} width={0.14} height={1.05} r={0.07} color="rgba(255,255,255,0.16)"><BlurMask blur={0.035} style="normal" /></RoundedRect>
+      </Group>
       {/* pearls on the spike tips */}
       {SPIKE_TIPS.map((t, i) => (
         <Group key={i}>
