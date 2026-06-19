@@ -15,8 +15,12 @@ const IS_ANDROID = Platform.OS === 'android';
 
 // Android only: constant normalized nudges to re-center the constellation after orientation mapping.
 // DX: NEGATIVE = screen-LEFT. DY: NEGATIVE = screen-UP (markers sit low → lift them up).
+// The lift is TRACK-AWARE: BlazeFace's 6 keypoints sit a touch low and need lifting, but the mesh's
+// eye anchors are geometric eye-centres (mid of the eye-corner contour points) that already land on
+// the eyes — lifting them too pushes the mesh ABOVE the eyeline. Tune per-device from raw keypoints.
 const ANDROID_DX = 0;
-const ANDROID_DY = -0.05;
+const ANDROID_DY_BLAZE = -0.05;
+const ANDROID_DY_MESH = 0;
 
 // Replay sampling rate for the captured track — 15fps is plenty for an overlay and keeps the
 // persisted track small.
@@ -94,7 +98,9 @@ export const faceTrackKind: 'mesh' | 'blaze' = useMesh ? 'mesh' : 'blaze';
 // flicker — but that easing is exactly what reads as lag/choppiness. The mesh is far cleaner, so it
 // can chase each fresh detection much harder → snappier, tighter tracking. DEADBAND is the motion
 // below which we hold the pose; tighter for the mesh so small moves still register.
-const SMOOTH = faceTrackKind === 'mesh' ? 0.6 : (IS_ANDROID ? 0.55 : 0.18);
+// The mesh is clean enough to chase each detection hard (snappier, less lag). Android's JS thread +
+// re-render is slower than iOS, so the easing reads as MORE lag there — ease less (higher factor).
+const SMOOTH = faceTrackKind === 'mesh' ? (IS_ANDROID ? 0.8 : 0.6) : (IS_ANDROID ? 0.55 : 0.18);
 const DEADBAND = faceTrackKind === 'mesh' ? 0.004 : 0.008;
 
 // BlazeFace keypoint indices (right/left as seen in the image).
@@ -126,11 +132,12 @@ function reduce(points: number[][] | null | undefined, _aspect: number, orientat
   // Already upright + selfie-mirrored — no reflection / lift / roll-fix.
   if (IS_ANDROID) {
     const ll = orientation === 'landscape-left';
+    const dy = _isMesh ? ANDROID_DY_MESH : ANDROID_DY_BLAZE;
     const am = (p: number[]) => {
       const p0 = p[0], p1 = p[1];
       const x = ll ? 1 - p1 : p1;
       const y = ll ? 1 - p0 : p0;
-      return { x: x + ANDROID_DX, y: y + ANDROID_DY };
+      return { x: x + ANDROID_DX, y: y + dy };
     };
     const le = am(points[LEFT_EYE]), re = am(points[RIGHT_EYE]), nose = am(points[NOSE_TIP]), mouth = am(points[MOUTH]);
     const er = am(points[EAR_R]), el = am(points[EAR_L]);

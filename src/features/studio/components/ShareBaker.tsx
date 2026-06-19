@@ -6,6 +6,7 @@ import { ControlledClockProvider } from '../effectClock';
 import EffectLayer from './EffectLayer';
 import { isEmptyRecipe, type OverlayRecipe } from '../effectRecipe';
 import { FaceLensReplay } from '../../lens/faceLens';
+import { ANON_LENS_KEY, ANON_FLOOR } from '../../lens/useAnonymousMode';
 import { exportRecipe } from '../../../infrastructure/native/studioExporter';
 
 export type BakeOpts = { sourceUri: string; recipe?: OverlayRecipe | null; durationSec: number; fps?: number; voiceMod?: 'deep' | null };
@@ -82,14 +83,16 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
   }), [clock]);
 
   if (!job) { return null; }
-  // Rendered off-screen (still laid out, so captureRef works). Transparent so the PNG keeps
-  // alpha for compositing over the video.
+  // Rendered off-screen (still laid out, so captureRef works). Normally transparent so the PNG keeps
+  // alpha for compositing over the video — EXCEPT for the anonymous silhouette, which uses an opaque
+  // dark floor so a missed Skia paint can never leak the underlying face through a transparent frame.
+  const anon = job.recipe.faceLens?.lensId === ANON_LENS_KEY;
   return (
     <View
       ref={stageRef}
       collapsable={false}
       pointerEvents="none"
-      style={{ position: 'absolute', left: -100000, top: 0, width: job.w, height: job.h, backgroundColor: 'transparent' }}>
+      style={{ position: 'absolute', left: -100000, top: 0, width: job.w, height: job.h, backgroundColor: anon ? ANON_FLOOR : 'transparent' }}>
       <ControlledClockProvider clock={clock}>
         <EffectLayer recipe={job.recipe} width={job.w} height={job.h} />
       </ControlledClockProvider>

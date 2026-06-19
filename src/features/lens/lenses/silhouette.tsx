@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Rect, Path, Skia, Circle, RadialGradient, BlurMask, vec, type SkPath } from '@shopify/react-native-skia';
 import { off, WorldVignette, type LensProps, type Pt } from '../core';
+import { ANON_FLOOR } from '../useAnonymousMode';
 
 // "React Anonymously" — the anonymous-source look: the whole scene is crushed dark and the wearer
 // becomes a featureless black bust (head + shoulders) with a cool backlit rim, like an interview
@@ -76,8 +77,9 @@ export function Silhouette({ f, w, h }: LensProps) {
 
   return (
     <>
-      {/* crush the whole scene dark, darker at the edges */}
-      <Rect x={0} y={0} width={w} height={h} color="rgba(2,3,6,0.9)" />
+      {/* fully hide the scene behind an opaque dark floor — identical to the bake stage's floor, so
+          the live preview matches the recorded result exactly */}
+      <Rect x={0} y={0} width={w} height={h} color={ANON_FLOOR} />
       <WorldVignette w={w} h={h} colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.5)']} />
 
       {/* cool backlight behind the head — reads as the rim/halo once the dark head covers its centre */}

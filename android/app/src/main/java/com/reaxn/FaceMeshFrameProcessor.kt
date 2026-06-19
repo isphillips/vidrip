@@ -67,10 +67,6 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
       )
     }
 
-    val matOpt = result.facialTransformationMatrixes()
-    if (matOpt.isPresent && matOpt.get().isNotEmpty()) {
-      out["m"] = matOpt.get()[0].map { it.toDouble() } // FloatArray(16), row-major
-    }
     return out
   }
 
@@ -105,7 +101,9 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
           .setMinFacePresenceConfidence(0.5f)
           .setMinTrackingConfidence(0.5f)
           .setOutputFaceBlendshapes(true)
-          .setOutputFacialTransformationMatrixes(true)
+          // The 4×4 facial-transform matrix (a per-frame PnP solve) is not consumed in JS — skip it to
+          // save inference time. Re-enable if a lens ever needs head pose.
+          .setOutputFacialTransformationMatrixes(false)
           .build()
         FaceLandmarker.createFromOptions(context.applicationContext, opts)
       } catch (e: Throwable) { null }

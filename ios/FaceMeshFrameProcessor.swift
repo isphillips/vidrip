@@ -43,7 +43,9 @@ import QuartzCore
     opts.minFacePresenceConfidence = 0.5
     opts.minTrackingConfidence = 0.5
     opts.outputFaceBlendshapes = true
-    opts.outputFacialTransformationMatrixes = true
+    // The 4×4 facial-transform matrix (a per-frame PnP solve) is not consumed in JS — skip it to save
+    // inference time. Re-enable if a lens ever needs head pose.
+    opts.outputFacialTransformationMatrixes = false
     return try? FaceLandmarker(options: opts)
   }
 }
@@ -121,11 +123,6 @@ public class FaceMeshFrameProcessor: FrameProcessorPlugin {
       ]
     }
 
-    if let mat = result.facialTransformationMatrixes.first {
-      var arr: [Double] = []; arr.reserveCapacity(16)
-      for i in 0..<16 { arr.append(Double(mat.data[i])) }
-      out["m"] = arr
-    }
     return out
   }
 }
