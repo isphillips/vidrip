@@ -105,6 +105,19 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     if (profile) { setProfile({ ...(profile as any), show_reactions_in_profile: next }); }
   };
 
+  // React Anonymously: hide my face (silhouette) and pitch my voice down in everything I record.
+  const reactAnonymously = !!(profile as any)?.react_anonymously;
+  const [savingAnon, setSavingAnon] = useState(false);
+  const handleToggleAnon = async (next: boolean) => {
+    if (!user?.id || savingAnon) { return; }
+    setSavingAnon(true);
+    const { error } = await (supabase as any)
+      .from('users').update({ react_anonymously: next }).eq('id', user.id);
+    setSavingAnon(false);
+    if (error) { Alert.alert('Error', 'Could not update this setting.'); return; }
+    if (profile) { setProfile({ ...(profile as any), react_anonymously: next }); }
+  };
+
   // ── Synced accounts (creator connections + personal feed connections) ────────
   const [synced, setSynced] = useState<SyncedAccount[]>([]);       // connection_type 'creator'
   const [feedAccounts, setFeedAccounts] = useState<SyncedAccount[]>([]); // 'feed'
@@ -354,6 +367,21 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
             value={showReactions}
             onValueChange={handleToggleShowReactions}
             disabled={savingShowReactions}
+            trackColor={{ true: C.ACCENT, false: C.BORDER }}
+          />
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.row}>
+          <View style={styles.syncInfo}>
+            <Text style={styles.rowLabel}>React Anonymously</Text>
+            <Text style={styles.syncHandle} numberOfLines={3}>
+              Hide your face behind a silhouette and lower your voice in every video you record, so you stay anonymous in posts.
+            </Text>
+          </View>
+          <Switch
+            value={reactAnonymously}
+            onValueChange={handleToggleAnon}
+            disabled={savingAnon}
             trackColor={{ true: C.ACCENT, false: C.BORDER }}
           />
         </View>

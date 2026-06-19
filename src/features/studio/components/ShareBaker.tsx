@@ -8,7 +8,7 @@ import { isEmptyRecipe, type OverlayRecipe } from '../effectRecipe';
 import { FaceLensReplay } from '../../lens/faceLens';
 import { exportRecipe } from '../../../infrastructure/native/studioExporter';
 
-export type BakeOpts = { sourceUri: string; recipe?: OverlayRecipe | null; durationSec: number; fps?: number };
+export type BakeOpts = { sourceUri: string; recipe?: OverlayRecipe | null; durationSec: number; fps?: number; voiceMod?: 'deep' | null };
 export type ShareBakerHandle = { bake: (opts: BakeOpts) => Promise<string> };
 
 const MAX_FRAMES = 300;       // cap capture cost / disk for long clips
@@ -34,9 +34,14 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
   const [bakeTime, setBakeTime] = useState(0);
 
   useImperativeHandle(ref, () => ({
-    bake: async ({ sourceUri, recipe, durationSec, fps = 30 }) => {
-      // No overlay → nothing to bake; the source already is the final video.
-      if (isEmptyRecipe(recipe)) { return sourceUri; }
+    bake: async ({ sourceUri, recipe, durationSec, fps = 30, voiceMod = null }) => {
+      // No overlay AND no audio change → nothing to bake; the source already is the final video.
+      if (isEmptyRecipe(recipe) && !voiceMod) { return sourceUri; }
+      // Voice-only bake (e.g. anonymous mode with the silhouette somehow empty): process audio only.
+      if (isEmptyRecipe(recipe)) {
+        const { uri: vUri } = await exportRecipe({ clips: [{ uri: sourceUri }], colorMatrix: null, mirror: false, voiceMod });
+        return vUri;
+      }
       const r = recipe!;
       // Face-lens clips have no authoring canvas — match the stage to the recorded frame aspect
       // so the replayed lens maps 1:1 onto the source video (no crop/stretch).
@@ -70,6 +75,7 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
         colorMatrix: null,            // look already baked into the source
         mirror: false,
         overlayFrames: { uris, fps: effFps, overlap: 0, width: w, height: h },
+        voiceMod,                     // anonymous mode pitch-shifts the audio on export
       });
       return uri;
     },

@@ -11,6 +11,8 @@ import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.OverlaySettings
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.MatrixTransformation
@@ -93,8 +95,18 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
 
     buildOverlayEffect(recipe, vw, vh)?.let { videoEffects.add(it) }
 
+    // Audio effects. "React Anonymously" pitch-shifts the voice down. Sonic preserves tempo/duration
+    // (it time-stretches to compensate for the resample), so audio stays in sync with the video.
+    val audioProcessors = ArrayList<AudioProcessor>()
+    val voiceMod = if (recipe.hasKey("voiceMod")) recipe.getString("voiceMod") else null
+    if (voiceMod == "deep") {
+      val sonic = SonicAudioProcessor()
+      sonic.setPitch(0.72f) // <1 = deeper; ~-5 semitones
+      audioProcessors.add(sonic)\
+    }
+
     val edited = EditedMediaItem.Builder(mediaItem)
-      .setEffects(Effects(emptyList(), videoEffects))
+      .setEffects(Effects(audioProcessors, videoEffects))
       .build()
 
     val outFile = File(reactContext.cacheDir, "studio_${UUID.randomUUID()}.mp4")

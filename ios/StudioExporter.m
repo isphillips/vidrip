@@ -45,6 +45,59 @@ static CIImage *ApplyLook(CIImage *img, NSArray *m, BOOL mirror, CGRect extent) 
   return [img imageByCroppingToRect:extent];
 }
 
+// Render a pitch-shifted ("deep") copy of an audio file offline via AVAudioUnitTimePitch. Pitch is in
+// cents (negative = lower). timePitch preserves duration, so the result stays in sync with the video.
+// Writes float PCM to a temp .caf (re-encoded to AAC by the final video export). nil on failure.
+static NSURL *PitchShiftFile(NSURL *inURL, float pitchCents) {
+  NSError *err = nil;
+  AVAudioFile *inFile = [[AVAudioFile alloc] initForReading:inURL error:&err];
+  AVAudioFormat *fmt = inFile.processingFormat;
+
+  AVAudioEngine *engine = [[AVAudioEngine alloc] init];
+  AVAudioPlayerNode *player = [[AVAudioPlayerNode alloc] init];
+  AVAudioUnitTimePitch *pitch = [[AVAudioUnitTimePitch alloc] init];
+  pitch.pitch = pitchCents;
+  [engine attachNode:player];
+  [engine attachNode:pitch];
+  [engine connect:player to:pitch format:fmt];
+  [engine connect:pitch to:engine.mainMixerNode format:fmt];
+
+  if (![engine enableManualRenderingMode:AVAudioEngineManualRenderingModeOffline
+                                  format:fmt
+                       maximumFrameCount:4096
+                                   error:&err]) { return nil; }
+  [player scheduleFile:inFile atTime:nil completionHandler:nil];
+  if (![engine startAndReturnError:&err]) { return nil; }
+  [player play];
+
+  NSURL *outURL = [[NSFileManager defaultManager].temporaryDirectory
+                    URLByAppendingPathComponent:[NSString stringWithFormat:@"voice_%@.caf", [NSUUID UUID].UUIDString]];
+  AVAudioFile *outFile = [[AVAudioFile alloc] initForWriting:outURL
+                                                    settings:engine.manualRenderingFormat.settings
+                                                commonFormat:AVAudioPCMFormatFloat32
+                                                 interleaved:NO
+                                                       error:&err];
+
+  AVAudioPCMBuffer *buf = [[AVAudioPCMBuffer alloc] initWithPCMFormat:engine.manualRenderingFormat
+                                                       frameCapacity:engine.manualRenderingMaximumFrameCount];
+  AVAudioFramePosition total = inFile.length;
+  BOOL ok = YES;
+  while (engine.manualRenderingSampleTime < total) {
+    AVAudioFrameCount frames = (AVAudioFrameCount)MIN((AVAudioFramePosition)buf.frameCapacity, total - engine.manualRenderingSampleTime);
+    AVAudioEngineManualRenderingStatus status = [engine renderOffline:frames toBuffer:buf error:&err];
+    if (status == AVAudioEngineManualRenderingStatusSuccess) {
+      if (![outFile writeFromBuffer:buf error:&err]) { ok = NO; break; }
+    } else if (status == AVAudioEngineManualRenderingStatusInsufficientDataFromInputNode) {
+      break; // input exhausted — done
+    } else {
+      ok = NO; break;
+    }
+  }
+  [player stop];
+  [engine stop];
+  return ok ? outURL : nil;
+}
+
 RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
@@ -100,7 +153,17 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
     AVMutableCompositionTrack *aTrack =
       [comp addMutableTrackWithMediaType:AVMediaTypeAudio
                         preferredTrackID:kCMPersistentTrackID_Invalid];
-    [aTrack insertTimeRange:range ofTrack:srcAudio atTime:kCMTimeZero error:nil];
+    // "React Anonymously": pitch the voice down. Render a deep copy of the trimmed audio offline and
+    // mux that instead of the original; fall back to the original if the render fails.
+    BOOL deepVoice = [recipe[@"voiceMod"] isKindOfClass:[NSString class]] && [recipe[@"voiceMod"] isEqualToString:@"deep"];
+    NSURL *pitchedURL = deepVoice ? [self renderDeepVoiceFromAsset:asset range:range] : nil;
+    AVURLAsset *pitched = pitchedURL ? [AVURLAsset URLAssetWithURL:pitchedURL options:nil] : nil;
+    AVAssetTrack *pTrack = pitched ? [pitched tracksWithMediaType:AVMediaTypeAudio].firstObject : nil;
+    if (pTrack) {
+      [aTrack insertTimeRange:CMTimeRangeMake(kCMTimeZero, pitched.duration) ofTrack:pTrack atTime:kCMTimeZero error:nil];
+    } else {
+      [aTrack insertTimeRange:range ofTrack:srcAudio atTime:kCMTimeZero error:nil];
+    }
   }
 
   // Optional look baked per-frame via AVVideoComposition: mirror → color adjust →
@@ -222,6 +285,28 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
         break;
     }
   }];
+}
+
+// Produce a pitch-shifted ("deep") audio file for the trimmed range. Exports just the trimmed audio
+// to a temp m4a (so AVAudioFile can read it), then renders it through AVAudioUnitTimePitch offline.
+// Runs synchronously (the export module method is already off the main thread). nil on failure.
+- (NSURL *)renderDeepVoiceFromAsset:(AVAsset *)asset range:(CMTimeRange)range
+{
+  AVAssetExportSession *aexp =
+    [[AVAssetExportSession alloc] initWithAsset:asset presetName:AVAssetExportPresetAppleM4A];
+  if (!aexp) { return nil; }
+  NSURL *trimmedURL = [[NSFileManager defaultManager].temporaryDirectory
+                        URLByAppendingPathComponent:[NSString stringWithFormat:@"voicesrc_%@.m4a", [NSUUID UUID].UUIDString]];
+  aexp.outputURL = trimmedURL;
+  aexp.outputFileType = AVFileTypeAppleM4A;
+  aexp.timeRange = range;
+
+  dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+  [aexp exportAsynchronouslyWithCompletionHandler:^{ dispatch_semaphore_signal(sem); }];
+  dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(60 * NSEC_PER_SEC)));
+  if (aexp.status != AVAssetExportSessionStatusCompleted) { return nil; }
+
+  return PitchShiftFile(trimmedURL, -500.0f); // ≈ down 5 semitones, matches Android's 0.72 pitch
 }
 
 @end

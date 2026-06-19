@@ -27,10 +27,14 @@ import {
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import DraggablePip from './DraggablePip';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
+import { faceLensRecipe } from '../../studio/effectRecipe';
 import FaceLensOverlay, { lensByKey, type FaceLensTrack } from '../../lens/faceLens';
 import LensPicker from '../../lens/LensPicker';
 import { MOCK_FACE } from '../../lens/useFaceLandmarks';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
+import { useAnonymousMode, ANON_LENS_KEY, ANON_VOICE_MOD } from '../../lens/useAnonymousMode';
+import { useUploadStore } from '../../../store/uploadStore';
+import { useBakeQueueStore } from '../../../store/bakeQueueStore';
 
 
 function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
@@ -136,17 +140,27 @@ export default function ReactionRecorder({
   }, []);
   // AR face lens for the reaction (null = none). Replayed/baked the same as the studio.
   const [lensKey, setLensKey] = useState<string | null>(null);
+  // React Anonymously: force the silhouette lens (overriding any pick), hide the picker, and bake the
+  // silhouette + deep voice into the reaction (and afterthought) so the raw face/voice never ship.
+  const anon = useAnonymousMode();
+  const effLensKey = anon ? ANON_LENS_KEY : lensKey;
   // Request the full 478-pt mesh only when the active lens is a mesh lens (so its track captures the
-  // mesh for replay). Inert while lensKey is null.
-  const { frameProcessor, landmarks: liveLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true, !!lensByKey(lensKey)?.mesh);
-  const lensLandmarks = liveLandmarks ?? (lensKey && !faceTrackingAvailable ? MOCK_FACE : null);
+  // mesh for replay). Inert while effLensKey is null.
+  const { frameProcessor, landmarks: liveLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true, !!lensByKey(effLensKey)?.mesh);
+  const lensLandmarks = liveLandmarks ?? (effLensKey && !faceTrackingAvailable ? MOCK_FACE : null);
   // Camera-frame aspect (w/h) — shared by the live overlay and the captured track so replay
   // cover-crops the same way the preview did.
   const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
   // Latest captured lens track, set on stop and handed to onSave.
   const lensTrackRef = useRef<FaceLensTrack | null>(null);
   const lensKeyRef = useRef<string | null>(null);
-  useEffect(() => { lensKeyRef.current = lensKey; }, [lensKey]);
+  useEffect(() => { lensKeyRef.current = effLensKey; }, [effLensKey]);
+  // Captured lens track for the afterthought clip (anonymous mode bakes it too).
+  const afterTrackRef = useRef<FaceLensTrack | null>(null);
+  // Anonymous mode hands the heavy silhouette + voice bake to the global background baker (so the
+  // recorder returns to the thread immediately, with a toast — like a normal reaction save).
+  const enqueueUpload = useUploadStore((s) => s.enqueue);
+  const requestBake = useBakeQueueStore((s) => s.requestBake);
   const [ytPlaying, setYtPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -263,6 +277,28 @@ export default function ReactionRecorder({
     const m = mainVideoRef.current;
     if (!m) { onBack(); return; }
     setAfterPhase('none');
+
+    if (anon) {
+      // Anonymous mode: the silhouette + deep voice must be baked into the file(s) before they're
+      // saved/uploaded (the raw face/voice must never leave the device). That bake is slow, so we
+      // hand it to the global background baker and leave immediately — exactly like a normal reaction,
+      // with a toast tracking progress. The recorder can unmount; the bake finishes at app root.
+      const mainTrack = m.lensTrack, afterTrack = afterTrackRef.current, afterRaw = afterthought;
+      const dur = m.duration, ytOff = m.ytStartOffset, hp = m.headphones, rawMain = m.path;
+      enqueueUpload(uploadingText || 'Saving reaction…', async () => {
+        const bakedMain = await requestBake({ sourceUri: rawMain, recipe: mainTrack ? faceLensRecipe(mainTrack) : null, durationSec: dur, voiceMod: ANON_VOICE_MOD });
+        let after = afterRaw;
+        if (afterRaw) {
+          const bakedAfter = await requestBake({ sourceUri: afterRaw.path, recipe: afterTrack ? faceLensRecipe(afterTrack) : null, durationSec: afterRaw.duration, voiceMod: ANON_VOICE_MOD });
+          after = { ...afterRaw, path: bakedAfter };
+        }
+        // Save with the baked file + no replay track (the look is in the pixels now).
+        await onSave(bakedMain, dur, ytOff, hp, null, after);
+      });
+      onBack();
+      return;
+    }
+
     setUploading(true);
     try {
       await onSave(m.path, m.duration, m.ytStartOffset, m.headphones, m.lensTrack, afterthought);
@@ -271,7 +307,7 @@ export default function ReactionRecorder({
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
       setUploading(false);
     }
-  }, [onSave, onBack]);
+  }, [onSave, onBack, anon, enqueueUpload, requestBake, uploadingText]);
   useEffect(() => { finalizeRef.current = finalize; }, [finalize]);
 
   const handleStop = useCallback(async () => {
@@ -337,17 +373,21 @@ export default function ReactionRecorder({
       onRecordingFinished: (v) => { afterCallbackRef.current?.(v); afterCallbackRef.current = null; },
       onRecordingError: () => { afterCallbackRef.current = null; finalizeRef.current(null); },
     });
+    // Anonymous mode: track the afterthought too so its silhouette can be baked in.
+    if (anon) { startTrack(ANON_LENS_KEY, frameAspect); }
     if (afterTimerRef.current) { clearInterval(afterTimerRef.current); }
     afterTimerRef.current = setInterval(() => {
       afterElapsedRef.current += 1;
       setAfterElapsed(afterElapsedRef.current);
       if (afterElapsedRef.current >= AFTERTHOUGHT_MAX) { stopAfterthoughtRef.current(); }
     }, 1000);
-  }, []);
+  }, [anon, startTrack, frameAspect]);
 
   const stopAfterthought = useCallback(async () => {
     if (afterTimerRef.current) { clearInterval(afterTimerRef.current); afterTimerRef.current = null; }
     StatusBar.setHidden(false, 'fade');
+    // Finalize the afterthought's lens track (anonymous mode) before we capture the file.
+    afterTrackRef.current = anon ? stopTrack() : null;
     try {
       const v = await Promise.race([
         new Promise<VideoFile>((resolve, reject) => {
@@ -360,7 +400,7 @@ export default function ReactionRecorder({
     } catch {
       await finalize(null);   // afterthought failed → send the reaction without it
     }
-  }, [finalize]);
+  }, [finalize, anon, stopTrack]);
   useEffect(() => { stopAfterthoughtRef.current = stopAfterthought; }, [stopAfterthought]);
 
   // Keep the timer's auto-stop pointed at the current handleStop.
@@ -397,7 +437,7 @@ export default function ReactionRecorder({
     setIgStarted(false);   // reel remounts → show tap-to-play again
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
-  }, [stopTimer, cancelTrack]);
+  }, [stopTimer, cancelTrack, capAnim]);
 
   const onYtStateChange = useCallback((state: string) => {
     if (state === 'playing') {
@@ -599,10 +639,10 @@ export default function ReactionRecorder({
               // MediaPipe needs RGB frames; keep the format CONSTANT across lens toggles (don't key it
               // on lensKey) so switching a lens on/off mid-session never re-negotiates the buffer.
               pixelFormat={faceTrackingAvailable ? 'rgb' : 'yuv'}
-              frameProcessor={faceTrackingAvailable && lensKey ? frameProcessor : undefined}
+              frameProcessor={faceTrackingAvailable && effLensKey ? frameProcessor : undefined}
             />
             <FaceLensOverlay
-              lens={lensKey}
+              lens={effLensKey}
               landmarks={lensLandmarks}
               width={camAsPip ? PIP_W : width}
               height={camAsPip ? PIP_H : height}
@@ -672,10 +712,17 @@ export default function ReactionRecorder({
         </View>
       )}
 
-      {/* AR lens picker (top center) — available before AND during recording. */}
-      {!uploading && afterPhase === 'none' && (
+      {/* AR lens picker (top center) — available before AND during recording. Hidden in anonymous
+          mode (silhouette is forced); a status badge shows instead. */}
+      {!uploading && afterPhase === 'none' && (anon ? (
+        <View style={[styles.anonBadgeWrap, { top: topInset + SPACE.SM }]} pointerEvents="none">
+          <View style={styles.anonBadge}>
+            <Text style={styles.anonBadgeTxt}>🕶  Anonymous</Text>
+          </View>
+        </View>
+      ) : (
         <LensPicker lensKey={lensKey} onChange={setLensKey} topInset={topInset} />
-      )}
+      ))}
 
       {/* Controls. Source-driven (reactions): start is driven by the source video,
           but once recording you can restart or stop manually. Otherwise (private
@@ -806,6 +853,12 @@ const styles = StyleSheet.create({
   recBadge: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: SPACE.XS, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS, borderRadius: RADIUS.FULL },
   recDot: { width: 8, height: 8, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_HOT },
   recText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
+  anonBadgeWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 20 },
+  anonBadge: {
+    backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
+  },
+  anonBadgeTxt: { color: C.WHITE, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.SM, letterSpacing: 0.5 },
   controls: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: SPACE.XL },
   secondaryBtn: { width: 56, height: 56, borderRadius: RADIUS.FULL, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)', backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   secondaryBtnIcon: { color: C.WHITE, fontSize: 20 },

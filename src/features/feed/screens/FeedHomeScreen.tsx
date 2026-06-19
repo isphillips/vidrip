@@ -23,7 +23,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { useFeedStore } from '../../../store/feedStore';
 import { useBlockStore } from '../../../store/blockStore';
-import { fetchFeedThreads, type FeedThread } from '../../../infrastructure/supabase/queries/threads';
+import { fetchFeedThreads, fetchMyReactions, type FeedThread, type MyReaction } from '../../../infrastructure/supabase/queries/threads';
 import {
   fetchMyReviews, fetchChannelsToReact, fetchMyChannelReactions,
   type ChannelReview, type ChannelToReact, type MyChannelReaction,
@@ -119,6 +119,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [channelTiles, setChannelTiles] = useState<ChannelToReact[]>([]);
   const [myChannelReactions, setMyChannelReactions] = useState<MyChannelReaction[]>([]);
+  const [myReactions, setMyReactions] = useState<MyReaction[]>([]);
 
   const swipeRefs = useRef<Map<string, Swipeable | null>>(new Map());
 
@@ -167,10 +168,16 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     try { setMyChannelReactions(await fetchMyChannelReactions(user.id)); } catch { /* swallow */ }
   }, [user]);
 
+  // The user's friend-share reactions — sourced from the reactions table (not thread membership).
+  const loadMyReactions = useCallback(async () => {
+    if (!user) return;
+    try { setMyReactions(await fetchMyReactions(user.id)); } catch { /* swallow */ }
+  }, [user]);
+
   // useFocusEffect already fires on the initial (focused) mount AND on every refocus,
   // so a separate mount-only useEffect would double every query on first load. Rely on
   // the focus effect alone.
-  useFocusEffect(useCallback(() => { load(); loadChannels(); loadReviews(); loadChannelReactions(); }, [load, loadChannels, loadReviews, loadChannelReactions]));
+  useFocusEffect(useCallback(() => { load(); loadChannels(); loadReviews(); loadChannelReactions(); loadMyReactions(); }, [load, loadChannels, loadReviews, loadChannelReactions, loadMyReactions]));
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   const addFav = (id: string) => {
@@ -219,18 +226,19 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   //  - friend-share reactions (threads I reacted to → open the Thread)
   //  - channel-clip reactions (channel_posts → open in the channel)
   const myReactionsList = useMemo(() => {
-    const fromThreads = threads
-      .filter(t => !hidden.has(t.id) && !blocked.has(t.sender_id) && t.my_status === 'reacted')
-      .map(t => ({
+    const fromThreads = myReactions
+      .filter(r => !(r.sender_id && blocked.has(r.sender_id)) && !(r.thread_id && hidden.has(r.thread_id)))
+      .map(r => ({
         kind: 'thread' as const,
-        id: t.id,
-        reactionId: t.my_reaction_id,
-        created_at: t.created_at,
-        thumbnail: t.video_thumbnail
-          ?? (t.source_type === 'youtube' ? `https://img.youtube.com/vi/${t.video_id}/hqdefault.jpg` : null),
-        title: t.video_title ?? 'Video',
-        subtitle: t.sender ? `@${t.sender.handle}` : 'Friend',
-        meta: `${t.reaction_count} reaction${t.reaction_count !== 1 ? 's' : ''}`,
+        id: r.id,                 // reaction id → unique key
+        threadId: r.thread_id,    // chat fallback
+        reactionId: r.id,         // open the reaction viewer directly
+        created_at: r.created_at,
+        thumbnail: r.video_thumbnail
+          ?? (r.source_type === 'youtube' && r.video_id ? `https://img.youtube.com/vi/${r.video_id}/hqdefault.jpg` : null),
+        title: r.video_title ?? 'Video',
+        subtitle: r.sender ? `@${r.sender.handle}` : 'Friend',
+        meta: `${r.reaction_count} reaction${r.reaction_count !== 1 ? 's' : ''}`,
       }));
     const fromChannels = myChannelReactions.map(r => ({
       kind: 'channel' as const,
@@ -245,7 +253,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
       meta: r.duration ? `▶ ${r.duration}s reaction` : 'Reaction',
     }));
     return [...fromThreads, ...fromChannels].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-  }, [threads, hidden, myChannelReactions, blocked]);
+  }, [myReactions, hidden, myChannelReactions, blocked]);
 
   // Pill counts are scoped to the ACTIVE tab's partition (Favorites = favorited
   // threads, Feed = the rest) so the bubbles match the list actually shown.
@@ -476,7 +484,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           data={myReactionsList}
           keyExtractor={item => `${item.kind}:${item.id}`}
           contentContainerStyle={myReactionsList.length === 0 ? styles.emptyContainer : styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); Promise.all([load(), loadChannelReactions()]).finally(() => setRefreshing(false)); }} tintColor={C.ACCENT} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); Promise.all([loadMyReactions(), loadChannelReactions()]).finally(() => setRefreshing(false)); }} tintColor={C.ACCENT} />}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No reactions yet</Text>
@@ -494,7 +502,9 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
                 // the chat only if no reaction id resolved.
                 ? item.reactionId
                   ? navigation.navigate('WatchReaction', { reactionId: item.reactionId })
-                  : navigation.navigate('Thread', { threadId: item.id })
+                  : item.threadId
+                    ? navigation.navigate('Thread', { threadId: item.threadId })
+                    : undefined
                 : (navigation as any).navigate('Channels', { screen: 'WatchChannelClip', params: { postId: item.id } })}>
               <View style={styles.thumbnail}>
                 {item.thumbnail ? (

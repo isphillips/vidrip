@@ -4,6 +4,7 @@
 // only use `Comp` for the static picker preview.
 import type { Lens, LensCategory } from '../core';
 import { Debug } from './debug';
+import { Silhouette } from './silhouette';
 import { BigEyes } from './bigEyes';
 import { Galaxy } from './galaxy';
 import { NeonVisor } from './neonVisor';
@@ -74,6 +75,9 @@ import { Steampunk } from './steampunk';
 
 export const LENSES: Lens[] = [
   { key: 'debug', label: 'Debug', icon: 'bug', Comp: Debug, mesh: true },
+  // "React Anonymously" — privacy silhouette. mesh:true so it tracks the head. Forced on (not just
+  // picked) when the user's anonymous-mode account setting is enabled.
+  { key: 'anon', label: 'Anonymous', icon: 'eye-off-outline', Comp: Silhouette, mesh: true },
   // ── Beauty (skin retouch via the warp pixel pipeline; makeup via the mesh overlay) ──
   { key: 'smooth', label: 'Smooth', icon: 'sparkles-outline', Comp: WarpGhost, warp: 'smooth', beauty: true },
   { key: 'glow', label: 'Glow', icon: 'sunny-outline', Comp: WarpGhost, warp: 'glow', beauty: true },

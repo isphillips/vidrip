@@ -20,6 +20,7 @@ import FaceLensOverlay, { lensByKey } from '../../lens/faceLens';
 import LensPicker from '../../lens/LensPicker';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 import { useWarpFrameProcessor, warpAvailable } from '../../lens/warpLens';
+import { useAnonymousMode, ANON_LENS_KEY, ANON_VOICE_MOD } from '../../lens/useAnonymousMode';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 const MAX_SEC = MAX_STUDIO_MS / 1000; // 180s hard cap (auto-stop)
@@ -41,12 +42,16 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
 
   // AR face lens (full-screen test surface for placement). Mirror only for the front camera.
   const [lensKey, setLensKey] = useState<string | null>(null);
+  // React Anonymously: when on, force the silhouette lens (overrides any pick), hide the picker, and
+  // pitch the voice down on the capture-bake. effLensKey is what actually drives tracking/render/bake.
+  const anon = useAnonymousMode();
+  const effLensKey = anon ? ANON_LENS_KEY : lensKey;
   // Pull the full 478-pt mesh only for mesh lenses (Debug + the face-mesh effects); every other lens
   // stays on the cheap 6-anchor bridge.
-  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus, frameAspect: measuredAspect, startTrack, stopTrack, cancelTrack } = useFaceTracking(facing === 'front', !!lensByKey(lensKey)?.mesh);
+  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus, frameAspect: measuredAspect, startTrack, stopTrack, cancelTrack } = useFaceTracking(facing === 'front', !!lensByKey(effLensKey)?.mesh);
   // Real camera-warp lens (e.g. Mega Eyes): bends the live pixels via a Skia frame processor. Each
   // warp lens names its shader in `warp`; non-warp lenses pass null for a passthrough processor.
-  const warpKey = lensByKey(lensKey)?.warp ?? null;
+  const warpKey = lensByKey(effLensKey)?.warp ?? null;
   const isWarp = !!warpKey && warpAvailable(warpKey);
   const warpFrameProcessor = useWarpFrameProcessor(isWarp ? warpKey : null);
   // Prefer the aspect measured from the live frame (ground truth for the keypoint coordinate space);
@@ -102,9 +107,10 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       // the pixels for the whole flow — no track to thread, lens visible through trim/filter/overlay.
       // Falls back to the un-lensed footage if the bake fails (never lose the recording).
       let finalUri = uri;
-      const track = lensKey ? stopTrack() : null;
-      if (track) {
-        try { finalUri = await bakerRef.current!.bake({ sourceUri: uri, recipe: faceLensRecipe(track), durationSec: elapsedRef.current }); }
+      const track = effLensKey ? stopTrack() : null;
+      const voiceMod = anon ? ANON_VOICE_MOD : null;
+      if (track || voiceMod) {
+        try { finalUri = await bakerRef.current!.bake({ sourceUri: uri, recipe: track ? faceLensRecipe(track) : null, durationSec: elapsedRef.current, voiceMod }); }
         catch { finalUri = uri; }
       }
       // Persist the (lens-baked) recording as a draft immediately (survives crash/close); edits
@@ -116,7 +122,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
     } finally {
       setBusy(false);
     }
-  }, [recording, navigation, lensKey, stopTrack]);
+  }, [recording, navigation, effLensKey, anon, stopTrack]);
   stopRef.current = stop;
 
   const start = useCallback(() => {
@@ -135,7 +141,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       },
     });
     // Begin capturing the AR lens track in lock-step with the recording (no-op if no lens worn).
-    if (lensKey) { startTrack(lensKey, measuredAspect); }
+    if (effLensKey) { startTrack(effLensKey, measuredAspect); }
     setRecording(true);
     StatusBar.setHidden(true, 'fade');
     timerRef.current = setInterval(() => {
@@ -143,7 +149,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       setElapsed(elapsedRef.current);
       if (elapsedRef.current >= MAX_SEC) { stopRef.current(); } // hard 180s cap
     }, 1000);
-  }, [recording, ready, lensKey, startTrack, measuredAspect, cancelTrack]);
+  }, [recording, ready, effLensKey, startTrack, measuredAspect, cancelTrack]);
 
   const importLibrary = useCallback(async () => {
     if (recording) { return; }
@@ -177,13 +183,13 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
             enableBufferCompression={false}
             frameProcessor={
               isWarp ? warpFrameProcessor
-                : faceTrackingAvailable && lensKey ? frameProcessor
+                : faceTrackingAvailable && effLensKey ? frameProcessor
                   : undefined
             }
           />
           {/* Full-screen AR lens — overlay lenses only; warp lenses are baked into the preview above. */}
           {!isWarp && (
-            <FaceLensOverlay lens={lensKey} landmarks={lensLandmarks} width={width} height={height} frameAspect={frameAspect} />
+            <FaceLensOverlay lens={effLensKey} landmarks={lensLandmarks} width={width} height={height} frameAspect={frameAspect} />
           )}
         </>
       ) : (
@@ -215,8 +221,18 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
         </Text>
       )}
 
-      {/* Filter pill + slide-down grid (top center) — available while recording too. */}
-      <LensPicker lensKey={lensKey} onChange={setLensKey} topInset={top} />
+      {/* Filter pill + slide-down grid (top center) — available while recording too. In anonymous
+          mode the picker is hidden (the silhouette is forced) and a status badge shows instead. */}
+      {anon ? (
+        <View style={[styles.anonBadgeWrap, { top: top + SPACE.SM }]} pointerEvents="none">
+          <View style={styles.anonBadge}>
+            <Ionicons name="eye-off-outline" size={14} color={C.WHITE} style={{ marginRight: 6 }} />
+            <Text style={styles.anonBadgeTxt}>Anonymous</Text>
+          </View>
+        </View>
+      ) : (
+        <LensPicker lensKey={lensKey} onChange={setLensKey} topInset={top} />
+      )}
 
       {/* Recording timer — sits just above the record button so the lens picker owns the top. */}
       {recording && (
@@ -263,6 +279,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SPACE.SM,
     backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
   },
+  anonBadgeWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 20 },
+  anonBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
+  },
+  anonBadgeTxt: { color: C.WHITE, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.SM, letterSpacing: 0.5 },
   recTimerWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   recDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.DANGER },
   timerTxt: { color: C.WHITE, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },

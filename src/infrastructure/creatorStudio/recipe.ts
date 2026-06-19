@@ -50,6 +50,10 @@ export type StudioRecipe = {
    *  time-matched frame onto each output frame and crossfades the last `overlap` frames back
    *  into the first for a seamless repeat. Takes precedence over `overlay`. */
   overlayFrames?: { uris: string[]; fps: number; overlap: number; width: number; height: number } | null;
+  /** Audio voice modulation baked on export. 'deep' pitch-shifts the voice down (preserving timing)
+   *  for the "React Anonymously" mode — iOS via AVAudioUnitTimePitch, Android via SonicAudioProcessor.
+   *  Omit/null = original audio copied through unchanged. */
+  voiceMod?: 'deep' | null;
   output?: { width?: number; height?: number; fps?: number; bitrate?: number };
 };
 

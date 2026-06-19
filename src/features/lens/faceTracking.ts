@@ -84,9 +84,6 @@ try { meshPlugin = VisionCameraProxy.initFrameProcessorPlugin('faceMesh', {}); }
 // Prefer the mesh when requested AND built; otherwise BlazeFace.
 const useMesh = USE_FACE_MESH && !!meshPlugin;
 const plugin = useMesh ? meshPlugin : blazePlugin;
-// DIAGNOSTIC: which native plugins this build actually registered. mesh:false → the faceMesh native
-// plugin isn't in the running app (stale/failed build) → mesh lenses can't work. Remove once sorted.
-console.log('[lens] native plugins → blaze:', !!blazePlugin, 'mesh:', !!meshPlugin, '| track:', useMesh ? 'mesh' : 'blaze');
 
 /** Whether a native MediaPipe plugin is present in this build (gate Camera frameProcessor on it). */
 export const faceTrackingAvailable = !!plugin;

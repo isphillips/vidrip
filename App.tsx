@@ -6,6 +6,7 @@ import { HotUpdater } from '@hot-updater/react-native';
 import RootNavigator from './src/app/navigation/RootNavigator';
 import ScreenGradient from './src/components/ScreenGradient';
 import UploadToast from './src/components/UploadToast';
+import BakeQueueHost from './src/features/studio/components/BakeQueueHost';
 import { SUPABASE_ANON_KEY } from './src/infrastructure/supabase/client';
 import { C, FONT } from './src/theme';
 
@@ -18,6 +19,7 @@ function App() {
         <StatusBar barStyle="light-content" backgroundColor={C.BG_SOLID} />
         <RootNavigator />
         <UploadToast />
+        <BakeQueueHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

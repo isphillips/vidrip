@@ -3,6 +3,10 @@ import { View, StyleSheet } from 'react-native';
 import { Canvas } from '@shopify/react-native-skia';
 import { faceFrame, useLensClock, dequantizeMesh, type FaceLandmarks, type FaceLensTrack } from './core';
 import { lensByKey } from './lenses';
+import { ANON_LENS_KEY } from './useAnonymousMode';
+
+// Opaque black cover — the privacy fail-safe for anonymous mode when no face is tracked this frame.
+const Blackout = () => <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} pointerEvents="none" />;
 
 // Public entry point for the AR face-lens system. The lens infrastructure lives in ./core (types,
 // the face-frame mapping, the clock, shapes, primitives) and each lens is its own file in ./lenses,
@@ -24,6 +28,11 @@ export default function FaceLensOverlay({
   const def = lensByKey(lens);
   const show = !!def && !!landmarks && width > 0 && height > 0;
   const clock = useLensClock(animate && show);
+  // Anonymous fail-safe: the silhouette lens must never reveal the face. If it's active but there's
+  // no face (or no mesh) this frame, black the whole frame — live preview AND baked output.
+  if (lens === ANON_LENS_KEY && (!landmarks || !landmarks.mesh) && width > 0 && height > 0) {
+    return <Blackout />;
+  }
   if (!def || !landmarks || width <= 0 || height <= 0) { return null; }
   const f = faceFrame(landmarks, width, height, frameAspect);
   const Comp = def.Comp;
@@ -43,7 +52,12 @@ export default function FaceLensOverlay({
 export function FaceLensReplay({
   track, timeSec, width, height, frameAspect,
 }: { track?: FaceLensTrack | null; timeSec: number; width: number; height: number; frameAspect?: number }) {
-  if (!track || track.frames.length === 0) { return null; }
+  if (!track) { return null; }
+  // Anonymous fail-safe: a silhouette track with no frames still blacks the frame so a raw face can't
+  // slip through the bake.
+  if (track.frames.length === 0) {
+    return track.lensId === ANON_LENS_KEY && width > 0 && height > 0 ? <Blackout /> : null;
+  }
   let i = Math.round(timeSec * track.fps);
   if (i < 0) { i = 0; }
   if (i >= track.frames.length) { i = track.frames.length - 1; }

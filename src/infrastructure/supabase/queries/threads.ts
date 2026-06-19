@@ -90,6 +90,55 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
   });
 }
 
+// One of MY friend-share reactions, sourced from the reactions table (the source of truth) rather
+// than derived from thread membership — so it includes reactions to my own shares and is keyed by the
+// actual reaction. Joined to the parent thread for the video metadata + sender + total reaction count.
+export type MyReaction = {
+  id: string;                 // reaction id (open the reaction viewer)
+  thread_id: string | null;   // parent thread (chat fallback / hide key)
+  sender_id: string | null;   // parent thread's sender (block filtering)
+  created_at: string;
+  video_id: string | null;
+  video_title: string | null;
+  video_thumbnail: string | null;
+  source_type: 'youtube' | 'tiktok' | 'instagram';
+  sender: { handle: string; display_name: string } | null;
+  reaction_count: number;     // total reactions on the parent thread
+};
+
+export async function fetchMyReactions(userId: string): Promise<MyReaction[]> {
+  const { data, error } = await supabase
+    .from('reactions')
+    .select(`
+      id, thread_id, created_at, yt_video_id, source_type,
+      thread:threads!thread_id(
+        video_id, video_title, video_thumbnail, source_type, sender_id,
+        sender:users!sender_id(handle, display_name),
+        reactions(id)
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) { throw error; }
+
+  return (data ?? []).map((r: any) => {
+    const t = r.thread;
+    return {
+      id: r.id,
+      thread_id: r.thread_id ?? null,
+      sender_id: t?.sender_id ?? null,
+      created_at: r.created_at,
+      video_id: t?.video_id ?? r.yt_video_id ?? null,
+      video_title: t?.video_title ?? null,
+      video_thumbnail: t?.video_thumbnail ?? null,
+      source_type: t?.source_type ?? r.source_type ?? 'youtube',
+      sender: t?.sender ?? null,
+      reaction_count: t?.reactions?.length ?? 0,
+    };
+  });
+}
+
 export async function fetchThread(threadId: string, userId: string): Promise<ThreadDetail | null> {
   const { data, error } = await supabase
     .from('threads')
