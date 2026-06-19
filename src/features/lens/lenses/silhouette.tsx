@@ -53,7 +53,14 @@ export function Silhouette({ f, w, h }: LensProps) {
   // Pivot a little above the eyes (toward the forehead) so the dome grows upward over the hair.
   const py = cy - f.faceW * 0.12;
   const margin = f.faceW * 0.14;                 // fixed outward dilation → keeps the nose tucked inside
-  const head = convexHull(f.meshPts).map((pt) => {
+  // The hull only needs the face OUTLINE, so subsample the dense mesh (~1/5 of the points define the
+  // same convex shape) — a big per-frame saving on slower Android JS threads. Always include the nose
+  // tip (canonical index 1) so it stays inside the hull in profile views.
+  const sample: Pt[] = [];
+  for (let i = 0; i < f.meshPts.length; i += 5) { sample.push(f.meshPts[i]); }
+  const noseTip = f.mesh[1];
+  if (noseTip) { sample.push(noseTip); }
+  const head = convexHull(sample).map((pt) => {
     const vx = pt.x - cx, vy = pt.y - py;
     const sy = vy < 0 ? 1.55 : 1.25;             // taller above (skull/hair), fuller below (jaw)
     const qx = cx + vx * 1.22, qy = py + vy * sy;
