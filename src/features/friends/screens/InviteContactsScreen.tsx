@@ -95,6 +95,12 @@ function smsUrl(phone: string, code: string): string {
 export default function InviteContactsScreen() {
   const { user } = useAuthStore();
   const tabBarHeight = useBottomTabBarHeight();
+  // Memoized so incidental re-renders (matches/sent/codes resolving) don't hand the list
+  // a fresh style object → re-layout → scroll jitter. Only changes if the nav height does.
+  const listContentStyle = useMemo(
+    () => [styles.list, { paddingBottom: tabBarHeight + SPACE.LG }],
+    [tabBarHeight],
+  );
 
   const [perm, setPerm] = useState<'loading' | 'granted' | 'denied'>('loading');
   const [contacts, setContacts] = useState<DeviceContact[]>([]);
@@ -238,7 +244,7 @@ export default function InviteContactsScreen() {
           ref={sectionRef}
           sections={sections}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + SPACE.LG }]}
+          contentContainerStyle={listContentStyle}
           // Sticky headers jitter on iOS when momentum settles / scrollToLocation lands
           // on a boundary; the A–Z rail handles navigation, so keep headers inline.
           stickySectionHeadersEnabled={false}
