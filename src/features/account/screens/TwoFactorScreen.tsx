@@ -9,6 +9,8 @@ import {
   Alert,
   Linking,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
@@ -119,7 +121,10 @@ export default function TwoFactorScreen({ navigation }: AccountStackScreenProps<
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {verified ? (
         <>
           <Text style={styles.enabledBadge}>🔐 Two-factor is on</Text>
@@ -183,11 +188,13 @@ export default function TwoFactorScreen({ navigation }: AccountStackScreenProps<
           </TouchableOpacity>
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: C.BG },
   container: { flex: 1, backgroundColor: C.BG },
   content: { padding: SPACE.LG },
   center: { flex: 1, backgroundColor: C.BG, alignItems: 'center', justifyContent: 'center' },

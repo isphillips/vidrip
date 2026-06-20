@@ -1,7 +1,7 @@
 // OAuth config for syncing creator accounts. Only PUBLIC client ids live here
 // (safe in the app). Client secrets live in the sync-oauth edge function env.
 
-export type SyncProvider = 'youtube' | 'tiktok' | 'instagram';
+export type SyncProvider = 'youtube' | 'tiktok' | 'instagram' | 'facebook';
 
 // 'creator' = opens a Members Only channel from the account's uploads.
 // 'feed'    = pulls the user's personal feed (e.g. Liked Videos) into "For You".
@@ -22,12 +22,23 @@ export const TIKTOK_CLIENT_KEY = 'sbawbp2z1skyo0obdt';
 // signs in with Instagram directly, no Facebook Page required. The app secret lives
 // in the sync-oauth edge function env.
 export const INSTAGRAM_APP_ID = '1354410146587874';
+// Facebook App ID (public) for Facebook Login. Reels live on a Page, so the creator
+// authorizes Page access and then picks which Page to import. App secret lives in the
+// sync-oauth edge function env.
+// TODO: fill from Meta App Dashboard (App ID). Often the same Meta app as Instagram.
+export const FACEBOOK_APP_ID = '1590496342638743';
+// Graph API version pinned so a Meta-side default bump can't silently change behavior.
+export const FACEBOOK_GRAPH_VERSION = 'v21.0';
 
 const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
 const TIKTOK_SCOPE = 'user.info.basic,user.info.profile,video.list';
 // Instagram API with Instagram Login — read the creator's own profile + media
 // (Reels) straight from their Instagram Business/Creator account.
 const INSTAGRAM_SCOPE = 'instagram_business_basic';
+// Facebook Login — list the user's Pages and read each Page's published content
+// (reels). pages_show_list enumerates Pages; pages_read_engagement reads Page-owned
+// media. Both require App Review + business verification for production access.
+const FACEBOOK_SCOPE = 'pages_show_list,pages_read_engagement';
 
 // One redirect URL serves both providers + connection types, so both are carried
 // in `state` as `${provider}.${type}.${nonce}`.
@@ -64,6 +75,25 @@ export function buildAuthUrl(
       state,
     });
     return { url: `https://www.instagram.com/oauth/authorize?${p.toString()}`, state };
+  }
+  if (provider === 'facebook') {
+    // Facebook Login dialog — the creator grants Page access; the app then lists
+    // their Pages and imports the chosen Page's reels. Returns ?code to REDIRECT_URI.
+    // auth_type=rerequest forces the granular Page-selection screen to re-appear on
+    // reconnect (otherwise FB silently reuses the prior choice), so a creator can add
+    // a Page they didn't grant the first time.
+    const p = new URLSearchParams({
+      client_id: FACEBOOK_APP_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: 'code',
+      scope: FACEBOOK_SCOPE,
+      auth_type: 'rerequest',
+      state,
+    });
+    return {
+      url: `https://www.facebook.com/${FACEBOOK_GRAPH_VERSION}/dialog/oauth?${p.toString()}`,
+      state,
+    };
   }
   // tiktok
   const p = new URLSearchParams({
@@ -103,7 +133,10 @@ export function parseOAuthDeepLink(
   // state = `${provider}.${type}.${nonce}` (older builds: `${provider}.${nonce}`).
   const parts = state.split('.');
   const provider: SyncProvider =
-    parts[0] === 'tiktok' ? 'tiktok' : parts[0] === 'instagram' ? 'instagram' : 'youtube';
+    parts[0] === 'tiktok' ? 'tiktok'
+      : parts[0] === 'instagram' ? 'instagram'
+      : parts[0] === 'facebook' ? 'facebook'
+      : 'youtube';
   const connectionType: ConnectionType = parts[1] === 'feed' ? 'feed' : 'creator';
   return {
     provider,

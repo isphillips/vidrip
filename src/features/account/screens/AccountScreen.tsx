@@ -11,6 +11,7 @@ import {
   Switch,
   Linking,
   Image,
+  Modal,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,9 +22,13 @@ import { useOAuthStore } from '../../../store/oauthStore';
 import {
   fetchSyncedAccounts,
   syncOAuthCode,
+  connectFacebook,
+  resumeFacebookPages,
+  importFacebookPage,
   setSyncedAccountEnabled,
   disconnectSyncedAccount,
   type SyncedAccount,
+  type FacebookPage,
 } from '../../../infrastructure/supabase/queries/syncedAccounts';
 import { refreshConnectedFeed } from '../../../infrastructure/supabase/queries/connectedFeed';
 import { buildAuthUrl, type SyncProvider, type ConnectionType } from '../../../infrastructure/oauth/config';
@@ -43,6 +48,7 @@ const PROVIDERS: { key: SyncProvider; label: string }[] = [
   { key: 'youtube', label: 'YouTube' },
   { key: 'tiktok', label: 'TikTok' },
   { key: 'instagram', label: 'Instagram' },
+  { key: 'facebook', label: 'Facebook' },
 ];
 
 // Personal-feed connections (powers the "For You" grid). YouTube only for now.
@@ -125,6 +131,13 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   const [syncingType, setSyncingType] = useState<ConnectionType | null>(null);
   const { pending, clearPending } = useOAuthStore();
 
+  // Facebook reels live on a Page, so connecting returns the user's Pages for a
+  // picker; selecting one imports that Page's reels (phase 2).
+  const [fbPages, setFbPages] = useState<FacebookPage[] | null>(null);
+  const [fbConnType, setFbConnType] = useState<ConnectionType>('creator');
+  const [importingPageId, setImportingPageId] = useState<string | null>(null);
+  const [resumingFbId, setResumingFbId] = useState<string | null>(null);
+
   const loadSynced = useCallback(async () => {
     if (!user?.id) { return; }
     try { setSynced(await fetchSyncedAccounts(user.id, 'creator')); } catch { /* ignore */ }
@@ -182,6 +195,28 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     }
     setSyncing(true);
     setSyncingType(connectionType);
+    // Facebook is two-phase: exchange the code for the user's Pages, then let them
+    // pick which Page to import reels from (handled by the picker modal below).
+    if (provider === 'facebook') {
+      connectFacebook(code, connectionType)
+        .then(async (pages) => {
+          // The pending connection now exists server-side — reflect it so the row shows
+          // "Choose Page" if the user dismisses the picker without selecting one.
+          await loadSynced();
+          if (!pages.length) {
+            Alert.alert(
+              'No Pages found',
+              "We couldn't find any Facebook Pages you manage. Reels are imported from a Page, so you'll need one to connect.",
+            );
+            return;
+          }
+          setFbConnType(connectionType);
+          setFbPages(pages);
+        })
+        .catch((e: any) => Alert.alert("Couldn't connect Facebook", e?.message ?? 'Could not connect account.'))
+        .finally(() => { setSyncing(false); setSyncingType(null); });
+      return;
+    }
     syncOAuthCode(provider, code, connectionType)
       .then(async () => {
         // A feed connection has no content yet — kick off the first pull now.
@@ -192,13 +227,39 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
       .finally(() => { setSyncing(false); setSyncingType(null); });
   }, [pending, clearPending, loadSynced]);
 
+  // Reopen the picker for a pending Facebook connection (connected but no Page chosen
+  // yet) — re-lists Pages from the stashed token, no reconnect needed.
+  const handleResumeFacebook = (acct: SyncedAccount) => {
+    setResumingFbId(acct.id);
+    resumeFacebookPages(acct.connection_type)
+      .then((pages) => {
+        if (!pages.length) {
+          Alert.alert('No Pages found', "We couldn't find any Facebook Pages you manage.");
+          return;
+        }
+        setFbConnType(acct.connection_type);
+        setFbPages(pages);
+      })
+      .catch((e: any) => Alert.alert("Couldn't load Pages", e?.message ?? 'Please reconnect and try again.'))
+      .finally(() => setResumingFbId(null));
+  };
+
+  // Phase 2: import the chosen Facebook Page's reels.
+  const handleSelectFacebookPage = (page: FacebookPage) => {
+    setImportingPageId(page.id);
+    importFacebookPage(page.id, fbConnType)
+      .then(async () => { setFbPages(null); await loadSynced(); })
+      .catch((e: any) => Alert.alert('Import failed', e?.message ?? 'Could not import this Page.'))
+      .finally(() => setImportingPageId(null));
+  };
+
   const handleToggleEnabled = async (acct: SyncedAccount) => {
     setSynced(prev => prev.map(a => a.id === acct.id ? { ...a, enabled: !a.enabled } : a));
     try { await setSyncedAccountEnabled(acct.id, !acct.enabled); } catch { loadSynced(); }
   };
 
   const handleDisconnect = (acct: SyncedAccount) => {
-    const provLabel = acct.provider === 'tiktok' ? 'TikTok' : acct.provider === 'instagram' ? 'Instagram' : 'YouTube';
+    const provLabel = PROVIDERS.find(p => p.key === acct.provider)?.label ?? acct.provider;
     Alert.alert('Disconnect', `Disconnect ${provLabel}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -397,6 +458,8 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           <View style={styles.section}>
             {PROVIDERS.map(({ key, label }, i) => {
               const acct = synced.find(a => a.provider === key);
+              // A Facebook account connected but with no Page chosen yet (null handle).
+              const fbPending = !!acct && acct.provider === 'facebook' && !acct.provider_handle;
               return (
                 <View key={key}>
                   {i > 0 && <View style={styles.divider} />}
@@ -409,13 +472,29 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                         <Text style={styles.rowLabel}>{label}</Text>
                         {acct ? (
                           <Text style={styles.syncHandle} numberOfLines={1}>
-                            {acct.provider_display_name
-                              || (acct.provider_handle ? `@${acct.provider_handle}` : 'Connected')}
+                            {fbPending
+                              ? 'Connected, choose a Page'
+                              : acct.provider_display_name
+                                || (acct.provider_handle ? `@${acct.provider_handle}` : 'Connected')}
                           </Text>
                         ) : null}
                       </View>
                     </View>
-                    {acct ? (
+                    {fbPending && acct ? (
+                      <View style={styles.syncRight}>
+                        <TouchableOpacity
+                          style={styles.connectBtn}
+                          onPress={() => handleResumeFacebook(acct)}
+                          disabled={resumingFbId === acct.id}>
+                          <Text style={styles.connectBtnText}>
+                            {resumingFbId === acct.id ? '…' : 'Choose Page'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDisconnect(acct)} hitSlop={8}>
+                          <Text style={styles.syncDisconnect}>Disconnect</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : acct ? (
                       <View style={styles.syncRight}>
                         <Switch
                           value={acct.enabled}
@@ -562,6 +641,64 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           onInvitePeople={() => (navigation as any).navigate('Channels', { screen: 'InviteToChannel', params: { channelId: creatorChannel.id, channelName: creatorChannel.title } })}
         />
       )}
+
+      {/* Facebook Page picker — Reels are imported from the chosen Page. */}
+      <Modal
+        visible={!!fbPages}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { if (!importingPageId) { setFbPages(null); } }}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Choose a Facebook Page</Text>
+            <Text style={styles.modalHint}>
+              Reels are imported from a Page you manage. Pick which Page to connect.
+            </Text>
+            <ScrollView style={styles.modalList} keyboardShouldPersistTaps="handled">
+              {(fbPages ?? []).map((page) => {
+                const importing = importingPageId === page.id;
+                // Two distinct "can't import" reasons, each with its own hint:
+                //   no manage token → access problem; manageable but no reels → empty.
+                const noReels = page.importable && page.hasReels === false;
+                const greyed = !page.importable || noReels;
+                const hint = !page.importable ? 'Needs manage access' : noReels ? 'No reels to import' : null;
+                const selectable = page.importable && !noReels;
+                return (
+                  <TouchableOpacity
+                    key={page.id}
+                    style={[styles.pageRow, greyed && styles.pageRowDisabled]}
+                    activeOpacity={0.7}
+                    disabled={!selectable || !!importingPageId}
+                    onPress={() => handleSelectFacebookPage(page)}>
+                    {page.avatar ? (
+                      <Image source={{ uri: page.avatar }} style={styles.pageAvatar} />
+                    ) : (
+                      <View style={styles.pageAvatar} />
+                    )}
+                    <View style={styles.pageInfo}>
+                      <Text style={styles.pageName} numberOfLines={1}>{page.name || 'Untitled Page'}</Text>
+                      {hint && (
+                        <Text style={styles.pageHint} numberOfLines={1}>{hint}</Text>
+                      )}
+                    </View>
+                    {importing
+                      ? <ActivityIndicator color={C.ACCENT} size="small" />
+                      : selectable
+                        ? <Text style={styles.rowChevron}>›</Text>
+                        : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCancel}
+              disabled={!!importingPageId}
+              onPress={() => setFbPages(null)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -637,4 +774,31 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM, color: C.INK },
   rowLabelDanger: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.DANGER },
   rowChevron: { fontSize: FONT.SIZES.LG, color: C.MUTED },
+  modalBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', padding: SPACE.LG,
+  },
+  modalCard: {
+    backgroundColor: C.SURFACE, borderRadius: RADIUS.MD,
+    padding: SPACE.LG, borderWidth: 1, borderColor: C.BORDER, maxHeight: '70%',
+  },
+  modalTitle: { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
+  modalHint: {
+    fontSize: FONT.SIZES.XS, color: C.SUBTLE, fontFamily: FONT.BODY,
+    marginTop: SPACE.XS, marginBottom: SPACE.MD, lineHeight: 16,
+  },
+  // flexShrink lets the list scroll within the card's maxHeight instead of growing to
+  // its full content height (which clips the last rows and pushes Cancel off-screen).
+  modalList: { flexShrink: 1 },
+  pageRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
+    paddingVertical: SPACE.MD, borderBottomWidth: 1, borderBottomColor: C.BORDER,
+  },
+  pageRowDisabled: { opacity: 0.45 },
+  pageAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.SURFACE_2 },
+  pageInfo: { flex: 1, gap: 2 },
+  pageName: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM, color: C.INK },
+  pageHint: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.MUTED },
+  modalCancel: { alignItems: 'center', paddingTop: SPACE.LG },
+  modalCancelText: { fontSize: FONT.SIZES.MD, color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD },
 });
