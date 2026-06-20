@@ -274,6 +274,7 @@ export default function ChannelsHomeScreen({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
   header: {
+    paddingTop: SPACE.SM,
     paddingBottom: SPACE.MD,
     gap: SPACE.MD,
   },

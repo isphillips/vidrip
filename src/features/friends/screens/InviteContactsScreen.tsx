@@ -4,6 +4,7 @@ import {
   Linking, Platform, RefreshControl,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { ensureContactsPermission, loadDeviceContacts, type DeviceContact } from '../../../infrastructure/native/contacts';
@@ -58,7 +59,7 @@ function sectionGetItemLayout(
   return { length: 0, offset, index };
 }
 
-function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l: string) => void }) {
+function AZIndex({ available, onSelect, bottomGap = 0 }: { available: Set<string>; onSelect: (l: string) => void; bottomGap?: number }) {
   // Only fire on crossing into a NEW letter — calling scrollToLocation on every move
   // event floods the SectionList and makes the rail letters flash/double + open gaps.
   const last = useRef<string | null>(null);
@@ -68,7 +69,9 @@ function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l
   };
   return (
     <View
-      style={styles.azIndex}
+      // Centre within the VISIBLE area: shift the centred rail up by half the nav gap
+      // so it isn't sitting low / partly behind the bottom tab bar.
+      style={[styles.azIndex, { marginTop: -(AZ_H + bottomGap) / 2 }]}
       onStartShouldSetResponder={() => true}
       onMoveShouldSetResponder={() => true}
       onResponderTerminationRequest={() => false}
@@ -91,6 +94,7 @@ function smsUrl(phone: string, code: string): string {
 
 export default function InviteContactsScreen() {
   const { user } = useAuthStore();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [perm, setPerm] = useState<'loading' | 'granted' | 'denied'>('loading');
   const [contacts, setContacts] = useState<DeviceContact[]>([]);
@@ -234,7 +238,7 @@ export default function InviteContactsScreen() {
           ref={sectionRef}
           sections={sections}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + SPACE.LG }]}
           // Sticky headers jitter on iOS when momentum settles / scrollToLocation lands
           // on a boundary; the A–Z rail handles navigation, so keep headers inline.
           stickySectionHeadersEnabled={false}
@@ -261,7 +265,7 @@ export default function InviteContactsScreen() {
             );
           }}
         />
-        {sections.length > 0 && <AZIndex available={available} onSelect={scrollToLetter} />}
+        {sections.length > 0 && <AZIndex available={available} onSelect={scrollToLetter} bottomGap={tabBarHeight} />}
       </View>
 
       {/* Code picker */}

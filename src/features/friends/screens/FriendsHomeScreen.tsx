@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 0,
-    marginTop: 0,
+    marginTop: SPACE.SM,
   },
   title: {
     fontSize: FONT.SIZES.XL,

@@ -711,11 +711,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: SPACE.SM,
     paddingHorizontal: SPACE.LG,
-    paddingTop: SPACE.MD,
+    paddingTop: SPACE.LG,
     paddingBottom: 0,
     zIndex: 10,
   },
-  headerMail: { marginLeft: 'auto', marginTop: -3 },
+  headerMail: { marginLeft: 'auto', marginTop: 0 },
   headerLogo: { width: 48, height: 84, marginTop: -8, marginBottom: -32, pointerEvents: 'none' },
   wordmarkRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 10, marginLeft: -5 },
   wordmarkText: {
