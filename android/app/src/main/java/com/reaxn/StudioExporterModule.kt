@@ -102,7 +102,7 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
     if (voiceMod == "deep") {
       val sonic = SonicAudioProcessor()
       sonic.setPitch(0.72f) // <1 = deeper; ~-5 semitones
-      audioProcessors.add(sonic)\
+      audioProcessors.add(sonic)
     }
 
     val edited = EditedMediaItem.Builder(mediaItem)

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, StatusBar, ActivityIndicator,
   useWindowDimensions,
@@ -16,7 +16,7 @@ import { pickVideoFromLibrary } from '../../../infrastructure/media/imagePicker'
 import { createDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import ShareBaker, { type ShareBakerHandle } from '../components/ShareBaker';
 import { faceLensRecipe } from '../effectRecipe';
-import FaceLensOverlay, { lensByKey } from '../../lens/faceLens';
+import { LiveFaceLens, lensByKey } from '../../lens/faceLens';
 import LensPicker from '../../lens/LensPicker';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 import { useWarpFrameProcessor, warpAvailable } from '../../lens/warpLens';
@@ -26,6 +26,26 @@ import type { StudioStackScreenProps } from '../../../app/navigation/types';
 const MAX_SEC = MAX_STUDIO_MS / 1000; // 180s hard cap (auto-stop)
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+// DEV-only landmark readout. Subscribes to the tracker's external store directly so it stays live
+// at the camera rate without re-rendering the whole capture screen each frame.
+function LensDebugReadout({
+  subscribe, getLandmarks, status, style,
+}: {
+  subscribe: (cb: () => void) => () => void;
+  getLandmarks: () => any;
+  status: string;
+  style: any;
+}) {
+  const lm = useSyncExternalStore(subscribe, getLandmarks);
+  return (
+    <Text style={style}>
+      {lm
+        ? `L ${lm.leftEye.x.toFixed(2)},${lm.leftEye.y.toFixed(2)}  R ${lm.rightEye.x.toFixed(2)},${lm.rightEye.y.toFixed(2)}  N ${lm.noseTip.x.toFixed(2)},${lm.noseTip.y.toFixed(2)}`
+        : `LM:no  FP:${faceTrackingAvailable ? 'yes' : 'NO'}  ${status}`}
+    </Text>
+  );
+}
 
 // In-app studio camera. Records a portrait clip (720p/30fps, 2 Mbps, 180s cap) and
 // hands the file to StudioDetails to publish — the same pipeline as an import.
@@ -48,7 +68,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
   const effLensKey = anon ? ANON_LENS_KEY : lensKey;
   // Pull the full 478-pt mesh only for mesh lenses (Debug + the face-mesh effects); every other lens
   // stays on the cheap 6-anchor bridge.
-  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus, frameAspect: measuredAspect, startTrack, stopTrack, cancelTrack } = useFaceTracking(facing === 'front', !!lensByKey(effLensKey)?.mesh);
+  const { frameProcessor, subscribeLandmarks, getLandmarks, status: lensStatus, delegate: meshDelegate, perf: meshPerf, trackKind, frameAspect: measuredAspect, startTrack, stopTrack, cancelTrack } = useFaceTracking(facing === 'front', !!lensByKey(effLensKey)?.mesh);
   // Real camera-warp lens (e.g. Mega Eyes): bends the live pixels via a Skia frame processor. Each
   // warp lens names its shader in `warp`; non-warp lenses pass null for a passthrough processor.
   const warpKey = lensByKey(effLensKey)?.warp ?? null;
@@ -189,7 +209,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
           />
           {/* Full-screen AR lens — overlay lenses only; warp lenses are baked into the preview above. */}
           {!isWarp && (
-            <FaceLensOverlay lens={effLensKey} landmarks={lensLandmarks} width={width} height={height} frameAspect={frameAspect} />
+            <LiveFaceLens subscribe={subscribeLandmarks} getLandmarks={getLandmarks} lens={effLensKey} width={width} height={height} frameAspect={frameAspect} />
           )}
         </>
       ) : (
@@ -211,14 +231,26 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
         </TouchableOpacity>
       </View>
 
-      {/* DEV diagnostic. Shows transformed (normalized 0..1) L eye, R eye, nose so the exact
-          geometry can be read off: eyes should share ~same y (level), nose centered & below. */}
-      {__DEV__ && (
-        <Text style={[styles.lensDebug, { bottom: top - 22 }]}>
-          {lensLandmarks
-            ? `L ${lensLandmarks.leftEye.x.toFixed(2)},${lensLandmarks.leftEye.y.toFixed(2)}  R ${lensLandmarks.rightEye.x.toFixed(2)},${lensLandmarks.rightEye.y.toFixed(2)}  N ${lensLandmarks.noseTip.x.toFixed(2)},${lensLandmarks.noseTip.y.toFixed(2)}`
-            : `LM:no  FP:${faceTrackingAvailable ? 'yes' : 'NO'}  ${lensStatus}`}
+      {/* TEMP diagnostic (visible in release): which MediaPipe delegate the 478-pt mesh loaded on —
+          GPU is fast, CPU is the ~1s-lag culprit. OnePlus/ColorOS blocks logcat, so we surface it
+          here. Remove once the delegate is confirmed. */}
+      {!!effLensKey && (
+        <Text style={[styles.delegateBadge, { top: top + 4 }]}>
+          {trackKind} · {meshDelegate ?? '…'}{meshPerf ? `  ·  infer ${Math.round(meshPerf.infer)}ms  ·  total ${Math.round(meshPerf.total)}ms` : ''}
         </Text>
+      )}
+
+      {/* DEV diagnostic. Shows transformed (normalized 0..1) L eye, R eye, nose so the exact
+          geometry can be read off: eyes should share ~same y (level), nose centered & below.
+          Subscribes to the landmark store itself so this dev-only readout stays live without
+          re-rendering the whole capture screen each frame. */}
+      {__DEV__ && (
+        <LensDebugReadout
+          subscribe={subscribeLandmarks}
+          getLandmarks={getLandmarks}
+          status={lensStatus}
+          style={[styles.lensDebug, { bottom: top - 22 }]}
+        />
       )}
 
       {/* Filter pill + slide-down grid (top center) — available while recording too. In anonymous
@@ -303,4 +335,5 @@ const styles = StyleSheet.create({
   recInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: C.DANGER },
   recInnerStop: { width: 30, height: 30, borderRadius: 6, backgroundColor: C.DANGER },
   lensDebug: { position: 'absolute', alignSelf: 'center', color: '#0f0', fontFamily: FONT.BODY_SEMIBOLD, fontSize: 11, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  delegateBadge: { position: 'absolute', left: 0, right: 0, textAlign: 'center', color: '#00e5ff', fontFamily: FONT.BODY_BOLD, fontSize: 13, zIndex: 50 },
 });

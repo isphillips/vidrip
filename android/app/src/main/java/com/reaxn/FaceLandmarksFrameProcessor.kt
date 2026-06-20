@@ -23,21 +23,29 @@ class FaceLandmarksFrameProcessor(proxy: VisionCameraProxy, options: Map<String,
   init { warmUp(proxy.context) }
 
   override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
+    val cb0 = android.os.SystemClock.elapsedRealtimeNanos()
     val det = detector ?: return mapOf("err" to "no_model")
     val image = frame.image ?: return mapOf("err" to "no_image")
     val mp = MediaImageBuilder(image).build()
     // Orientation is handled in JS (faceTracking.ts, per frame.orientation) — keypoints are returned
     // in the raw sensor space.
     val ts = android.os.SystemClock.uptimeMillis()
-    val result = try { det.detectForVideo(mp, ts) } catch (e: Throwable) { return mapOf("err" to "detect_fail") }
+    val tInf = android.os.SystemClock.elapsedRealtimeNanos()
+    val result = try { det.detectForVideo(mp, ts) } catch (e: Throwable) { return mapOf("err" to "detect_fail", "delegate" to delegateName) }
+    val infMs = (android.os.SystemClock.elapsedRealtimeNanos() - tInf) / 1e6
     val detections = result.detections()
-    if (detections.isEmpty()) return mapOf("err" to "no_face")
+    if (detections.isEmpty()) return mapOf("err" to "no_face", "delegate" to delegateName)
     val kps = detections[0].keypoints()
-    if (!kps.isPresent || kps.get().size < 6) return mapOf("err" to "no_kps")
+    if (!kps.isPresent || kps.get().size < 6) return mapOf("err" to "no_kps", "delegate" to delegateName)
     val list = kps.get()
     val pts = ArrayList<List<Double>>(list.size)
     for (k in list) { pts.add(listOf(k.x().toDouble(), k.y().toDouble())) }
-    return mapOf("points" to pts)
+    val out = HashMap<String, Any>()
+    out["points"] = pts
+    out["delegate"] = delegateName
+    out["msInfer"] = infMs
+    out["msTotal"] = (android.os.SystemClock.elapsedRealtimeNanos() - cb0) / 1e6
+    return out
   }
 
   companion object {
@@ -47,15 +55,23 @@ class FaceLandmarksFrameProcessor(proxy: VisionCameraProxy, options: Map<String,
     var detector: FaceDetector? = null
       private set
 
+    // Which delegate the BlazeFace detector loaded on (GPU/CPU/none) — surfaced to JS for the badge.
+    @Volatile
+    var delegateName: String = "none"
+      private set
+
     @JvmStatic
     fun warmUp(context: android.content.Context) {
       if (detector != null) { return }
       synchronized(this) {
         if (detector != null) { return }
         // Prefer the GPU delegate (much cheaper inference); fall back to CPU if GPU init fails.
-        detector = build(context, Delegate.GPU)?.also { android.util.Log.i("FaceDetector", "delegate=GPU") }
-          ?: build(context, Delegate.CPU)?.also { android.util.Log.i("FaceDetector", "delegate=CPU") }
-          ?: run { android.util.Log.w("FaceDetector", "delegate=none (model failed to load)"); null }
+        val gpu = build(context, Delegate.GPU)
+        if (gpu != null) { detector = gpu; delegateName = "GPU"; android.util.Log.i("FaceDetector", "delegate=GPU"); return }
+        val cpu = build(context, Delegate.CPU)
+        if (cpu != null) { detector = cpu; delegateName = "CPU"; android.util.Log.i("FaceDetector", "delegate=CPU"); return }
+        delegateName = "none"
+        android.util.Log.w("FaceDetector", "delegate=none (model failed to load)")
       }
     }
 

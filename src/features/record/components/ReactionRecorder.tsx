@@ -28,7 +28,7 @@ import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import DraggablePip from './DraggablePip';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
 import { faceLensRecipe } from '../../studio/effectRecipe';
-import FaceLensOverlay, { lensByKey, type FaceLensTrack } from '../../lens/faceLens';
+import { LiveFaceLens, lensByKey, type FaceLensTrack } from '../../lens/faceLens';
 import LensPicker from '../../lens/LensPicker';
 import { MOCK_FACE } from '../../lens/useFaceLandmarks';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
@@ -146,8 +146,9 @@ export default function ReactionRecorder({
   const effLensKey = anon ? ANON_LENS_KEY : lensKey;
   // Request the full 478-pt mesh only when the active lens is a mesh lens (so its track captures the
   // mesh for replay). Inert while effLensKey is null.
-  const { frameProcessor, landmarks: liveLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true, !!lensByKey(effLensKey)?.mesh);
-  const lensLandmarks = liveLandmarks ?? (effLensKey && !faceTrackingAvailable ? MOCK_FACE : null);
+  const { frameProcessor, subscribeLandmarks, getLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true, !!lensByKey(effLensKey)?.mesh);
+  // Fallback face for devices without the native plugin (mock so the lens still previews).
+  const mockFallback = effLensKey && !faceTrackingAvailable ? MOCK_FACE : null;
   // Camera-frame aspect (w/h) — shared by the live overlay and the captured track so replay
   // cover-crops the same way the preview did.
   const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
@@ -641,9 +642,11 @@ export default function ReactionRecorder({
               pixelFormat={faceTrackingAvailable ? 'rgb' : 'yuv'}
               frameProcessor={faceTrackingAvailable && effLensKey ? frameProcessor : undefined}
             />
-            <FaceLensOverlay
+            <LiveFaceLens
+              subscribe={subscribeLandmarks}
+              getLandmarks={getLandmarks}
               lens={effLensKey}
-              landmarks={lensLandmarks}
+              fallback={mockFallback}
               width={camAsPip ? PIP_W : width}
               height={camAsPip ? PIP_H : height}
               frameAspect={frameAspect}

@@ -25,13 +25,16 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
   init { warmUp(proxy.context) }
 
   override fun callback(frame: Frame, arguments: Map<String, Any>?): Any? {
+    val cb0 = android.os.SystemClock.elapsedRealtimeNanos()
     val landmarker = detector ?: return mapOf("err" to "no_model")
     val image = frame.image ?: return mapOf("err" to "no_image")
     val mp = MediaImageBuilder(image).build()
     val ts = android.os.SystemClock.uptimeMillis()
-    val result = try { landmarker.detectForVideo(mp, ts) } catch (e: Throwable) { return mapOf("err" to "detect_fail") }
+    val tInf = android.os.SystemClock.elapsedRealtimeNanos()
+    val result = try { landmarker.detectForVideo(mp, ts) } catch (e: Throwable) { return mapOf("err" to "detect_fail", "delegate" to delegateName) }
+    val infMs = (android.os.SystemClock.elapsedRealtimeNanos() - tInf) / 1e6
     val faces = result.faceLandmarks()
-    if (faces.isEmpty() || faces[0].size < 468) return mapOf("err" to "no_face")
+    if (faces.isEmpty() || faces[0].size < 468) return mapOf("err" to "no_face", "delegate" to delegateName)
     val f = faces[0]
 
     // Canonical MediaPipe FaceMesh indices → 6 BlazeFace-equivalent anchors (subject-anatomical, image
@@ -48,6 +51,8 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
     )
     val out = HashMap<String, Any>()
     out["points"] = points
+    out["delegate"] = delegateName
+    out["msInfer"] = infMs
 
     // Full 478-pt mesh, only when JS asks (Debug lens) — keeps the bridge cheap by default.
     if (arguments?.get("mesh") == true) {
@@ -67,10 +72,9 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
       )
     }
 
-    val matOpt = result.facialTransformationMatrixes()
-    if (matOpt.isPresent && matOpt.get().isNotEmpty()) {
-      out["m"] = matOpt.get()[0].map { it.toDouble() } // FloatArray(16), row-major
-    }
+    // Full native callback time incl. the per-frame list-building/serialization (msTotal − msInfer
+    // ≈ the cost of marshaling the 478-pt mesh). Surfaced to the on-screen badge for profiling.
+    out["msTotal"] = (android.os.SystemClock.elapsedRealtimeNanos() - cb0) / 1e6
     return out
   }
 
@@ -80,14 +84,24 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
     var detector: FaceLandmarker? = null
       private set
 
+    // Which MediaPipe delegate actually loaded (GPU/CPU/none). Surfaced to JS in every result so the
+    // app can show it on-screen — OnePlus/ColorOS suppresses logcat for release apps, so this is the
+    // only reliable way to confirm whether the heavy 478-pt mesh is on GPU or the (slow) CPU.
+    @Volatile
+    var delegateName: String = "none"
+      private set
+
     @JvmStatic
     fun warmUp(context: android.content.Context) {
       if (detector != null) { return }
       synchronized(this) {
         if (detector != null) { return }
-        detector = build(context, Delegate.GPU)?.also { android.util.Log.i("FaceMesh", "delegate=GPU") }
-          ?: build(context, Delegate.CPU)?.also { android.util.Log.i("FaceMesh", "delegate=CPU") }
-          ?: run { android.util.Log.w("FaceMesh", "delegate=none (model failed to load)"); null }
+        val gpu = build(context, Delegate.GPU)
+        if (gpu != null) { detector = gpu; delegateName = "GPU"; android.util.Log.i("FaceMesh", "delegate=GPU"); return }
+        val cpu = build(context, Delegate.CPU)
+        if (cpu != null) { detector = cpu; delegateName = "CPU"; android.util.Log.i("FaceMesh", "delegate=CPU"); return }
+        delegateName = "none"
+        android.util.Log.w("FaceMesh", "delegate=none (model failed to load)")
       }
     }
 
@@ -104,8 +118,11 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
           .setMinFaceDetectionConfidence(0.5f)
           .setMinFacePresenceConfidence(0.5f)
           .setMinTrackingConfidence(0.5f)
+          // Blendshapes (jaw/blink/smile/brow) cost ~10-20ms — kept ON only for the mesh path, which
+          // is already throttled; anchor lenses route to BlazeFace (no blendshapes) for the fast path.
           .setOutputFaceBlendshapes(true)
-          .setOutputFacialTransformationMatrixes(true)
+          // Facial transformation matrix is NOT consumed in JS — computing it added inference time
+          // for nothing, so it's off. Re-enable here (and read `m` in faceTracking) if a lens needs it.
           .build()
         FaceLandmarker.createFromOptions(context.applicationContext, opts)
       } catch (e: Throwable) { null }

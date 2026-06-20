@@ -21,9 +21,12 @@ const ANDROID_DY = -0.05;
 // Replay sampling rate for the captured track — 15fps is plenty for an overlay and keeps the
 // persisted track small.
 const TRACK_FPS = 15;
-// Cap live inference. The camera runs at 30fps; with the GPU delegate BlazeFace is cheap enough to
-// run every frame. Lower this if a CPU-delegate device struggles.
-const LIVE_FPS = 30;
+// Anchor-only lenses use the lightweight BlazeFace detector (~5-10ms) — run them at the full camera
+// rate for real-time tracking.
+const ANCHOR_LIVE_FPS = 30;
+// Mesh lenses pull the full 478-pt model — far heavier inference (~40ms) — so cap them lower so the
+// inference doesn't back up into the "dots trail my face by ~1s" lag.
+const MESH_LIVE_FPS = 15;
 const r3 = (n: number) => Math.round(n * 1000) / 1000; // trim serialized track size
 
 // Orientation fed to MediaPipe on iOS. Calibrated: feeding 'up' makes the FaceLandmarker output a
@@ -81,21 +84,23 @@ let blazePlugin: ReturnType<typeof VisionCameraProxy.initFrameProcessorPlugin> |
 let meshPlugin: ReturnType<typeof VisionCameraProxy.initFrameProcessorPlugin> | undefined;
 try { blazePlugin = VisionCameraProxy.initFrameProcessorPlugin('faceLandmarks', {}); } catch { blazePlugin = undefined; }
 try { meshPlugin = VisionCameraProxy.initFrameProcessorPlugin('faceMesh', {}); } catch { meshPlugin = undefined; }
-// Prefer the mesh when requested AND built; otherwise BlazeFace.
-const useMesh = USE_FACE_MESH && !!meshPlugin;
-const plugin = useMesh ? meshPlugin : blazePlugin;
+// Both plugins stay available and are chosen PER LENS in the hook (see useFaceTracking): mesh-
+// rendering lenses use the heavy 478-pt FaceLandmarker; everything else uses the lightweight
+// BlazeFace 6-keypoint detector, so the majority of lenses track at full rate instead of paying the
+// mesh's ~40ms every frame.
+const hasMesh = USE_FACE_MESH && !!meshPlugin;
+const hasBlaze = !!blazePlugin;
 
-/** Whether a native MediaPipe plugin is present in this build (gate Camera frameProcessor on it). */
-export const faceTrackingAvailable = !!plugin;
-/** Which face track is live ('mesh' = Face Landmarker, 'blaze' = BlazeFace). Exposed for diagnostics. */
-export const faceTrackKind: 'mesh' | 'blaze' = useMesh ? 'mesh' : 'blaze';
+/** Whether ANY native MediaPipe plugin is present in this build (gate Camera frameProcessor on it). */
+export const faceTrackingAvailable = hasMesh || hasBlaze;
+/** Coarse default ('mesh' if the heavy model is built). Per-lens routing in the hook overrides it. */
+export const faceTrackKind: 'mesh' | 'blaze' = hasMesh ? 'mesh' : 'blaze';
 
-// EMA factor toward each new detection. BlazeFace needs heavy easing (0.18 on iOS) to mask its
-// flicker — but that easing is exactly what reads as lag/choppiness. The mesh is far cleaner, so it
-// can chase each fresh detection much harder → snappier, tighter tracking. DEADBAND is the motion
-// below which we hold the pose; tighter for the mesh so small moves still register.
-const SMOOTH = faceTrackKind === 'mesh' ? 0.6 : (IS_ANDROID ? 0.55 : 0.18);
-const DEADBAND = faceTrackKind === 'mesh' ? 0.004 : 0.008;
+// EMA factor + deadband per track type. BlazeFace is jumpier → eased more (0.18 on iOS) to mask
+// flicker; the mesh is far cleaner so it chases each detection harder (snappier). Chosen per-lens in
+// the hook from which detector that lens routes to.
+const EMA = { mesh: 0.6, blaze: IS_ANDROID ? 0.55 : 0.18 };
+const DEAD = { mesh: 0.006, blaze: 0.008 };
 
 // BlazeFace keypoint indices (right/left as seen in the image).
 const RIGHT_EYE = 0;
@@ -164,8 +169,27 @@ function reduce(points: number[][] | null | undefined, _aspect: number, orientat
 // landmarks. `mirror` true for the front camera. Returns landmarks=null (and a no-op processor) if
 // the plugin isn't built yet.
 export function useFaceTracking(mirror = true, withMesh = false) {
-  const [landmarks, setLandmarks] = useState<FaceLandmarks | null>(null);
+  // Landmarks are delivered via an external store (a ref + listener set) rather than React state: at
+  // LIVE_FPS, a setState here would re-render the ENTIRE host component (the whole ReactionRecorder /
+  // StudioCapture tree) every frame. Consumers read them through <LiveFaceLens> (useSyncExternalStore),
+  // so only the small overlay re-renders per frame — never the heavy parent.
+  const landmarksRef = useRef<FaceLandmarks | null>(null);
+  const listenersRef = useRef<Set<() => void>>(new Set());
+  const emitLandmarks = useCallback(() => { listenersRef.current.forEach((l) => l()); }, []);
+  const subscribeLandmarks = useCallback((cb: () => void) => {
+    listenersRef.current.add(cb);
+    return () => { listenersRef.current.delete(cb); };
+  }, []);
+  const getLandmarks = useCallback(() => landmarksRef.current, []);
   const [status, setStatus] = useState<string>('init'); // diagnostic: ok | null | <err>
+  // Which native MediaPipe delegate loaded (GPU/CPU/none) — surfaced from the frame result so the app
+  // can show it (logcat is suppressed on OnePlus release builds). Set once; rarely re-renders.
+  const [delegate, setDelegate] = useState<string | null>(null);
+  const delegateRef = useRef<string | null>(null);
+  // TEMP profiling: native inference / total callback time, updated ~2x/sec so the badge doesn't
+  // re-render at the frame rate.
+  const [perf, setPerf] = useState<{ infer: number; total: number } | null>(null);
+  const lastPerfRef = useRef(0);
   // The aspect (w/h, <1 for portrait) of the actual frame the keypoints are normalized to — measured
   // from the live frame, not guessed from `format` (which can differ from the delivered buffer and
   // makes the overlay's cover-crop mapping splay markers off-face toward the edges). 0 until known.
@@ -177,7 +201,21 @@ export function useFaceTracking(mirror = true, withMesh = false) {
   const hiddenRef = useRef(true);                   // whether markers are currently hidden
   const recRef = useRef<TrackRec | null>(null);     // active capture (during recording)
 
-  const push = useCallback((lm: FaceLandmarks | null, st: string) => {
+  // Per-lens detector routing: mesh lenses → 478-pt FaceLandmarker; the rest → BlazeFace (fast).
+  const meshActive = withMesh && hasMesh;
+  // Easing/deadband follow the active detector. Held in refs so `push` (stable, []-deps) reads the
+  // current value without being recreated (which would churn the frame processor).
+  const emaRef = useRef(0.6);
+  const deadRef = useRef(0.006);
+  emaRef.current = meshActive ? EMA.mesh : EMA.blaze;
+  deadRef.current = meshActive ? DEAD.mesh : DEAD.blaze;
+
+  const push = useCallback((lm: FaceLandmarks | null, st: string, dele?: string, infMs?: number, totMs?: number) => {
+    if (dele && dele !== delegateRef.current) { delegateRef.current = dele; setDelegate(dele); }
+    if (infMs != null) {
+      const tnow = Date.now();
+      if (tnow - lastPerfRef.current > 500) { lastPerfRef.current = tnow; setPerf({ infer: infMs, total: totMs ?? infMs }); }
+    }
     if (st !== statusRef.current) { statusRef.current = st; setStatus(st); }
     const now = Date.now();
     const rec = recRef.current;
@@ -192,17 +230,19 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       const moved = prev
         ? Math.max(d(lm.noseTip, prev.noseTip), d(lm.leftEye, prev.leftEye), d(lm.rightEye, prev.rightEye), d(lm.mouthCenter, prev.mouthCenter))
         : 1;
-      if (prev && moved < DEADBAND) { return; }
+      if (prev && moved < deadRef.current) { return; }
       // Ease toward the detection; snap on first acquire or a big jump so markers don't crawl.
-      const out = prev && moved < SNAP ? ema(prev, lm, SMOOTH) : lm;
+      const out = prev && moved < SNAP ? ema(prev, lm, emaRef.current) : lm;
       smoothRef.current = out;
-      setLandmarks(out);
+      landmarksRef.current = out;
+      emitLandmarks();
     } else if (!hiddenRef.current && now - lastGoodRef.current > HIDE_MS) {
       hiddenRef.current = true;
       smoothRef.current = null;
-      setLandmarks(null);
+      landmarksRef.current = null;
+      emitLandmarks();
     }
-  }, []);
+  }, [emitLandmarks]);
   const pushJs = Worklets.createRunOnJS(push);
 
   // Record the real frame aspect once (it doesn't change mid-session). Logged so we can confirm it
@@ -217,28 +257,30 @@ export function useFaceTracking(mirror = true, withMesh = false) {
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
-    if (!plugin) { return; }
-    runAtTargetFps(LIVE_FPS, () => {
+    // Route per lens: mesh lenses → heavy 478-pt FaceLandmarker; the rest → lightweight BlazeFace.
+    const wantMesh = withMesh && hasMesh;
+    const activePlugin = wantMesh ? meshPlugin : (blazePlugin ?? meshPlugin);
+    if (!activePlugin) { return; }
+    // BlazeFace is cheap → full camera rate; the mesh is throttled so its ~40ms inference can't back up.
+    const targetFps = wantMesh ? MESH_LIVE_FPS : ANCHOR_LIVE_FPS;
+    runAtTargetFps(targetFps, () => {
       'worklet';
       // min/max is rotation-invariant, so this is the displayed portrait aspect regardless of sensor
       // orientation — the true space the keypoints live in.
       const aspect = Math.min(frame.width, frame.height) / Math.max(frame.width, frame.height);
       setAspectJs(aspect);
       const ori = String(frame.orientation);
-      // Only ask the native side for the full 478-pt mesh when a mesh-rendering lens needs it — keeps
-      // the bridge to 6 anchors otherwise. `ori` pins the orientation fed to MediaPipe (see reduce()).
-      const wantMesh = withMesh && useMesh;
       // VisionCamera throws "expected an Object" if the 2nd arg is explicitly undefined — always pass a
-      // real object.
-      const res = (wantMesh ? plugin!.call(frame, { mesh: true, ori: IOS_MESH_ORI }) : plugin!.call(frame, { ori: IOS_MESH_ORI })) as unknown as
-        { points?: number[][]; bs?: FaceBlendshapes; mesh?: number[][]; err?: string } | null;
+      // real object. Only ask for the full 478-pt mesh when a mesh lens needs it.
+      const res = (wantMesh ? activePlugin.call(frame, { mesh: true, ori: IOS_MESH_ORI }) : activePlugin.call(frame, { ori: IOS_MESH_ORI })) as unknown as
+        { points?: number[][]; bs?: FaceBlendshapes; mesh?: number[][]; err?: string; delegate?: string; msInfer?: number; msTotal?: number } | null;
       if (res && res.points) {
-        const lm = reduce(res.points, aspect, ori, false, useMesh, res.mesh);
+        const lm = reduce(res.points, aspect, ori, false, wantMesh, res.mesh);
         // Carry the mesh blendshapes through (BlazeFace returns none). faceFrame() prefers jawOpen
         // over the geometric mouth-open proxy and exposes blink/smile/browRaise when present.
         if (lm && res.bs) { lm.bs = res.bs; }
-        pushJs(lm, 'ok');
-      } else { pushJs(null, (res && res.err) || 'null'); }
+        pushJs(lm, 'ok', res.delegate, res.msInfer, res.msTotal);
+      } else { pushJs(null, (res && res.err) || 'null', res?.delegate, res?.msInfer, res?.msTotal); }
     });
   }, [pushJs, setAspectJs, mirror, withMesh]);
 
@@ -283,5 +325,5 @@ export function useFaceTracking(mirror = true, withMesh = false) {
     return track;
   }, []);
 
-  return { frameProcessor, landmarks, status, frameAspect, startTrack, stopTrack, cancelTrack };
+  return { frameProcessor, subscribeLandmarks, getLandmarks, status, delegate, perf, trackKind: meshActive ? 'mesh' : 'blaze', frameAspect, startTrack, stopTrack, cancelTrack };
 }
