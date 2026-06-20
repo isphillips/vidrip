@@ -249,8 +249,8 @@ const styles = StyleSheet.create({
 
   // copy
   hello: {
-    fontSize: 40, fontFamily: FONT.DISPLAY_BOLD, fontWeight: '800', color: C.INK,
-    marginTop: SPACE.SM, letterSpacing: 0.5,
+    fontSize: 40, fontFamily: FONT.DISPLAY_BOLD, fontWeight: '700', color: C.INK,
+    marginTop: SPACE.MD, letterSpacing: 0.5,
   },
   welcome: {
     fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.MUTED,
