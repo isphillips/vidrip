@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)',
   },
   // The Ionicons "camera" glyph sits slightly low-right in its box — nudge it up-and-left to center.
-  fabIcon: { transform: [{ translateX: -1 }, { translateY: -1.5 }], includeFontPadding: false },
+  fabIcon: { transform: [{ translateX: -1.45 }, { translateY: -2.8 }], includeFontPadding: false },
   fabLabel: { fontSize: 10, fontFamily: FONT.BODY_MEDIUM, color: C.WHITE, opacity: 0.9, marginTop: 1 },
   fabPlus: { color: C.WHITE, fontSize: 30, lineHeight: 32, fontWeight: '300', marginTop: -2 },
   backdrop: { position: 'absolute', left: 0, right: 0, top: -1000, bottom: 0 },

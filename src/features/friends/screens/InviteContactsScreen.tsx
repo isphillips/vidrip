@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, SectionList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Modal,
-  Linking, Platform,
+  Linking, Platform, RefreshControl,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
@@ -59,14 +59,22 @@ function sectionGetItemLayout(
 }
 
 function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l: string) => void }) {
-  const pick = (y: number) => onSelect(LETTERS[Math.max(0, Math.min(LETTERS.length - 1, Math.floor(y / AZ_ROW)))]);
+  // Only fire on crossing into a NEW letter — calling scrollToLocation on every move
+  // event floods the SectionList and makes the rail letters flash/double + open gaps.
+  const last = useRef<string | null>(null);
+  const pick = (y: number) => {
+    const l = LETTERS[Math.max(0, Math.min(LETTERS.length - 1, Math.floor(y / AZ_ROW)))];
+    if (l !== last.current) { last.current = l; onSelect(l); }
+  };
   return (
     <View
       style={styles.azIndex}
       onStartShouldSetResponder={() => true}
       onMoveShouldSetResponder={() => true}
-      onResponderGrant={(e) => pick(e.nativeEvent.locationY)}
-      onResponderMove={(e) => pick(e.nativeEvent.locationY)}>
+      onResponderTerminationRequest={() => false}
+      onResponderGrant={(e) => { last.current = null; pick(e.nativeEvent.locationY); }}
+      onResponderMove={(e) => pick(e.nativeEvent.locationY)}
+      onResponderRelease={() => { last.current = null; }}>
       {LETTERS.map(l => <Text key={l} style={[styles.azLetter, !available.has(l) && styles.azLetterDim]}>{l}</Text>)}
     </View>
   );
@@ -90,8 +98,30 @@ export default function InviteContactsScreen() {
   const [matches, setMatches] = useState<Record<string, ContactMatch>>({});
   const [codes, setCodes] = useState<string[]>([]);        // available (unredeemed) codes, server-side
   const [picker, setPicker] = useState<DeviceContact | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const sectionRef = useRef<SectionList<DeviceContact>>(null);
+
+  // Pull-to-refresh: re-read device contacts (so contacts added since open appear),
+  // plus refresh sent-invites, codes, and the "on Vidrip" matches.
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const ok = await ensureContactsPermission();
+      if (!ok) { setPerm('denied'); return; }
+      setPerm('granted');
+      const list = await loadDeviceContacts();
+      setContacts(list);
+      setSent(await loadSentInvites());
+      if (user) {
+        fetchMyInviteCodes(user.id)
+          .then(rows => setCodes(rows.filter(r => !r.used_by).map(r => r.code)))
+          .catch(() => {});
+      }
+      matchContacts(list).then(setMatches).catch(() => {});
+    } catch { /* keep what we have */ }
+    finally { setRefreshing(false); }
+  }, [user]);
 
   useEffect(() => {
     let alive = true;
@@ -205,8 +235,11 @@ export default function InviteContactsScreen() {
           sections={sections}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          stickySectionHeadersEnabled
+          // Sticky headers jitter on iOS when momentum settles / scrollToLocation lands
+          // on a boundary; the A–Z rail handles navigation, so keep headers inline.
+          stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.ACCENT} />}
           getItemLayout={sectionGetItemLayout}
           onScrollToIndexFailed={() => {}}
           ListEmptyComponent={
@@ -286,7 +319,9 @@ const styles = StyleSheet.create({
 
   azIndex: { position: 'absolute', right: 1, top: '50%', marginTop: -AZ_H / 2, height: AZ_H, width: 18, alignItems: 'center', justifyContent: 'space-between' },
   azLetter: { height: AZ_ROW, lineHeight: AZ_ROW, width: 18, textAlign: 'center', fontSize: 9.5, fontWeight: '700', color: C.ACCENT_HOT },
-  azLetterDim: { color: C.SUBTLE, opacity: 0.45 },
+  // Alpha baked into the color (NOT `opacity`) so the dim letters don't ghost/double
+  // over the scrolling list — see the matching note in FriendsHomeScreen.
+  azLetterDim: { color: 'rgba(234,201,238,0.45)' },
 
   empty: { alignItems: 'center', paddingTop: SPACE.XXXL },
   emptyText: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY },

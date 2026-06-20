@@ -1482,7 +1482,7 @@ const styles = StyleSheet.create({
 
   headerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD,
+    paddingHorizontal: SPACE.LG, paddingTop: SPACE.SM,
   },
   headerTitle: {
     fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD,

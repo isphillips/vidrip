@@ -223,10 +223,10 @@ export default function ChannelsHomeScreen({
 
       {tab === 'Exclusive' ? (
         <View style={styles.center}>
-          <Ionicons name="diamond" size={40} color={C.ACCENT_HOT} style={{ marginBottom: SPACE.MD }} />
-          <Text style={styles.exclusiveTitle}>Exclusive Content</Text>
+          <Ionicons name="diamond-outline" size={40} color={C.ACCENT_HOT} style={{ marginBottom: SPACE.MD }} />
+          <Text style={styles.exclusiveTitle}>Exclusive Drops</Text>
           <Text style={styles.emptyText}>
-            Private channels you award to your subscribers will live here. Coming soon.
+            Private channels awarded to you by creators will live here.
           </Text>
         </View>
       ) : loading ? (
@@ -275,7 +275,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
   header: {
     paddingBottom: SPACE.MD,
-    paddingTop: SPACE.SM,
     gap: SPACE.MD,
   },
   titleRow: {

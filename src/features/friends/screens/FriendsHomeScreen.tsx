@@ -65,14 +65,23 @@ function groupFriends(friends: Friend[]): FriendSection[] {
 
 // The vertical A–Z+# rail on the right; tap or drag to jump to a section (greyed where empty).
 function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l: string) => void }) {
-  const pick = (y: number) => onSelect(LETTERS[Math.max(0, Math.min(LETTERS.length - 1, Math.floor(y / AZ_ROW)))]);
+  // Only fire when the finger crosses into a NEW letter. onResponderMove fires dozens of
+  // times per second; calling scrollToLocation on each one floods the SectionList (it
+  // re-sticks headers + re-windows rows mid-drag → the letters flash/double and gaps appear).
+  const last = useRef<string | null>(null);
+  const pick = (y: number) => {
+    const l = LETTERS[Math.max(0, Math.min(LETTERS.length - 1, Math.floor(y / AZ_ROW)))];
+    if (l !== last.current) { last.current = l; onSelect(l); }
+  };
   return (
     <View
       style={styles.azIndex}
       onStartShouldSetResponder={() => true}
       onMoveShouldSetResponder={() => true}
-      onResponderGrant={(e) => pick(e.nativeEvent.locationY)}
-      onResponderMove={(e) => pick(e.nativeEvent.locationY)}>
+      onResponderTerminationRequest={() => false}
+      onResponderGrant={(e) => { last.current = null; pick(e.nativeEvent.locationY); }}
+      onResponderMove={(e) => pick(e.nativeEvent.locationY)}
+      onResponderRelease={() => { last.current = null; }}>
       {LETTERS.map(l => (
         <Text key={l} style={[styles.azLetter, !available.has(l) && styles.azLetterDim]}>{l}</Text>
       ))}
@@ -167,7 +176,9 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
           sections={sections}
           keyExtractor={(item) => item.userId}
           contentContainerStyle={styles.list}
-          stickySectionHeadersEnabled
+          // Sticky headers jitter on iOS when momentum settles / scrollToLocation lands
+          // on a boundary; the A–Z rail handles navigation, so keep headers inline.
+          stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
           onScrollToIndexFailed={() => {}}
           ListHeaderComponent={
@@ -268,7 +279,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT.WEIGHTS.BOLD,
     textTransform: 'uppercase',
   },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.XS, paddingRight: SPACE.MD },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.XS, paddingRight: SPACE.LG },
   plusBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   sectionLabel: {
     fontSize: FONT.SIZES.SM,
@@ -291,7 +302,10 @@ const styles = StyleSheet.create({
     width: 18, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 1,
   },
   azLetter: { height: AZ_ROW, lineHeight: AZ_ROW, width: 18, textAlign: 'center', fontSize: 9.5, fontWeight: '700', color: C.ACCENT_HOT },
-  azLetterDim: { color: C.SUBTLE, opacity: 0.45 },
+  // Alpha baked into the color (NOT `opacity`): an `opacity` view-style forces each dim
+  // letter into an offscreen layer that iOS re-composites over the scrolling list every
+  // frame → the greyed letters ghost/double during scroll. A translucent color doesn't.
+  azLetterDim: { color: 'rgba(234,201,238,0.45)' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

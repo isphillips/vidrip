@@ -101,6 +101,36 @@ function SwipeAction({ icon, onPress, variant }: { icon: string; onPress: () => 
   );
 }
 
+// ── Favorite heart that pops in (spring overshoot) on add and bursts (expand →
+//    shrink + fade) on remove — like a bubble. Stays mounted through the exit anim.
+function FavHeart({ visible }: { visible: boolean }) {
+  const scale = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const [rendered, setRendered] = useState(visible);
+  const first = useRef(true);
+
+  useEffect(() => {
+    if (first.current) { first.current = false; return; } // no pop on initial mount / scroll-in
+    if (visible) {
+      setRendered(true);
+      scale.setValue(0);
+      Animated.spring(scale, { toValue: 1, friction: 4, tension: 150, useNativeDriver: true }).start();
+    } else {
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.35, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 0, duration: 160, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      ]).start(({ finished }) => { if (finished) { setRendered(false); } });
+    }
+  }, [visible, scale]);
+
+  if (!rendered) { return null; }
+  const opacity = scale.interpolate({ inputRange: [0, 0.6, 1.35], outputRange: [0, 1, 1], extrapolate: 'clamp' });
+  return (
+    <Animated.View style={[styles.favHeart, { opacity, transform: [{ scale }] }]} pointerEvents="none">
+      <Ionicons name="heart" size={11} color="#fff" />
+    </Animated.View>
+  );
+}
+
 // ── Reusable swipeable row: brand action pane + a persistent slide hint + the
 //    top-left favorite heart overlay (so every list gets the same affordances). ──
 function SwipeRow({
@@ -138,11 +168,7 @@ function SwipeRow({
       }}>
       <View>
         {children}
-        {isFav && (
-          <View style={styles.favHeart} pointerEvents="none">
-            <Ionicons name="heart" size={11} color="#fff" />
-          </View>
-        )}
+        <FavHeart visible={isFav} />
         {/* Slide affordance: a soft left-chevron grip so it's obvious the row pulls open. */}
         <View style={styles.swipeHint} pointerEvents="none">
           <Ionicons name="chevron-back" size={14} color={C.SUBTLE} />
@@ -685,7 +711,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: SPACE.SM,
     paddingHorizontal: SPACE.LG,
-    paddingTop: SPACE.LG,
+    paddingTop: SPACE.MD,
     paddingBottom: 0,
     zIndex: 10,
   },

@@ -426,3 +426,8 @@ verify_jwt = false
 
 [functions.send-push]
 verify_jwt = false
+
+# Cron: prunes dead/removed YouTube videos from the shorts feed. Protected by x-internal-secret
+# (no Supabase JWT), so disable the gateway's JWT check like the other internal cron functions.
+[functions.cleanup-shorts]
+verify_jwt = false
