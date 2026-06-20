@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import SlimeWizard from '../components/SlimeWizard';
 import GradientButton from '../../studio/components/GradientButton';
 
 export default function EnterInviteCodeScreen({
-  navigation,
+  navigation, route,
 }: AuthStackScreenProps<'EnterInviteCode'>) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,6 +29,10 @@ export default function EnterInviteCodeScreen({
       setCode(`${clean.slice(0, 5)}-${clean.slice(5, 9)}`);
     }
   };
+
+  // Pre-fill from an invite deep link / universal link (e.g. vidrip.app/i/<CODE>).
+  const prefill = route.params?.code;
+  useEffect(() => { if (prefill) { handleChangeText(prefill); } }, [prefill]);
 
   const handleSubmit = async () => {
     const trimmed = code.trim().toUpperCase();

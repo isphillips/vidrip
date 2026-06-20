@@ -5,7 +5,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 export type AuthStackParamList = {
   Welcome: undefined;
   SignIn: undefined;
-  EnterInviteCode: undefined;
+  EnterInviteCode: { code?: string } | undefined;
   CreateProfile: { inviteCode: string };
 };
 
@@ -70,6 +70,7 @@ export type FriendsStackParamList = {
   FriendsHome: undefined;
   AddFriend: undefined;
   InviteManagement: undefined;
+  InviteContacts: undefined;
   Profile: { userId: string };
 };
 

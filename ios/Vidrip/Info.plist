@@ -50,6 +50,8 @@
 	<string>Reaxn captures your audio while recording reactions.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Vidrip lets you choose a photo from your library for your profile picture.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Vidrip uses your contacts so you can invite friends with your invite codes. Phone numbers are never uploaded or stored.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Raleway-BoldItalic.ttf</string>

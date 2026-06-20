@@ -27,6 +27,7 @@ import FriendsHomeScreen from '../../features/friends/screens/FriendsHomeScreen'
 import UserProfileScreen from '../../features/friends/screens/UserProfileScreen';
 import AddFriendScreen from '../../features/friends/screens/AddFriendScreen';
 import InviteManagementScreen from '../../features/friends/screens/InviteManagementScreen';
+import InviteContactsScreen from '../../features/friends/screens/InviteContactsScreen';
 import ShareHomeScreen from '../../features/share/screens/ShareHomeScreen';
 import AccountScreen from '../../features/account/screens/AccountScreen';
 import EditProfileScreen from '../../features/account/screens/EditProfileScreen';
@@ -81,6 +82,7 @@ function FriendsNavigator() {
       <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
       <FriendsStack.Screen name="Profile" component={UserProfileScreen} options={{ title: 'Profile', headerBackTitle: 'Friends' }} />
       <FriendsStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
+      <FriendsStack.Screen name="InviteContacts" component={InviteContactsScreen} options={{ headerShown: false }} />
     </FriendsStack.Navigator>
   );
 }

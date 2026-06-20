@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   slimeImg: { width: SLIME_W, height: SLIME_H },
 
   // wizard hat (CSS-triangle cone + band + brim + star)
-  hat: { position: 'absolute', top: -34, alignSelf: 'center', left: SLIME_W * 0.28, alignItems: 'center', transform: [{ rotate: '-8deg' }] },
+  hat: { position: 'absolute', top: -48, alignSelf: 'center', left: (SLIME_W * 0.28) - 36, alignItems: 'center', transform: [{ rotate: '-8deg' }] },
   hatCone: { width: 0, height: 0, borderLeftWidth: 21, borderRightWidth: 21, borderBottomWidth: 46, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: PURPLE },
   hatBand: { width: 44, height: 7, marginTop: -2, backgroundColor: GOLD, borderRadius: 2 },
   hatBrim: { width: 60, height: 11, borderRadius: 6, backgroundColor: '#5a1a78', marginTop: 1 },

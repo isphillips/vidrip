@@ -1344,6 +1344,27 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - react-native-contacts (8.0.10):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.01.01.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - react-native-create-thumbnail (2.2.0):
     - React-Core
   - react-native-image-editor (4.3.0):
@@ -1940,7 +1961,7 @@ PODS:
     - Yoga
   - RNCPushNotificationIOS (1.12.0):
     - React-Core
-  - RNDateTimePicker (8.6.0):
+  - RNDateTimePicker (9.1.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -2247,6 +2268,7 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
+  - react-native-contacts (from `../node_modules/react-native-contacts`)
   - react-native-create-thumbnail (from `../node_modules/react-native-create-thumbnail`)
   - "react-native-image-editor (from `../node_modules/@react-native-community/image-editor`)"
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
@@ -2391,6 +2413,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
+  react-native-contacts:
+    :path: "../node_modules/react-native-contacts"
   react-native-create-thumbnail:
     :path: "../node_modules/react-native-create-thumbnail"
   react-native-image-editor:
@@ -2544,6 +2568,7 @@ SPEC CHECKSUMS:
   React-logger: ae95f0effa7e1791bd6f7283caddca323d4fbc1e
   React-Mapbuffer: 7eb5d69e1154e7743487ef0c8d7261e5b59afb32
   React-microtasksnativemodule: 01dd998649ff5f8814846b7eee84c4d57f5d3671
+  react-native-contacts: 94302515d3b163e698dd165cc6b6380a31ad4b17
   react-native-create-thumbnail: c15cedc37f3822777d44e6035be041f7961341ea
   react-native-image-editor: 484df2867edfe8a9aec1966a478b031c042fe8a6
   react-native-image-picker: 602c0ae73967fbd9db64aff0f76ee33bb6f51e75
@@ -2585,7 +2610,7 @@ SPEC CHECKSUMS:
   RNCClipboard: 5fdc5218e7aa17c955bfc6c58264b406034ec31b
   RNCMaskedView: 8542667cb39fff458c1a1a3f9e70205042636129
   RNCPushNotificationIOS: 85957a0534fd1309b4c028ccbe5b1baf9ab5cf57
-  RNDateTimePicker: 3cde67a9b3dda377995635fd3920d6f632e3b058
+  RNDateTimePicker: 990f2e5dac308e607f22504b6428c2d13888602e
   RNFBApp: 007089d96f1da73303c6383452796ebf7f747227
   RNFBMessaging: a12bd45d4c1572e7a6f7b4c65377ec2ce600bf92
   RNFS: 89de7d7f4c0f6bafa05343c578f61118c8282ed8

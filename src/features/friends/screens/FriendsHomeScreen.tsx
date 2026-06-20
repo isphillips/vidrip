@@ -1,10 +1,9 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 
 import {
   View,
   Text,
-  FlatList,
   SectionList,
   StyleSheet,
   TouchableOpacity,
@@ -13,10 +12,11 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
+import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, Easing as ReEasing } from 'react-native-reanimated';
+import GradientButton from '../../studio/components/GradientButton';
+import MailboxButton from '../../channels/components/MailboxButton';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Handle from '../../../components/Handle';
-import { BRAND_GRADIENT } from '../../../components/GradientIcon';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { useBlockStore } from '../../../store/blockStore';
@@ -30,6 +30,56 @@ import {
 } from '../../../infrastructure/supabase/queries/friends';
 import type { FriendsStackScreenProps } from '../../../app/navigation/types';
 
+// A plain white "+" that spins one full turn and lands as an "×" when active (it's the same plus
+// rotated 45°), reversing back to "+" when not. Used as the add-friend toggle.
+function MorphPlus({ active, onPress }: { active: boolean; onPress: () => void }) {
+  const rot = useSharedValue(0);
+  useEffect(() => {
+    rot.value = withTiming(active ? 405 : 0, { duration: 420, easing: ReEasing.out(ReEasing.cubic) });
+  }, [active, rot]);
+  const st = useAnimatedStyle(() => ({ transform: [{ rotate: `${rot.value}deg` }] }));
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={10} activeOpacity={0.7} style={styles.plusBtn} accessibilityLabel="Add friend">
+      <Reanimated.View style={st}><Ionicons name="add" size={30} color={C.WHITE} /></Reanimated.View>
+    </TouchableOpacity>
+  );
+}
+
+// ── Alphabetical sections + iOS-style A–Z index ───────────────────────────────
+const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '#'];
+const AZ_ROW = 12;                 // height per letter in the side index
+const AZ_H = LETTERS.length * AZ_ROW;
+const order = (t: string) => (t === '#' ? 91 : t.charCodeAt(0)); // A=65…Z=90, # last
+
+type FriendSection = { title: string; data: Friend[] };
+function groupFriends(friends: Friend[]): FriendSection[] {
+  const map = new Map<string, Friend[]>();
+  const sorted = [...friends].sort((a, b) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' }));
+  for (const f of sorted) {
+    const ch = (f.displayName.trim()[0] || '#').toUpperCase();
+    const key = /[A-Z]/.test(ch) ? ch : '#';
+    (map.get(key) ?? map.set(key, []).get(key)!).push(f);
+  }
+  return [...map.keys()].sort((a, b) => order(a) - order(b)).map(title => ({ title, data: map.get(title)! }));
+}
+
+// The vertical A–Z+# rail on the right; tap or drag to jump to a section (greyed where empty).
+function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l: string) => void }) {
+  const pick = (y: number) => onSelect(LETTERS[Math.max(0, Math.min(LETTERS.length - 1, Math.floor(y / AZ_ROW)))]);
+  return (
+    <View
+      style={styles.azIndex}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={(e) => pick(e.nativeEvent.locationY)}
+      onResponderMove={(e) => pick(e.nativeEvent.locationY)}>
+      {LETTERS.map(l => (
+        <Text key={l} style={[styles.azLetter, !available.has(l) && styles.azLetterDim]}>{l}</Text>
+      ))}
+    </View>
+  );
+}
+
 export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProps<'FriendsHome'>) {
   const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
@@ -37,9 +87,27 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
   const [friends, setFriends] = useState<Friend[]>([]);
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addActive, setAddActive] = useState(false);
+  // Spin the + to an × on tap, then push the AddFriend screen a beat later so the morph is seen.
+  const openAddFriend = () => {
+    setAddActive(true);
+    setTimeout(() => navigation.navigate('AddFriend'), 200);
+  };
   // App-wide block: hide blocked users from the friends + requests lists.
   const visFriends = friends.filter(f => !blocked.has(f.userId));
   const visPending = pending.filter(p => !blocked.has(p.userId));
+
+  // Group friends A–Z (with a trailing # bucket) and wire the side index to scroll to sections.
+  const sections = useMemo(() => groupFriends(visFriends), [visFriends]);
+  const available = useMemo(() => new Set(sections.map(s => s.title)), [sections]);
+  const sectionRef = useRef<SectionList<Friend>>(null);
+  const scrollToLetter = useCallback((letter: string) => {
+    if (!sections.length) { return; }
+    let idx = sections.findIndex(s => s.title === letter);
+    if (idx < 0) { idx = sections.findIndex(s => order(s.title) >= order(letter)); }
+    if (idx < 0) { idx = sections.length - 1; }
+    try { sectionRef.current?.scrollToLocation({ sectionIndex: idx, itemIndex: 0, viewPosition: 0, animated: false }); } catch { /* not measured yet */ }
+  }, [sections]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -54,7 +122,7 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
     }
   }, [user]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { setAddActive(false); load(); }, [load]));
 
   const handleAccept = async (req: PendingRequest) => {
     try {
@@ -87,62 +155,61 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
     <View style={styles.container}>
       <View style={[styles.headerRow, { paddingTop: top }]}>
         <Text style={styles.title}>Friends</Text>
-        <TouchableOpacity
-          hitSlop={8}
-          accessibilityLabel="Add friend"
-          onPress={() => navigation.navigate('AddFriend')}>
-          <LinearGradient
-            colors={BRAND_GRADIENT}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.addButton}>
-            <Ionicons name="add" size={24} color={C.WHITE} />
-          </LinearGradient>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <MorphPlus active={addActive} onPress={openAddFriend} />
+          <MailboxButton />
+        </View>
       </View>
 
-      {visPending.length > 0 && (
-        <>
-          <Text style={styles.sectionLabel}>Requests</Text>
-          {visPending.map((req) => (
-            <View key={req.friendshipId} style={styles.requestRow}>
-              <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: req.userId })} activeOpacity={0.8}>
-                {req.avatarUrl ? (
-                  <Image source={{ uri: req.avatarUrl }} style={styles.avatar} />
-                ) : (
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{req.displayName[0]?.toUpperCase()}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              <View style={styles.rowInfo}>
-                <Text style={styles.name}>{req.displayName}</Text>
-                <Handle userId={req.userId} handle={req.handle} style={styles.handle} />
-              </View>
-              <View style={styles.requestActions}>
-                <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(req)}>
-                  <Text style={styles.acceptBtnText}>Accept</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.declineBtn} onPress={() => handleDecline(req)}>
-                  <Text style={styles.declineBtnText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-          <Text style={styles.sectionLabel}>Friends</Text>
-        </>
-      )}
-
-      {visFriends.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>No friends yet</Text>
-          <Text style={styles.emptyHint}>Tap + to find people by handle</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={visFriends}
+      <View style={styles.listWrap}>
+        <SectionList
+          ref={sectionRef}
+          sections={sections}
           keyExtractor={(item) => item.userId}
           contentContainerStyle={styles.list}
+          stickySectionHeadersEnabled
+          showsVerticalScrollIndicator={false}
+          onScrollToIndexFailed={() => {}}
+          ListHeaderComponent={
+            visPending.length > 0 ? (
+              <View>
+                <Text style={styles.sectionLabel}>Requests</Text>
+                {visPending.map((req) => (
+                  <View key={req.friendshipId} style={styles.requestRow}>
+                    <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: req.userId })} activeOpacity={0.8}>
+                      {req.avatarUrl ? (
+                        <Image source={{ uri: req.avatarUrl }} style={styles.avatar} />
+                      ) : (
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>{req.displayName[0]?.toUpperCase()}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    <View style={styles.rowInfo}>
+                      <Text style={styles.name}>{req.displayName}</Text>
+                      <Handle userId={req.userId} handle={req.handle} style={styles.handle} />
+                    </View>
+                    <View style={styles.requestActions}>
+                      <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(req)}>
+                        <Text style={styles.acceptBtnText}>Accept</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.declineBtn} onPress={() => handleDecline(req)}>
+                        <Text style={styles.declineBtnText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+                {visFriends.length > 0 && <Text style={styles.sectionLabel}>Friends</Text>}
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>No friends yet</Text>
+              <Text style={styles.emptyHint}>Tap + to find people by handle</Text>
+            </View>
+          }
+          renderSectionHeader={({ section }) => <Text style={styles.azHeader}>{section.title}</Text>}
           renderItem={({ item }) => (
             <View style={styles.row}>
               <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.userId })} activeOpacity={0.8}>
@@ -161,13 +228,23 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
             </View>
           )}
         />
-      )}
+        {sections.length > 0 && <AZIndex available={available} onSelect={scrollToLetter} />}
+      </View>
 
-      <TouchableOpacity
-        style={styles.inviteButton}
-        onPress={() => navigation.navigate('InviteManagement')}>
-        <Text style={styles.inviteButtonText}>Manage Invite Codes</Text>
-      </TouchableOpacity>
+      <GradientButton
+        label="Invite from Contacts"
+        icon="people-outline"
+        variant="outline"
+        onPress={() => navigation.navigate('InviteContacts')}
+        style={styles.inviteCtaTop}
+      />
+      <GradientButton
+        label="Manage Invite Codes"
+        icon="key-outline"
+        variant="outline"
+        onPress={() => navigation.navigate('InviteManagement')}
+        style={styles.inviteCta}
+      />
     </View>
   );
 }
@@ -191,14 +268,8 @@ const styles = StyleSheet.create({
     fontWeight: FONT.WEIGHTS.BOLD,
     textTransform: 'uppercase',
   },
-  addButton: {
-    width: 38,
-    height: 38,
-    borderRadius: RADIUS.FULL,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACE.LG,
-  },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.XS, paddingRight: SPACE.MD },
+  plusBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   sectionLabel: {
     fontSize: FONT.SIZES.SM,
     color: C.MUTED,
@@ -208,7 +279,19 @@ const styles = StyleSheet.create({
     marginBottom: SPACE.SM,
     marginTop: SPACE.XS,
   },
-  list: { paddingHorizontal: SPACE.LG, gap: SPACE.SM },
+  listWrap: { flex: 1 },
+  list: { paddingLeft: SPACE.LG, paddingRight: SPACE.XL, gap: SPACE.SM, paddingBottom: SPACE.LG },
+  azHeader: {
+    fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD, color: C.ACCENT_HOT,
+    backgroundColor: C.BG_SOLID, paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD, paddingBottom: SPACE.XS,
+  },
+  // iOS-Contacts-style index rail, vertically centred on the right edge.
+  azIndex: {
+    position: 'absolute', right: 1, top: '50%', marginTop: -AZ_H / 2, height: AZ_H,
+    width: 18, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 1,
+  },
+  azLetter: { height: AZ_ROW, lineHeight: AZ_ROW, width: 18, textAlign: 'center', fontSize: 9.5, fontWeight: '700', color: C.ACCENT_HOT },
+  azLetterDim: { color: C.SUBTLE, opacity: 0.45 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -260,22 +343,12 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACE.SM },
   emptyText: { fontSize: FONT.SIZES.LG, fontWeight: '600', color: C.INK },
   emptyHint: { fontSize: FONT.SIZES.SM, color: C.MUTED },
-  inviteButton: {
-    backgroundColor: C.ACCENT,
-    borderRadius: RADIUS.MD,
-    marginBottom: SPACE.LG,
-    padding: SPACE.LG,
-    alignItems: 'center',
-  },
+  inviteCtaTop: { marginHorizontal: SPACE.LG, marginBottom: SPACE.SM },
+  inviteCta: { marginHorizontal: SPACE.LG, marginBottom: SPACE.XXL },
   reactBtn: {
     backgroundColor: C.ACCENT,
     borderRadius: RADIUS.MD,
     padding: SPACE.LG,
     alignItems: 'center',
-  },
-  inviteButtonText: {
-    color: C.WHITE,
-    fontSize: FONT.SIZES.LG,
-    fontFamily: FONT.BODY_BOLD,
   },
 });

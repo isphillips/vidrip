@@ -187,7 +187,7 @@ export default function SlimeWelcome() {
 
       <Text style={styles.hello}>Hello</Text>
       <Text style={styles.welcome}>
-        Welcome to Vidrip, where reactions are shared with people who care.
+        My name is Drippy. Welcome to my world, where reactions are shared with people who care.
       </Text>
     </View>
   );

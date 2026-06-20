@@ -1,24 +1,30 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { sendFriendRequest } from '../../../infrastructure/supabase/queries/friends';
+import SlimeFriend from '../components/SlimeFriend';
+import GradientButton from '../../studio/components/GradientButton';
 import type { FriendsStackScreenProps } from '../../../app/navigation/types';
 
 export default function AddFriendScreen({ navigation }: FriendsStackScreenProps<'AddFriend'>) {
   const { user } = useAuthStore();
   const [handle, setHandle] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Scroll the input into view when focused (instead of auto-popping the keyboard over
+  // Drippy on mount). Delay lets the keyboard + KeyboardAvoidingView settle first.
+  const scrollRef = useRef<ScrollView>(null);
+  const focusScroll = () => { setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 180); };
 
   const handleAdd = async () => {
     if (!user || !handle.trim()) return;
@@ -42,31 +48,36 @@ export default function AddFriendScreen({ navigation }: FriendsStackScreenProps<
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Text style={styles.title}>Add a Friend</Text>
-      <Text style={styles.subtitle}>Enter their handle to send a friend request</Text>
-      <View style={styles.inputRow}>
-        <Text style={styles.at}>@</Text>
-        <TextInput
-          style={styles.input}
-          value={handle}
-          onChangeText={setHandle}
-          placeholder="theirhandle"
-          placeholderTextColor={C.SUBTLE}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoFocus
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
+        <SlimeFriend />
+        <Text style={styles.title}>Add a Friend</Text>
+        <Text style={styles.subtitle}>Enter their handle and Drippy will pass along your request.</Text>
+        <View style={styles.inputRow}>
+          <Text style={styles.at}>@</Text>
+          <TextInput
+            style={styles.input}
+            value={handle}
+            onChangeText={setHandle}
+            placeholder="theirhandle"
+            placeholderTextColor={C.SUBTLE}
+            autoCapitalize="none"
+            autoCorrect={false}
+            onFocus={focusScroll}
+          />
+        </View>
+        <GradientButton
+          label="Send Request"
+          icon="person-add"
+          onPress={handleAdd}
+          disabled={!isValid}
+          loading={loading}
+          style={styles.cta}
         />
-      </View>
-      <TouchableOpacity
-        style={[styles.button, (!isValid || loading) && styles.buttonDisabled]}
-        onPress={handleAdd}
-        disabled={!isValid || loading}>
-        {loading ? (
-          <ActivityIndicator color={C.WHITE} />
-        ) : (
-          <Text style={styles.buttonText}>Send Request</Text>
-        )}
-      </TouchableOpacity>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -75,12 +86,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.BG,
-    padding: SPACE.XL,
-    paddingTop: SPACE.XXXL,
   },
-  title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD,
-    fontWeight: '700', color: C.INK, marginBottom: SPACE.XS },
-  subtitle: { fontSize: FONT.SIZES.MD, color: C.MUTED, marginBottom: SPACE.XXL },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: SPACE.XL,
+  },
+  title: {
+    fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD,
+    fontWeight: '700', color: C.INK, marginBottom: SPACE.XS, textAlign: 'center',
+    marginTop: SPACE.XXL
+  },
+  subtitle: {
+    fontSize: FONT.SIZES.MD, color: C.MUTED, marginBottom: SPACE.XL,
+    textAlign: 'center', lineHeight: 22,
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -99,13 +119,5 @@ const styles = StyleSheet.create({
     fontSize: FONT.SIZES.LG,
     color: C.INK,
   },
-  button: {
-    backgroundColor: C.ACCENT,
-    borderRadius: RADIUS.MD,
-    padding: SPACE.LG,
-    alignItems: 'center',
-  },
-  buttonDisabled: { opacity: 0.4 },
-  buttonText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD,
-    fontWeight: '700' },
+  cta: { marginTop: SPACE.SM },
 });
