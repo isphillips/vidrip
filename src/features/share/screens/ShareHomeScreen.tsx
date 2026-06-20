@@ -214,6 +214,9 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   const barShownRef   = useRef(true);
   const lastScrollY   = useRef(0);
   const gridRef       = useRef<FlatList<VideoItem>>(null);
+  // Keep the paste-link field above the keyboard (it auto-focuses when you switch to Paste mode).
+  const pasteScrollRef = useRef<ScrollView>(null);
+  const focusPasteScroll = () => { setTimeout(() => pasteScrollRef.current?.scrollToEnd({ animated: true }), 250); };
   const setFeedBar = useCallback((shown: boolean) => {
     if (barShownRef.current === shown) { return; }
     barShownRef.current = shown;
@@ -954,13 +957,20 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
       {/* Paste mode */}
       {mode === 'paste' ? (
-        <View style={styles.pasteContainer}>
+        <ScrollView
+          ref={pasteScrollRef}
+          style={styles.pasteScroll}
+          contentContainerStyle={styles.pasteContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets>
           <SlimeDetective />
           <Text style={styles.pasteLabel}>YouTube, TikTok, or Instagram URL</Text>
           <TextInput
             style={styles.pasteInput} value={url} onChangeText={setUrl}
             placeholder="Paste a YouTube, TikTok, or Instagram Reel link" placeholderTextColor={C.SUBTLE}
             autoCapitalize="none" autoCorrect={false} keyboardType="url" autoFocus
+            onFocus={focusPasteScroll}
           />
           {linkStatus === 'tooLong' ? (
             <View style={styles.tooLongBox}>
@@ -977,7 +987,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               loading={pasting || linkStatus === 'checking'}
             />
           )}
-        </View>
+        </ScrollView>
       ) : (
         <>
           <Animated.View
@@ -1494,6 +1504,7 @@ const styles = StyleSheet.create({
   toggleTxtActive: { color: C.WHITE },
 
   // paste
+  pasteScroll:    { flex: 1 },
   pasteContainer: { padding: SPACE.LG, gap: SPACE.MD, marginTop: SPACE.LG },
   pasteLabel:     { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD, textTransform: 'uppercase', letterSpacing: 1, marginTop: SPACE.LG },
   pasteInput:     { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, padding: SPACE.LG, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },

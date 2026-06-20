@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
@@ -12,6 +12,10 @@ export default function MfaChallengeScreen({ onVerified }: { onVerified: () => v
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
+  // Keep the code field above the keyboard (it auto-focuses on mount).
+  const scrollRef = useRef<ScrollView>(null);
+  const focusScroll = () => { setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250); };
 
   const submit = async () => {
     setBusy(true); setErr('');
@@ -37,9 +41,11 @@ export default function MfaChallengeScreen({ onVerified }: { onVerified: () => v
       end={{ x: 1, y: 1 }}
       style={styles.container}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets>
         <SlimeGuard />
         <Text style={styles.title}>Two-factor</Text>
         <Text style={styles.sub}>Enter the current 6-digit code from your authenticator app.</Text>
@@ -54,6 +60,7 @@ export default function MfaChallengeScreen({ onVerified }: { onVerified: () => v
           autoFocus
           autoComplete="one-time-code"
           textContentType="oneTimeCode"
+          onFocus={focusScroll}
         />
         {!!err && <Text style={styles.err}>{err}</Text>}
         <GradientButton

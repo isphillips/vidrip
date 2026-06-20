@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,11 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+
+  // Scroll the form into view when a field is focused so the keyboard never covers it (the slime
+  // artwork above pushes the inputs down). Delay lets the keyboard + KeyboardAvoidingView settle first.
+  const scrollRef = useRef<ScrollView>(null);
+  const focusScroll = () => { setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 180); };
 
   const validEmail = email.trim().includes('@');
 
@@ -90,6 +95,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -127,6 +133,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
+          onFocus={focusScroll}
         />
 
         {mode === 'password' && (
@@ -142,6 +149,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
               autoCorrect={false}
               returnKeyType="go"
               onSubmitEditing={handlePasswordSignIn}
+              onFocus={focusScroll}
             />
             <TouchableOpacity
               style={styles.eyeBtn}
