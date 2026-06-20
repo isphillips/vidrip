@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   title: { fontSize: FONT.SIZES.XL, textTransform: 'uppercase', fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
   newBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM,
-    borderRadius: RADIUS.MD, marginBottom: 20,
+    borderRadius: RADIUS.MD, marginBottom: 50,
   },
   newBtnText: { paddingVertical: SPACE.LG, color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
   toggle: {

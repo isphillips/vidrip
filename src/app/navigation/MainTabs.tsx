@@ -32,6 +32,7 @@ import AccountScreen from '../../features/account/screens/AccountScreen';
 import EditProfileScreen from '../../features/account/screens/EditProfileScreen';
 import PasswordSetupScreen from '../../features/account/screens/PasswordSetupScreen';
 import TwoFactorScreen from '../../features/account/screens/TwoFactorScreen';
+import AccountAdvancedScreen from '../../features/account/screens/AccountAdvancedScreen';
 import { Image } from 'react-native';
 import { useFeedStore } from '../../store/feedStore';
 import { useShareUiStore } from '../../store/shareUiStore';
@@ -100,6 +101,7 @@ function AccountNavigator() {
       <AccountStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="PasswordSetup" component={PasswordSetupScreen} options={{ title: 'Password Login', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="TwoFactor" component={TwoFactorScreen} options={{ title: 'Two-Factor Auth', headerBackTitle: 'Account' }} />
+      <AccountStack.Screen name="AccountAdvanced" component={AccountAdvancedScreen} options={{ title: 'Advanced', headerBackTitle: 'Account' }} />
     </AccountStack.Navigator>
   );
 }

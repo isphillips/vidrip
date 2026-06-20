@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   awardBtn:{ flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.ACCENT_LITE, borderRadius: RADIUS.MD, padding: SPACE.MD },
   awardTxt:{ color: C.INK, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
 
-  footer:  { paddingVertical: SPACE.SM },
+  footer:  { paddingVertical: SPACE.SM, marginBottom: 50 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet:   { backgroundColor: C.SURFACE_2, borderTopLeftRadius: RADIUS.LG, borderTopRightRadius: RADIUS.LG, padding: SPACE.LG, paddingBottom: SPACE.XL, gap: SPACE.SM },

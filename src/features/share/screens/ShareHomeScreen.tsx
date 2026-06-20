@@ -11,6 +11,8 @@ import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/n
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import GradientButton from '../../studio/components/GradientButton';
+import SlimeDetective from '../components/SlimeDetective';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
 import { IG_REEL_JS, TapToPlayHint } from '../../shared/igReelPlayer';
 import {
@@ -953,6 +955,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       {/* Paste mode */}
       {mode === 'paste' ? (
         <View style={styles.pasteContainer}>
+          <SlimeDetective />
           <Text style={styles.pasteLabel}>YouTube, TikTok, or Instagram URL</Text>
           <TextInput
             style={styles.pasteInput} value={url} onChangeText={setUrl}
@@ -967,13 +970,12 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               </Text>
             </View>
           ) : (
-            <TouchableOpacity
-              style={[styles.pasteBtn, (linkStatus !== 'ok' || pasting) && styles.pasteBtnDisabled]}
-              onPress={() => handlePastePreview()} disabled={linkStatus !== 'ok' || pasting}>
-              {(pasting || linkStatus === 'checking')
-                ? <ActivityIndicator color={C.WHITE} />
-                : <Text style={styles.pasteBtnText}>Preview & Share →</Text>}
-            </TouchableOpacity>
+            <GradientButton
+              label="Preview & Share →"
+              onPress={() => handlePastePreview()}
+              disabled={linkStatus !== 'ok'}
+              loading={pasting || linkStatus === 'checking'}
+            />
           )}
         </View>
       ) : (
@@ -984,6 +986,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               opacity: searchAnim,
               height: searchAnim.interpolate({ inputRange: [0, 1], outputRange: [0, SEARCH_ROW_HEIGHT] }),
               overflow: 'hidden',
+              zIndex: 2, elevation: 2,
             }}>
             <View style={styles.searchRow}>
               <TextInput
@@ -1491,8 +1494,8 @@ const styles = StyleSheet.create({
   toggleTxtActive: { color: C.WHITE },
 
   // paste
-  pasteContainer: { padding: SPACE.LG, gap: SPACE.MD },
-  pasteLabel:     { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD, textTransform: 'uppercase', letterSpacing: 1 },
+  pasteContainer: { padding: SPACE.LG, gap: SPACE.MD, marginTop: SPACE.LG },
+  pasteLabel:     { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD, textTransform: 'uppercase', letterSpacing: 1, marginTop: SPACE.LG },
   pasteInput:     { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, padding: SPACE.LG, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   pasteBtn:         { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, padding: SPACE.LG, alignItems: 'center' },
   pasteBtnDisabled: { opacity: 0.4 },
@@ -1511,7 +1514,9 @@ const styles = StyleSheet.create({
   searchInput:   { flex: 1, paddingVertical: SPACE.MD, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   searchSpinner: { marginLeft: SPACE.SM },
   gridSpinner: { marginTop: SPACE.XL },
-  tabsScroll: {  height: 50, marginBottom: 0 },
+  // zIndex/elevation keeps the pills painted ABOVE the grid, so a short (sparse) grid
+  // can't cover their bottom when the search row pushes them down.
+  tabsScroll: { height: 55, marginBottom: 0, zIndex: 2, elevation: 2 },
   tabs:    { paddingHorizontal: SPACE.LG, gap: SPACE.SM, alignItems: 'center', height: 33 },
   tab:     { alignItems: 'center', justifyContent: 'center', height: 33, paddingHorizontal: SPACE.MD, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, borderWidth: 1, borderColor: C.BORDER },
   tabActive:    { borderWidth: 1, borderColor: C.DANGER },

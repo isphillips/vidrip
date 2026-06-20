@@ -51,6 +51,7 @@ export type AccountStackParamList = {
   InviteManagement: undefined;
   PasswordSetup: undefined;
   TwoFactor: undefined;
+  AccountAdvanced: undefined;
 };
 
 // Feed stack

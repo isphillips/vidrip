@@ -98,31 +98,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     apply();
   };
 
-  // Opt-in: surface my recent reactions on my public profile.
-  const showReactions = !!(profile as any)?.show_reactions_in_profile;
-  const [savingShowReactions, setSavingShowReactions] = useState(false);
-  const handleToggleShowReactions = async (next: boolean) => {
-    if (!user?.id || savingShowReactions) { return; }
-    setSavingShowReactions(true);
-    const { error } = await (supabase as any)
-      .from('users').update({ show_reactions_in_profile: next }).eq('id', user.id);
-    setSavingShowReactions(false);
-    if (error) { Alert.alert('Error', 'Could not update this setting.'); return; }
-    if (profile) { setProfile({ ...(profile as any), show_reactions_in_profile: next }); }
-  };
-
-  // React Anonymously: hide my face (silhouette) and pitch my voice down in everything I record.
-  const reactAnonymously = !!(profile as any)?.react_anonymously;
-  const [savingAnon, setSavingAnon] = useState(false);
-  const handleToggleAnon = async (next: boolean) => {
-    if (!user?.id || savingAnon) { return; }
-    setSavingAnon(true);
-    const { error } = await (supabase as any)
-      .from('users').update({ react_anonymously: next }).eq('id', user.id);
-    setSavingAnon(false);
-    if (error) { Alert.alert('Error', 'Could not update this setting.'); return; }
-    if (profile) { setProfile({ ...(profile as any), react_anonymously: next }); }
-  };
+  // Privacy toggles and Two-Factor now live on the Advanced screen.
 
   // ── Synced accounts (creator connections + personal feed connections) ────────
   const [synced, setSynced] = useState<SyncedAccount[]>([]);       // connection_type 'creator'
@@ -414,40 +390,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         )}
       </View>
 
-      {/* Privacy */}
-      <Text style={styles.sectionLabel}>Privacy</Text>
-      <View style={styles.section}>
-        <View style={styles.row}>
-          <View style={styles.syncInfo}>
-            <Text style={styles.rowLabel}>Show reactions in profile</Text>
-            <Text style={styles.syncHandle} numberOfLines={3}>
-              Let anyone who opens your profile see and play your recent reactions.
-            </Text>
-          </View>
-          <Switch
-            value={showReactions}
-            onValueChange={handleToggleShowReactions}
-            disabled={savingShowReactions}
-            trackColor={{ true: C.ACCENT, false: C.BORDER }}
-          />
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.row}>
-          <View style={styles.syncInfo}>
-            <Text style={styles.rowLabel}>React Anonymously</Text>
-            <Text style={styles.syncHandle} numberOfLines={3}>
-              Hide your face behind a silhouette and lower your voice in every video you record, so you stay anonymous in posts.
-            </Text>
-          </View>
-          <Switch
-            value={reactAnonymously}
-            onValueChange={handleToggleAnon}
-            disabled={savingAnon}
-            trackColor={{ true: C.ACCENT, false: C.BORDER }}
-          />
-        </View>
-      </View>
-
       {/* Connected accounts (creator) — only when creator mode is on */}
       {isCreator && (
         <>
@@ -603,8 +545,8 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         <View style={styles.divider} />
         <TouchableOpacity
           style={styles.row}
-          onPress={() => navigation.navigate('TwoFactor')}>
-          <Text style={styles.rowLabel}>Two-Factor Auth</Text>
+          onPress={() => navigation.navigate('AccountAdvanced')}>
+          <Text style={styles.rowLabel}>Advanced</Text>
           <Text style={styles.rowChevron}>›</Text>
         </TouchableOpacity>
         <View style={styles.divider} />

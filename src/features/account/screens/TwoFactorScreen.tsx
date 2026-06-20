@@ -217,7 +217,8 @@ const styles = StyleSheet.create({
   copyBtnText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
   input: {
     backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER,
-    padding: SPACE.LG, fontSize: FONT.SIZES.LG, color: C.INK, fontFamily: FONT.BODY, letterSpacing: 4,
+    // No letterSpacing: on iOS it leaks into other TextInputs across the app (RN bug).
+    padding: SPACE.LG, fontSize: FONT.SIZES.LG, color: C.INK, fontFamily: FONT.BODY,
   },
   primaryBtn: { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, padding: SPACE.LG, alignItems: 'center', marginTop: SPACE.LG },
   primaryBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },

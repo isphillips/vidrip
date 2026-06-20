@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Linking, Alert, ScrollView, TouchableOpacity,
 } from 'react-native';
-import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming, withDelay, withRepeat, interpolate, Extrapolation, Easing, type SharedValue } from 'react-native-reanimated';
+import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming, withRepeat, interpolate, Extrapolation, Easing, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
@@ -10,12 +10,13 @@ import { useOAuthStore } from '../../store/oauthStore';
 import { buildAuthUrl } from '../../infrastructure/oauth/config';
 import { syncOAuthCode } from '../../infrastructure/supabase/queries/syncedAccounts';
 import { refreshConnectedFeed } from '../../infrastructure/supabase/queries/connectedFeed';
+import LinearGradient from 'react-native-linear-gradient';
 import { DecoDivider, Kicker, Pips, DecoButton } from './components';
 import PaintReveal from '../../components/PaintReveal';
+import GradientButton from '../studio/components/GradientButton';
+import OnboardingSlime from './OnboardingSlime';
 
 const STEPS = 5;
-const LOGO_W = 96;
-const LOGO_H = 104;
 
 // Per-letter pink→purple ramp across the 6 letters of VIDRIP (stable objects).
 const VIDRIP_COLORS = [
@@ -79,35 +80,17 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
     });
   };
 
-  // Wax-seal stamp entrance + a continuous 3D rock so the coin catches the light.
-  const stamp = useSharedValue(0);
-  const tilt = useSharedValue(0);
-  const bob = useSharedValue(0);
-  useEffect(() => {
-    stamp.value = withDelay(120, withTiming(1, { duration: 600, easing: Easing.out(Easing.back(1.6)) }));
-    tilt.value = withRepeat(withTiming(1, { duration: 3600, easing: Easing.linear }), -1, false);
-    bob.value = withRepeat(withTiming(1, { duration: 1500, easing: Easing.linear }), -1, false);
-  }, [stamp, tilt, bob]);
-  const logoStyle = useAnimatedStyle(() => {
-    const wobble = Math.sin(tilt.value * Math.PI * 2); // -1..1, seamless loop
-    const hop = Math.sin(bob.value * Math.PI);          // 0..1..0, one arc per loop
-    return {
-      opacity: stamp.value,
-      transform: [
-        { perspective: 700 },
-        { translateY: -hop * 14 },                        // bounce up and back down
-        { scale: 0.7 + stamp.value * 0.3 },
-        { scaleY: 1 - hop * 0.04 },                       // subtle stretch at the top
-        { rotateY: `${wobble * 16}deg` },                 // 3D side-to-side tilt
-        { rotateZ: `${(1 - stamp.value) * -8 + wobble * 2}deg` },
-      ],
-    };
-  });
-
   return (
     <View style={[styles.stage, { paddingTop: top }]}>
-      {/* Dark backdrop over the gradient; fades out on the final step. */}
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.cover, coverStyle]} />
+      {/* Dark brand gradient backdrop; fades out on the final step to reveal the paint stage. */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, coverStyle]}>
+        <LinearGradient
+          colors={['#2A0E4E', '#190A33', '#0B0518']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
       {/* Paint splatter + dripping reveal, replacing the curtain on the last step. */}
       <PaintReveal active={reveal} />
       {step > 0 && (
@@ -119,17 +102,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
         <Animated.View key={step} entering={FadeIn.duration(350)} style={styles.stepWrap}>
           {step === 0 && (
             <View style={styles.center}>
-              <Animated.View style={[styles.logoWrap, logoStyle]}>
-                <Animated.Image
-                  source={require('../../assets/driplogo.png')}
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-                <Sparkle x={LOGO_W * 0.1} y={LOGO_H * 0.20} size={16} delay={0} />
-                <Sparkle x={LOGO_W * 0.74} y={LOGO_H * 0.30} size={11} delay={450} />
-                <Sparkle x={LOGO_W * 0.60} y={LOGO_H * 0.8} size={13} delay={900} />
-                <Sparkle x={LOGO_W * 0.30} y={LOGO_H * 0.58} size={9} delay={1350} />
-              </Animated.View>
+              <OnboardingSlime mood="welcome" />
               <Kicker>Members Only</Kicker>
               <Text style={styles.h1}>
                 Welcome to{'\n'}
@@ -147,6 +120,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
 
           {step === 1 && (
             <View style={styles.center}>
+              <OnboardingSlime mood="liked" />
               <Kicker>Step One</Kicker>
               <Text style={styles.h2}>Your “Liked”</Text>
               <DecoDivider />
@@ -167,6 +141,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
 
           {step === 2 && (
             <View style={styles.center}>
+              <OnboardingSlime mood="share" />
               <Kicker>Step Two</Kicker>
               <Text style={styles.h2}>Share a clip</Text>
               <DecoDivider />
@@ -176,6 +151,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
 
           {step === 3 && (
             <View style={styles.center}>
+              <OnboardingSlime mood="react" />
               <Kicker>Step Three</Kicker>
               <Text style={styles.h2}>React back</Text>
               <DecoDivider />
@@ -185,6 +161,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
 
           {step === 4 && (
             <View style={styles.center}>
+              <OnboardingSlime mood="done" />
               <Kicker>You're set</Kicker>
               <Text style={styles.h2}>The night is yours</Text>
               <DecoDivider />
@@ -201,40 +178,23 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
       <View style={[styles.footer, { paddingBottom: bottom + SPACE.LG }]}>
         <Pips count={STEPS} active={step} />
         <View style={styles.ctaCol}>
-          {step === 0 && <DecoButton label="STEP INSIDE" variant="solid" onPress={next} />}
+          {step === 0 && <GradientButton label="STEP INSIDE" icon="sparkles" onPress={next} />}
 
           {step === 1 && (
             connected
-              ? <DecoButton label="NEXT" variant="solid" onPress={next} />
+              ? <GradientButton label="NEXT" icon="arrow-forward" onPress={next} />
               : <>
-                  <DecoButton label="CONNECT YOUTUBE" variant="solid" loading={connecting} onPress={connectYouTube} />
+                  <GradientButton label="CONNECT YOUTUBE" icon="logo-youtube" loading={connecting} onPress={connectYouTube} />
                   <DecoButton label="Skip for now" variant="ghost" onPress={next} />
                 </>
           )}
 
-          {(step === 2 || step === 3) && <DecoButton label="NEXT" variant="solid" onPress={next} />}
+          {(step === 2 || step === 3) && <GradientButton label="NEXT" icon="arrow-forward" onPress={next} />}
 
-          {step === 4 && <DecoButton label="ENTER" variant="solid" onPress={onDone} />}
+          {step === 4 && <GradientButton label="ENTER" icon="sparkles" onPress={onDone} />}
         </View>
       </View>
     </View>
-  );
-}
-
-// A twinkling sparkle that pops on a loop (scale + opacity + slow spin).
-function Sparkle({ x, y, size, delay }: { x: number; y: number; size: number; delay: number }) {
-  const t = useSharedValue(0);
-  useEffect(() => {
-    t.value = withDelay(delay, withRepeat(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }), -1, false));
-  }, [t, delay]);
-  const style = useAnimatedStyle(() => {
-    const p = Math.sin(t.value * Math.PI); // 0 → 1 → 0 twinkle
-    return { opacity: p, transform: [{ scale: 0.3 + p * 0.9 }, { rotate: `${t.value * 90}deg` }] };
-  });
-  return (
-    <Animated.Text style={[styles.sparkle, { left: x, top: y, fontSize: size }, style]}>
-      ✦
-    </Animated.Text>
   );
 }
 
@@ -447,9 +407,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
   // Onboarding stage — sits over the app gradient (ScreenGradient wrap).
   stage: { flex: 1 },
-  // Opaque dark backdrop over the gradient until the final step, then fades out.
-  cover: { backgroundColor: C.BG_SOLID },
-
   // Curtain photo backdrop (final step)
   curtains: { ...StyleSheet.absoluteFillObject, marginLeft: -35 },
   curtainImg: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined },
@@ -461,10 +418,6 @@ const styles = StyleSheet.create({
   stepWrap: { flex: 1, justifyContent: 'center' },
   center: { alignItems: 'center', gap: SPACE.MD },
 
-  logoWrap: { width: LOGO_W, height: LOGO_H, marginBottom: SPACE.SM },
-  logo: { width: LOGO_W, height: LOGO_H },
-  // Twinkling sparkles over the coin.
-  sparkle: { position: 'absolute', color: '#FFF8E1', textShadowColor: C.GOLD, textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } },
   h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.MEDIUM, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
   vidrip: { fontFamily: 'Syne-ExtraBold', fontWeight: FONT.WEIGHTS.BOLD, letterSpacing: 0.5 },
   h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.BOLD, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },

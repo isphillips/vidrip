@@ -71,7 +71,7 @@ export default function StudioCollectionsScreen({ navigation }: StudioStackScree
       />
 
       <TouchableOpacity activeOpacity={0.9} onPress={() => navigation.navigate('StudioCollectionEdit', {})}>
-        <LinearGradient colors={['#FF4FA3', '#A05CFF', '#2DD4BF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.newBtn}>
+        <LinearGradient colors={['#FF4FA3', '#A05CFF', '#3B82F6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.newBtn}>
           <Ionicons name="add-circle" size={22} color={C.WHITE} />
           <Text style={styles.newBtnText}>New collection</Text>
         </LinearGradient>
@@ -96,6 +96,6 @@ const styles = StyleSheet.create({
   emptyInner:{ alignItems: 'center', gap: SPACE.SM, paddingHorizontal: SPACE.XL },
   emptyTitle:{ color: C.INK, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.MD },
   emptyHint: { color: C.SUBTLE, fontFamily: FONT.BODY, fontSize: FONT.SIZES.SM, textAlign: 'center' },
-  newBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM, paddingVertical: SPACE.MD, borderRadius: RADIUS.MD, marginBottom: SPACE.LG },
-  newBtnText:{ color: C.WHITE, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.MD },
+  newBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM, borderRadius: RADIUS.MD, marginBottom: 50 },
+  newBtnText:{ color: C.WHITE, paddingVertical: SPACE.LG, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.MD },
 });

@@ -254,7 +254,7 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG, paddingHorizontal: SPACE.MD },
   header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACE.MD },
-  iconBtn:   { width: 40, height: 40, borderRadius: RADIUS.FULL, alignItems: 'center', justifyContent: 'center', backgroundColor: C.SURFACE_2 },
+  iconBtn:   { width: 40, height: 40, borderRadius: RADIUS.FULL, alignItems: 'center', justifyContent: 'center' },
   title:     { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, textAlign: 'center' },
   subtitle:  { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_MEDIUM, color: C.ACCENT_HOT, textAlign: 'center', marginTop: 1 },
 

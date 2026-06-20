@@ -28,16 +28,16 @@ export default function GradientButton({
       <LinearGradient
         colors={BRAND} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
         style={[styles.btn, dim && styles.btnDisabled]}>
-        {loading ? (
-          <ActivityIndicator color={C.WHITE} />
-        ) : (
-          <View style={styles.row}>
-            {icon && (
-              <Ionicons name={icon} size={20} color={C.WHITE} style={{ marginRight: 8 }} />
-            )}
-            <Text style={styles.txt}>{label}</Text>
-          </View>
-        )}
+        {/* Keep the label + padding stable while loading (just swap the icon for a spinner) so the
+            button never collapses or blanks out mid-press. */}
+        <View style={styles.row}>
+          {loading ? (
+            <ActivityIndicator color={C.WHITE} style={styles.lead} />
+          ) : icon ? (
+            <Ionicons name={icon} size={20} color={C.WHITE} style={styles.lead} />
+          ) : null}
+          <Text style={styles.txt}>{label}</Text>
+        </View>
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -47,5 +47,6 @@ const styles = StyleSheet.create({
   btn:         { borderRadius: RADIUS.MD, alignItems: 'center', justifyContent: 'center' },
   btnDisabled: { opacity: 0.5 },
   row:         { padding: SPACE.LG, flexDirection: 'row', alignItems: 'center' },
+  lead:        { marginRight: 8 },
   txt:         { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
 });

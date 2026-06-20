@@ -4,13 +4,14 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
+  ScrollView,
   Alert,
 } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
 import type { AuthStackScreenProps } from '../../../app/navigation/types';
+import SlimeWizard from '../components/SlimeWizard';
+import GradientButton from '../../studio/components/GradientButton';
 
 export default function EnterInviteCodeScreen({
   navigation,
@@ -53,29 +54,33 @@ export default function EnterInviteCodeScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Enter your invite code</Text>
-      <Text style={styles.subtitle}>Reaxn is invite only. Get a code from a friend.</Text>
-      <TextInput
-        style={styles.input}
-        value={code}
-        onChangeText={handleChangeText}
-        placeholder="XXXXX-XXXX"
-        placeholderTextColor={C.SUBTLE}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        maxLength={10}
-        spellCheck={false}
-      />
-      <TouchableOpacity
-        style={[styles.button, (!code.trim() || loading) && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={!code.trim() || loading}>
-        {loading ? (
-          <ActivityIndicator color={C.WHITE} />
-        ) : (
-          <Text style={styles.buttonText}>Continue</Text>
-        )}
-      </TouchableOpacity>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
+        <SlimeWizard />
+        <Text style={styles.title}>Enter your invite code</Text>
+        <Text style={styles.subtitle}>Vidrip is invite only. Enter your code for exclusive access.</Text>
+        <TextInput
+          style={styles.input}
+          value={code}
+          onChangeText={handleChangeText}
+          placeholder="XXXXX-XXXX"
+          placeholderTextColor={C.SUBTLE}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          maxLength={10}
+          spellCheck={false}
+        />
+        <GradientButton
+          label="Continue"
+          icon="sparkles"
+          onPress={handleSubmit}
+          disabled={!code.trim()}
+          loading={loading}
+          style={styles.cta}
+        />
+      </ScrollView>
     </View>
   );
 }
@@ -84,19 +89,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.BG,
+  },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
     padding: SPACE.XL,
-    paddingTop: SPACE.XXXL,
   },
   title: {
     fontSize: FONT.SIZES.XXL,
     fontFamily: FONT.DISPLAY_BOLD,
     fontWeight: '700',
     color: C.INK,
+    textAlign: 'center',
+    marginTop: SPACE.SM,
     marginBottom: SPACE.SM,
   },
   subtitle: {
     fontSize: FONT.SIZES.MD,
     color: C.MUTED,
+    textAlign: 'center',
     marginBottom: SPACE.XXL,
   },
   input: {
@@ -108,23 +119,9 @@ const styles = StyleSheet.create({
     fontSize: FONT.SIZES.XL,
     fontWeight: '700',
     color: C.INK,
-    letterSpacing: 4,
+    // No letterSpacing: on iOS it leaks into other TextInputs across the app (RN bug).
     textAlign: 'center',
     marginBottom: SPACE.LG,
   },
-  button: {
-    backgroundColor: C.ACCENT,
-    borderRadius: RADIUS.MD,
-    padding: SPACE.LG,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-  buttonText: {
-    color: C.WHITE,
-    fontSize: FONT.SIZES.LG,
-    fontFamily: FONT.BODY_BOLD,
-    fontWeight: '700',
-  },
+  cta: { marginTop: SPACE.SM },
 });

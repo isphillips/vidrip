@@ -1,20 +1,24 @@
 diff --git a/node_modules/react-native-vision-camera/ios/Core/CameraSession+Audio.swift b/node_modules/react-native-vision-camera/ios/Core/CameraSession+Audio.swift
-index 3d67c8c..ca56819 100644
+index 3d67c8c..ef9ff05 100644
 --- a/node_modules/react-native-vision-camera/ios/Core/CameraSession+Audio.swift
 +++ b/node_modules/react-native-vision-camera/ios/Core/CameraSession+Audio.swift
-@@ -29,6 +29,15 @@ extension CameraSession {
+@@ -22,9 +22,19 @@ extension CameraSession {
+     do {
+       let audioSession = AVAudioSession.sharedInstance()
+ 
++      // Record through the Bluetooth headset mic (HFP) when AirPods/BT headphones are connected.
++      // iOS deliberately runs the BUILT-IN mic at very low sensitivity whenever a Bluetooth OUTPUT
++      // (A2DP) is active — and input gain is not settable (gainSettable=no) — so capturing from the
++      // built-in mic yielded a correct route but an almost inaudible voice. .allowBluetooth lets iOS
++      // use the headset's OWN mic (HFP), which records the wearer's voice at a normal level.
++      // Trade-off: while recording, the session is mono/narrowband (HFP), so the reel monitored in the
++      // ears is call-quality — but the EXPORTED video's source audio comes from the original file, so
++      // the final result is unaffected. With no Bluetooth device connected this changes nothing
++      // (built-in mic + speaker, exactly as before).
+       try audioSession.updateCategory(AVAudioSession.Category.playAndRecord,
+                                       mode: .videoRecording,
+                                       options: [.mixWithOthers,
++                                                .allowBluetooth,
+                                                 .allowBluetoothA2DP,
                                                  .defaultToSpeaker,
                                                  .allowAirPlay])
- 
-+      // Capture from the built-in mic while leaving Bluetooth on A2DP for high-quality playback (this
-+      // is what the native Camera app does). We deliberately do NOT enable .allowBluetooth (HFP) — that
-+      // would drop AirPods to mono call-quality audio. Forcing the built-in input also fixes the silent-
-+      // recording bug with AirPods connected: A2DP is output-only, so without this the session has no
-+      // usable mic and records silence.
-+      if let builtInMic = audioSession.availableInputs?.first(where: { $0.portType == .builtInMic }) {
-+        try? audioSession.setPreferredInput(builtInMic)
-+      }
-+
-       if #available(iOS 14.5, *) {
-         // prevents the audio session from being interrupted by a phone call
-         try audioSession.setPrefersNoInterruptionsFromSystemAlerts(true)

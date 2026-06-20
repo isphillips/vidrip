@@ -5,9 +5,9 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -15,6 +15,8 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
 import type { AuthStackScreenProps } from '../../../app/navigation/types';
+import SlimeWelcome from '../components/SlimeWelcome';
+import GradientButton from '../../studio/components/GradientButton';
 
 type Mode = 'magic' | 'password';
 
@@ -87,83 +89,87 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Text style={styles.title}>Sign In</Text>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <SlimeWelcome />
 
-      {/* Mode toggle */}
-      <View style={styles.toggle}>
-        <TouchableOpacity
-          style={[styles.toggleBtn, mode === 'magic' && styles.toggleBtnActive]}
-          onPress={() => setMode('magic')}>
-          <Text style={[styles.toggleTxt, mode === 'magic' && styles.toggleTxtActive]}>
-            Magic Link
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toggleBtn, mode === 'password' && styles.toggleBtnActive]}
-          onPress={() => setMode('password')}>
-          <Text style={[styles.toggleTxt, mode === 'password' && styles.toggleTxtActive]}>
-            Password
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.subtitle}>
-        {mode === 'magic' ? "We'll email you a one-tap link" : 'Sign in with your email and password'}
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@example.com"
-        placeholderTextColor={C.SUBTLE}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoFocus
-      />
-
-      {mode === 'password' && (
-        <View style={styles.passwordRow}>
-          <TextInput
-            style={styles.passwordInput}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={C.SUBTLE}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="go"
-            onSubmitEditing={handlePasswordSignIn}
-          />
+        {/* Mode toggle */}
+        <View style={styles.toggle}>
           <TouchableOpacity
-            style={styles.eyeBtn}
-            onPress={() => setShowPassword((v) => !v)}>
-            <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+            style={[styles.toggleBtn, mode === 'magic' && styles.toggleBtnActive]}
+            onPress={() => setMode('magic')}>
+            <Text style={[styles.toggleTxt, mode === 'magic' && styles.toggleTxtActive]}>
+              Magic Link
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, mode === 'password' && styles.toggleBtnActive]}
+            onPress={() => setMode('password')}>
+            <Text style={[styles.toggleTxt, mode === 'password' && styles.toggleTxtActive]}>
+              Password
+            </Text>
           </TouchableOpacity>
         </View>
-      )}
 
-      {mode === 'magic' ? (
-        <TouchableOpacity
-          style={[styles.button, (!validEmail || loading) && styles.buttonDisabled]}
-          onPress={handleMagicLink}
-          disabled={!validEmail || loading}>
-          {loading
-            ? <ActivityIndicator color={C.WHITE} />
-            : <Text style={styles.buttonText}>Send Magic Link</Text>}
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          style={[styles.button, (!validEmail || !password || loading) && styles.buttonDisabled]}
-          onPress={handlePasswordSignIn}
-          disabled={!validEmail || !password || loading}>
-          {loading
-            ? <ActivityIndicator color={C.WHITE} />
-            : <Text style={styles.buttonText}>Sign In</Text>}
-        </TouchableOpacity>
-      )}
+        <Text style={styles.subtitle}>
+          {mode === 'magic' ? "We'll email you a one-tap link" : 'Sign in with your email and password'}
+        </Text>
+
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          placeholderTextColor={C.SUBTLE}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+
+        {mode === 'password' && (
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={styles.passwordInput}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              placeholderTextColor={C.SUBTLE}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="go"
+              onSubmitEditing={handlePasswordSignIn}
+            />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowPassword((v) => !v)}>
+              <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {mode === 'magic' ? (
+          <GradientButton
+            label="Send Magic Link"
+            icon="sparkles"
+            onPress={handleMagicLink}
+            disabled={!validEmail}
+            loading={loading}
+            style={styles.cta}
+          />
+        ) : (
+          <GradientButton
+            label="Sign In"
+            onPress={handlePasswordSignIn}
+            disabled={!validEmail || !password}
+            loading={loading}
+            style={styles.cta}
+          />
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -172,15 +178,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.BG,
-    padding: SPACE.XL,
-    paddingTop: SPACE.XXXL,
   },
-  title: {
-    fontSize: FONT.SIZES.XXL,
-    fontFamily: FONT.DISPLAY_BOLD,
-    fontWeight: '700',
-    color: C.INK,
-    marginBottom: SPACE.LG,
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: SPACE.XL,
   },
   toggle: {
     flexDirection: 'row',
@@ -188,6 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.MD,
     padding: 3,
     gap: 3,
+    marginTop: SPACE.XXL,
     marginBottom: SPACE.LG,
     borderWidth: 1,
     borderColor: C.BORDER,
@@ -236,20 +239,7 @@ const styles = StyleSheet.create({
   },
   eyeBtn: { paddingHorizontal: SPACE.MD },
   eyeIcon: { fontSize: 18 },
-  button: {
-    backgroundColor: C.ACCENT,
-    borderRadius: RADIUS.MD,
-    padding: SPACE.LG,
-    alignItems: 'center',
-    marginTop: SPACE.SM,
-  },
-  buttonDisabled: { opacity: 0.4 },
-  buttonText: {
-    color: C.WHITE,
-    fontSize: FONT.SIZES.LG,
-    fontFamily: FONT.BODY_BOLD,
-    fontWeight: '700',
-  },
+  cta: { marginTop: SPACE.SM },
   sentContainer: {
     justifyContent: 'center',
     alignItems: 'center',
