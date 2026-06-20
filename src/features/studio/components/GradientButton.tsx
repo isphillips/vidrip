@@ -4,6 +4,7 @@ import {
   type StyleProp, type ViewStyle,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 
@@ -37,12 +38,28 @@ export default function GradientButton({
       <Text style={styles.txt}>{label}</Text>
     </View>
   );
+  // Outline: mask a full-bleed gradient to a rounded-rect ring, so the WHOLE border is a gradient and
+  // the centre is genuinely transparent (the screen shows through). Diagonal so the gradient flows
+  // around the border. The label sits on top of the mask.
+  if (variant === 'outline') {
+    return (
+      <TouchableOpacity onPress={onPress} disabled={dim} activeOpacity={0.85} style={style}>
+        <View style={[styles.outlineWrap, dim && styles.btnDisabled]}>
+          <MaskedView style={StyleSheet.absoluteFill} maskElement={<View style={styles.ring} />}>
+            <LinearGradient colors={BRAND} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          </MaskedView>
+          {content}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity onPress={onPress} disabled={dim} activeOpacity={0.85} style={style}>
       <LinearGradient
         colors={BRAND} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={[variant === 'outline' ? styles.border : styles.btn, dim && styles.btnDisabled]}>
-        {variant === 'outline' ? <View style={styles.outlineInner}>{content}</View> : content}
+        style={[styles.btn, dim && styles.btnDisabled]}>
+        {content}
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -50,9 +67,9 @@ export default function GradientButton({
 
 const styles = StyleSheet.create({
   btn:          { borderRadius: RADIUS.MD, alignItems: 'center', justifyContent: 'center' },
-  // Outline: the gradient is just a 1.5px ring; the inner pill is the brand-dark bg (reads as transparent).
-  border:       { borderRadius: RADIUS.MD, padding: 1.5 },
-  outlineInner: { borderRadius: RADIUS.MD - 1.5, backgroundColor: C.BG_SOLID, alignItems: 'center', justifyContent: 'center' },
+  outlineWrap:  { borderRadius: RADIUS.MD, alignItems: 'center', justifyContent: 'center' },
+  // Mask: opaque rounded border (shows the gradient) around a transparent centre (hides it).
+  ring:         { flex: 1, borderRadius: RADIUS.MD, borderWidth: 1.5, borderColor: '#000', backgroundColor: 'transparent' },
   btnDisabled:  { opacity: 0.5 },
   row:          { padding: SPACE.LG, flexDirection: 'row', alignItems: 'center' },
   lead:         { marginRight: 8 },
