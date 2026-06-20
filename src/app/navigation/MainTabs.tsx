@@ -14,7 +14,7 @@ import type {
   AccountStackParamList,
 } from './types';
 import ChannelsNavigator from './ChannelsStack';
-import { screenLayout } from '../../components/ScreenGradient';
+import { screenLayout, GRADIENT_DARK } from '../../components/ScreenGradient';
 
 import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
@@ -54,11 +54,16 @@ const ShareStack = createNativeStackNavigator<ShareStackParamList>();
 const AccountStack = createNativeStackNavigator<AccountStackParamList>();
 
 const NAV_OPTS = {
-  headerStyle: { backgroundColor: C.BG },
+  // Opaque dark backings (the gradient's top/second tone) — NOT transparent. A
+  // transparent header lets the OS paint its default light bar material for a frame
+  // during the push/pop animation (the "white flash"); an opaque dark bar that matches
+  // the gradient's top edge stays seamless. contentStyle is the dark backstop behind
+  // the screenLayout gradient so transitions never reveal the white window underneath.
+  headerStyle: { backgroundColor: GRADIENT_DARK[0] },
   headerTintColor: C.INK,
   headerShadowVisible: false,
   headerBackTitleVisible: false,
-  contentStyle: { backgroundColor: C.BG },
+  contentStyle: { backgroundColor: GRADIENT_DARK[1] },
 };
 
 function FeedNavigator() {
@@ -82,7 +87,7 @@ function FriendsNavigator() {
       <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
       <FriendsStack.Screen name="Profile" component={UserProfileScreen} options={{ title: 'Profile', headerBackTitle: 'Friends' }} />
       <FriendsStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
-      <FriendsStack.Screen name="InviteContacts" component={InviteContactsScreen} options={{ headerShown: false }} />
+      <FriendsStack.Screen name="InviteContacts" component={InviteContactsScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
     </FriendsStack.Navigator>
   );
 }

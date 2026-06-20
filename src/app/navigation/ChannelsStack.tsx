@@ -1,7 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { C } from '../../theme';
-import { screenLayout } from '../../components/ScreenGradient';
+import { screenLayout, GRADIENT_DARK } from '../../components/ScreenGradient';
 import type { ChannelsStackParamList, MessagesStackParamList } from './types';
 
 import ChannelsHomeScreen from '../../features/channels/screens/ChannelsHomeScreen';
@@ -21,11 +21,14 @@ import InviteToChannelScreen from '../../features/channels/screens/InviteToChann
 import ManageChannelMembersScreen from '../../features/channels/screens/ManageChannelMembersScreen';
 
 const NAV_OPTS = {
-  headerStyle: { backgroundColor: C.BG },
+  // Opaque dark backings (gradient's top/second tone), not transparent — a transparent
+  // header flashes the OS's default light bar material during push/pop; contentStyle is
+  // the dark backstop behind the screenLayout gradient. See MainTabs NAV_OPTS.
+  headerStyle: { backgroundColor: GRADIENT_DARK[0] },
   headerTintColor: C.INK,
   headerShadowVisible: false,
   headerBackTitleVisible: false,
-  contentStyle: { backgroundColor: C.BG },
+  contentStyle: { backgroundColor: GRADIENT_DARK[1] },
 };
 
 // Every channel screen except the list root. Reused by the Channels tab AND the

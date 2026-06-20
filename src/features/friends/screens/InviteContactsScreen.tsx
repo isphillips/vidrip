@@ -3,7 +3,6 @@ import {
   View, Text, SectionList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Modal,
   Linking, Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
@@ -31,7 +30,35 @@ function groupByName(items: DeviceContact[]): Section[] {
   return [...map.keys()].sort((a, b) => azOrder(a) - azOrder(b)).map(title => ({ title, data: map.get(title)! }));
 }
 
-function AZIndex({ onSelect }: { onSelect: (l: string) => void }) {
+// Fixed row/header heights so we can hand-roll getItemLayout — that's what lets the A–Z
+// rail jump to a section far down a long contacts list. Without it scrollToLocation
+// fails silently on sections that haven't been measured/rendered yet (the bug that made
+// the lettering feel dead). SectionList flattens each section into [header, ...rows,
+// footer] index slots — the trailing footer slot exists even with no renderSectionFooter
+// — so the walk below mirrors that exact structure.
+const ROW_H = 56;     // avatar 40 + 2×SPACE.SM vertical padding
+const HEADER_H = 34;  // azHeader fixed height
+function sectionGetItemLayout(
+  data: ReadonlyArray<{ data: ReadonlyArray<unknown> }> | null,
+  index: number,
+): { length: number; offset: number; index: number } {
+  if (!data) { return { length: ROW_H, offset: 0, index }; }
+  let offset = 0;
+  let cursor = 0;
+  for (const section of data) {
+    if (cursor === index) { return { length: HEADER_H, offset, index }; }   // section header
+    offset += HEADER_H; cursor += 1;
+    for (let r = 0; r < section.data.length; r++) {
+      if (cursor === index) { return { length: ROW_H, offset, index }; }     // contact row
+      offset += ROW_H; cursor += 1;
+    }
+    if (cursor === index) { return { length: 0, offset, index }; }           // section footer slot
+    cursor += 1;
+  }
+  return { length: 0, offset, index };
+}
+
+function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l: string) => void }) {
   const pick = (y: number) => onSelect(LETTERS[Math.max(0, Math.min(LETTERS.length - 1, Math.floor(y / AZ_ROW)))]);
   return (
     <View
@@ -40,7 +67,7 @@ function AZIndex({ onSelect }: { onSelect: (l: string) => void }) {
       onMoveShouldSetResponder={() => true}
       onResponderGrant={(e) => pick(e.nativeEvent.locationY)}
       onResponderMove={(e) => pick(e.nativeEvent.locationY)}>
-      {LETTERS.map(l => <Text key={l} style={styles.azLetter}>{l}</Text>)}
+      {LETTERS.map(l => <Text key={l} style={[styles.azLetter, !available.has(l) && styles.azLetterDim]}>{l}</Text>)}
     </View>
   );
 }
@@ -48,14 +75,13 @@ function AZIndex({ onSelect }: { onSelect: (l: string) => void }) {
 // ── invite message + SMS deep link ────────────────────────────────────────────
 function smsUrl(phone: string, code: string): string {
   const number = phone.replace(/[^\d+]/g, '');
-  const body = `Join me on Vidrip 🎬 — use my invite code ${code} to get in: https://vidrip.app/i/${code}`;
+  const body = `Join me on Vidrip 🎬! Use my invite code ${code} to get in: https://vidrip.app/i/${code}`;
   // iOS wants the body after "&", Android after "?".
   const sep = Platform.OS === 'ios' ? '&' : '?';
   return `sms:${number}${sep}body=${encodeURIComponent(body)}`;
 }
 
 export default function InviteContactsScreen() {
-  const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
 
   const [perm, setPerm] = useState<'loading' | 'granted' | 'denied'>('loading');
@@ -94,6 +120,7 @@ export default function InviteContactsScreen() {
   }, [user]);
 
   const sections = useMemo(() => groupByName(contacts), [contacts]);
+  const available = useMemo(() => new Set(sections.map(s => s.title)), [sections]);
   const used = useMemo(() => sentCodes(sent), [sent]);
   const unsent = useMemo(() => codes.filter(c => !used.has(c)), [codes, used]);
 
@@ -102,7 +129,7 @@ export default function InviteContactsScreen() {
     let idx = sections.findIndex(s => s.title === letter);
     if (idx < 0) { idx = sections.findIndex(s => azOrder(s.title) >= azOrder(letter)); }
     if (idx < 0) { idx = sections.length - 1; }
-    try { sectionRef.current?.scrollToLocation({ sectionIndex: idx, itemIndex: 0, animated: false }); } catch { /* not measured */ }
+    try { sectionRef.current?.scrollToLocation({ sectionIndex: idx, itemIndex: 0, viewPosition: 0, animated: false }); } catch { /* not measured */ }
   }, [sections]);
 
   const openPicker = (c: DeviceContact) => {
@@ -163,7 +190,7 @@ export default function InviteContactsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.banner, { paddingTop: top + SPACE.SM }]}>
+      <View style={styles.banner}>
         <Text style={styles.bannerTitle}>Invite from Contacts</Text>
         <Text style={styles.bannerSub}>
           {codes.length === 0
@@ -180,6 +207,7 @@ export default function InviteContactsScreen() {
           contentContainerStyle={styles.list}
           stickySectionHeadersEnabled
           showsVerticalScrollIndicator={false}
+          getItemLayout={sectionGetItemLayout}
           onScrollToIndexFailed={() => {}}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -200,7 +228,7 @@ export default function InviteContactsScreen() {
             );
           }}
         />
-        {sections.length > 0 && <AZIndex onSelect={scrollToLetter} />}
+        {sections.length > 0 && <AZIndex available={available} onSelect={scrollToLetter} />}
       </View>
 
       {/* Code picker */}
@@ -216,7 +244,7 @@ export default function InviteContactsScreen() {
                   onPress={() => picker && sendInvite(picker, code)}>
                   <Text style={[styles.codeText, already && styles.codeUsed]}>{code}</Text>
                   {already
-                    ? <Text style={styles.codeSentLabel}>already sent</Text>
+                    ? <Text style={styles.codeSentLabel}>Already allocated, but send anyway</Text>
                     : <Ionicons name="paper-plane" size={16} color={C.ACCENT_HOT} />}
                 </TouchableOpacity>
               );
@@ -231,17 +259,17 @@ export default function InviteContactsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SPACE.SM },
-  banner: { paddingHorizontal: SPACE.LG, paddingBottom: SPACE.SM },
+  banner: { paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD, paddingBottom: SPACE.SM },
   bannerTitle: { fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
   bannerSub: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED, marginTop: 2 },
 
   listWrap: { flex: 1 },
   list: { paddingLeft: SPACE.LG, paddingRight: SPACE.XL, paddingBottom: SPACE.LG },
   azHeader: {
-    fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD, color: C.ACCENT_HOT,
-    backgroundColor: C.BG_SOLID, paddingTop: SPACE.MD, paddingBottom: SPACE.XS,
+    height: HEADER_H, fontSize: FONT.SIZES.SM, lineHeight: FONT.SIZES.SM + 5, fontFamily: FONT.BODY_BOLD,
+    color: C.ACCENT_HOT, backgroundColor: C.BG_SOLID, paddingTop: SPACE.MD, paddingBottom: SPACE.XS,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: SPACE.MD, paddingVertical: SPACE.SM },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SPACE.MD, height: ROW_H },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.ACCENT, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: C.ACCENT_HOT, fontFamily: FONT.DISPLAY_BOLD, fontSize: FONT.SIZES.MD },
   name: { flex: 1, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
@@ -258,6 +286,7 @@ const styles = StyleSheet.create({
 
   azIndex: { position: 'absolute', right: 1, top: '50%', marginTop: -AZ_H / 2, height: AZ_H, width: 18, alignItems: 'center', justifyContent: 'space-between' },
   azLetter: { height: AZ_ROW, lineHeight: AZ_ROW, width: 18, textAlign: 'center', fontSize: 9.5, fontWeight: '700', color: C.ACCENT_HOT },
+  azLetterDim: { color: C.SUBTLE, opacity: 0.45 },
 
   empty: { alignItems: 'center', paddingTop: SPACE.XXXL },
   emptyText: { color: C.MUTED, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY },
@@ -269,7 +298,7 @@ const styles = StyleSheet.create({
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: C.SURFACE_2, borderTopLeftRadius: RADIUS.LG, borderTopRightRadius: RADIUS.LG, padding: SPACE.LG, gap: SPACE.SM, paddingBottom: SPACE.XXL },
-  sheetTitle: { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
+  sheetTitle: { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_SEMIBOLD, color: C.INK },
   sheetHint: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED, marginBottom: SPACE.SM },
   codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, paddingHorizontal: SPACE.LG, paddingVertical: SPACE.MD },
   codeText: { fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, color: C.INK, letterSpacing: 1 },
