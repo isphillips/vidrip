@@ -209,6 +209,7 @@ const styles = StyleSheet.create({
     color: C.MUTED,
     fontFamily: FONT.BODY,
     marginBottom: SPACE.LG,
+    textAlign: 'center'
   },
   input: {
     backgroundColor: C.SURFACE,
