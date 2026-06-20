@@ -11,6 +11,9 @@ interface UploadState {
   jobs: UploadJob[];
   /** Start a background upload. Returns immediately — progress shown via toast. */
   enqueue: (label: string, fn: () => Promise<void>) => void;
+  /** Show an indeterminate progress toast you dismiss yourself (returns its id). For a slow pre-step
+   *  (e.g. an anonymize bake) that hands off to a real enqueue — no premature "done" state. */
+  show: (label: string) => string;
   dismiss: (id: string) => void;
 }
 
@@ -38,6 +41,12 @@ export const useUploadStore = create<UploadState>((set) => ({
           ),
         }));
       });
+  },
+
+  show(label) {
+    const id = String(++_counter);
+    set(s => ({ jobs: [...s.jobs, { id, label, status: 'uploading' }] }));
+    return id;
   },
 
   dismiss(id) {

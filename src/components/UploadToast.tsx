@@ -42,7 +42,7 @@ export default function UploadToast() {
             <>
               <Text style={styles.doneIcon}>✓</Text>
               <Text style={[styles.label, styles.labelDone]}>
-                {job.label.replace(/…$/, '')} — done
+                {job.label.replace(/…$/, '')} done
               </Text>
             </>
           )}
@@ -82,6 +82,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     maxWidth: '100%',
+    marginBottom: SPACE.SM,
   },
   pillDone: { borderColor: 'rgba(34,197,94,0.35)' },
   pillError: { borderColor: 'rgba(239,68,68,0.35)' },

@@ -54,6 +54,10 @@ export type StudioRecipe = {
    *  for the "React Anonymously" mode — iOS via AVAudioUnitTimePitch, Android via SonicAudioProcessor.
    *  Omit/null = original audio copied through unchanged. */
   voiceMod?: 'deep' | null;
+  /** Anonymous-mode silhouette drawn NATIVELY per output frame from a captured mesh track (instead of
+   *  pre-rendered overlay PNGs — no JS frame capture, no jank). `trackFile` is a file:// path to JSON:
+   *  { fps, frameAspect, meshIdx, frames:[[le,re,nose,mouth flat + faceWidth]|null], meshFrames }. */
+  silhouette?: { trackFile: string } | null;
   output?: { width?: number; height?: number; fps?: number; bitrate?: number };
 };
 

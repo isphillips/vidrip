@@ -1,0 +1,20 @@
+diff --git a/node_modules/react-native-vision-camera/ios/Core/CameraSession+Audio.swift b/node_modules/react-native-vision-camera/ios/Core/CameraSession+Audio.swift
+index 3d67c8c..ca56819 100644
+--- a/node_modules/react-native-vision-camera/ios/Core/CameraSession+Audio.swift
++++ b/node_modules/react-native-vision-camera/ios/Core/CameraSession+Audio.swift
+@@ -29,6 +29,15 @@ extension CameraSession {
+                                                 .defaultToSpeaker,
+                                                 .allowAirPlay])
+ 
++      // Capture from the built-in mic while leaving Bluetooth on A2DP for high-quality playback (this
++      // is what the native Camera app does). We deliberately do NOT enable .allowBluetooth (HFP) — that
++      // would drop AirPods to mono call-quality audio. Forcing the built-in input also fixes the silent-
++      // recording bug with AirPods connected: A2DP is output-only, so without this the session has no
++      // usable mic and records silence.
++      if let builtInMic = audioSession.availableInputs?.first(where: { $0.portType == .builtInMic }) {
++        try? audioSession.setPreferredInput(builtInMic)
++      }
++
+       if #available(iOS 14.5, *) {
+         // prevents the audio session from being interrupted by a phone call
+         try audioSession.setPrefersNoInterruptionsFromSystemAlerts(true)

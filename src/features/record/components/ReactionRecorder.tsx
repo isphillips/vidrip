@@ -160,6 +160,8 @@ export default function ReactionRecorder({
   // Anonymous mode hands the heavy silhouette + voice bake to the global background baker (so the
   // recorder returns to the thread immediately, with a toast — like a normal reaction save).
   const enqueueUpload = useUploadStore((s) => s.enqueue);
+  const showUpload = useUploadStore((s) => s.show);
+  const dismissUpload = useUploadStore((s) => s.dismiss);
   const requestBake = useBakeQueueStore((s) => s.requestBake);
   const [ytPlaying, setYtPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -280,21 +282,29 @@ export default function ReactionRecorder({
 
     if (anon) {
       // Anonymous mode: the silhouette + deep voice must be baked into the file(s) before they're
-      // saved/uploaded (the raw face/voice must never leave the device). That bake is slow, so we
-      // hand it to the global background baker and leave immediately — exactly like a normal reaction,
-      // with a toast tracking progress. The recorder can unmount; the bake finishes at app root.
+      // saved/uploaded (the raw face/voice must never leave the device). The bake is slow, so it runs
+      // in the global background baker and we leave immediately. ONE toast progression: a "Preparing…"
+      // toast during the bake, dismissed the instant before onSave shows the real "Saving…" toast — so
+      // there's never an overlapping/premature "saved". Bake at 15fps (the silhouette track is 15fps)
+      // to halve the work and keep the rest of the app responsive while it runs.
       const mainTrack = m.lensTrack, afterTrack = afterTrackRef.current, afterRaw = afterthought;
       const dur = m.duration, ytOff = m.ytStartOffset, hp = m.headphones, rawMain = m.path;
-      enqueueUpload(uploadingText || 'Saving reaction…', async () => {
-        const bakedMain = await requestBake({ sourceUri: rawMain, recipe: mainTrack ? faceLensRecipe(mainTrack) : null, durationSec: dur, voiceMod: ANON_VOICE_MOD });
-        let after = afterRaw;
-        if (afterRaw) {
-          const bakedAfter = await requestBake({ sourceUri: afterRaw.path, recipe: afterTrack ? faceLensRecipe(afterTrack) : null, durationSec: afterRaw.duration, voiceMod: ANON_VOICE_MOD });
-          after = { ...afterRaw, path: bakedAfter };
+      const prepId = showUpload('Preparing video…');
+      (async () => {
+        try {
+          const bakedMain = await requestBake({ sourceUri: rawMain, recipe: mainTrack ? faceLensRecipe(mainTrack) : null, durationSec: dur, voiceMod: ANON_VOICE_MOD, fps: 15 });
+          let after = afterRaw;
+          if (afterRaw) {
+            const bakedAfter = await requestBake({ sourceUri: afterRaw.path, recipe: afterTrack ? faceLensRecipe(afterTrack) : null, durationSec: afterRaw.duration, voiceMod: ANON_VOICE_MOD, fps: 15 });
+            after = { ...afterRaw, path: bakedAfter };
+          }
+          dismissUpload(prepId);                                   // hand off cleanly to the save toast
+          await onSave(bakedMain, dur, ytOff, hp, null, after);    // shows the real "Saving…" toast
+        } catch (e) {
+          dismissUpload(prepId);
+          enqueueUpload(uploadingText || 'Saving reaction…', async () => { throw e instanceof Error ? e : new Error('Could not anonymize the reaction'); });
         }
-        // Save with the baked file + no replay track (the look is in the pixels now).
-        await onSave(bakedMain, dur, ytOff, hp, null, after);
-      });
+      })();
       onBack();
       return;
     }
@@ -307,7 +317,7 @@ export default function ReactionRecorder({
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
       setUploading(false);
     }
-  }, [onSave, onBack, anon, enqueueUpload, requestBake, uploadingText]);
+  }, [onSave, onBack, anon, enqueueUpload, showUpload, dismissUpload, requestBake, uploadingText]);
   useEffect(() => { finalizeRef.current = finalize; }, [finalize]);
 
   const handleStop = useCallback(async () => {

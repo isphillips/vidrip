@@ -1,13 +1,26 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
+import RNFS from 'react-native-fs';
 import { useSharedValue } from 'react-native-reanimated';
 import { ControlledClockProvider } from '../effectClock';
 import EffectLayer from './EffectLayer';
 import { isEmptyRecipe, type OverlayRecipe } from '../effectRecipe';
-import { FaceLensReplay } from '../../lens/faceLens';
+import { FaceLensReplay, type FaceLensTrack } from '../../lens/faceLens';
 import { ANON_LENS_KEY, ANON_FLOOR } from '../../lens/useAnonymousMode';
 import { exportRecipe } from '../../../infrastructure/native/studioExporter';
+
+// Serialize a silhouette mesh track to a temp JSON file the native exporter reads (one file path over
+// the bridge instead of a multi-MB array). Anchors are flattened per frame; mesh stays quantized.
+async function writeSilhouetteTrack(track: FaceLensTrack): Promise<string> {
+  const frames = track.frames.map((f) => (f
+    ? [f.leftEye.x, f.leftEye.y, f.rightEye.x, f.rightEye.y, f.noseTip.x, f.noseTip.y, f.mouthCenter.x, f.mouthCenter.y, f.faceWidth]
+    : null));
+  const payload = { fps: track.fps, frameAspect: track.frameAspect ?? 0, meshIdx: track.meshIdx ?? [], frames, meshFrames: track.meshFrames ?? [] };
+  const path = `${RNFS.CachesDirectoryPath}/anon_track_${Date.now()}.json`;
+  await RNFS.writeFile(path, JSON.stringify(payload), 'utf8');
+  return `file://${path}`;
+}
 
 export type BakeOpts = { sourceUri: string; recipe?: OverlayRecipe | null; durationSec: number; fps?: number; voiceMod?: 'deep' | null };
 export type ShareBakerHandle = { bake: (opts: BakeOpts) => Promise<string> };
@@ -44,6 +57,13 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
         return vUri;
       }
       const r = recipe!;
+      // iOS anonymous mode: composite the silhouette NATIVELY from the mesh track (no JS frame capture
+      // → no jank). Android stays on the PNG-capture path below until its native compositor lands.
+      if (Platform.OS === 'ios' && r.faceLens?.lensId === ANON_LENS_KEY && r.faceLens.meshFrames?.length) {
+        const trackFile = await writeSilhouetteTrack(r.faceLens);
+        const { uri } = await exportRecipe({ clips: [{ uri: sourceUri }], colorMatrix: null, mirror: false, voiceMod, silhouette: { trackFile } });
+        return uri;
+      }
       // Face-lens clips have no authoring canvas — match the stage to the recorded frame aspect
       // so the replayed lens maps 1:1 onto the source video (no crop/stretch).
       const aspect = r.faceLens?.frameAspect

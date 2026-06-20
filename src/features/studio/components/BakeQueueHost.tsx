@@ -22,6 +22,7 @@ export default function BakeQueueHost() {
           recipe: current.recipe,
           durationSec: current.durationSec,
           voiceMod: current.voiceMod,
+          fps: current.fps,
         });
         current.resolve(uri);
       } catch (e) {

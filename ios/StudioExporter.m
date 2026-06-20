@@ -98,6 +98,150 @@ static NSURL *PitchShiftFile(NSURL *inURL, float pitchCents) {
   return ok ? outURL : nil;
 }
 
+// ── Anonymous silhouette (native compositing) ───────────────────────────────────
+// Draws the "React Anonymously" silhouette for one output frame directly from the captured mesh
+// track — an opaque dark frame + a head (convex hull of the mesh, dilated + smoothed) + shoulders +
+// a cool backlight, mirroring src/features/lens/lenses/silhouette.tsx. Replaces the JS frame-capture
+// bake (no JS thread work, no jank). Keep the geometry/colours here in sync with the JS lens.
+static CGPoint MidP(CGPoint a, CGPoint b) { return CGPointMake((a.x + b.x) / 2, (a.y + b.y) / 2); }
+static double CrossP(CGPoint o, CGPoint a, CGPoint b) { return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x); }
+static int CmpPt(const void *a, const void *b) {
+  const CGPoint *p = (const CGPoint *)a, *q = (const CGPoint *)b;
+  if (p->x < q->x) { return -1; } if (p->x > q->x) { return 1; }
+  if (p->y < q->y) { return -1; } if (p->y > q->y) { return 1; } return 0;
+}
+// Andrew's monotone chain. `out` holds up to 2n points; returns the hull count (closed polygon, no
+// duplicate endpoint).
+static NSInteger ConvexHull(CGPoint *pts, NSInteger n, CGPoint *out) {
+  if (n < 3) { for (NSInteger i = 0; i < n; i++) { out[i] = pts[i]; } return n; }
+  qsort(pts, n, sizeof(CGPoint), CmpPt);
+  NSInteger k = 0;
+  for (NSInteger i = 0; i < n; i++) { while (k >= 2 && CrossP(out[k-2], out[k-1], pts[i]) <= 0) { k--; } out[k++] = pts[i]; }
+  NSInteger lower = k + 1;
+  for (NSInteger i = n - 2; i >= 0; i--) { while (k >= lower && CrossP(out[k-2], out[k-1], pts[i]) <= 0) { k--; } out[k++] = pts[i]; }
+  return k - 1;
+}
+
+static CIImage *SilhouetteImageForTime(NSDictionary *track, double t, CGRect extent) {
+  CGFloat W = extent.size.width, H = extent.size.height;
+  if (W < 1 || H < 1) { return nil; }
+  NSArray *framesA = [track[@"frames"] isKindOfClass:[NSArray class]] ? track[@"frames"] : nil;
+  NSArray *meshFramesA = [track[@"meshFrames"] isKindOfClass:[NSArray class]] ? track[@"meshFrames"] : nil;
+  double fps = [track[@"fps"] doubleValue]; if (fps <= 0) { fps = 15; }
+  NSInteger n = framesA.count;
+  if (n == 0) { return nil; }
+  NSInteger i = (NSInteger)llround(t * fps);
+  if (i < 0) { i = 0; } if (i >= n) { i = n - 1; }
+
+  // Flipped top-left bitmap context (matches the PNG overlays' raster order).
+  CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+  CGContextRef ctx = CGBitmapContextCreate(NULL, (size_t)W, (size_t)H, 8, 0, cs,
+    (CGBitmapInfo)(kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big));
+  if (!ctx) { CGColorSpaceRelease(cs); return nil; }
+  CGContextTranslateCTM(ctx, 0, H);
+  CGContextScaleCTM(ctx, 1, -1);
+
+  // 1. opaque dark floor — fully hides the video (privacy floor).
+  CGContextSetRGBFillColor(ctx, 2/255.0, 3/255.0, 6/255.0, 1.0);
+  CGContextFillRect(ctx, CGRectMake(0, 0, W, H));
+
+  id frame = framesA[i];
+  if (![frame isKindOfClass:[NSArray class]] || ((NSArray *)frame).count < 9) {
+    // No face this frame → leave the opaque floor (nothing identifiable can show).
+    CGImageRef img = CGBitmapContextCreateImage(ctx);
+    CGContextRelease(ctx); CGColorSpaceRelease(cs);
+    CIImage *ci = img ? [CIImage imageWithCGImage:img] : nil;
+    if (img) { CGImageRelease(img); }
+    return ci;
+  }
+  NSArray *fa = (NSArray *)frame;
+  CGFloat lex = [fa[0] doubleValue] * W, ley = [fa[1] doubleValue] * H;
+  CGFloat rex = [fa[2] doubleValue] * W, rey = [fa[3] doubleValue] * H;
+  CGFloat mox = [fa[6] doubleValue] * W, moy = [fa[7] doubleValue] * H;
+  CGFloat faceW = [fa[8] doubleValue] * W;
+  CGFloat cx = (lex + rex) / 2.0, cy = (ley + rey) / 2.0;
+  CGFloat py = cy - faceW * 0.12;
+  CGFloat margin = faceW * 0.14;
+  CGFloat ux = cx - mox, uy = cy - moy; CGFloat ul = hypot(ux, uy);
+  if (ul < 1e-3) { ux = 0; uy = -1; } else { ux /= ul; uy /= ul; }   // head "up" axis
+
+  // backlight halo (drawn first; the head covers its centre → reads as a rim).
+  CGFloat blx = cx, bly = cy - faceW * 0.32, blr = faceW * 1.9;
+  CGFloat blComps[8] = { 125/255.0, 155/255.0, 205/255.0, 0.40,  35/255.0, 55/255.0, 95/255.0, 0.0 };
+  CGFloat blLocs[2] = { 0.0, 1.0 };
+  CGGradientRef blGrad = CGGradientCreateWithColorComponents(cs, blComps, blLocs, 2);
+  if (blGrad) {
+    CGContextDrawRadialGradient(ctx, blGrad, CGPointMake(blx, bly), 0, CGPointMake(blx, bly), blr, kCGGradientDrawsAfterEndLocation);
+    CGGradientRelease(blGrad);
+  }
+
+  // shoulders — gravity-aligned bust from the chin to the bottom.
+  CGFloat chinx = mox - ux * 0.5 * faceW, chiny = moy - uy * 0.5 * faceW;
+  CGFloat neck = faceW * 0.5, shoulder = faceW * 1.7;
+  CGMutablePathRef shPath = CGPathCreateMutable();
+  CGPathMoveToPoint(shPath, NULL, chinx - neck, chiny);
+  CGPathAddQuadCurveToPoint(shPath, NULL, chinx - shoulder, chiny + faceW * 0.45, chinx - shoulder, H);
+  CGPathAddLineToPoint(shPath, NULL, chinx + shoulder, H);
+  CGPathAddQuadCurveToPoint(shPath, NULL, chinx + shoulder, chiny + faceW * 0.45, chinx + neck, chiny);
+  CGPathCloseSubpath(shPath);
+
+  // head — convex hull of the mesh, dilated outward + smoothed.
+  NSArray *mf = (i < (NSInteger)meshFramesA.count && [meshFramesA[i] isKindOfClass:[NSArray class]]) ? meshFramesA[i] : nil;
+  CGMutablePathRef headPath = NULL;
+  NSInteger mc = mf ? (NSInteger)mf.count / 2 : 0;
+  if (mc >= 3) {
+    CGPoint *pts = malloc(sizeof(CGPoint) * mc);
+    NSInteger np = 0;
+    for (NSInteger k = 0; k < mc; k++) {
+      double qxr = [mf[k*2] doubleValue], qyr = [mf[k*2+1] doubleValue];
+      if (qxr == 0 && qyr == 0) { continue; }   // missing mesh point (quantized to 0,0)
+      pts[np++] = CGPointMake(qxr / 1000.0 * W, qyr / 1000.0 * H);
+    }
+    CGPoint *hull = malloc(sizeof(CGPoint) * 2 * (mc + 1)); // monotone chain needs up to 2n during build
+    NSInteger hn = np >= 3 ? ConvexHull(pts, np, hull) : 0;
+    if (hn >= 3) {
+      CGPoint *head = malloc(sizeof(CGPoint) * hn);
+      for (NSInteger j = 0; j < hn; j++) {
+        CGFloat vx = hull[j].x - cx, vy = hull[j].y - py;
+        CGFloat sy = vy < 0 ? 1.55 : 1.25;
+        CGFloat qx = cx + vx * 1.22, qy = py + vy * sy;
+        CGFloat dvx = qx - cx, dvy = qy - py; CGFloat len = hypot(dvx, dvy); if (len < 1e-3) { len = 1; }
+        head[j] = CGPointMake(qx + dvx / len * margin, qy + dvy / len * margin);
+      }
+      headPath = CGPathCreateMutable();
+      CGPoint m0 = MidP(head[hn-1], head[0]);
+      CGPathMoveToPoint(headPath, NULL, m0.x, m0.y);
+      for (NSInteger j = 0; j < hn; j++) {
+        CGPoint cur = head[j], m = MidP(cur, head[(j+1) % hn]);
+        CGPathAddQuadCurveToPoint(headPath, NULL, cur.x, cur.y, m.x, m.y);
+      }
+      CGPathCloseSubpath(headPath);
+      free(head);
+    }
+    free(pts); free(hull);
+  }
+
+  // fills (ink) + cool rims.
+  CGContextSetRGBFillColor(ctx, 4/255.0, 6/255.0, 10/255.0, 1.0);
+  CGContextAddPath(ctx, shPath); CGContextFillPath(ctx);
+  CGContextSetRGBStrokeColor(ctx, 150/255.0, 180/255.0, 225/255.0, 0.4); CGContextSetLineWidth(ctx, 3.0);
+  CGContextAddPath(ctx, shPath); CGContextStrokePath(ctx);
+  if (headPath) {
+    CGContextSetRGBFillColor(ctx, 4/255.0, 6/255.0, 10/255.0, 1.0);
+    CGContextAddPath(ctx, headPath); CGContextFillPath(ctx);
+    CGContextSetRGBStrokeColor(ctx, 155/255.0, 185/255.0, 230/255.0, 0.5); CGContextSetLineWidth(ctx, 2.5);
+    CGContextAddPath(ctx, headPath); CGContextStrokePath(ctx);
+    CGPathRelease(headPath);
+  }
+  CGPathRelease(shPath);
+
+  CGImageRef img = CGBitmapContextCreateImage(ctx);
+  CGContextRelease(ctx); CGColorSpaceRelease(cs);
+  CIImage *ci = img ? [CIImage imageWithCGImage:img] : nil;
+  if (img) { CGImageRelease(img); }
+  return ci;
+}
+
 RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
@@ -200,8 +344,18 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
   if (frames && overlap > frames.count / 2) { overlap = frames.count / 2; }
   NSInteger loopLen = frames ? (NSInteger)frames.count - overlap : 0;
 
+  // Anonymous silhouette: a mesh track drawn natively per frame (instead of overlay PNGs). Loaded once.
+  NSDictionary *silDict = [recipe[@"silhouette"] isKindOfClass:[NSDictionary class]] ? recipe[@"silhouette"] : nil;
+  NSDictionary *silTrack = nil;
+  if (silDict) {
+    NSURL *tu = URLFromUri(silDict[@"trackFile"]);
+    NSData *jd = tu ? [NSData dataWithContentsOfURL:tu] : nil;
+    id parsed = jd ? [NSJSONSerialization JSONObjectWithData:jd options:0 error:nil] : nil;
+    if ([parsed isKindOfClass:[NSDictionary class]]) { silTrack = parsed; }
+  }
+
   AVVideoComposition *videoComp = nil;
-  if (colorMatrix || mirror || overlayCI || frames) {
+  if (colorMatrix || mirror || overlayCI || frames || silTrack) {
     videoComp = [AVVideoComposition videoCompositionWithAsset:comp
       applyingCIFiltersWithHandler:^(AVAsynchronousCIImageFilteringRequest *request) {
         CGRect extent = request.sourceImage.extent;
@@ -246,6 +400,17 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
           [over setValue:[ov imageByCroppingToRect:extent] forKey:kCIInputImageKey];
           [over setValue:out forKey:kCIInputBackgroundImageKey];
           out = over.outputImage ?: out;
+        }
+
+        // Anonymous silhouette — opaque, so it fully replaces the frame (the face never shows).
+        if (silTrack) {
+          CIImage *sil = SilhouetteImageForTime(silTrack, CMTimeGetSeconds(request.compositionTime), extent);
+          if (sil) {
+            CIFilter *over = [CIFilter filterWithName:@"CISourceOverCompositing"];
+            [over setValue:sil forKey:kCIInputImageKey];
+            [over setValue:out forKey:kCIInputBackgroundImageKey];
+            out = over.outputImage ?: out;
+          }
         }
         [request finishWithImage:[out imageByCroppingToRect:extent] context:nil];
       }];

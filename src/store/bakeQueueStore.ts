@@ -10,6 +10,7 @@ export type BakeRequest = {
   recipe: OverlayRecipe | null;
   durationSec: number;
   voiceMod: 'deep' | null;
+  fps?: number;
   resolve: (uri: string) => void;
   reject: (e: unknown) => void;
 };
@@ -17,7 +18,7 @@ export type BakeRequest = {
 interface BakeQueueState {
   queue: BakeRequest[];
   /** Enqueue a bake; resolves with the baked file uri (or rejects). Processed by BakeQueueHost. */
-  requestBake: (opts: { sourceUri: string; recipe: OverlayRecipe | null; durationSec: number; voiceMod: 'deep' | null }) => Promise<string>;
+  requestBake: (opts: { sourceUri: string; recipe: OverlayRecipe | null; durationSec: number; voiceMod: 'deep' | null; fps?: number }) => Promise<string>;
   /** Remove a finished request from the queue (called by the host). */
   complete: (id: string) => void;
 }
