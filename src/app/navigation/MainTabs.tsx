@@ -15,9 +15,12 @@ import ChannelsNavigator from './ChannelsStack';
 import { screenLayout, GRADIENT_DARK } from '../../components/ScreenGradient';
 
 import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
+import FriendConversationScreen from '../../features/feed/screens/FriendConversationScreen';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
 import WatchReactionScreen from '../../features/threads/screens/WatchReactionScreen';
 import WatchReviewScreen from '../../features/channels/screens/WatchReviewScreen';
+import ChannelVideoRecordScreen from '../../features/channels/screens/ChannelVideoRecordScreen';
+import WatchChannelClipScreen from '../../features/channels/screens/WatchChannelClipScreen';
 import GiftRevealScreen from '../../features/exclusive/screens/GiftRevealScreen';
 import ExclusiveCollectionScreen from '../../features/exclusive/screens/ExclusiveCollectionScreen';
 import ExclusiveWatchScreen from '../../features/exclusive/screens/ExclusiveWatchScreen';
@@ -68,9 +71,12 @@ function FeedNavigator() {
   return (
     <FeedStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <FeedStack.Screen name="FeedHome" component={FeedHomeScreen} options={{ headerShown: false }} />
+      <FeedStack.Screen name="FriendConversation" component={FriendConversationScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
       <FeedStack.Screen name="WatchReview" component={WatchReviewScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <FeedStack.Screen name="ChannelVideoRecord" component={ChannelVideoRecordScreen as any} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <FeedStack.Screen name="WatchChannelClip" component={WatchChannelClipScreen as any} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
       <FeedStack.Screen name="GiftReveal" component={GiftRevealScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
       <FeedStack.Screen name="ExclusiveCollection" component={ExclusiveCollectionScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="ExclusiveWatch" component={ExclusiveWatchScreen} options={{ headerShown: false }} />

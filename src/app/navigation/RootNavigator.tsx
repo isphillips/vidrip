@@ -22,7 +22,6 @@ import {
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import StudioStack from './StudioStack';
-import { MessagesNavigator } from './ChannelsStack';
 import ProfileDrawer from '../../components/ProfileDrawer';
 import ProfileReactionPlayer from '../../components/ProfileReactionPlayer';
 import MfaChallengeScreen from '../../features/auth/screens/MfaChallengeScreen';
@@ -284,11 +283,6 @@ export default function RootNavigator() {
                 name="Studio"
                 component={StudioStack}
                 options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-              />
-              <Root.Screen
-                name="Messages"
-                component={MessagesNavigator}
-                options={{ animation: 'slide_from_right' }}
               />
               <Root.Screen
                 name="RecordReaction"

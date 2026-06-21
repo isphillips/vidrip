@@ -39,12 +39,6 @@ export type ChannelsStackParamList = {
 export type ChannelsStackScreenProps<T extends keyof ChannelsStackParamList> =
   NativeStackScreenProps<ChannelsStackParamList, T>;
 
-// The Messages stack reuses every channel screen (so a private-chat conversation
-// behaves like any channel) with the chat list as its root instead of ChannelsHome.
-export type MessagesStackParamList = Omit<ChannelsStackParamList, 'ChannelsHome'> & {
-  MessagesList: undefined;
-};
-
 export type AccountStackParamList = {
   AccountHome: undefined;
   EditProfile: undefined;
@@ -57,9 +51,22 @@ export type AccountStackParamList = {
 // Feed stack
 export type FeedStackParamList = {
   FeedHome: undefined;
+  // Messenger-style merged timeline with one friend (video shares + reactions + DM).
+  FriendConversation: {
+    friendUserId: string;
+    displayName?: string;
+    handle?: string;
+    avatarUrl?: string | null;
+    dmChannelId?: string | null;
+    threadIds?: string[];
+  };
   Thread: { threadId: string };
   WatchReaction: { reactionId: string };
   WatchReview: { reviewId: string };
+  // Reused channel screens, registered in the Feed stack so composing/playing a DM
+  // clip from a friend conversation stays in-stack (back returns to the conversation).
+  ChannelVideoRecord: { channelId: string };
+  WatchChannelClip: { postId: string };
   GiftReveal: { awardId: string };
   ExclusiveCollection: { collectionId: string };
   ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null };
@@ -113,7 +120,6 @@ export type StudioStackScreenProps<T extends keyof StudioStackParamList> =
 export type RootStackParamList = {
   Main: undefined;
   Studio: undefined;
-  Messages: undefined;
   RecordReaction: RecordStackParamList['RecordReaction'];
   RecordComment: {
     rootSourceId: string;

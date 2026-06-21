@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import Handle from '../../../components/Handle';
+import ExclusiveGlow from '../../../components/conversation/ExclusiveGlow';
+import { rowStateStyle, type RowState } from '../../../components/conversation/useRowState';
 import type { ChannelSummary } from '../../../infrastructure/supabase/queries/channels';
 
 type Props = {
@@ -14,12 +16,17 @@ type Props = {
   // badges are shown so the owner can flip them inline.
   onToggleListed?: () => void;
   onToggleInviteOnly?: () => void;
+  // Shared visual-state language (teal unread / grey caught-up / gold exclusive),
+  // matching the Feed conversation rows. Omitted → no state treatment.
+  state?: RowState;
+  exclusiveGlow?: boolean;
 };
 
 export default function ChannelCard({
   channel, userId, onPress, onAcceptInvite, onDeclineInvite,
-  onToggleListed, onToggleInviteOnly,
+  onToggleListed, onToggleInviteOnly, state, exclusiveGlow = false,
 }: Props) {
+  const stateStyle = state ? rowStateStyle(state, exclusiveGlow).container : null;
   const isOwner = !!userId && channel.created_by === userId;
   const showOwnerControls = !!onToggleListed && !!onToggleInviteOnly;
   const listed = channel.is_listed ?? channel.is_public;
@@ -30,7 +37,8 @@ export default function ChannelCard({
   // dedicated Vidrip profile image is added — not the provider avatar.
   const initial = (channel.name || '?').replace(/^@/, '').charAt(0).toUpperCase() || '?';
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+    <ExclusiveGlow active={exclusiveGlow}>
+    <TouchableOpacity style={[styles.card, stateStyle]} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.body}>
         {channel.is_members_only ? (
           channel.owner?.avatar_url ? (
@@ -123,6 +131,7 @@ export default function ChannelCard({
         )}
       </View>
     </TouchableOpacity>
+    </ExclusiveGlow>
   );
 }
 

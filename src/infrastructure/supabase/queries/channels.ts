@@ -357,6 +357,34 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
   });
 }
 
+// Maps each given (private/DM) channel id → the OTHER member's user id, for the
+// per-friend Feed grouping. 1:1 DMs have exactly two members; channels with a single
+// resolvable peer are returned, group (3+) channels are skipped (no single friend).
+export async function fetchPrivateChannelPeers(
+  userId: string,
+  channelIds: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (channelIds.length === 0) { return map; }
+  const { data, error } = await (supabase as any)
+    .from('group_members')
+    .select('group_id, user_id')
+    .in('group_id', channelIds);
+  if (error) { return map; }
+
+  // group_id → set of member ids (excluding me)
+  const peers = new Map<string, Set<string>>();
+  for (const row of (data ?? [])) {
+    if (row.user_id === userId) { continue; }
+    if (!peers.has(row.group_id)) { peers.set(row.group_id, new Set()); }
+    peers.get(row.group_id)!.add(row.user_id);
+  }
+  for (const [groupId, members] of peers) {
+    if (members.size === 1) { map.set(groupId, [...members][0]); }
+  }
+  return map;
+}
+
 export async function markChannelAsRead(channelId: string): Promise<void> {
   await (supabase as any)
     .from('group_members')

@@ -2,10 +2,9 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { C } from '../../theme';
 import { screenLayout, GRADIENT_DARK } from '../../components/ScreenGradient';
-import type { ChannelsStackParamList, MessagesStackParamList } from './types';
+import type { ChannelsStackParamList } from './types';
 
 import ChannelsHomeScreen from '../../features/channels/screens/ChannelsHomeScreen';
-import PrivateChatsScreen from '../../features/channels/screens/PrivateChatsScreen';
 import ChannelScreen from '../../features/channels/screens/ChannelScreen';
 import ChannelPostScreen from '../../features/channels/screens/ChannelPostScreen';
 import WatchYouTubePostScreen from '../../features/channels/screens/WatchYouTubePostScreen';
@@ -62,18 +61,5 @@ export default function ChannelsNavigator() {
       <Stack.Screen name="ChannelsHome" component={ChannelsHomeScreen} options={{ headerShown: false }} />
       {channelScreens(Stack)}
     </Stack.Navigator>
-  );
-}
-
-const MStack = createNativeStackNavigator<MessagesStackParamList>();
-
-// Root-level Messages stack: the chat list, then conversations pushed on top so
-// back returns to the list, and backing out of the list returns to the origin.
-export function MessagesNavigator() {
-  return (
-    <MStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
-      <MStack.Screen name="MessagesList" component={PrivateChatsScreen} options={{ headerShown: false }} />
-      {channelScreens(MStack)}
-    </MStack.Navigator>
   );
 }

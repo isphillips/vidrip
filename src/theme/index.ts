@@ -31,6 +31,13 @@ export const C = {
   GOLD: '#e056fd',
   GOLD_DIM: '#71368a',
 
+  // True gold/yellow — exclusive-drop glow (the GOLD above is actually magenta).
+  GOLD_REAL: '#FFD24A',
+  GOLD_REAL_DIM: '#8a6a14',
+
+  // Light purple — "read but not yet responded" row outline.
+  ACCENT_OUTLINE: '#b388ff',
+
   // Status
   SUCCESS: '#22C55E',
   DANGER: '#16e0d5',

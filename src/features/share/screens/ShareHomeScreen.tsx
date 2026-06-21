@@ -36,7 +36,6 @@ import { fetchSyncedAccounts } from '../../../infrastructure/supabase/queries/sy
 import { fetchRecommended, refreshRecommended, RECOMMENDED_COOLDOWN_MS } from '../../../infrastructure/supabase/queries/recommended';
 import { fetchFriendsTrending, fetchPersonalizedShorts, fetchTrending } from '../../../infrastructure/supabase/queries/personalized';
 import { useAuthStore } from '../../../store/authStore';
-import MailboxButton from '../../channels/components/MailboxButton';
 import VideoCommentsSheet from '../../comments/components/VideoCommentsSheet';
 import type { ShareStackScreenProps, RootStackParamList } from '../../../app/navigation/types';
 
@@ -941,7 +940,6 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               <Ionicons name={searchOpen ? 'close' : 'search'} size={22} color={C.INK} />
             </TouchableOpacity>
           )}
-          <MailboxButton />
         </View>
       </View>
 

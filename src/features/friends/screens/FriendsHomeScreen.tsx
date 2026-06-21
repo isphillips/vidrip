@@ -14,7 +14,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, Easing as ReEasing } from 'react-native-reanimated';
 import GradientButton from '../../studio/components/GradientButton';
-import MailboxButton from '../../channels/components/MailboxButton';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Handle from '../../../components/Handle';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
@@ -166,7 +165,6 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
         <Text style={styles.title}>Friends</Text>
         <View style={styles.headerActions}>
           <MorphPlus active={addActive} onPress={openAddFriend} />
-          <MailboxButton />
         </View>
       </View>
 
