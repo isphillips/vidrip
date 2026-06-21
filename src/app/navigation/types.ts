@@ -21,7 +21,7 @@ export type MainTabParamList = {
 // Channels stack
 export type ChannelsStackParamList = {
   ChannelsHome: undefined;
-  Channel: { channelId: string; channelName: string; isPublic: boolean; isJoined: boolean; isOwner: boolean; isMembersOnly?: boolean; inviteOnly?: boolean; ownerHandle?: string; justSubscribed?: boolean };
+  Channel: { channelId: string; channelName: string; isPublic: boolean; isJoined: boolean; isOwner: boolean; isMembersOnly?: boolean; inviteOnly?: boolean; ownerHandle?: string; justSubscribed?: boolean; isGroupChat?: boolean };
   InviteToChannel: { channelId: string; channelName: string };
   ChannelPost: { postId: string; channelId: string; isJoined: boolean };
   WatchYouTubePost: { postId: string; channelId: string };
@@ -64,9 +64,11 @@ export type FeedStackParamList = {
   WatchReaction: { reactionId: string };
   WatchReview: { reviewId: string };
   // Reused channel screens, registered in the Feed stack so composing/playing a DM
-  // clip from a friend conversation stays in-stack (back returns to the conversation).
+  // clip, or opening/creating a group chat, stays in-stack.
   ChannelVideoRecord: { channelId: string };
   WatchChannelClip: { postId: string };
+  CreateGroupChat: undefined;
+  Channel: { channelId: string; channelName: string; isPublic: boolean; isJoined: boolean; isOwner: boolean; isMembersOnly?: boolean; inviteOnly?: boolean; ownerHandle?: string; justSubscribed?: boolean; isGroupChat?: boolean };
   GiftReveal: { awardId: string };
   ExclusiveCollection: { collectionId: string };
   ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null };

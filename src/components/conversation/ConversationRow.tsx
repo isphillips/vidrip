@@ -18,6 +18,7 @@ export type ConversationRowProps = {
   exclusiveGlow?: boolean;
   thumbnail?: string | null;
   onPress: () => void;
+  onLongPress?: () => void;
   // Optional trailing slot (e.g. invite Accept/Decline) rendered in place of the thumbnail.
   trailing?: React.ReactNode;
 };
@@ -32,16 +33,22 @@ export default function ConversationRow({
   exclusiveGlow = false,
   thumbnail,
   onPress,
+  onLongPress,
   trailing,
 }: ConversationRowProps) {
   const s = rowStateStyle(state, exclusiveGlow);
   const showBadge = unreadCount > 0 && (s.badge != null || exclusiveGlow);
+  // Caught-up friends keep full opacity (the dim treatment read too dark in the Feed);
+  // the unread/unreplied accent borders still distinguish active conversations.
+  const container = { ...s.container, opacity: 1 };
 
   return (
     <ExclusiveGlow active={exclusiveGlow}>
       <TouchableOpacity
-        style={[styles.card, s.container]}
+        style={[styles.card, container]}
         onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={350}
         activeOpacity={0.85}>
         <View style={styles.body}>
           <View>

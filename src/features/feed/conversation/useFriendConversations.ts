@@ -8,7 +8,9 @@ import {
   fetchPrivateChannels, fetchPrivateChannelPeers, type ChannelSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
-import { buildFriendConversations, type FriendConversation } from './friendConversation';
+import {
+  buildFriendConversations, buildGroupConversations, mergeFeedItems, type FeedItem,
+} from './friendConversation';
 
 const HIDDEN_KEY = 'vidrip_hidden_threads';
 
@@ -50,19 +52,20 @@ export function useFriendConversations() {
 
   const refresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
 
-  const conversations = useMemo<FriendConversation[]>(() => {
+  const items = useMemo<FeedItem[]>(() => {
     if (!user) { return []; }
-    return buildFriendConversations({
+    const friendConvos = buildFriendConversations({
       friends, threads, dmChannels, peerByChannel,
       myId: user.id, blocked, hidden,
     });
+    return mergeFeedItems(friendConvos, buildGroupConversations(dmChannels));
   }, [friends, threads, dmChannels, peerByChannel, user, blocked, hidden]);
 
-  // Total threads still needing my reaction — drives the bottom-tab Feed badge.
+  // Total items still needing my attention — drives the bottom-tab Feed badge.
   const toReactCount = useMemo(
-    () => conversations.reduce((n, c) => n + c.unreadCount, 0),
-    [conversations],
+    () => items.reduce((n, it) => n + (it.kind === 'friend' ? it.conv.unreadCount : it.group.unreadCount), 0),
+    [items],
   );
 
-  return { conversations, toReactCount, loading, refreshing, refresh };
+  return { items, toReactCount, loading, refreshing, refresh };
 }

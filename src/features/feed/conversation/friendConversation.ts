@@ -78,8 +78,10 @@ export function buildFriendConversations({
     else if (t.my_status !== 'reacted') { tl.unreplied += 1; } // seen but not reacted
   }
 
-  // Fold 1:1 DM channels, mapped to their friend via the peer map.
+  // Fold 1:1 DM channels, mapped to their friend via the peer map. Group chats are
+  // their own thing (handled by buildGroupConversations), never a friend conversation.
   for (const c of dmChannels) {
+    if (c.is_group_chat) { continue; }
     const friendId = peerByChannel.get(c.id);
     if (!friendId) { continue; }              // group (3+) or unresolved → skip
     const conv = map.get(friendId);
@@ -111,5 +113,52 @@ export function buildFriendConversations({
   return [...map.values()].sort((a, b) => {
     if (a.lastActivityAt !== b.lastActivityAt) { return b.lastActivityAt - a.lastActivityAt; }
     return a.displayName.localeCompare(b.displayName);
+  });
+}
+
+// A friends group chat (private channel with 3+ members). These are the DM channels NOT
+// resolved to a single 1:1 peer. Auto-named by participants (DB trigger).
+export type GroupConversation = {
+  channelId: string;
+  name: string;
+  memberCount: number;
+  lastActivityAt: number;
+  unreadCount: number;
+  state: RowState;
+};
+
+export function buildGroupConversations(
+  dmChannels: ChannelSummary[],
+): GroupConversation[] {
+  return dmChannels
+    .filter(c => c.is_group_chat === true) // group chats are explicitly flagged
+    .map(c => ({
+      channelId: c.id,
+      name: c.name || 'Group chat',
+      memberCount: c.member_count,
+      lastActivityAt: c.last_message_at ? Date.parse(c.last_message_at) || 0 : 0,
+      unreadCount: c.unread_count,
+      state: (c.unread_count > 0 ? 'unread' : 'caughtup') as RowState,
+    }))
+    .sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+}
+
+// Unified, recency-sorted Feed list item: a per-friend conversation or a group chat.
+export type FeedItem =
+  | { kind: 'friend'; sortAt: number; conv: FriendConversation }
+  | { kind: 'group'; sortAt: number; group: GroupConversation };
+
+export function mergeFeedItems(
+  friends: FriendConversation[],
+  groups: GroupConversation[],
+): FeedItem[] {
+  const items: FeedItem[] = [
+    ...friends.map(c => ({ kind: 'friend' as const, sortAt: c.lastActivityAt, conv: c })),
+    ...groups.map(g => ({ kind: 'group' as const, sortAt: g.lastActivityAt, group: g })),
+  ];
+  return items.sort((a, b) => {
+    if (a.sortAt !== b.sortAt) { return b.sortAt - a.sortAt; }
+    // Stable-ish tiebreak: friends with no activity after groups with no activity.
+    return a.kind === b.kind ? 0 : a.kind === 'group' ? -1 : 1;
   });
 }

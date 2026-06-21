@@ -11,6 +11,7 @@ import {
   fetchPublicChannels,
   fetchMembersOnlyChannels,
   fetchSubscribedChannels,
+  fetchPrivateChannels,
   acceptChannelInvite,
   declineChannelInvite,
   setChannelPublic,
@@ -18,8 +19,28 @@ import {
   type ChannelSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 import ChannelCard from '../components/ChannelCard';
+import ConversationRow from '../../../components/conversation/ConversationRow';
 import type { RowState } from '../../../components/conversation/useRowState';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
+
+// A private channel as shown in the Channels list — a multi-member private channel that
+// is NOT a group chat (group chats live in the Feed) and NOT a 1:1 DM (those are friend
+// conversations in the Feed).
+type PrivateChannelRow = {
+  id: string; name: string; memberCount: number; unread: number; state: RowState; lastAt: number;
+};
+const privateChannelRows = (channels: ChannelSummary[]): PrivateChannelRow[] =>
+  channels
+    .filter(c => c.is_group_chat !== true && c.member_count >= 3)
+    .map(c => ({
+      id: c.id,
+      name: c.name || 'Private channel',
+      memberCount: c.member_count,
+      unread: c.unread_count,
+      state: (c.unread_count > 0 ? 'unread' : 'caughtup') as RowState,
+      lastAt: c.last_message_at ? Date.parse(c.last_message_at) || 0 : 0,
+    }))
+    .sort((a, b) => b.lastAt - a.lastAt);
 
 // One unified, recency-sorted activity list for every channel the user can act on —
 // curated public, members-only, subscribed, and owned. The old Public/Exclusive
@@ -34,6 +55,7 @@ export default function ChannelsHomeScreen({
   const [publicChannels, setPublicChannels] = useState<ChannelSummary[]>([]);
   const [membersOnly, setMembersOnly] = useState<ChannelSummary[]>([]);
   const [subscribed, setSubscribed] = useState<ChannelSummary[]>([]);
+  const [privateChannels, setPrivateChannels] = useState<PrivateChannelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -41,14 +63,16 @@ export default function ChannelsHomeScreen({
     if (!user) { return; }
     if (!silent) { setLoading(true); }
     try {
-      const [pub, mo, subd] = await Promise.all([
+      const [pub, mo, subd, dm] = await Promise.all([
         fetchPublicChannels(user.id).catch(() => []),
         fetchMembersOnlyChannels(user.id).catch(() => []),
         fetchSubscribedChannels(user.id).catch(() => []),
+        fetchPrivateChannels(user.id).catch(() => []),
       ]);
       setPublicChannels(pub);
       setMembersOnly(mo);
       setSubscribed(subd);
+      setPrivateChannels(privateChannelRows(dm));
     } catch (e) {
       console.error('[ChannelsHome] load error:', JSON.stringify(e));
     } finally {
@@ -139,6 +163,30 @@ export default function ChannelsHomeScreen({
     });
   }, [publicChannels, membersOnly, subscribed]);
 
+  const privateHeader = privateChannels.length > 0 ? (
+    <View style={styles.privateSection}>
+      {privateChannels.map(p => (
+        <ConversationRow
+          key={p.id}
+          avatarUrl={null}
+          fallbackInitial="🔒"
+          title={p.name}
+          subtitle={p.unread > 0 ? `${p.unread} new` : 'Caught up'}
+          unreadCount={p.unread}
+          state={p.state}
+          onPress={() => navigation.navigate('Channel', {
+            channelId: p.id,
+            channelName: p.name,
+            isPublic: false,
+            isJoined: true,
+            isOwner: false,
+            isMembersOnly: false,
+          })}
+        />
+      ))}
+    </View>
+  ) : null;
+
   return (
     <View style={[styles.container, { paddingTop: top }]}>
       <View style={styles.header}>
@@ -151,6 +199,7 @@ export default function ChannelsHomeScreen({
         <FlatList
           data={data}
           keyExtractor={c => c.id}
+          ListHeaderComponent={privateHeader}
           renderItem={({ item }) => {
             const isOwner = item.created_by === user?.id;
             const isPendingInvite = !!item.invite_only && item.invite_status === 'pending';
@@ -176,13 +225,15 @@ export default function ChannelsHomeScreen({
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.ACCENT_HOT} />
           }
           ListEmptyComponent={
-            <View style={styles.center}>
-              <Text style={styles.emptyText}>
-                No channels yet. Browse and join a channel to see its activity here.
-              </Text>
-            </View>
+            privateChannels.length > 0 ? null : (
+              <View style={styles.center}>
+                <Text style={styles.emptyText}>
+                  No channels yet. Browse and join a channel to see its activity here.
+                </Text>
+              </View>
+            )
           }
-          contentContainerStyle={data.length === 0 ? styles.emptyContainer : styles.listContent}
+          contentContainerStyle={data.length === 0 && privateChannels.length === 0 ? styles.emptyContainer : styles.listContent}
         />
       )}
     </View>
@@ -200,6 +251,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: SPACE.SM,
   },
+  privateSection: { borderBottomWidth: 1, borderBottomColor: C.BORDER_STRONG },
   listContent: { paddingTop: SPACE.SM },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACE.XL },
   emptyContainer: { flexGrow: 1 },

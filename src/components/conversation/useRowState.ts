@@ -43,8 +43,10 @@ export function rowStateStyle(state: RowState, exclusiveGlow = false): RowStateS
       };
     case 'caughtup':
     default:
+      // Caught-up rows keep full brightness (the dim read too dark in both lists); the
+      // teal/purple accent borders on active rows are enough to distinguish them.
       return {
-        container: { opacity: 0.55, borderLeftWidth: 3, borderLeftColor: 'transparent' },
+        container: { opacity: 1, borderLeftWidth: 3, borderLeftColor: 'transparent' },
         badge: null,
         badgeBg: null,
       };
