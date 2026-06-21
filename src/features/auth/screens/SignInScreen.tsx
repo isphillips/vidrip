@@ -10,12 +10,11 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
 import type { AuthStackScreenProps } from '../../../app/navigation/types';
 import SlimeWelcome from '../components/SlimeWelcome';
+import SlimeMail from '../components/SlimeMail';
 import GradientButton from '../../studio/components/GradientButton';
 
 type Mode = 'magic' | 'password';
@@ -68,13 +67,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
   if (sent) {
     return (
       <View style={[styles.container, styles.sentContainer]}>
-        <LinearGradient
-          colors={['#e056fd', '#8b22a5', '#16e0d5']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.sentBadge}>
-          <Ionicons name="mail-outline" size={42} color={C.WHITE} />
-        </LinearGradient>
+        <SlimeMail />
         <Text style={styles.sentTitle}>Check your email</Text>
         <Text style={styles.sentSubtitle}>
           We sent a magic link to{'\n'}
@@ -253,20 +246,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: SPACE.XL,
-  },
-  sentBadge: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACE.XL,
-    // brand glow
-    shadowColor: C.ACCENT_HOT,
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
   },
   sentTitle: {
     fontSize: FONT.SIZES.XXXL,

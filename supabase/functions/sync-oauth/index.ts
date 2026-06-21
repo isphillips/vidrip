@@ -18,7 +18,8 @@ const FACEBOOK_APP_SECRET = (Deno.env.get("FACEBOOK_APP_SECRET") ?? "").trim();
 
 // Must exactly match the redirect_uri used in the authorize request
 // (src/infrastructure/oauth/config.ts) and registered in each provider console.
-const REDIRECT_URI = "https://ltpscwticavqutbzrrjb.supabase.co/functions/v1/oauth-callback";
+// Served by the Cloudflare Pages Function at web/functions/api/oauth-callback.ts.
+const REDIRECT_URI = "https://vidrip.app/api/oauth-callback";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -87,12 +88,14 @@ async function tiktokExchange(code: string) {
 
 async function tiktokProfileAndVideos(accessToken: string): Promise<{ profile: Profile; videos: Video[] }> {
   const h = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+  // `username` is intentionally NOT requested — it needs the user.info.profile scope, which
+  // we dropped. display_name (from user.info.basic) covers the account label, so handle is "".
   const uRes = await fetch(
-    "https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,username", { headers: h });
+    "https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name", { headers: h });
   const u = (await uRes.json()).data?.user ?? {};
   const profile: Profile = {
     accountId: u.open_id ?? "",
-    handle: u.username ?? "",
+    handle: "",
     displayName: u.display_name ?? "",
     avatar: u.avatar_url ?? null,
   };

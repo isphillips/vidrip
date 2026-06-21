@@ -7,15 +7,16 @@ export type SyncProvider = 'youtube' | 'tiktok' | 'instagram' | 'facebook';
 // 'feed'    = pulls the user's personal feed (e.g. Liked Videos) into "For You".
 export type ConnectionType = 'creator' | 'feed';
 
-// TikTok/Google require an https redirect (custom schemes rejected). The app's
-// OAuth WebView intercepts navigation to this URL to extract the code — it
-// never actually loads, so the URL only needs to be registered, not served.
-// Register this exact value in BOTH the TikTok and Google consoles.
-export const REDIRECT_URI =
-  'https://ltpscwticavqutbzrrjb.supabase.co/functions/v1/oauth-callback';
+// Providers require an https redirect (custom schemes rejected) and block OAuth in embedded
+// WebViews, so auth runs in the system browser and redirects here. This is a real endpoint —
+// a Cloudflare Pages Function on vidrip.app (web/functions/api/oauth-callback.ts) that 302s
+// back into the app via reaxn://. Served natively on vidrip.app (NOT proxied to Supabase,
+// which is itself on Cloudflare and rejects the loop). Register this exact value in the
+// Google + TikTok (+ Meta) consoles, and keep it in sync with sync-oauth's REDIRECT_URI.
+export const REDIRECT_URI = 'https://vidrip.app/api/oauth-callback';
 
 // TODO: fill from Google Cloud Console (OAuth 2.0 Client ID, iOS/Web).
-export const GOOGLE_CLIENT_ID = '1028980678970-ea99v2h8kmli81rangil85dfqoqui459.apps.googleusercontent.com';
+export const GOOGLE_CLIENT_ID = '571633447038-jf3jkapo7drtmfrefb2kut1etmh5pa05.apps.googleusercontent.com';
 // TODO: fill from TikTok developer portal (Client key).
 export const TIKTOK_CLIENT_KEY = 'sbawbp2z1skyo0obdt';
 // Instagram App ID (public) for "Instagram API with Instagram Login" — the creator
@@ -31,7 +32,10 @@ export const FACEBOOK_APP_ID = '1590496342638743';
 export const FACEBOOK_GRAPH_VERSION = 'v21.0';
 
 const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
-const TIKTOK_SCOPE = 'user.info.basic,user.info.profile,video.list';
+// Only user.info.basic + video.list. We deliberately omit user.info.profile: it solely
+// (→ @handle), which display_name already covers — so dropping it keeps
+// the TikTok app-review scope surface minimal.
+const TIKTOK_SCOPE = 'user.info.basic,video.list';
 // Instagram API with Instagram Login — read the creator's own profile + media
 // (Reels) straight from their Instagram Business/Creator account.
 const INSTAGRAM_SCOPE = 'instagram_business_basic';

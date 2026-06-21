@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useFocusEffect } from '@react-navigation/native';
 import { C } from '../../theme';
 import MainTabBar from './MainTabBar';
 import { useAuthStore } from '../../store/authStore';
-import { fetchCanCreate } from '../../infrastructure/creatorStudio/api';
 import type {
   MainTabParamList,
   FeedStackParamList,
@@ -114,17 +112,8 @@ function AccountNavigator() {
 }
 
 export default function MainTabs() {
-  const { user } = useAuthStore();
-  const [canCreate, setCanCreate] = useState(false);
+  const [canCreate, _setCanCreate] = useState(true);
   const toReact = useFeedStore(s => s.toReactCount);
-
-  // The studio flag gates the center Create FAB + the Studio nav treatment. Refetch
-  // on focus so an admin grant shows up without a full restart.
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.id) { fetchCanCreate(user.id).then(setCanCreate).catch(() => {}); }
-    }, [user?.id]),
-  );
 
   return (
     <Tab.Navigator

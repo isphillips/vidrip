@@ -54,19 +54,29 @@ export default function GradientButton({
     );
   }
 
+  // Solid: gradient is an absolute-fill BACKGROUND; the label/icon sit in a sibling layer ON TOP —
+  // NOT nested inside the LinearGradient. react-native-linear-gradient can measure late/zero during
+  // native-stack transitions and re-renders, and when it does it CLIPS its children — which hid the
+  // words and kept the icon from coming back on the loading→idle swap. Decoupling keeps the content
+  // laid out regardless of the gradient's measurement. Mirrors ScreenGradient + the outline variant.
   return (
     <TouchableOpacity onPress={onPress} disabled={dim} activeOpacity={0.85} style={style}>
-      <LinearGradient
-        colors={BRAND} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={[styles.btn, dim && styles.btnDisabled]}>
+      <View style={[styles.btn, dim && styles.btnDisabled]}>
+        <LinearGradient
+          colors={BRAND} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
         {content}
-      </LinearGradient>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  btn:          { borderRadius: RADIUS.MD, alignItems: 'center', justifyContent: 'center' },
+  // overflow:hidden clips the absolute-fill gradient to the rounded corners. backgroundColor is a
+  // solid mid-brand fallback behind it: react-native-linear-gradient may not paint during native-stack
+  // transitions, so without it the button flashes blank — the opaque gradient covers it once it draws.
+  btn:          { borderRadius: RADIUS.MD, alignItems: 'center', justifyContent: 'center', backgroundColor: BRAND[1], overflow: 'hidden' },
   outlineWrap:  { borderRadius: RADIUS.MD, alignItems: 'center', justifyContent: 'center' },
   // Mask: opaque rounded border (shows the gradient) around a transparent centre (hides it).
   ring:         { flex: 1, borderRadius: RADIUS.MD, borderWidth: 1.5, borderColor: '#000', backgroundColor: 'transparent' },

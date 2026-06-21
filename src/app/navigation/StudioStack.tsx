@@ -1,7 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { C } from '../../theme';
-import { screenLayout } from '../../components/ScreenGradient';
+import { screenLayout, GRADIENT_DARK } from '../../components/ScreenGradient';
 import type { StudioStackParamList } from './types';
 import StudioHomeScreen from '../../features/studio/screens/StudioHomeScreen';
 import StudioCaptureScreen from '../../features/studio/screens/StudioCaptureScreen';
@@ -18,7 +17,7 @@ const Stack = createNativeStackNavigator<StudioStackParamList>();
 export default function StudioStack() {
   return (
     <Stack.Navigator
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.BG } }}
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: GRADIENT_DARK[1] } }}
       screenLayout={screenLayout}>
       <Stack.Screen name="StudioHome" component={StudioHomeScreen} />
       <Stack.Screen name="StudioCapture" component={StudioCaptureScreen} options={{ animation: 'slide_from_bottom' }} />

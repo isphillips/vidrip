@@ -6,7 +6,7 @@ import EnterInviteCodeScreen from '../../features/auth/screens/EnterInviteCodeSc
 import CreateProfileScreen from '../../features/auth/screens/CreateProfileScreen';
 import type { AuthStackParamList } from './types';
 import { C } from '../../theme';
-import { screenLayout } from '../../components/ScreenGradient';
+import { screenLayout, GRADIENT_DARK } from '../../components/ScreenGradient';
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -15,11 +15,15 @@ export default function AuthStack() {
     <Stack.Navigator
       screenLayout={screenLayout}
       screenOptions={{
-        headerStyle: { backgroundColor: C.BG },
+        // Opaque dark header/content (gradient's top/second tone), NOT transparent. A
+        // transparent bar makes iOS render its light translucent material for a frame
+        // during the push — that's the back-button "white flash" on SignIn. Mirrors the
+        // MainTabs / ChannelsStack navigators.
+        headerStyle: { backgroundColor: GRADIENT_DARK[0] },
         headerTintColor: C.INK,
         headerShadowVisible: false,
         headerBackTitleVisible: false,
-        contentStyle: { backgroundColor: C.BG },
+        contentStyle: { backgroundColor: GRADIENT_DARK[1] },
       }}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: '' }} />
