@@ -27,16 +27,10 @@ const ICONS = {
   Feed: require('../../assets/icon-feed.png'),
   Channels: require('../../assets/icon-channels.png'),
   Share: require('../../assets/icon-share.png'),
+  Messages: require('../../assets/icon-friends.png'), // placeholder image (bottom slimes draw the glyph, not this)
   Friends: require('../../assets/icon-friends.png'),
   Account: require('../../assets/icon-account.png'),
 };
-
-// Primary buttons shown directly in the bar (Browse = the 'Share' route).
-const PRIMARY: { route: keyof typeof ICONS; label: string }[] = [
-  { route: 'Feed', label: 'Feed' },
-  { route: 'Channels', label: 'Channels' },
-  { route: 'Share', label: 'Browse' },
-];
 
 // Each tab is the same little slime friend — uniform + muted when idle, lit up in its own neon colour
 // with a "kind" topper glyph when selected. Each has its OWN body shape (proportions + corner radii) so
@@ -45,6 +39,7 @@ const IDLE_SLIME = '#9486AE';
 const TAB_THEME: Record<keyof typeof ICONS, { glyph: string; neon: string; shape: ViewStyle }> = {
   Feed:     { glyph: 'sparkles', neon: '#FF4FA3', shape: { width: 18, height: 18, borderTopLeftRadius: 11, borderTopRightRadius: 11, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 } },     // tall + round
   Channels: { glyph: 'grid',     neon: '#A05CFF', shape: { width: 23, height: 14, borderTopLeftRadius: 8,  borderTopRightRadius: 8,  borderBottomLeftRadius: 6, borderBottomRightRadius: 6 } },     // wide + squat
+  Messages: { glyph: 'mail',     neon: '#FF6A00', shape: { width: 20, height: 17, borderTopLeftRadius: 10, borderTopRightRadius: 10, borderBottomLeftRadius: 7, borderBottomRightRadius: 9 } },     // neon-orange postman
   Share:    { glyph: 'compass',  neon: '#2DD4BF', shape: { width: 19, height: 18, borderTopLeftRadius: 10, borderTopRightRadius: 10, borderBottomLeftRadius: 9, borderBottomRightRadius: 9 } },     // round
   Friends:  { glyph: 'heart',    neon: '#e056fd', shape: { width: 21, height: 16, borderTopLeftRadius: 13, borderTopRightRadius: 7,  borderBottomLeftRadius: 9, borderBottomRightRadius: 7 } },     // lopsided
   Account:  { glyph: 'star',     neon: '#FFD86B', shape: { width: 18, height: 18, borderTopLeftRadius: 9,  borderTopRightRadius: 9,  borderBottomLeftRadius: 9, borderBottomRightRadius: 5 } },     // tilted droplet
@@ -71,7 +66,7 @@ function Bubble({ burst, x, size, delay, color }: { burst: SharedValue<number>; 
 
 // Each slime blinks on its own cadence so the five never blink in unison.
 const BLINK_GAP: Record<keyof typeof ICONS, number> = {
-  Feed: 2600, Channels: 3400, Share: 4200, Friends: 3000, Account: 3800,
+  Feed: 2600, Channels: 3400, Messages: 3600, Share: 4200, Friends: 3000, Account: 3800,
 };
 
 // A miniature slime: a uniquely-shaped blob + googly eyes + a topper glyph, plus a per-route quirk —
@@ -86,9 +81,12 @@ function SlimeTab({ route, glyph, neon, shape, active }: { route: keyof typeof I
   const burst = useSharedValue(0);
   const eat = useSharedValue(0);
   const emote = useSharedValue(0);
+  const wow = useSharedValue(0);
   const isFeed = route === 'Feed';
   const isFriends = route === 'Friends';
   const isAccount = route === 'Account';
+  const isMessages = route === 'Messages';
+  const isShare = route === 'Share';
 
   // gentle idle breathing
   useEffect(() => {
@@ -130,6 +128,20 @@ function SlimeTab({ route, glyph, neon, shape, active }: { route: keyof typeof I
       -1,
     );
   }, [emote, isFriends, isAccount]);
+
+  // Browse occasionally drops its jaw — "wow" at whatever it's watching.
+  useEffect(() => {
+    if (!isShare) { return; }
+    wow.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 2600 }),                                    // mouth closed (wait)
+        withTiming(1, { duration: 240, easing: ReEasing.out(ReEasing.quad) }),// jaw drops
+        withTiming(1, { duration: 520 }),                                     // hold the wow
+        withTiming(0, { duration: 200 }),                                     // close
+      ),
+      -1,
+    );
+  }, [wow, isShare]);
 
   // selecting springs a bounce + hop + bubbles (blinking stays on its idle loop)
   useEffect(() => {
@@ -202,6 +214,10 @@ function SlimeTab({ route, glyph, neon, shape, active }: { route: keyof typeof I
       ],
     };
   });
+  const mouthStyle = useAnimatedStyle(() => ({
+    height: interpolate(wow.value, [0, 1], [1.5, 6]),
+    width: interpolate(wow.value, [0, 1], [4.5, 6]),
+  }));
 
   const color = active ? neon : IDLE_SLIME;
   const op = active ? 1 : 0.6;
@@ -229,6 +245,16 @@ function SlimeTab({ route, glyph, neon, shape, active }: { route: keyof typeof I
             </>
           )}
 
+          {/* Messages: cross-body messenger satchel (strap + flapped bag at the hip) */}
+          {isMessages && (
+            <>
+              <View style={styles.satchelStrap} />
+              <View style={styles.satchelBag}>
+                <View style={styles.satchelFlap} />
+              </View>
+            </>
+          )}
+
           {/* Feed: little hands (lift a touch while eating) */}
           {isFeed && (
             <Reanimated.View style={[styles.handLayer, handStyle]} pointerEvents="none">
@@ -240,12 +266,15 @@ function SlimeTab({ route, glyph, neon, shape, active }: { route: keyof typeof I
           <Reanimated.View style={[styles.sEye, styles.sEyeL, lidStyle]}><View style={styles.sPupil} /></Reanimated.View>
           <Reanimated.View style={[styles.sEye, styles.sEyeR, lidStyle]}><View style={styles.sPupil} /></Reanimated.View>
 
-          {/* Browse: round black-framed eyeglasses over the eyes */}
+          {/* Browse: round black-framed eyeglasses + an occasional jaw-drop "wow" mouth */}
           {route === 'Share' && (
             <>
               <View style={[styles.lens, styles.lensL]} />
               <View style={[styles.lens, styles.lensR]} />
               <View style={styles.bridge} />
+              <View style={styles.sMouthLayer} pointerEvents="none">
+                <Reanimated.View style={[styles.sMouth, mouthStyle]} />
+              </View>
             </>
           )}
 
@@ -381,50 +410,20 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
   const badgeBorderX = flow.interpolate({ inputRange: [0, 1], outputRange: [0, -badgeSize.w] });
   const studioTextX = flow.interpolate({ inputRange: [0, 1], outputRange: [0, -studioTextSize.w] });
 
-  // "More" popup (Friends + Account rise from the bottom-right).
-  const [moreOpen, setMoreOpen] = useState(false);
-  const more = useRef(new Animated.Value(0)).current;
-  const toggleMore = (open: boolean) => {
-    setMoreOpen(open);
-    Animated.timing(more, { toValue: open ? 1 : 0, duration: 200, useNativeDriver: true }).start();
-  };
-  const go = (route: string) => { toggleMore(false); handleTabPress(route); };
-  const moreActive = current === 'Friends' || current === 'Account';
+  // Hide the whole bar during Studio's creation flow (camera / trim / filter / details) — only the
+  // Studio HOME keeps the bottom nav; the deeper full-screen steps shouldn't show it.
+  const activeRoute = state.routes[state.index] as any;
+  if (activeRoute?.name === 'Studio') {
+    const nested = activeRoute.state;
+    const sub = nested?.routes?.[nested.index ?? (nested.routes?.length ?? 1) - 1]?.name;
+    if (sub && sub !== 'StudioHome') { return null; }
+  }
 
   // Everyone gets the Studio FAB now (the editor is open to all users). The creator-only
   // chrome — the flowing gradient top border + STUDIO pill — stays gated by `canCreate`;
   // the publish-time fork (friends vs channel) is what actually differentiates creators.
   return (
     <View pointerEvents="box-none">
-      {/* Backdrop to dismiss the popup */}
-      {moreOpen && <Pressable style={styles.backdrop} onPress={() => toggleMore(false)} />}
-
-      {/* "More" popup items */}
-      {moreOpen && (
-        <View style={[styles.popup, { bottom: BAR_H + bottom + SPACE.SM }]} pointerEvents="box-none">
-          {[
-            { route: 'Friends', label: 'Friends', icon: ICONS.Friends, i: 1 },
-            { route: 'Account', label: 'Account', icon: ICONS.Account, i: 0 },
-          ].map(it => (
-            <Animated.View key={it.route} style={{
-              opacity: more,
-              transform: [{ translateY: more.interpolate({ inputRange: [0, 1], outputRange: [20 + it.i * 14, 0] }) }],
-            }}>
-              <TouchableOpacity style={styles.popupItem} onPress={() => go(it.route)} activeOpacity={0.85}>
-                <Text style={styles.popupLabel}>{it.label}</Text>
-                <SlimeTab
-                  route={it.route as keyof typeof ICONS}
-                  glyph={TAB_THEME[it.route as keyof typeof ICONS].glyph}
-                  neon={TAB_THEME[it.route as keyof typeof ICONS].neon}
-                  shape={TAB_THEME[it.route as keyof typeof ICONS].shape}
-                  active={current === it.route}
-                />
-              </TouchableOpacity>
-            </Animated.View>
-          ))}
-        </View>
-      )}
-
       {/* "Studio" badge — centered, just under the ＋ FAB (acts as its label) */}
       {SHOW_STUDIO_PILL && canCreate && (
         <View style={[styles.studioBadgeWrap, { bottom: bottom + 4 }]} pointerEvents="none">
@@ -476,23 +475,13 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
           </View>
         )}
 
-        <TabBtn route={PRIMARY[0].route} label={PRIMARY[0].label} active={current === PRIMARY[0].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[0].route)} />
-        <TabBtn route={PRIMARY[1].route} label={PRIMARY[1].label} active={current === PRIMARY[1].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[1].route)} />
+        <TabBtn route="Feed"     label="Feed"     active={current === 'Feed'}     toReact={toReact} onPress={() => handleTabPress('Feed')} />
+        <TabBtn route="Channels" label="Channels" active={current === 'Channels'} toReact={toReact} onPress={() => handleTabPress('Channels')} />
 
-        <GlowFab onPress={() => navigation.getParent()?.navigate('Studio' as never)} />
+        <GlowFab onPress={() => handleTabPress('Studio')} />
 
-        <TabBtn route={PRIMARY[2].route} label={PRIMARY[2].label} active={current === PRIMARY[2].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[2].route)} />
-
-        {/* More (hamburger) */}
-        {(() => {
-          const on = moreActive || moreOpen;
-          return (
-            <TouchableOpacity style={styles.tab} onPress={() => toggleMore(!moreOpen)} activeOpacity={0.7}>
-              <Ionicons name="menu" size={26} color={on ? C.DANGER : C.WHITE} style={{ opacity: on ? 1 : 0.5 }} />
-              <Text style={[styles.label, { color: on ? C.DANGER : C.WHITE, opacity: on ? 1 : 0.6 }]}>More</Text>
-            </TouchableOpacity>
-          );
-        })()}
+        <TabBtn route="Messages" label="Messages" active={current === 'Messages'} toReact={toReact} onPress={() => handleTabPress('Messages')} />
+        <TabBtn route="Share"    label="Browse"   active={current === 'Share'}    toReact={toReact} onPress={() => handleTabPress('Share')} />
       </View>
     </View>
   );
@@ -525,6 +514,11 @@ const styles = StyleSheet.create({
   antRodR: { transformOrigin: '50% 100%', transform: [{ rotate: '36deg' }] },
   antBall: { position: 'absolute', top: -2.5, left: -1, width: 4, height: 4, borderRadius: 2 },
 
+  // Messages: cross-body messenger satchel — a diagonal strap + a flapped leather bag at the hip
+  satchelStrap: { position: 'absolute', top: -2, left: 9, width: 2.6, height: 24, borderRadius: 1.3, backgroundColor: '#6B4423', transform: [{ rotate: '62deg' }] },
+  satchelBag: { position: 'absolute', bottom: 1, left: -3, width: 10, height: 8.5, borderRadius: 2, backgroundColor: '#6B4423', overflow: 'hidden' },
+  satchelFlap: { position: 'absolute', top: 0, left: 0, right: 0, height: 4, backgroundColor: '#4A2E18' },
+
   // Feed: little hands at the sides
   handLayer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
   hand: { position: 'absolute', width: 5, height: 5, borderRadius: 3, bottom: 1 },
@@ -539,6 +533,9 @@ const styles = StyleSheet.create({
   lensL: { left: 2 },
   lensR: { right: 2 },
   bridge: { position: 'absolute', top: 6.4, left: 8, width: 3, height: 1.4, borderRadius: 1, backgroundColor: '#08040d' },
+  // Browse: jaw-drop "wow" mouth (animated open/close)
+  sMouthLayer: { position: 'absolute', left: 0, right: 0, top: 11, alignItems: 'center' },
+  sMouth: { backgroundColor: '#16091f', borderRadius: 3 },
 
   // Friends / Account: floating emote (heart / sleepy z's), rising + fading above the head
   emoteLayer: { position: 'absolute', top: -8, left: 0, right: 0, alignItems: 'center' },

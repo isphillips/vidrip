@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,16 +15,25 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AccountBlob from '../../../components/AccountBlob';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useFeedStore } from '../../../store/feedStore';
-import { renameGroupChat } from '../../../infrastructure/supabase/queries/channels';
+import { useAuthStore } from '../../../store/authStore';
+import { useReactQueueStore, type ReactTarget } from '../../../store/reactQueueStore';
+import {
+  renameGroupChat, fetchChannelUpdatesSummary, type ChannelUpdateSummary,
+} from '../../../infrastructure/supabase/queries/channels';
 import ConversationRow from '../../../components/conversation/ConversationRow';
-import ChannelsFeedBlock from '../components/ChannelsFeedBlock';
+import { relativeTime } from '../../../utils/relativeTime';
 import ExclusiveRail from '../../exclusive/components/ExclusiveRail';
 import { useFriendConversations } from '../conversation/useFriendConversations';
+import type { FeedItem } from '../conversation/friendConversation';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
+
+// One Feed row: a friend conversation, a group chat, or a followed channel with unseen uploads.
+type FeedRow = FeedItem | { kind: 'channel'; sortAt: number; channel: ChannelUpdateSummary };
 
 // Flowing-water wordmark: a pink↔purple gradient slides under a "drip" text mask.
 const FLOW_PINK = '#FF4FA3';
@@ -34,7 +43,60 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 // ── Main screen: Messenger-style 1:1 friend conversations + group chats ─────────
 export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'FeedHome'>) {
   const { top } = useSafeAreaInsets();
-  const { items, toReactCount, loading, refreshing, refresh } = useFriendConversations();
+  const { user } = useAuthStore();
+  const { items, threads, toReactCount, loading, refreshing, refresh } = useFriendConversations();
+  const setQueue = useReactQueueStore(s => s.setQueue);
+
+  // Followed channels (public/members-only) with unseen uploads, fetched alongside the
+  // conversation sources so each can be slotted into the recency-sorted Feed.
+  const [channelUpdates, setChannelUpdates] = useState<ChannelUpdateSummary[]>([]);
+  const loadChannels = useCallback(async () => {
+    if (!user) { return; }
+    try { setChannelUpdates(await fetchChannelUpdatesSummary(user.id)); } catch { /* ignore */ }
+  }, [user]);
+  useFocusEffect(useCallback(() => { loadChannels(); }, [loadChannels]));
+  const onRefresh = useCallback(() => { refresh(); loadChannels(); }, [refresh, loadChannels]);
+
+  // Feed is actionable-only: a friend, group, or followed channel surfaces here only while it has
+  // unseen videos to react to. The full conversation list (including caught-up chats) lives in Messages.
+  // Channel rows ('channel' kind only — group chats already arrive via the conversations hook) are
+  // interleaved by their last unseen upload time.
+  const rows = useMemo<FeedRow[]>(() => {
+    const convRows: FeedRow[] = items.filter(it =>
+      it.kind === 'friend' ? it.conv.unreadCount > 0 : it.group.unreadCount > 0,
+    );
+    const channelRows: FeedRow[] = channelUpdates
+      .filter(c => c.kind === 'channel' && c.unseen_count > 0)
+      .map(c => ({
+        kind: 'channel' as const,
+        sortAt: c.last_unseen_at ? Date.parse(c.last_unseen_at) || 0 : 0,
+        channel: c,
+      }));
+    return [...convRows, ...channelRows].sort((a, b) => b.sortAt - a.sortAt);
+  }, [items, channelUpdates]);
+
+  const channelToReact = useMemo(
+    () => channelUpdates.filter(c => c.kind === 'channel').reduce((n, c) => n + c.unseen_count, 0),
+    [channelUpdates],
+  );
+
+  // "Doom-react": tapping an entry opens its first pending video and chains through every pending
+  // video (this entry's first, then the rest). Returns false if there's nothing to react to.
+  const startDoomReact = (entryThreadIds: string[]): boolean => {
+    const pending = threads.filter(t => t.sender_id !== user?.id && t.my_status !== 'reacted'
+      && t.thread_kind !== 'studio_share' && !!t.video_id);
+    const mine = pending.filter(t => entryThreadIds.includes(t.id));
+    const rest = pending.filter(t => !entryThreadIds.includes(t.id));
+    const ordered = [...mine, ...rest];
+    if (ordered.length === 0) { return false; }
+    const toTarget = (t: typeof ordered[number]): ReactTarget => ({
+      threadId: t.id, videoId: t.video_id ?? undefined, sourceType: (t.source_type ?? undefined) as ReactTarget['sourceType'],
+    });
+    const [first, ...others] = ordered;
+    setQueue(others.map(toTarget));
+    (navigation as any).getParent()?.navigate('RecordReaction', { ...toTarget(first), queued: true });
+    return true;
+  };
 
   // Long-press a group chat → rename it (any member can; empty reverts to auto name).
   const [renaming, setRenaming] = useState<{ channelId: string; name: string } | null>(null);
@@ -47,9 +109,11 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     refresh();
   };
 
-  // Bottom-tab Feed badge mirrors the total items needing my attention.
+  // Bottom-tab Feed badge mirrors the total items needing my attention (conversations + channels).
   const setToReactCount = useFeedStore(s => s.setToReactCount);
-  useEffect(() => { setToReactCount(toReactCount); }, [toReactCount, setToReactCount]);
+  useEffect(() => {
+    setToReactCount(toReactCount + channelToReact);
+  }, [toReactCount, channelToReact, setToReactCount]);
 
   // Flowing "drip" wordmark gradient.
   const [dripSize, setDripSize] = useState({ w: 70, h: 34 });
@@ -96,14 +160,11 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             </MaskedView>
           </View>
           <TouchableOpacity
-            style={styles.newGroupBtn}
+            style={styles.acctBtn}
             hitSlop={10}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('CreateGroupChat')}>
-            <Ionicons name="people" size={22} color={C.ACCENT_HOT} />
-            <View style={styles.newGroupPlus}>
-              <Ionicons name="add" size={12} color={C.WHITE} />
-            </View>
+            onPress={() => (navigation as any).getParent()?.navigate('Account')}>
+            <AccountBlob size={34} />
           </TouchableOpacity>
         </View>
       </View>
@@ -115,19 +176,18 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
 
       <FlatList
         style={styles.fill}
-        data={items}
-        keyExtractor={it => (it.kind === 'friend' ? `f:${it.conv.friendUserId}` : `g:${it.group.channelId}`)}
-        contentContainerStyle={items.length === 0 ? styles.emptyContainer : undefined}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.ACCENT} />}
-        ListHeaderComponent={
-          <ChannelsFeedBlock
-            onPress={() => (navigation as any).navigate('Channels', { screen: 'ChannelsHome' })}
-          />
-        }
+        data={rows}
+        keyExtractor={it => (
+          it.kind === 'friend' ? `f:${it.conv.friendUserId}`
+          : it.kind === 'group' ? `g:${it.group.channelId}`
+          : `c:${it.channel.channel_id}`
+        )}
+        contentContainerStyle={rows.length === 0 ? styles.emptyContainer : undefined}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.ACCENT} />}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No conversations yet</Text>
-            <Text style={styles.emptySubtitle}>Add friends and share a Short to start a chat.</Text>
+            <Text style={styles.emptyTitle}>You're all caught up 🎉</Text>
+            <Text style={styles.emptySubtitle}>New videos to react to will show up here.</Text>
           </View>
         }
         renderItem={({ item }) => item.kind === 'friend' ? (
@@ -138,17 +198,23 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             subtitle={item.conv.subtitle}
             unreadCount={item.conv.unreadCount}
             state={item.conv.state}
+            eyes={item.conv.state === 'unreplied'}
+            timestamp={relativeTime(item.conv.lastActivityAt)}
             exclusiveGlow={item.conv.hasExclusiveDrop}
-            onPress={() => navigation.navigate('FriendConversation', {
-              friendUserId: item.conv.friendUserId,
-              displayName: item.conv.displayName,
-              handle: item.conv.handle,
-              avatarUrl: item.conv.avatarUrl,
-              dmChannelId: item.conv.dmChannelId,
-              threadIds: item.conv.threadIds,
-            })}
+            onPress={() => {
+              // Doom-react through this friend's pending videos; fall back to the chat if none.
+              if (startDoomReact(item.conv.threadIds)) { return; }
+              navigation.navigate('FriendConversation', {
+                friendUserId: item.conv.friendUserId,
+                displayName: item.conv.displayName,
+                handle: item.conv.handle,
+                avatarUrl: item.conv.avatarUrl,
+                dmChannelId: item.conv.dmChannelId,
+                threadIds: item.conv.threadIds,
+              });
+            }}
           />
-        ) : (
+        ) : item.kind === 'group' ? (
           <ConversationRow
             avatarUrl={null}
             fallbackInitial="👥"
@@ -158,6 +224,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
               : `${item.group.memberCount} members · hold to rename`}
             unreadCount={item.group.unreadCount}
             state={item.group.state}
+            timestamp={relativeTime(item.group.lastActivityAt)}
             onPress={() => (navigation as any).navigate('Channel', {
               channelId: item.group.channelId,
               channelName: item.group.name,
@@ -168,6 +235,25 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
               isGroupChat: true,
             })}
             onLongPress={() => { setDraftName(item.group.name); setRenaming({ channelId: item.group.channelId, name: item.group.name }); }}
+          />
+        ) : (
+          <ConversationRow
+            avatarUrl={null}
+            fallbackInitial="📢"
+            title={item.channel.name}
+            subtitle={`${item.channel.unseen_count} new video${item.channel.unseen_count !== 1 ? 's' : ''} to react to`}
+            unreadCount={item.channel.unseen_count}
+            state="unread"
+            timestamp={relativeTime(item.sortAt)}
+            onPress={() => (navigation as any).navigate('Channel', {
+              channelId: item.channel.channel_id,
+              channelName: item.channel.name,
+              isPublic: true,
+              isJoined: true,
+              isOwner: false,
+              isMembersOnly: item.channel.is_members_only,
+              isGroupChat: false,
+            })}
           />
         )}
       />
@@ -211,8 +297,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: SPACE.SM,
     paddingHorizontal: SPACE.LG,
-    paddingTop: SPACE.LG,
-    paddingBottom: SPACE.SM,
+    paddingTop: SPACE.MD,
+    paddingBottom: SPACE.MD,
     zIndex: 10,
   },
   headerLogo: { width: 32, height: 55, marginTop: -5, marginBottom: -21, pointerEvents: 'none' },
@@ -226,6 +312,7 @@ const styles = StyleSheet.create({
     color: C.BLACK,
   },
   titleVi: { color: C.WHITE },
+  acctBtn: { marginLeft: 'auto', marginTop: 6 },
   newGroupBtn: {
     marginLeft: 'auto', marginTop: 4,
     width: 40, height: 40, borderRadius: 20,

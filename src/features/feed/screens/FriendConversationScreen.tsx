@@ -9,6 +9,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import GradientIcon from '../../../components/GradientIcon';
+import DrippyEyes from '../../../components/DrippyEyes';
 import { supabase } from '../../../infrastructure/supabase/client';
 import { fetchThread, markThreadSeen } from '../../../infrastructure/supabase/queries/threads';
 import {
@@ -35,7 +36,7 @@ const ms = (iso?: string | null) => (iso ? Date.parse(iso) || 0 : 0);
 export default function FriendConversationScreen({
   route, navigation,
 }: FeedStackScreenProps<'FriendConversation'>) {
-  const { top } = useSafeAreaInsets();
+  const { top, bottom: safeBottom } = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { friendUserId, displayName, handle, avatarUrl, threadIds = [] } = route.params;
 
@@ -230,7 +231,14 @@ export default function FriendConversationScreen({
                   <Text style={styles.shareTitle} numberOfLines={2}>
                     {item.reacted ? item.title : 'Sent you a video to react to'}
                   </Text>
-                  <Text style={styles.shareMeta}>{item.reacted ? '✓ Reacted · tap to view' : '👀 Tap to react'}</Text>
+                  {item.reacted ? (
+                    <Text style={styles.shareMeta}>✓ Reacted · tap to view</Text>
+                  ) : (
+                    <View style={styles.shareMetaRow}>
+                      <DrippyEyes size={12} />
+                      <Text style={styles.shareMeta}>Tap to react</Text>
+                    </View>
+                  )}
                 </View>
               </TouchableOpacity>
             ) : (
@@ -259,15 +267,13 @@ export default function FriendConversationScreen({
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.bottomBar}>
-          <View style={styles.barBtns}>
-            <TouchableOpacity style={styles.barBtn} onPress={handleVideoCompose} activeOpacity={0.8}>
-              <GradientIcon name="videocam" size={26} />
-            </TouchableOpacity>
-            <Pressable onPressIn={handleMicPressIn} onPressOut={handleMicPressOut} style={[styles.barBtn, isHoldingMic && styles.barBtnActive]}>
-              {isHoldingMic ? <Ionicons name="mic" size={26} color={C.ACCENT_HOT} /> : <GradientIcon name="mic" size={26} />}
-            </Pressable>
-          </View>
+        <View style={[styles.barBtns, { bottom: safeBottom + 70 }]}>
+          <TouchableOpacity style={styles.barBtn} onPress={handleVideoCompose} activeOpacity={0.8}>
+            <GradientIcon name="videocam" size={26} />
+          </TouchableOpacity>
+          <Pressable onPressIn={handleMicPressIn} onPressOut={handleMicPressOut} style={[styles.barBtn, isHoldingMic && styles.barBtnActive]}>
+            {isHoldingMic ? <Ionicons name="mic" size={26} color={C.ACCENT_HOT} /> : <GradientIcon name="mic" size={26} />}
+          </Pressable>
         </View>
       )}
     </View>
@@ -311,19 +317,17 @@ const styles = StyleSheet.create({
   shareThumbBlindImg: { width: 20, height: 28 },
   shareInfo: { flex: 1, gap: 4 },
   shareTitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
+  shareMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   shareMeta: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
 
-  // Composer
-  bottomBar: {
-    borderTopWidth: 1, borderTopColor: C.BORDER, backgroundColor: C.SURFACE,
-    paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG,
-  },
-  barBtns: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.XL },
+  // Composer — floating record buttons, fixed bottom-right above the nav, stacked, Studio-style (shadowed pill).
+  barBtns: { position: 'absolute', right: SPACE.LG, alignItems: 'center', gap: SPACE.MD },
   barBtn: {
-    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: C.SURFACE_2,
+    width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.SURFACE_2, borderWidth: 1, borderColor: C.BORDER_STRONG,
+    shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 8,
   },
-  barBtnActive: { backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.ACCENT_HOT },
+  barBtnActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
   audioPreview: {
     flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
     borderTopWidth: 1, borderTopColor: C.BORDER, backgroundColor: C.SURFACE,

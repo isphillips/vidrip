@@ -138,8 +138,6 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
     );
   };
 
-  const close = () => navigation.getParent()?.goBack();
-
   const renderVideo = ({ item }: { item: MyCreatorVideo }) => {
     const scheduled = isScheduled(item);
     const st = STATUS[item.status] ?? STATUS.processing;
@@ -229,7 +227,6 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
           <TouchableOpacity onPress={() => navigation.navigate('StudioCalendar')} hitSlop={10}>
             <Ionicons name="calendar-outline" size={23} color={C.INK} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={close} hitSlop={10}><Ionicons name="close" size={26} color={C.INK} /></TouchableOpacity>
         </View>
       </View>
 

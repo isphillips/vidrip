@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../theme';
 import ExclusiveGlow from './ExclusiveGlow';
+import DrippyEyes from '../DrippyEyes';
 import { rowStateStyle, type RowState } from './useRowState';
 
 // Generalized messenger-style conversation row, shared by the Feed (per-friend) and
@@ -21,6 +22,10 @@ export type ConversationRowProps = {
   onLongPress?: () => void;
   // Optional trailing slot (e.g. invite Accept/Decline) rendered in place of the thumbnail.
   trailing?: React.ReactNode;
+  // Show Drippy's animated eyes before the subtitle (the "waiting for your reaction" cue).
+  eyes?: boolean;
+  // Last-activity stamp shown top-right of the row (e.g. "3:30 PM", "Mon", "Jun 17").
+  timestamp?: string;
 };
 
 export default function ConversationRow({
@@ -35,6 +40,8 @@ export default function ConversationRow({
   onPress,
   onLongPress,
   trailing,
+  eyes = false,
+  timestamp,
 }: ConversationRowProps) {
   const s = rowStateStyle(state, exclusiveGlow);
   const showBadge = unreadCount > 0 && (s.badge != null || exclusiveGlow);
@@ -69,9 +76,15 @@ export default function ConversationRow({
           </View>
 
           <View style={styles.meta}>
-            <Text style={styles.title} numberOfLines={1}>{title}</Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.title, styles.titleFlex]} numberOfLines={1}>{title}</Text>
+              {timestamp ? <Text style={styles.timestamp}>{timestamp}</Text> : null}
+            </View>
             {subtitle ? (
-              <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
+              <View style={styles.subtitleRow}>
+                {eyes ? <DrippyEyes size={11} /> : null}
+                <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
+              </View>
             ) : null}
           </View>
 
@@ -113,6 +126,10 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_BOLD },
   title: { fontSize: FONT.SIZES.MD, fontFamily: FONT.DISPLAY_SEMIBOLD, color: C.INK },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
+  titleFlex: { flex: 1 },
+  timestamp: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.SUBTLE },
+  subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   subtitle: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
   thumbnail: {
     width: 56, height: 56, borderRadius: RADIUS.SM,

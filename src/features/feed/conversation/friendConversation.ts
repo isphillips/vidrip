@@ -15,7 +15,8 @@ export type FriendConversation = {
   threadIds: string[];     // inbound threads from this friend (sender === friend)
   dmChannelId: string | null;
   lastActivityAt: number;  // ms epoch, max across sources (0 = no activity yet)
-  unreadCount: number;     // badge: items needing my attention
+  unreadCount: number;     // badge: items needing my attention (reactions + DMs) — Feed uses this
+  dmUnread: number;        // DM-message unread only — Messages uses this (reactions belong to Feed)
   state: RowState;
   subtitle: string;
   hasExclusiveDrop: boolean;
@@ -50,6 +51,7 @@ export function buildFriendConversations({
       dmChannelId: null,
       lastActivityAt: 0,
       unreadCount: 0,
+      dmUnread: 0,
       state: 'caughtup',
       subtitle: '',
       hasExclusiveDrop: false,
@@ -95,6 +97,7 @@ export function buildFriendConversations({
   for (const conv of map.values()) {
     const tl = tally.get(conv.friendUserId) ?? { pending: 0, unreplied: 0, dmUnread: 0 };
     conv.unreadCount = tl.pending + tl.unreplied + tl.dmUnread;
+    conv.dmUnread = tl.dmUnread;
     if (tl.pending > 0 || tl.dmUnread > 0) {
       conv.state = 'unread';
       conv.subtitle = tl.dmUnread > 0 && tl.pending === 0
@@ -102,7 +105,7 @@ export function buildFriendConversations({
         : `${tl.pending + tl.dmUnread} new`;
     } else if (tl.unreplied > 0) {
       conv.state = 'unreplied';
-      conv.subtitle = '👀 Waiting for your reaction';
+      conv.subtitle = 'Waiting for your reaction';
     } else {
       conv.state = 'caughtup';
       conv.subtitle = conv.lastActivityAt > 0 ? 'Caught up' : 'Say hi 👋';

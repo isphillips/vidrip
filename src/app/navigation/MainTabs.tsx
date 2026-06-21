@@ -7,14 +7,17 @@ import { useAuthStore } from '../../store/authStore';
 import type {
   MainTabParamList,
   FeedStackParamList,
+  MessagesStackParamList,
   FriendsStackParamList,
   ShareStackParamList,
   AccountStackParamList,
 } from './types';
 import ChannelsNavigator from './ChannelsStack';
+import StudioStack from './StudioStack';
 import { screenLayout, GRADIENT_DARK } from '../../components/ScreenGradient';
 
 import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
+import MessagesHomeScreen from '../../features/messages/screens/MessagesHomeScreen';
 import FriendConversationScreen from '../../features/feed/screens/FriendConversationScreen';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
 import WatchReactionScreen from '../../features/threads/screens/WatchReactionScreen';
@@ -52,6 +55,7 @@ const tabIcon = (source: ReturnType<typeof require>, w = 28, h = 28) =>
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const FeedStack = createNativeStackNavigator<FeedStackParamList>();
+const MessagesStack = createNativeStackNavigator<MessagesStackParamList>();
 const FriendsStack = createNativeStackNavigator<FriendsStackParamList>();
 const ShareStack = createNativeStackNavigator<ShareStackParamList>();
 const AccountStack = createNativeStackNavigator<AccountStackParamList>();
@@ -85,6 +89,27 @@ function FeedNavigator() {
       <FeedStack.Screen name="ExclusiveCollection" component={ExclusiveCollectionScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="ExclusiveWatch" component={ExclusiveWatchScreen} options={{ headerShown: false }} />
     </FeedStack.Navigator>
+  );
+}
+
+function MessagesNavigator() {
+  return (
+    <MessagesStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
+      <MessagesStack.Screen name="MessagesHome" component={MessagesHomeScreen} options={{ headerShown: false }} />
+      <MessagesStack.Screen name="AddFriend" component={AddFriendScreen as any} options={{ title: 'Add Friend', headerBackTitle: 'Messages' }} />
+      <MessagesStack.Screen name="InviteContacts" component={InviteContactsScreen as any} options={{ title: 'Import Contacts', headerBackTitle: 'Messages' }} />
+      <MessagesStack.Screen name="FriendConversation" component={FriendConversationScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <MessagesStack.Screen name="CreateGroupChat" component={CreateGroupChatScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <MessagesStack.Screen name="Channel" component={ChannelScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
+      <MessagesStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
+      <MessagesStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
+      <MessagesStack.Screen name="WatchReview" component={WatchReviewScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <MessagesStack.Screen name="ChannelVideoRecord" component={ChannelVideoRecordScreen as any} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <MessagesStack.Screen name="WatchChannelClip" component={WatchChannelClipScreen as any} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
+      <MessagesStack.Screen name="GiftReveal" component={GiftRevealScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
+      <MessagesStack.Screen name="ExclusiveCollection" component={ExclusiveCollectionScreen} options={{ headerShown: false }} />
+      <MessagesStack.Screen name="ExclusiveWatch" component={ExclusiveWatchScreen} options={{ headerShown: false }} />
+    </MessagesStack.Navigator>
   );
 }
 
@@ -167,6 +192,15 @@ export default function MainTabs() {
           },
         })}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Channels' }} />
+      <Tab.Screen name="Studio" component={StudioStack}
+        listeners={({ navigation }) => ({
+          // The center FAB lands on the Studio home; deeper creation screens are pushed in-stack.
+          tabPress: (e) => {
+            e.preventDefault();
+            (navigation as any).navigate('Studio', { screen: 'StudioHome' });
+          },
+        })}
+        options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Studio' }} />
       <Tab.Screen name="Share" component={ShareNavigator}
         listeners={() => ({
           // Tapping Browse always returns to the browse view (even from the Paste
@@ -174,6 +208,16 @@ export default function MainTabs() {
           tabPress: () => { useShareUiStore.getState().requestBrowse(); },
         })}
         options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Browse' }} />
+      <Tab.Screen name="Messages" component={MessagesNavigator}
+        listeners={({ navigation }) => ({
+          // Tapping Messages always returns to the conversation list, regardless of how
+          // deep the stack is (FriendConversation / Channel group chat / Thread).
+          tabPress: (e) => {
+            e.preventDefault();
+            (navigation as any).navigate('Messages', { screen: 'MessagesHome' });
+          },
+        })}
+        options={{ tabBarIcon: tabIcon(require('../../assets/icon-friends.png')), tabBarLabel: 'Messages' }} />
       <Tab.Screen name="Friends" component={FriendsNavigator}
         listeners={({ navigation }) => ({
           // Tapping Friends always returns to the friends list, regardless of how

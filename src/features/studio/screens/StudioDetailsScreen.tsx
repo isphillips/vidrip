@@ -16,7 +16,6 @@ import {
 } from '../../../infrastructure/creatorStudio/api';
 import { publishStudioClipToFriends } from '../../../infrastructure/creatorStudio/studioShare';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
-import PublishForkModal from '../components/PublishForkModal';
 import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
 import EffectPlayer from '../components/EffectPlayer';
@@ -35,12 +34,12 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   const { top } = useSafeAreaInsets();
   const { user, profile } = useAuthStore();
 
-  // Publish-destination fork. `is_creator` users choose between Path A (friends) and Path B (channel)
-  // via a modal; common users go straight to Path A. `creator_studio` (canCreate) gates Path B.
+  // Publish-destination fork, baked into the UI as a segmented toggle (Path A friends / Path B channel).
+  // The toggle only shows for `is_creator` users; common users only have Path A. `creator_studio`
+  // (canCreate) gates whether the Channel segment is selectable.
   const isCreator = !!(profile as any)?.is_creator;
   const [canCreate, setCanCreate]   = useState(false);
-  const [path, setPath]             = useState<'friends' | 'channel' | null>(isCreator ? null : 'friends');
-  const [forkVisible, setForkVisible] = useState(false);
+  const [path, setPath]             = useState<'friends' | 'channel'>('friends');
   const [friends, setFriends]       = useState<Friend[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
@@ -235,21 +234,19 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   // Path B posts/schedules to a channel.
   const nSel = selectedFriends.size;
   const cta =
-    path === null
-      ? { label: 'Choose where to post', icon: undefined as string | undefined, onPress: () => setForkVisible(true), disabled: uploading }
-      : path === 'friends'
-        ? {
-            label: uploading ? 'Sending…' : nSel > 0 ? `Send to ${nSel} friend${nSel === 1 ? '' : 's'}` : 'Send to friends',
-            icon: 'paper-plane-outline' as string | undefined,
-            onPress: sendToFriends,
-            disabled: uploading || nSel === 0,
-          }
-        : {
-            label: uploading ? 'Uploading…' : publishMode === 'schedule' ? 'Schedule post' : 'Post video',
-            icon: (publishMode === 'schedule' ? 'calendar-outline' : undefined) as string | undefined,
-            onPress: post,
-            disabled: uploading || noChannels || !channelId,
-          };
+    path === 'friends'
+      ? {
+          label: uploading ? 'Sending…' : nSel > 0 ? `Send to ${nSel} friend${nSel === 1 ? '' : 's'}` : 'Send to friends',
+          icon: 'paper-plane-outline' as string | undefined,
+          onPress: sendToFriends,
+          disabled: uploading || nSel === 0,
+        }
+      : {
+          label: uploading ? 'Uploading…' : publishMode === 'schedule' ? 'Schedule post' : 'Post video',
+          icon: (publishMode === 'schedule' ? 'calendar-outline' : undefined) as string | undefined,
+          onPress: post,
+          disabled: uploading || noChannels || !channelId,
+        };
 
   return (
     <View style={[styles.container, { paddingTop: top + SPACE.SM }]}>
@@ -289,13 +286,29 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           placeholder="Give it a title…" placeholderTextColor={C.SUBTLE} maxLength={120} editable={!uploading}
         />
 
-        {/* Creators can hop back to the fork to switch destination. */}
-        {isCreator && path && (
-          <TouchableOpacity style={styles.destSwitch} onPress={() => { if (!uploading) { setForkVisible(true); } }} activeOpacity={0.7}>
-            <Ionicons name={path === 'friends' ? 'people' : 'tv'} size={14} color={C.ACCENT_HOT} />
-            <Text style={styles.destSwitchTxt}>{path === 'friends' ? 'Sharing with friends' : 'Posting to a channel'}</Text>
-            <Text style={styles.destSwitchChange}>Change</Text>
-          </TouchableOpacity>
+        {/* Destination fork, baked in: creators choose friends vs channel; Channel locks without creator_studio. */}
+        {isCreator && (
+          <>
+            <Text style={styles.label}>Post to</Text>
+            <View style={styles.toggle}>
+              <TouchableOpacity
+                style={[styles.toggleBtn, path === 'friends' && styles.toggleBtnActive, uploading && styles.toggleBtnDisabled]}
+                onPress={() => { if (!uploading) { setPath('friends'); } }}
+                activeOpacity={uploading ? 1 : 0.8}>
+                <Ionicons name="people" size={16} color={path === 'friends' ? C.WHITE : C.MUTED} />
+                <Text style={[styles.toggleText, path === 'friends' && styles.toggleTextActive]}>Friends</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, path === 'channel' && styles.toggleBtnActive, (!canCreate || uploading) && styles.toggleBtnDisabled]}
+                onPress={() => { if (canCreate && !uploading) { setPath('channel'); } }}
+                activeOpacity={canCreate && !uploading ? 0.8 : 1}>
+                <Ionicons name={canCreate ? 'tv' : 'lock-closed'} size={16}
+                  color={path === 'channel' ? C.WHITE : canCreate ? C.MUTED : C.SUBTLE} />
+                <Text style={[styles.toggleText, path === 'channel' && styles.toggleTextActive, !canCreate && styles.toggleTextDisabled]}>Channel</Text>
+              </TouchableOpacity>
+            </View>
+            {!canCreate && <Text style={styles.hint}>Channels are available to select creators.</Text>}
+          </>
         )}
 
         {path === 'friends' && (
@@ -393,11 +406,6 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           </TouchableOpacity>
         )}
         </>
-        )}
-
-        {/* Creator who hasn't picked a destination yet. */}
-        {path === null && (
-          <Text style={styles.hint}>Choose where to post this video to continue.</Text>
         )}
       </ScrollView>
 
@@ -499,15 +507,6 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
         </Modal>
       )}
 
-      {/* Publish-destination fork — only meaningful for creator-account users. */}
-      <PublishForkModal
-        visible={forkVisible}
-        canCreate={canCreate}
-        onPickFriends={() => { setForkVisible(false); setPath('friends'); }}
-        onPickChannel={() => { setForkVisible(false); setPath('channel'); }}
-        onClose={() => setForkVisible(false)}
-      />
-
       {/* Off-screen; only renders while baking the overlay into a shareable MP4. */}
       <ShareBaker ref={bakerRef} />
     </View>
@@ -540,13 +539,6 @@ const styles = StyleSheet.create({
   },
   hint: { color: C.SUBTLE, fontFamily: FONT.BODY, fontSize: FONT.SIZES.SM, marginBottom: SPACE.SM },
 
-  destSwitch: {
-    flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, alignSelf: 'flex-start',
-    backgroundColor: C.SURFACE, borderRadius: RADIUS.FULL, borderWidth: 1, borderColor: C.ACCENT_LITE,
-    paddingVertical: 6, paddingHorizontal: SPACE.MD, marginBottom: SPACE.SM,
-  },
-  destSwitchTxt:    { color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
-  destSwitchChange: { color: C.ACCENT_HOT, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.SM },
   friendHandle:     { color: C.SUBTLE, fontFamily: FONT.BODY, fontSize: FONT.SIZES.SM, maxWidth: 120 },
 
   choice: {

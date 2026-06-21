@@ -9,11 +9,14 @@ export type AuthStackParamList = {
   CreateProfile: { inviteCode: string };
 };
 
-// Main tabs
+// Main tabs. Friends + Account remain registered tabs (reached from the shared top header),
+// but the custom MainTabBar only renders buttons for Feed/Channels/Studio/Messages/Browse.
 export type MainTabParamList = {
   Feed: undefined;
   Channels: undefined;
+  Studio: undefined;
   Share: undefined;
+  Messages: undefined;
   Friends: undefined;
   Account: undefined;
 };
@@ -74,6 +77,35 @@ export type FeedStackParamList = {
   ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null };
 };
 
+// Messages stack — the conversation/group-chat experience (moved out of Feed). Mirrors the
+// conversation screens; opens into FriendConversation / Channel (group) / Thread / reactions.
+export type MessagesStackParamList = {
+  MessagesHome: undefined;
+  AddFriend: undefined;
+  InviteContacts: undefined;
+  FriendConversation: {
+    friendUserId: string;
+    displayName?: string;
+    handle?: string;
+    avatarUrl?: string | null;
+    dmChannelId?: string | null;
+    threadIds?: string[];
+  };
+  Thread: { threadId: string };
+  WatchReaction: { reactionId: string };
+  WatchReview: { reviewId: string };
+  ChannelVideoRecord: { channelId: string };
+  WatchChannelClip: { postId: string };
+  CreateGroupChat: undefined;
+  Channel: { channelId: string; channelName: string; isPublic: boolean; isJoined: boolean; isOwner: boolean; isMembersOnly?: boolean; inviteOnly?: boolean; ownerHandle?: string; justSubscribed?: boolean; isGroupChat?: boolean };
+  GiftReveal: { awardId: string };
+  ExclusiveCollection: { collectionId: string };
+  ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null };
+};
+
+export type MessagesStackScreenProps<T extends keyof MessagesStackParamList> =
+  NativeStackScreenProps<MessagesStackParamList, T>;
+
 // Friends stack
 export type FriendsStackParamList = {
   FriendsHome: undefined;
@@ -99,6 +131,8 @@ export type RecordStackParamList = {
     // When the share carries a sender intro, play it before the source video.
     introUrl?: string;
     introDuration?: number;
+    // Part of a "doom-react" queue — after saving, advance to the next pending video (reactQueueStore).
+    queued?: boolean;
   };
 };
 

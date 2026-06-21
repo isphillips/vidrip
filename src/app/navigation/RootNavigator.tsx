@@ -21,7 +21,6 @@ import {
 } from '../../infrastructure/notifications/pushService';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
-import StudioStack from './StudioStack';
 import ProfileDrawer from '../../components/ProfileDrawer';
 import ProfileReactionPlayer from '../../components/ProfileReactionPlayer';
 import MfaChallengeScreen from '../../features/auth/screens/MfaChallengeScreen';
@@ -279,11 +278,7 @@ export default function RootNavigator() {
           ) : (
             <>
               <Root.Screen name="Main" component={MainTabs} />
-              <Root.Screen
-                name="Studio"
-                component={StudioStack}
-                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-              />
+              {/* Studio is now a bottom-nav tab (see MainTabs), not a root modal drawer. */}
               <Root.Screen
                 name="RecordReaction"
                 component={RecordReactionScreen}

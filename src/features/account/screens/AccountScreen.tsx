@@ -33,6 +33,7 @@ import {
 import { refreshConnectedFeed } from '../../../infrastructure/supabase/queries/connectedFeed';
 import { buildAuthUrl, type SyncProvider, type ConnectionType } from '../../../infrastructure/oauth/config';
 import { useOnboardingStore } from '../../onboarding/onboarding';
+import AccountBlob from '../../../components/AccountBlob';
 import type { AccountStackScreenProps } from '../../../app/navigation/types';
 import ChannelSettingsSheet from '../../channels/components/ChannelSettingsSheet';
 import {
@@ -282,7 +283,12 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     : null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: top + SPACE.LG }]}>
+    <View style={styles.screen}>
+      <View style={[styles.navbar, { paddingTop: top + SPACE.MD }]}>
+        <Text style={styles.navTitle}>Account</Text>
+        <View style={styles.navActions}><AccountBlob size={34} active /></View>
+      </View>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Avatar — tap to edit profile */}
       <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.85} onPress={() => navigation.navigate('EditProfile')}>
         {(profile as any)?.avatar_url ? (
@@ -641,12 +647,17 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.BG },
+  screen: { flex: 1, backgroundColor: C.BG },
+  navbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.LG, paddingBottom: SPACE.SM },
+  navTitle: { fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, letterSpacing: -1, textTransform: 'uppercase', marginTop: 5 },
+  navActions: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: SPACE.MD, marginTop: 5 },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: SPACE.LG, paddingTop: SPACE.LG },
   avatarWrap: { alignItems: 'center', paddingVertical: SPACE.XXL, gap: SPACE.SM },
   avatar: {

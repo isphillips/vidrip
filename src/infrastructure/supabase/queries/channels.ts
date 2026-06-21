@@ -16,7 +16,12 @@ export type ChannelSummary = {
   pinned_video_id: string | null;
   pinned_video_title: string | null;
   pinned_video_thumbnail: string | null;
+  // Owner-set channel intro video (groups.ad_video_*) — plays from the channel card.
+  ad_video_url?: string | null;
+  ad_video_duration?: number | null;
   member_count: number;
+  // Count of top-level content posts (videos/clips, excluding reactions + status messages).
+  post_count: number;
   is_joined: boolean;
   unread_count: number;
   last_message_at: string | null;
@@ -97,13 +102,31 @@ export type MyChannelReaction = {
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
+// Count top-level content posts (the channel's videos/clips) per channel, for the card stamp.
+// Excludes reactions (parent_post_id set) and status messages. One grouped query in JS — avoids
+// a per-channel round-trip and keeps it migration-free.
+async function countPostsByChannel(channelIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (!channelIds.length) { return counts; }
+  const { data } = await (supabase as any)
+    .from('channel_posts')
+    .select('channel_id')
+    .in('channel_id', channelIds)
+    .is('parent_post_id', null)
+    .neq('post_type', 'status');
+  (data ?? []).forEach((p: any) => {
+    counts.set(p.channel_id, (counts.get(p.channel_id) ?? 0) + 1);
+  });
+  return counts;
+}
+
 export async function fetchPublicChannels(userId: string): Promise<ChannelSummary[]> {
   const [channelsResult, membershipsResult] = await Promise.all([
     (supabase as any)
       .from('groups')
       .select(`
         id, name, description, is_public, created_by, member_count,
-        pinned_video_id, pinned_video_title, pinned_video_thumbnail,
+        pinned_video_id, pinned_video_title, pinned_video_thumbnail, ad_video_url, ad_video_duration,
         owner:users!created_by(handle, avatar_url)
       `)
       .eq('is_public', true)
@@ -122,6 +145,8 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
   const joinedIds = new Set<string>(
     (membershipsResult.data ?? []).map((m: any) => m.group_id),
   );
+
+  const postCounts = await countPostsByChannel((channelsResult.data ?? []).map((c: any) => c.id));
 
   // Count unreacted YouTube posts per joined channel — drives the home-screen dot.
   const unreactedByChannel = new Map<string, number>();
@@ -162,7 +187,10 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     pinned_video_id: c.pinned_video_id ?? null,
     pinned_video_title: c.pinned_video_title ?? null,
     pinned_video_thumbnail: c.pinned_video_thumbnail ?? null,
+    ad_video_url: c.ad_video_url ?? null,
+    ad_video_duration: c.ad_video_duration ?? null,
     member_count: c.member_count ?? 0,
+    post_count: postCounts.get(c.id) ?? 0,
     is_joined: joinedIds.has(c.id),
     unread_count: joinedIds.has(c.id) ? (unreactedByChannel.get(c.id) ?? 0) : 0,
     last_message_at: null,
@@ -175,7 +203,7 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
       .from('groups')
       .select(`
         id, name, description, is_public, created_by, member_count, avatar_url, invite_only, subscriber_mode,
-        pinned_video_id, pinned_video_title, pinned_video_thumbnail,
+        pinned_video_id, pinned_video_title, pinned_video_thumbnail, ad_video_url, ad_video_duration,
         owner:users!created_by(handle, avatar_url)
       `)
       .eq('is_members_only', true)
@@ -191,6 +219,8 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
 
   const joinedIds = new Set<string>((membershipsResult.data ?? []).map((m: any) => m.group_id));
   const pendingInviteIds = new Set<string>((invitesResult.data ?? []).map((i: any) => i.channel_id));
+
+  const postCounts = await countPostsByChannel((channelsResult.data ?? []).map((c: any) => c.id));
 
   // Unreacted source posts per joined channel → home-screen dot.
   const unreactedByChannel = new Map<string, number>();
@@ -223,7 +253,10 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
     pinned_video_id: c.pinned_video_id ?? null,
     pinned_video_title: c.pinned_video_title ?? null,
     pinned_video_thumbnail: c.pinned_video_thumbnail ?? null,
+    ad_video_url: c.ad_video_url ?? null,
+    ad_video_duration: c.ad_video_duration ?? null,
     member_count: c.member_count ?? 0,
+    post_count: postCounts.get(c.id) ?? 0,
     is_joined: joinedIds.has(c.id),
     unread_count: joinedIds.has(c.id) ? (unreactedByChannel.get(c.id) ?? 0) : 0,
     last_message_at: null,
@@ -343,6 +376,7 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
     pinned_video_title: null,
     pinned_video_thumbnail: null,
     member_count: c.member_count ?? 0,
+    post_count: 0,
     is_joined: true,
     unread_count: unreadMap.get(c.id)?.count ?? 0,
     last_message_at: unreadMap.get(c.id)?.lastMsg ?? null,
@@ -401,10 +435,19 @@ export async function ensurePrivateChannel(userA: string, userB: string): Promis
   return data as string;
 }
 
-export type ChannelUpdateSummary = { channel_id: string; name: string; unseen_count: number };
+export type ChannelUpdateSummary = {
+  channel_id: string;
+  name: string;
+  unseen_count: number;
+  // Recency axis for interleaving the channel row into the Feed (last unseen upload).
+  last_unseen_at: string | null;
+  is_members_only: boolean;
+  kind: 'channel' | 'group';
+};
 
-// One call powering the Feed "Channels" ticker — channels (public/members-only) the user
-// is in that have unseen updates, with a per-channel count.
+// One call powering the Feed "Channels" rows + ticker — channels (public/members-only) the
+// user is in that have unseen updates, with a per-channel count and the most-recent unseen
+// upload time (so the Feed can slot each channel into its recency-sorted list).
 export async function fetchChannelUpdatesSummary(userId: string): Promise<ChannelUpdateSummary[]> {
   const { data, error } = await (supabase as any)
     .rpc('get_channel_updates_summary', { p_user_id: userId });
@@ -413,6 +456,9 @@ export async function fetchChannelUpdatesSummary(userId: string): Promise<Channe
     channel_id: r.channel_id,
     name: r.name ?? 'a channel',
     unseen_count: Number(r.unseen_count ?? 0),
+    last_unseen_at: r.last_unseen_at ?? null,
+    is_members_only: !!r.is_members_only,
+    kind: (r.kind === 'group' ? 'group' : 'channel') as 'channel' | 'group',
   }));
 }
 
@@ -894,6 +940,8 @@ export async function fetchSubscribedChannels(userId: string): Promise<ChannelSu
     for (const u of (us ?? [])) { owners[u.id] = { handle: u.handle, avatar_url: u.avatar_url ?? null }; }
   }
 
+  const postCounts = await countPostsByChannel((groups ?? []).map((g: any) => g.id));
+
   return ((groups ?? []) as any[]).map((g) => ({
     id: g.id,
     name: g.name,
@@ -905,6 +953,7 @@ export async function fetchSubscribedChannels(userId: string): Promise<ChannelSu
     pinned_video_title: null,
     pinned_video_thumbnail: null,
     member_count: g.member_count ?? 0,
+    post_count: postCounts.get(g.id) ?? 0,
     is_joined: true,
     unread_count: 0,
     last_message_at: null,

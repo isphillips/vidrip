@@ -74,7 +74,7 @@ export default function ChannelhamburderScreen({
       .catch(() => {});
     return () => { alive = false; };
   }, [isOwnerParam, channelId, user?.id]);
-  const { top } = useSafeAreaInsets();
+  const { top, bottom: safeBottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const cardW = (width - SPACE.LG * 2 - SPACE.MD) / 2;
   const cardH = Math.round(cardW * (16 / 9));
@@ -560,22 +560,7 @@ export default function ChannelhamburderScreen({
           </TouchableOpacity>
         ) : (
           // Private channel top-right: add people + leave
-          <View style={styles.headerActions}>
-            <TouchableOpacity hitSlop={8}
-              onPress={() => navigation.navigate('AddChannelMembers', { channelId })}>
-              <Ionicons name="person-add" size={20} color={C.WHITE} />
-            </TouchableOpacity>
-            <TouchableOpacity hitSlop={8} onPress={() => {
-              Alert.alert('Leave channel?', '', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Leave', style: 'destructive', onPress: () => {
-                  if (user?.id) { leaveChannel(channelId, user.id).then(() => navigation.goBack()); }
-                }},
-              ]);
-            }}>
-              <Ionicons name="exit-outline" size={26} color={C.WHITE} />
-            </TouchableOpacity>
-          </View>
+          null
         )}
       </View>
 
@@ -744,24 +729,22 @@ export default function ChannelhamburderScreen({
         </View>
       )}
 
-      {/* Private channel: bottom bar with video + mic */}
+      {/* Private channel: floating video + mic buttons, fixed bottom-right above the nav (Browse-style). */}
       {!isPublic && !pendingAudio && (
-        <View style={styles.bottomBar}>
-          <View style={styles.barBtns}>
-            <TouchableOpacity style={styles.barBtn}
-              onPress={() => navigation.navigate('ChannelVideoRecord', { channelId })}
-              activeOpacity={0.8}>
-              <GradientIcon name="videocam" size={26} />
-            </TouchableOpacity>
-            <Pressable
-              onPressIn={handleMicPressIn}
-              onPressOut={handleMicPressOut}
-              style={[styles.barBtn, isHoldingMic && styles.barBtnActive]}>
-              {isHoldingMic
-                ? <Ionicons name="mic" size={26} color={C.ACCENT_HOT} />
-                : <GradientIcon name="mic" size={26} />}
-            </Pressable>
-          </View>
+        <View style={[styles.barBtns, { bottom: safeBottom + 70 }]}>
+          <TouchableOpacity style={styles.barBtn}
+            onPress={() => navigation.navigate('ChannelVideoRecord', { channelId })}
+            activeOpacity={0.8}>
+            <GradientIcon name="videocam" size={26} />
+          </TouchableOpacity>
+          <Pressable
+            onPressIn={handleMicPressIn}
+            onPressOut={handleMicPressOut}
+            style={[styles.barBtn, isHoldingMic && styles.barBtnActive]}>
+            {isHoldingMic
+              ? <Ionicons name="mic" size={26} color={C.ACCENT_HOT} />
+              : <GradientIcon name="mic" size={26} />}
+          </Pressable>
         </View>
       )}
 
@@ -929,19 +912,14 @@ const styles = StyleSheet.create({
   headerActionIcon: { fontSize: 20 },
   headerActionImg: { width: 24, height: 24, tintColor: C.INK },
   // Bottom bar (private)
-  bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    gap: SPACE.XL, paddingTop: SPACE.MD, paddingBottom: SPACE.XL,
-    backgroundColor: C.SURFACE,
-    borderTopWidth: 1, borderTopColor: C.BORDER_STRONG,
-  },
+  // Floating record buttons — fixed bottom-right above the nav, stacked, Studio-style (shadowed pill).
+  barBtns: { position: 'absolute', right: SPACE.LG, alignItems: 'center', gap: SPACE.MD },
   barBtn: {
-    width: 52, height: 52, borderRadius: RADIUS.FULL,
+    width: 54, height: 54, borderRadius: 27,
     backgroundColor: C.SURFACE_2, alignItems: 'center', justifyContent: 'center',
-    borderColor: C.DANGER, borderWidth: 1,
+    borderWidth: 1, borderColor: C.BORDER_STRONG,
+    shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 8,
   },
-  barBtns: { flexDirection: 'row', justifyContent: 'center', gap: SPACE.XL },
   barBtnActive: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
   barBtnIcon: { fontSize: 24 },
   barIcon: { width: 26, height: 26, tintColor: C.TEAL },

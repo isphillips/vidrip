@@ -1,17 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl,
+  View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, Modal,
 } from 'react-native';
+import Video from 'react-native-video';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../infrastructure/supabase/client';
+import AccountBlob from '../../../components/AccountBlob';
 import { C, FONT, SPACE } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
   fetchPublicChannels,
   fetchMembersOnlyChannels,
   fetchSubscribedChannels,
-  fetchPrivateChannels,
   acceptChannelInvite,
   declineChannelInvite,
   setChannelPublic,
@@ -19,28 +20,8 @@ import {
   type ChannelSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 import ChannelCard from '../components/ChannelCard';
-import ConversationRow from '../../../components/conversation/ConversationRow';
 import type { RowState } from '../../../components/conversation/useRowState';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
-
-// A private channel as shown in the Channels list — a multi-member private channel that
-// is NOT a group chat (group chats live in the Feed) and NOT a 1:1 DM (those are friend
-// conversations in the Feed).
-type PrivateChannelRow = {
-  id: string; name: string; memberCount: number; unread: number; state: RowState; lastAt: number;
-};
-const privateChannelRows = (channels: ChannelSummary[]): PrivateChannelRow[] =>
-  channels
-    .filter(c => c.is_group_chat !== true && c.member_count >= 3)
-    .map(c => ({
-      id: c.id,
-      name: c.name || 'Private channel',
-      memberCount: c.member_count,
-      unread: c.unread_count,
-      state: (c.unread_count > 0 ? 'unread' : 'caughtup') as RowState,
-      lastAt: c.last_message_at ? Date.parse(c.last_message_at) || 0 : 0,
-    }))
-    .sort((a, b) => b.lastAt - a.lastAt);
 
 // One unified, recency-sorted activity list for every channel the user can act on —
 // curated public, members-only, subscribed, and owned. The old Public/Exclusive
@@ -55,24 +36,23 @@ export default function ChannelsHomeScreen({
   const [publicChannels, setPublicChannels] = useState<ChannelSummary[]>([]);
   const [membersOnly, setMembersOnly] = useState<ChannelSummary[]>([]);
   const [subscribed, setSubscribed] = useState<ChannelSummary[]>([]);
-  const [privateChannels, setPrivateChannels] = useState<PrivateChannelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Channel intro video — plays full-screen, autoplays, auto-closes on end.
+  const [introUrl, setIntroUrl] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!user) { return; }
     if (!silent) { setLoading(true); }
     try {
-      const [pub, mo, subd, dm] = await Promise.all([
+      const [pub, mo, subd] = await Promise.all([
         fetchPublicChannels(user.id).catch(() => []),
         fetchMembersOnlyChannels(user.id).catch(() => []),
         fetchSubscribedChannels(user.id).catch(() => []),
-        fetchPrivateChannels(user.id).catch(() => []),
       ]);
       setPublicChannels(pub);
       setMembersOnly(mo);
       setSubscribed(subd);
-      setPrivateChannels(privateChannelRows(dm));
     } catch (e) {
       console.error('[ChannelsHome] load error:', JSON.stringify(e));
     } finally {
@@ -163,34 +143,14 @@ export default function ChannelsHomeScreen({
     });
   }, [publicChannels, membersOnly, subscribed]);
 
-  const privateHeader = privateChannels.length > 0 ? (
-    <View style={styles.privateSection}>
-      {privateChannels.map(p => (
-        <ConversationRow
-          key={p.id}
-          avatarUrl={null}
-          fallbackInitial="🔒"
-          title={p.name}
-          subtitle={p.unread > 0 ? `${p.unread} new` : 'Caught up'}
-          unreadCount={p.unread}
-          state={p.state}
-          onPress={() => navigation.navigate('Channel', {
-            channelId: p.id,
-            channelName: p.name,
-            isPublic: false,
-            isJoined: true,
-            isOwner: false,
-            isMembersOnly: false,
-          })}
-        />
-      ))}
-    </View>
-  ) : null;
-
   return (
     <View style={[styles.container, { paddingTop: top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Channels</Text>
+        <TouchableOpacity style={styles.acctBtn} hitSlop={10} activeOpacity={0.7}
+          onPress={() => (navigation as any).getParent()?.navigate('Account')}>
+          <AccountBlob size={34} />
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -199,7 +159,6 @@ export default function ChannelsHomeScreen({
         <FlatList
           data={data}
           keyExtractor={c => c.id}
-          ListHeaderComponent={privateHeader}
           renderItem={({ item }) => {
             const isOwner = item.created_by === user?.id;
             const isPendingInvite = !!item.invite_only && item.invite_status === 'pending';
@@ -209,6 +168,7 @@ export default function ChannelsHomeScreen({
                 channel={item}
                 userId={user?.id}
                 onPress={() => navigateToChannel(item)}
+                onPlayIntro={setIntroUrl}
                 state={state}
                 {...(isPendingInvite ? {
                   onAcceptInvite: () => handleAcceptInvite(item),
@@ -225,24 +185,43 @@ export default function ChannelsHomeScreen({
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.ACCENT_HOT} />
           }
           ListEmptyComponent={
-            privateChannels.length > 0 ? null : (
-              <View style={styles.center}>
-                <Text style={styles.emptyText}>
-                  No channels yet. Browse and join a channel to see its activity here.
-                </Text>
-              </View>
-            )
+            <View style={styles.center}>
+              <Text style={styles.emptyText}>
+                No channels yet. Browse and join a channel to see its activity here.
+              </Text>
+            </View>
           }
-          contentContainerStyle={data.length === 0 && privateChannels.length === 0 ? styles.emptyContainer : styles.listContent}
+          contentContainerStyle={data.length === 0 ? styles.emptyContainer : styles.listContent}
         />
       )}
+
+      {/* Channel intro video — full-screen, autoplays, auto-closes on end (tap anywhere to dismiss). */}
+      <Modal visible={!!introUrl} transparent={false} animationType="fade" supportedOrientations={['portrait']}
+        onRequestClose={() => setIntroUrl(null)}>
+        <TouchableOpacity style={styles.introPlayer} activeOpacity={1} onPress={() => setIntroUrl(null)}>
+          {introUrl && (
+            <Video
+              source={{ uri: introUrl }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="contain"
+              paused={false}
+              onEnd={() => setIntroUrl(null)}
+            />
+          )}
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
-  header: { paddingTop: SPACE.SM, paddingBottom: SPACE.MD, paddingHorizontal: SPACE.LG },
+  introPlayer: { flex: 1, backgroundColor: '#000' },
+  header: { 
+    flexDirection: 'row', alignItems: 'center', 
+    paddingHorizontal: SPACE.LG, marginTop: 9
+  },
+  acctBtn: { marginLeft: 'auto', marginTop: 9 },
   title: {
     fontSize: FONT.SIZES.XL,
     fontFamily: FONT.DISPLAY_BOLD,

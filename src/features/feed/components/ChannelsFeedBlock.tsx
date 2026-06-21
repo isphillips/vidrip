@@ -8,31 +8,45 @@ import {
   fetchChannelUpdatesSummary, type ChannelUpdateSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 
-const GAP = 36; // px between the looped marquee copies
+const GAP = 36; // px of empty space between repeated copies
 
-// A seamless left-scrolling news ticker. Two copies of the text scroll as one row so
-// the loop has no visible seam.
+// A seamless left-scrolling ticker. We render as many copies of the text as it takes to
+// overflow the visible width (plus one spare), then translate the row by exactly ONE
+// copy+gap and loop back instantly — so a fresh copy is always entering from the right
+// with no gap. (The old 2-copy version popped the text back in on the right whenever the
+// text was narrower than the row, which it usually is here.)
 function Marquee({ text }: { text: string }) {
   const x = useRef(new Animated.Value(0)).current;
   const [textW, setTextW] = useState(0);
+  const [wrapW, setWrapW] = useState(0);
+
+  const unit = textW + GAP; // one copy + its trailing gap = the loop distance
+  const copies = unit > 0 && wrapW > 0 ? Math.ceil(wrapW / unit) + 1 : 2;
 
   useEffect(() => {
-    if (textW <= 0) { return; }
-    const dist = textW + GAP;
+    if (unit <= 0 || wrapW <= 0) { return; }
     x.setValue(0);
     const loop = Animated.loop(
-      Animated.timing(x, { toValue: -dist, duration: dist * 22, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(x, { toValue: -unit, duration: unit * 22, easing: Easing.linear, useNativeDriver: true }),
     );
     loop.start();
     return () => loop.stop();
-  }, [textW, text, x]);
+  }, [unit, wrapW, text, x]);
 
   return (
-    <View style={styles.marqueeWrap}>
+    <View style={styles.marqueeWrap} onLayout={e => setWrapW(e.nativeEvent.layout.width)}>
       <Animated.View style={[styles.marqueeRow, { transform: [{ translateX: x }] }]}>
-        <Text onLayout={e => setTextW(e.nativeEvent.layout.width)} numberOfLines={1} style={styles.marqueeText}>{text}</Text>
-        <View style={{ width: GAP }} />
-        <Text numberOfLines={1} style={styles.marqueeText}>{text}</Text>
+        {Array.from({ length: copies }).map((_, i) => (
+          <React.Fragment key={i}>
+            <Text
+              numberOfLines={1}
+              style={styles.marqueeText}
+              onLayout={i === 0 ? e => setTextW(e.nativeEvent.layout.width) : undefined}>
+              {text}
+            </Text>
+            <View style={{ width: GAP }} />
+          </React.Fragment>
+        ))}
       </Animated.View>
     </View>
   );

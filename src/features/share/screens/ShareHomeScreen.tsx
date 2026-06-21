@@ -12,6 +12,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import GradientButton from '../../studio/components/GradientButton';
+import GradientIcon from '../../../components/GradientIcon';
+import AccountBlob from '../../../components/AccountBlob';
 import SlimeDetective from '../components/SlimeDetective';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
 import { IG_REEL_JS, TapToPlayHint } from '../../shared/igReelPlayer';
@@ -940,6 +942,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               <Ionicons name={searchOpen ? 'close' : 'search'} size={22} color={C.INK} />
             </TouchableOpacity>
           )}
+          <TouchableOpacity hitSlop={10} activeOpacity={0.7} style={styles.accountButton}
+            onPress={() => (rootNav as any).getParent()?.navigate('Account')}>
+            <AccountBlob size={34} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1332,11 +1338,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 )}
               </View>
               <View style={styles.overlayActions}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.75}>
-                  <Ionicons name="chatbubbles-outline" size={22} color={C.DANGER} />
+                <TouchableOpacity style={styles.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
+                  <GradientIcon name="chatbubbles" size={22} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={openDrawer} activeOpacity={0.75}>
-                  <Ionicons name="paper-plane-outline" size={22} color={C.DANGER} />
+                <TouchableOpacity style={styles.actionBtn} onPress={openDrawer} activeOpacity={0.8}>
+                  <GradientIcon name="paper-plane" size={22} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1487,8 +1493,9 @@ const styles = StyleSheet.create({
     color: C.INK, letterSpacing: -1,
     fontWeight: FONT.WEIGHTS.BOLD,
     textTransform: 'uppercase',
+    marginTop: 1
   },
-  searchToggle: { padding: SPACE.XS },
+  searchToggle: { padding: SPACE.XS, marginTop: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
 
   // mode toggle
@@ -1594,12 +1601,12 @@ const styles = StyleSheet.create({
   overlayChannel: { color: 'rgba(255,255,255,0.7)', fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
   overlayActions: { flexDirection: 'row', gap: SPACE.SM, paddingBottom: 2 },
   actionBtn: {
-    width: 48, height: 48, borderRadius: RADIUS.FULL,
-    backgroundColor: 'rgba(10, 0, 25, 0.88)',
-    borderWidth: 1.5, borderColor: C.DANGER,
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: C.SURFACE_2,
+    borderWidth: 1, borderColor: C.BORDER_STRONG,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: C.ACCENT_HOT, shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.75, shadowRadius: 10, elevation: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45, shadowRadius: 10, elevation: 8,
   },
   toast: { backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: RADIUS.MD, paddingVertical: SPACE.SM, paddingHorizontal: SPACE.LG, alignSelf: 'center' },
   toastText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM },
@@ -1653,4 +1660,5 @@ const styles = StyleSheet.create({
   sendBtn:         { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, paddingVertical: SPACE.LG, alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
   sendBtnText:     { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
+  accountButton:  { marginTop: 2 }
 });

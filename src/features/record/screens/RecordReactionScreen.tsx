@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { usePendingReactionsStore } from '../../../store/pendingReactionsStore';
@@ -9,12 +9,13 @@ import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateV
 import { STORAGE_MODE } from '../../../infrastructure/storage/config';
 import ReactionRecorder from '../components/ReactionRecorder';
 import IntroPreroll from '../../threads/components/IntroPreroll';
+import { useReactQueueStore } from '../../../store/reactQueueStore';
 import type { RecordStackScreenProps } from '../../../app/navigation/types';
 
 export default function RecordReactionScreen({
   route, navigation,
 }: RecordStackScreenProps<'RecordReaction'>) {
-  const { threadId, videoId, sourceType = 'youtube', sourceUri, introUrl } = route.params;
+  const { threadId, videoId, sourceType = 'youtube', sourceUri, introUrl, queued = false } = route.params;
   const { user, profile } = useAuthStore();
   const enqueue = useUploadStore(s => s.enqueue);
   const addPendingReaction = usePendingReactionsStore(s => s.add);
@@ -24,11 +25,27 @@ export default function RecordReactionScreen({
   const introSeen = useIntroSeenStore(s => s.seen);
   const markIntroSeen = useIntroSeenStore(s => s.markSeen);
 
-  const onBack = useCallback(() => navigation.goBack(), [navigation]);
+  // Track a just-saved reaction so the doom-react queue advances only on save (not a manual back).
+  const justSavedRef = useRef(false);
+  const onBack = useCallback(() => {
+    if (justSavedRef.current && queued) {
+      justSavedRef.current = false;
+      const next = useReactQueueStore.getState().shiftNext();
+      if (next) {
+        navigation.replace('RecordReaction', { ...next, queued: true });
+        return;
+      }
+      useReactQueueStore.getState().clear();
+    } else if (!justSavedRef.current) {
+      useReactQueueStore.getState().clear();   // user backed out → abandon the queue
+    }
+    navigation.goBack();
+  }, [navigation, queued]);
   const onSave = useCallback(async (
     filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean,
     _lensTrack?: unknown, afterthought?: { path: string; duration: number } | null,
   ) => {
+    justSavedRef.current = true;   // committed → onBack advances the doom-react queue
     enqueue('Saving reaction…', async () => {
       // Gate on automated moderation before anything is uploaded or inserted.
       await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'reaction' });
@@ -84,7 +101,7 @@ export default function RecordReactionScreen({
       uploadingText="Saving reaction…"
       onSave={onSave}
       maxDuration={180}
-      allowAfterthought
+      allowAfterthought={!queued}
     />
   );
 }

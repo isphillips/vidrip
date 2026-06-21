@@ -1,10 +1,26 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import Handle from '../../../components/Handle';
 import ExclusiveGlow from '../../../components/conversation/ExclusiveGlow';
 import { rowStateStyle, type RowState } from '../../../components/conversation/useRowState';
 import type { ChannelSummary } from '../../../infrastructure/supabase/queries/channels';
+
+// Compact "last updated" stamp: today → time (3:30 PM), within a week → weekday (Mon),
+// this year → "Jun 17", older → "Jun 17, 2025".
+function formatUpdated(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+  if (diffDays < 7) { return d.toLocaleDateString(undefined, { weekday: 'short' }); }
+  return d.toLocaleDateString(undefined, d.getFullYear() === now.getFullYear()
+    ? { month: 'short', day: 'numeric' }
+    : { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 type Props = {
   channel: ChannelSummary;
@@ -20,11 +36,13 @@ type Props = {
   // matching the Feed conversation rows. Omitted → no state treatment.
   state?: RowState;
   exclusiveGlow?: boolean;
+  // Tapping the intro-video tile plays the channel's intro full-screen (parent owns the player).
+  onPlayIntro?: (url: string) => void;
 };
 
 export default function ChannelCard({
   channel, userId, onPress, onAcceptInvite, onDeclineInvite,
-  onToggleListed, onToggleInviteOnly, state, exclusiveGlow = false,
+  onToggleListed, onToggleInviteOnly, state, exclusiveGlow = false, onPlayIntro,
 }: Props) {
   const stateStyle = state ? rowStateStyle(state, exclusiveGlow).container : null;
   const isOwner = !!userId && channel.created_by === userId;
@@ -50,7 +68,11 @@ export default function ChannelCard({
           )
         ) : channel.avatar_url ? (
           <Image source={{ uri: channel.avatar_url }} style={styles.avatar} resizeMode="cover" />
-        ) : null}
+        ) : (
+          <View style={styles.avatarFallback}>
+            <Text style={styles.avatarLetter}>{initial}</Text>
+          </View>
+        )}
         <View style={styles.meta}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>
@@ -58,16 +80,12 @@ export default function ChannelCard({
             </Text>
             {hasUnread && <View style={styles.unreadDot} />}
           </View>
-          {/* Owner @handle subtitle (the title now always holds the channel name). */}
-          {channel.owner && (
-            <Handle userId={channel.created_by ?? undefined} handle={channel.owner.handle} style={styles.owner} />
-          )}
           {channel.description ? (
             <Text style={styles.description} numberOfLines={2}>{channel.description}</Text>
           ) : null}
           <View style={styles.footer}>
             <Text style={styles.memberCount}>
-              {channel.member_count.toLocaleString()} member{channel.member_count !== 1 ? 's' : ''}
+              {channel.post_count.toLocaleString()} video{channel.post_count !== 1 ? 's' : ''}
             </Text>
             {isOwner
               ? null
@@ -96,34 +114,17 @@ export default function ChannelCard({
                 </View>
               ) : null
             }
-
-            {showOwnerControls && (
-              <>
-                <TouchableOpacity
-                  style={[styles.statusBadge, listed ? styles.statusOn : styles.statusOff]}
-                  onPress={onToggleListed} activeOpacity={0.8}>
-                  <Text style={[styles.statusBadgeText, listed ? styles.statusTextOn : styles.statusTextOff]}>
-                    {listed ? 'Public' : 'Private'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.statusBadge, inviteOnly ? styles.statusOff : styles.statusOn]}
-                  onPress={onToggleInviteOnly} activeOpacity={0.8}>
-                  <Text style={[styles.statusBadgeText, inviteOnly ? styles.statusTextOff : styles.statusTextOn]}>
-                    {inviteOnly ? 'Invite Only' : 'Open'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
           </View>
         </View>
 
-        {channel.pinned_video_thumbnail ? (
-          <Image
-            source={{ uri: channel.pinned_video_thumbnail }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
+        {channel.ad_video_url ? (
+          <TouchableOpacity
+            style={[styles.thumbnail, styles.introTile]}
+            activeOpacity={0.85}
+            onPress={() => onPlayIntro?.(channel.ad_video_url!)}>
+            <Ionicons name="play-circle" size={30} color={C.ACCENT_HOT} />
+            <Text style={styles.introLabel}>Intro</Text>
+          </TouchableOpacity>
         ) : (
           <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
             <Text style={styles.thumbnailPlaceholderIcon}>▶</Text>
@@ -207,17 +208,17 @@ const styles = StyleSheet.create({
     color: C.SUBTLE,
   },
   joinedPill: {
-    backgroundColor: C.ACCENT_LITE,
+    backgroundColor: C.SURFACE_2,
     borderRadius: RADIUS.FULL,
     paddingHorizontal: SPACE.SM,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: C.ACCENT,
+    borderColor: C.BORDER,
   },
   joinedText: {
     fontSize: FONT.SIZES.XS,
     fontFamily: FONT.BODY_MEDIUM,
-    color: C.ACCENT_HOT,
+    color: C.MUTED,
   },
   ownerPill: {
     backgroundColor: C.ACCENT,
@@ -266,4 +267,9 @@ const styles = StyleSheet.create({
     color: C.SUBTLE,
     fontSize: 18,
   },
+  introTile: {
+    alignItems: 'center', justifyContent: 'center', gap: 2,
+    backgroundColor: C.ACCENT_LITE, borderWidth: 1, borderColor: C.ACCENT,
+  },
+  introLabel: { fontSize: 9, fontFamily: FONT.BODY_BOLD, color: C.ACCENT_HOT, textTransform: 'uppercase', letterSpacing: 1 },
 });
