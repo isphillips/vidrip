@@ -32,6 +32,7 @@ export type ChannelSummary = {
   avatar_url?: string | null;
   subscribed?: boolean;       // user has an active paid subscription to this room
   subscriber_mode?: boolean;  // the room is gated by paid subscription
+  is_group_chat?: boolean;    // private multi-person chat (Feed), not a creator channel
 };
 
 export type ChannelPost = {
@@ -310,7 +311,7 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
   const { data, error } = await (supabase as any)
     .from('groups')
     .select(`
-      id, name, description, is_public, created_by, member_count,
+      id, name, description, is_public, created_by, member_count, is_group_chat,
       owner:users!created_by(handle, avatar_url)
     `)
     .eq('is_public', false)
@@ -345,6 +346,7 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
     is_joined: true,
     unread_count: unreadMap.get(c.id)?.count ?? 0,
     last_message_at: unreadMap.get(c.id)?.lastMsg ?? null,
+    is_group_chat: !!c.is_group_chat,
   }));
 
   // Unread channels float to top, then sort by last message
@@ -355,6 +357,34 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
     const bt = b.last_message_at ?? '';
     return bt.localeCompare(at);
   });
+}
+
+// Maps each given (private/DM) channel id → the OTHER member's user id, for the
+// per-friend Feed grouping. 1:1 DMs have exactly two members; channels with a single
+// resolvable peer are returned, group (3+) channels are skipped (no single friend).
+export async function fetchPrivateChannelPeers(
+  userId: string,
+  channelIds: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (channelIds.length === 0) { return map; }
+  const { data, error } = await (supabase as any)
+    .from('group_members')
+    .select('group_id, user_id')
+    .in('group_id', channelIds);
+  if (error) { return map; }
+
+  // group_id → set of member ids (excluding me)
+  const peers = new Map<string, Set<string>>();
+  for (const row of (data ?? [])) {
+    if (row.user_id === userId) { continue; }
+    if (!peers.has(row.group_id)) { peers.set(row.group_id, new Set()); }
+    peers.get(row.group_id)!.add(row.user_id);
+  }
+  for (const [groupId, members] of peers) {
+    if (members.size === 1) { map.set(groupId, [...members][0]); }
+  }
+  return map;
 }
 
 export async function markChannelAsRead(channelId: string): Promise<void> {
@@ -369,6 +399,37 @@ export async function ensurePrivateChannel(userA: string, userB: string): Promis
     .rpc('ensure_private_channel', { user_a: userA, user_b: userB });
   if (error) { throw error; }
   return data as string;
+}
+
+export type ChannelUpdateSummary = { channel_id: string; name: string; unseen_count: number };
+
+// One call powering the Feed "Channels" ticker — channels (public/members-only) the user
+// is in that have unseen updates, with a per-channel count.
+export async function fetchChannelUpdatesSummary(userId: string): Promise<ChannelUpdateSummary[]> {
+  const { data, error } = await (supabase as any)
+    .rpc('get_channel_updates_summary', { p_user_id: userId });
+  if (error) { return []; }
+  return (data ?? []).map((r: any) => ({
+    channel_id: r.channel_id,
+    name: r.name ?? 'a channel',
+    unseen_count: Number(r.unseen_count ?? 0),
+  }));
+}
+
+// Create a friends-only group chat (private channel with >=2 other members). Auto-named
+// from participant handles by a DB trigger. Returns the new channel id.
+export async function createGroupChat(memberIds: string[]): Promise<string> {
+  const { data, error } = await (supabase as any)
+    .rpc('create_group_chat', { p_member_ids: memberIds });
+  if (error) { throw new Error(error.message ?? 'Could not create group chat'); }
+  return data as string;
+}
+
+// Rename a group chat (any member). Empty name reverts to the auto participant name.
+export async function renameGroupChat(channelId: string, name: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .rpc('rename_group_chat', { p_channel_id: channelId, p_name: name });
+  if (error) { throw new Error(error.message ?? 'Could not rename group chat'); }
 }
 
 export async function fetchChannelPosts(channelId: string, userId?: string): Promise<ChannelPost[]> {
