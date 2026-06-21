@@ -123,11 +123,17 @@ export type ShareStackParamList = {
 // Record stack
 export type RecordStackParamList = {
   RecordReaction: {
-    threadId: string;
+    // 'thread' (default) = a friend/group share; 'channel' = a followed-channel post reacted
+    // to inline so the doom-react queue can chain channels and threads through one screen.
+    kind?: 'thread' | 'channel';
+    threadId?: string;                   // required for thread targets; absent for channel targets
     videoId?: string;                    // absent for a Studio-clip reaction (no source video)
     sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'studio';
     // For a Studio-clip reaction the creator's clip plays as the source from this URL.
     sourceUri?: string;
+    // Channel-post target — the source video + bunny embed/recipe are resolved lazily on mount.
+    postId?: string;
+    channelId?: string;
     // When the share carries a sender intro, play it before the source video.
     introUrl?: string;
     introDuration?: number;

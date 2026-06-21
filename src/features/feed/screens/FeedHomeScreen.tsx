@@ -23,7 +23,8 @@ import { useFeedStore } from '../../../store/feedStore';
 import { useAuthStore } from '../../../store/authStore';
 import { useReactQueueStore, type ReactTarget } from '../../../store/reactQueueStore';
 import {
-  renameGroupChat, fetchChannelUpdatesSummary, type ChannelUpdateSummary,
+  renameGroupChat, fetchChannelUpdatesSummary, fetchChannelPosts,
+  type ChannelUpdateSummary, type ChannelPost,
 } from '../../../infrastructure/supabase/queries/channels';
 import ConversationRow from '../../../components/conversation/ConversationRow';
 import { relativeTime } from '../../../utils/relativeTime';
@@ -96,6 +97,39 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     setQueue(others.map(toTarget));
     (navigation as any).getParent()?.navigate('RecordReaction', { ...toTarget(first), queued: true });
     return true;
+  };
+
+  // Doom-react a channel: start on its first unwatched video, chain through the channel's
+  // remaining pending posts, then continue through the rest of the Feed's pending shares.
+  const startChannelDoomReact = async (chId: string, chName: string, isMembersOnly: boolean) => {
+    let posts: ChannelPost[] = [];
+    try { posts = await fetchChannelPosts(chId, user?.id); } catch { /* ignore */ }
+    const channelTargets: ReactTarget[] = posts
+      .filter(p => p.parent_post_id == null && p.poster_id !== user?.id && !p.has_my_reaction
+        && (p.post_type === 'youtube' || p.post_type === 'creator'))
+      .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))   // oldest unwatched first
+      .map(p => ({ kind: 'channel' as const, postId: p.id, channelId: chId }));
+
+    const threadTargets: ReactTarget[] = threads
+      .filter(t => t.sender_id !== user?.id && t.my_status !== 'reacted'
+        && t.thread_kind !== 'studio_share' && !!t.video_id)
+      .map(t => ({
+        kind: 'thread' as const, threadId: t.id, videoId: t.video_id ?? undefined,
+        sourceType: (t.source_type ?? undefined) as ReactTarget['sourceType'],
+      }));
+
+    const ordered = [...channelTargets, ...threadTargets];
+    if (ordered.length === 0) {
+      // Nothing pending after all — just open the channel.
+      (navigation as any).navigate('Channel', {
+        channelId: chId, channelName: chName,
+        isPublic: true, isJoined: true, isOwner: false, isMembersOnly, isGroupChat: false,
+      });
+      return;
+    }
+    const [first, ...rest] = ordered;
+    setQueue(rest);
+    (navigation as any).getParent()?.navigate('RecordReaction', { ...first, queued: true });
   };
 
   // Long-press a group chat → rename it (any member can; empty reverts to auto name).
@@ -245,15 +279,9 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             unreadCount={item.channel.unseen_count}
             state="unread"
             timestamp={relativeTime(item.sortAt)}
-            onPress={() => (navigation as any).navigate('Channel', {
-              channelId: item.channel.channel_id,
-              channelName: item.channel.name,
-              isPublic: true,
-              isJoined: true,
-              isOwner: false,
-              isMembersOnly: item.channel.is_members_only,
-              isGroupChat: false,
-            })}
+            onPress={() => startChannelDoomReact(
+              item.channel.channel_id, item.channel.name, item.channel.is_members_only,
+            )}
           />
         )}
       />

@@ -1,29 +1,72 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { usePendingReactionsStore } from '../../../store/pendingReactionsStore';
+import { usePendingChannelReactionsStore } from '../../../store/pendingChannelReactionsStore';
 import { useIntroSeenStore } from '../../../store/introSeenStore';
 import { saveReaction } from '../../../infrastructure/storage/reactionStorage';
 import { localPathForReaction } from '../../../infrastructure/storage/localReactionStorage';
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import { STORAGE_MODE } from '../../../infrastructure/storage/config';
+import {
+  fetchChannelPost, commitChannelClip, uploadChannelClipRelay,
+} from '../../../infrastructure/supabase/queries/channels';
+import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
 import ReactionRecorder from '../components/ReactionRecorder';
 import IntroPreroll from '../../threads/components/IntroPreroll';
 import { useReactQueueStore } from '../../../store/reactQueueStore';
+import { faceLensRecipe, type OverlayRecipe } from '../../studio/effectRecipe';
+import { C } from '../../../theme';
+import type { FaceLensTrack } from '../../lens/faceLens';
 import type { RecordStackScreenProps } from '../../../app/navigation/types';
 
 export default function RecordReactionScreen({
   route, navigation,
 }: RecordStackScreenProps<'RecordReaction'>) {
-  const { threadId, videoId, sourceType = 'youtube', sourceUri, introUrl, queued = false } = route.params;
+  const {
+    kind = 'thread', threadId, videoId, sourceType = 'youtube', sourceUri,
+    postId, channelId, introUrl, queued = false,
+  } = route.params;
+  const isChannel = kind === 'channel' || !!postId;
   const { user, profile } = useAuthStore();
   const enqueue = useUploadStore(s => s.enqueue);
   const addPendingReaction = usePendingReactionsStore(s => s.add);
+  const addPendingChannelReaction = usePendingChannelReactionsStore(s => s.add);
 
   // Sender intro shares the once-per-session gate with ThreadScreen — if the
   // recipient already saw it on opening the video, don't replay it here.
   const introSeen = useIntroSeenStore(s => s.seen);
   const markIntroSeen = useIntroSeenStore(s => s.markSeen);
+
+  // Channel targets resolve their source video lazily (mirrors WatchYouTubePostScreen): yt id /
+  // re-hosted file, or a short-lived signed bunny embed + its animated overlay recipe.
+  const [chReady, setChReady] = useState(!isChannel);
+  const [chVideoId, setChVideoId] = useState<string | null>(null);
+  const [chSourceUri, setChSourceUri] = useState<string | null>(null);
+  const [chEmbedUrl, setChEmbedUrl] = useState<string | null>(null);
+  const [chRecipe, setChRecipe] = useState<OverlayRecipe | null>(null);
+  const [chSourceType, setChSourceType] =
+    useState<'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook'>('youtube');
+
+  useEffect(() => {
+    if (!isChannel || !postId) { return; }
+    let active = true;
+    setChReady(false);
+    fetchChannelPost(postId).then(async p => {
+      const st = p?.source_type ?? 'youtube';
+      if (!active) { return; }
+      setChVideoId(p?.yt_video_id ?? null);
+      setChSourceUri(p?.video_url ?? null);
+      setChSourceType(st);
+      if (st === 'bunny') {
+        try { const e = await signCreatorVideo(postId); if (active) { setChEmbedUrl(e); } } catch { /* not ready */ }
+        fetchOverlayRecipe(postId).then(r => { if (active) { setChRecipe(r); } }).catch(() => {});
+      }
+      if (active) { setChReady(true); }
+    });
+    return () => { active = false; };
+  }, [isChannel, postId]);
 
   // Track a just-saved reaction so the doom-react queue advances only on save (not a manual back).
   const justSavedRef = useRef(false);
@@ -41,11 +84,38 @@ export default function RecordReactionScreen({
     }
     navigation.goBack();
   }, [navigation, queued]);
+
   const onSave = useCallback(async (
     filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean,
-    _lensTrack?: unknown, afterthought?: { path: string; duration: number } | null,
+    lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null,
   ) => {
     justSavedRef.current = true;   // committed → onBack advances the doom-react queue
+
+    // ── Channel-post reaction: commit a clip under the post (mirrors WatchYouTubePostScreen). ──
+    if (isChannel && postId && channelId) {
+      enqueue('Posting reaction…', async () => {
+        await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'channel_clip' });
+        const newPostId = await commitChannelClip({
+          channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones,
+          overlayRecipe: lensTrack ? faceLensRecipe(lensTrack) : null,
+        });
+        addPendingChannelReaction(postId, {
+          id: newPostId, channel_id: channelId, poster_id: user!.id,
+          poster: { handle: profile?.handle ?? '' },
+          post_type: 'clip', source_type: 'youtube',
+          yt_video_id: null, yt_video_title: null, yt_video_thumbnail: null,
+          video_url: null, duration: Math.round(duration), is_pinned: false,
+          created_at: new Date().toISOString(), message: null,
+          emoji_reactions: [], reaction_count: 0, has_my_reaction: true,
+          review_count: 0, has_my_review: false, parent_post_id: postId,
+          parent_yt_video_id: null, parent_source_type: 'youtube',
+        });
+        await uploadChannelClipRelay(newPostId, user!.id);
+      });
+      return;
+    }
+
+    // ── Friend/group thread reaction. ──
     enqueue('Saving reaction…', async () => {
       // Gate on automated moderation before anything is uploaded or inserted.
       await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'reaction' });
@@ -55,7 +125,7 @@ export default function RecordReactionScreen({
       const storedVideoId = sourceType === 'studio' ? undefined : videoId;
       await saveReaction({
         userId: user!.id,
-        threadId,
+        threadId: threadId!,
         filePath,
         duration,
         mode: STORAGE_MODE,
@@ -69,7 +139,7 @@ export default function RecordReactionScreen({
         onCommitted: (reactionId) => {
           addPendingReaction({
             id: reactionId,
-            thread_id: threadId,
+            thread_id: threadId!,
             video_url: null,
             storage_mode: STORAGE_MODE,
             duration: Math.round(duration),
@@ -86,10 +156,32 @@ export default function RecordReactionScreen({
         },
       });
     });
-  }, [user, profile, threadId, videoId, sourceType, enqueue, addPendingReaction]);
+  }, [isChannel, postId, channelId, user, profile, threadId, videoId, sourceType, enqueue, addPendingReaction, addPendingChannelReaction]);
 
-  if (introUrl && !introSeen.has(threadId)) {
+  if (introUrl && threadId && !introSeen.has(threadId)) {
     return <IntroPreroll introUrl={introUrl} onDone={() => markIntroSeen(threadId)} />;
+  }
+
+  if (isChannel) {
+    const fileBacked = chSourceType === 'instagram' || chSourceType === 'facebook';
+    const ready = chSourceType === 'bunny' ? !!chEmbedUrl : fileBacked ? !!chSourceUri : !!chVideoId;
+    if (!chReady || !ready) {
+      return <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} size="large" /></View>;
+    }
+    return (
+      <ReactionRecorder
+        videoId={(fileBacked || chSourceType === 'bunny') ? undefined : (chVideoId ?? undefined)}
+        sourceUri={chSourceUri ?? undefined}
+        embedUrl={chEmbedUrl ?? undefined}
+        recipe={chRecipe}
+        sourceType={chSourceType}
+        onBack={onBack}
+        uploadingText="Posting reaction…"
+        onSave={onSave}
+        maxDuration={180}
+        allowAfterthought={false}
+      />
+    );
   }
 
   return (
@@ -105,3 +197,7 @@ export default function RecordReactionScreen({
     />
   );
 }
+
+const styles = StyleSheet.create({
+  center: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+});

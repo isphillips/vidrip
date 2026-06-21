@@ -60,13 +60,15 @@ export default function LensPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // 4 per row, uniform spacing all around. Compute the cell from the MEASURED scroll-area width (so
-  // border/rounding can't make the 4th cell overflow and wrap), with a 94% estimate as the fallback.
+  // 4 per row, edge-to-edge. cellW fits 4 with at least GAP between (from the MEASURED width, with a
+  // conservative fallback); the row then uses `space-between`, which only ever EXPANDS the gaps — so
+  // four fixed-width tiles can never wrap to 3, and the spare space is shared between columns (no
+  // right-edge gutter) instead of being dumped after the last tile.
   const COLS = 4;
   const GAP = SPACE.SM;
   const PAD = SPACE.SM;
-  const innerW = (gridW || width * 0.94) - PAD * 2;
-  const cellW = Math.floor((innerW - GAP * (COLS - 1)) / COLS);
+  const innerW = (gridW || width * 0.9) - PAD * 2;
+  const cellW = Math.max(56, Math.floor((innerW - GAP * (COLS - 1)) / COLS));
   const cellH = Math.round(cellW * 1.18);
 
   // None + the lenses in the active tab.
@@ -118,7 +120,7 @@ export default function LensPicker({
               style={styles.scroll}
               showsVerticalScrollIndicator={false}
               onLayout={e => setGridW(e.nativeEvent.layout.width)}
-              contentContainerStyle={[styles.grid, { padding: PAD, gap: GAP }]}>
+              contentContainerStyle={[styles.grid, { padding: PAD, rowGap: GAP }]}>
               {opts.map(o => {
                 const on = o.key === lensKey;
                 return (
@@ -130,6 +132,11 @@ export default function LensPicker({
                   </TouchableOpacity>
                 );
               })}
+              {/* Invisible spacers pad the final row to a multiple of COLS so its tiles stay column-
+                  aligned under the rows above (space-between would otherwise spread a partial row). */}
+              {Array.from({ length: (COLS - (opts.length % COLS)) % COLS }).map((_, i) => (
+                <View key={`sp-${i}`} style={{ width: cellW }} />
+              ))}
             </ScrollView>
           </Animated.View>
         )}
@@ -162,7 +169,7 @@ const styles = StyleSheet.create({
   tabTxt: { color: C.SUBTLE, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.XS },
   tabTxtOn: { color: C.WHITE, fontFamily: FONT.BODY_BOLD },
   scroll: { maxHeight: 380 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   cell: {
     borderRadius: RADIUS.MD, backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 2, borderColor: 'transparent', overflow: 'hidden',
