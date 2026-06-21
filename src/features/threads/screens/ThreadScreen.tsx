@@ -211,7 +211,16 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   // also flips the CTA to "You Reacted" before the server status catches up.
   const hasReacted = thread.my_status === 'reacted' || pendingForThread.length > 0;
   const canReact = !isSender && !hasReacted;
-  const obscured = canReact;
+
+  // Studio share: the creator's clip is the headline content (stored as the sender's reaction row).
+  // It's watchable without the "react to reveal" gate, and it's what recipients record against.
+  const isStudioShare = thread.thread_kind === 'studio_share';
+  const studioClip = isStudioShare
+    ? (displayReactions.find(r => (r.user as any)?.id === thread.sender_id) ?? null)
+    : null;
+  const listReactions = studioClip ? displayReactions.filter(r => r.id !== studioClip.id) : displayReactions;
+
+  const obscured = canReact && !isStudioShare;
   const thumbnail = thread.video_thumbnail ??
     (thread.source_type === 'youtube' ? `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg` : null);
 
@@ -225,6 +234,12 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
           <View style={styles.thumbBlind}>
             <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
           </View>
+        ) : isStudioShare && studioClip ? (
+          <TouchableOpacity activeOpacity={0.9} style={StyleSheet.absoluteFill}
+            onPress={() => navigation.navigate('WatchReaction', { reactionId: studioClip.id })}>
+            <Image source={{ uri: thumbnail ?? undefined }} style={styles.thumb} resizeMode="cover" />
+            <View style={styles.studioPlayBadge}><Text style={styles.studioPlayIcon}>▶</Text></View>
+          </TouchableOpacity>
         ) : (
           <Image source={{ uri: thumbnail ?? undefined }} style={styles.thumb} resizeMode="cover" />
         )}
@@ -242,11 +257,16 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
           ) : null}
           {canReact ? (
             <TouchableOpacity style={styles.reactBtn} activeOpacity={0.85}
-              onPress={() => navigation.getParent()?.navigate('RecordReaction', {
-                threadId, videoId: thread.video_id, sourceType: thread.source_type,
-                introUrl: thread.intro_url ?? undefined,
-                introDuration: thread.intro_duration ?? undefined,
-              })}>
+              onPress={() => navigation.getParent()?.navigate('RecordReaction',
+                isStudioShare && studioClip
+                  ? { threadId, sourceType: 'studio', sourceUri: studioClip.resolvedUri ?? undefined }
+                  : {
+                      threadId,
+                      videoId: thread.video_id ?? undefined,
+                      sourceType: thread.source_type ?? undefined,
+                      introUrl: thread.intro_url ?? undefined,
+                      introDuration: thread.intro_duration ?? undefined,
+                    })}>
               <Text style={styles.reactBtnText}>Record Your Reaction</Text>
             </TouchableOpacity>
           ) : hasReacted ? (
@@ -259,12 +279,12 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
 
       {/* All reactions — group inbox */}
       <Text style={styles.sectionTitle}>
-        {displayReactions.length === 0
+        {listReactions.length === 0
           ? 'No reactions yet'
-          : `${displayReactions.length} reaction${displayReactions.length !== 1 ? 's' : ''}`}
+          : `${listReactions.length} reaction${listReactions.length !== 1 ? 's' : ''}`}
       </Text>
 
-      {displayReactions.map((r) => {
+      {listReactions.map((r) => {
         // Fall back to the reaction's own resolved state so optimistic (pending)
         // reactions — not covered by the dlStatus effect — show as watchable.
         const status = dlStatus[r.id] ?? (r.resolvedUri && !r.needsDownload ? 'local' : 'unavailable');
@@ -353,6 +373,14 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', backgroundColor: C.BLACK,
   },
   thumbBlindImg: { width: 160, height: 200, opacity: 0.85 },
+  // Studio-share cover gets a centered play badge (tap to watch the creator's clip).
+  studioPlayBadge: {
+    position: 'absolute', alignSelf: 'center', top: '44%',
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  studioPlayIcon: { color: C.WHITE, fontSize: 26, marginLeft: 4 },
   blindOverlay: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(0,0,0,0.95)',

@@ -14,7 +14,7 @@ import type { RecordStackScreenProps } from '../../../app/navigation/types';
 export default function RecordReactionScreen({
   route, navigation,
 }: RecordStackScreenProps<'RecordReaction'>) {
-  const { threadId, videoId, sourceType = 'youtube', introUrl } = route.params;
+  const { threadId, videoId, sourceType = 'youtube', sourceUri, introUrl } = route.params;
   const { user, profile } = useAuthStore();
   const enqueue = useUploadStore(s => s.enqueue);
   const addPendingReaction = usePendingReactionsStore(s => s.add);
@@ -32,15 +32,19 @@ export default function RecordReactionScreen({
     enqueue('Saving reaction…', async () => {
       // Gate on automated moderation before anything is uploaded or inserted.
       await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'reaction' });
+      // A Studio-clip reaction has no external source video — store it as a plain reaction
+      // ('youtube' placeholder, no source id) so it plays standalone in the viewer.
+      const storedSourceType = sourceType === 'studio' ? 'youtube' : sourceType;
+      const storedVideoId = sourceType === 'studio' ? undefined : videoId;
       await saveReaction({
         userId: user!.id,
         threadId,
         filePath,
         duration,
         mode: STORAGE_MODE,
-        ytVideoId: videoId,
+        ytVideoId: storedVideoId,
         ytStartOffset,
-        sourceType,
+        sourceType: storedSourceType,
         recordedWithHeadphones,
         afterthought: afterthought ?? null,
         // Surface the reaction in the thread immediately (plays from the local
@@ -55,9 +59,9 @@ export default function RecordReactionScreen({
             created_at: new Date().toISOString(),
             user: { handle: profile?.handle ?? '', display_name: profile?.display_name ?? '' },
             emoji_reactions: [],
-            yt_video_id: videoId ?? null,
+            yt_video_id: storedVideoId ?? null,
             yt_start_offset: ytStartOffset,
-            source_type: sourceType,
+            source_type: storedSourceType,
             recorded_with_headphones: recordedWithHeadphones,
             resolvedUri: `file://${localPathForReaction(reactionId)}`,
             needsDownload: false,
@@ -74,6 +78,7 @@ export default function RecordReactionScreen({
   return (
     <ReactionRecorder
       videoId={videoId}
+      sourceUri={sourceUri}
       sourceType={sourceType}
       onBack={onBack}
       uploadingText="Saving reaction…"

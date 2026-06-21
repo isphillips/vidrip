@@ -11,9 +11,12 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
-  createCreatorVideo, uploadCreatorVideo, fetchPostableChannels, uploadCreatorThumbnail,
+  createCreatorVideo, uploadCreatorVideo, fetchPostableChannels, uploadCreatorThumbnail, fetchCanCreate,
   type PostableChannel, type Visibility, type UploadHandle,
 } from '../../../infrastructure/creatorStudio/api';
+import { publishStudioClipToFriends } from '../../../infrastructure/creatorStudio/studioShare';
+import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
+import PublishForkModal from '../components/PublishForkModal';
 import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
 import EffectPlayer from '../components/EffectPlayer';
@@ -30,7 +33,17 @@ const fmtSchedule = (d: Date) =>
 export default function StudioDetailsScreen({ route, navigation }: StudioStackScreenProps<'StudioDetails'>) {
   const { fileUri, recipe, durationSec, draftId, title: initTitle, channelId: initChannelId, visibility: initVisibility } = route.params;
   const { top } = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
+
+  // Publish-destination fork. `is_creator` users choose between Path A (friends) and Path B (channel)
+  // via a modal; common users go straight to Path A. `creator_studio` (canCreate) gates Path B.
+  const isCreator = !!(profile as any)?.is_creator;
+  const [canCreate, setCanCreate]   = useState(false);
+  const [path, setPath]             = useState<'friends' | 'channel' | null>(isCreator ? null : 'friends');
+  const [forkVisible, setForkVisible] = useState(false);
+  const [friends, setFriends]       = useState<Friend[]>([]);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
 
   const [title, setTitle]           = useState(initTitle ?? '');
   const [channels, setChannels]     = useState<PostableChannel[]>([]);
@@ -69,6 +82,27 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   useStudioAutosave(draftId, 'details', { title, channelId, visibility });
 
   useEffect(() => () => uploadRef.current?.abort(), []);
+
+  // Resolve the creator_studio flag so the fork can lock/unlock Path B (channel).
+  useEffect(() => {
+    if (user?.id && isCreator) { fetchCanCreate(user.id).then(setCanCreate).catch(() => {}); }
+  }, [user?.id, isCreator]);
+
+  // Lazy-load friends the first time the user lands on Path A (share with friends).
+  useEffect(() => {
+    if (path !== 'friends' || !user?.id || friends.length > 0) { return; }
+    setLoadingFriends(true);
+    fetchFriends(user.id).then(setFriends).catch(() => {}).finally(() => setLoadingFriends(false));
+  }, [path, user?.id, friends.length]);
+
+  const toggleFriend = (id: string) => {
+    if (uploading) { return; }
+    setSelectedFriends(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  };
 
   const selectChannel = (ch: PostableChannel) => {
     if (uploading) { return; }
@@ -142,6 +176,42 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
     }
   };
 
+  // Path A — share the clip to chosen friends (Supabase storage + p2p download). The overlay must be
+  // BAKED into the file here (recipients play a plain MP4 in the reaction viewer, no live recipe replay).
+  const sendToFriends = async () => {
+    if (selectedFriends.size === 0 || uploading || !user?.id) { return; }
+    setUploading(true);
+    try {
+      const baked = isEmptyRecipe(recipe)
+        ? fileUri
+        : await bakerRef.current!.bake({ sourceUri: fileUri, recipe, durationSec: durationSec ?? 0 });
+      // Best-effort, time-boxed thumbnail (public bucket) — same treatment as the channel path.
+      let thumbUrl: string | undefined;
+      try {
+        thumbUrl = await Promise.race([
+          (async () => {
+            const { path: tp } = await createThumbnail({ url: baked, timeStamp: 1000, format: 'jpeg' });
+            return await uploadCreatorThumbnail(tp);
+          })(),
+          new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error('thumb timeout')), 8000)),
+        ]);
+      } catch { /* best-effort */ }
+      await publishStudioClipToFriends({
+        userId: user.id,
+        fileUri: baked,
+        recipientIds: [...selectedFriends],
+        title: title.trim() || 'Untitled',
+        durationSec: durationSec ?? 0,
+        thumbnailUrl: thumbUrl ?? null,
+      });
+      if (draftId) { await deleteDraft(draftId).catch(() => {}); }
+      setUploaded(true);
+    } catch (e: any) {
+      Alert.alert('Share failed', e?.message ?? 'Something went wrong. Try again.');
+      setUploading(false);
+    }
+  };
+
   // Bake the overlay into the MP4 (only when sharing OUT) then open the OS share sheet.
   const shareWithEffects = async () => {
     if (sharing || uploading) { return; }
@@ -160,6 +230,26 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
 
   const widthPct   = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   const noChannels = !loadingChannels && channels.length === 0;
+
+  // The footer CTA is destination-driven: undecided creators open the fork; Path A sends to friends;
+  // Path B posts/schedules to a channel.
+  const nSel = selectedFriends.size;
+  const cta =
+    path === null
+      ? { label: 'Choose where to post', icon: undefined as string | undefined, onPress: () => setForkVisible(true), disabled: uploading }
+      : path === 'friends'
+        ? {
+            label: uploading ? 'Sending…' : nSel > 0 ? `Send to ${nSel} friend${nSel === 1 ? '' : 's'}` : 'Send to friends',
+            icon: 'paper-plane-outline' as string | undefined,
+            onPress: sendToFriends,
+            disabled: uploading || nSel === 0,
+          }
+        : {
+            label: uploading ? 'Uploading…' : publishMode === 'schedule' ? 'Schedule post' : 'Post video',
+            icon: (publishMode === 'schedule' ? 'calendar-outline' : undefined) as string | undefined,
+            onPress: post,
+            disabled: uploading || noChannels || !channelId,
+          };
 
   return (
     <View style={[styles.container, { paddingTop: top + SPACE.SM }]}>
@@ -199,6 +289,40 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           placeholder="Give it a title…" placeholderTextColor={C.SUBTLE} maxLength={120} editable={!uploading}
         />
 
+        {/* Creators can hop back to the fork to switch destination. */}
+        {isCreator && path && (
+          <TouchableOpacity style={styles.destSwitch} onPress={() => { if (!uploading) { setForkVisible(true); } }} activeOpacity={0.7}>
+            <Ionicons name={path === 'friends' ? 'people' : 'tv'} size={14} color={C.ACCENT_HOT} />
+            <Text style={styles.destSwitchTxt}>{path === 'friends' ? 'Sharing with friends' : 'Posting to a channel'}</Text>
+            <Text style={styles.destSwitchChange}>Change</Text>
+          </TouchableOpacity>
+        )}
+
+        {path === 'friends' && (
+          <>
+            <Text style={styles.label}>Send to</Text>
+            {loadingFriends
+              ? <ActivityIndicator color={C.ACCENT} style={{ alignSelf: 'flex-start' }} />
+              : friends.length === 0
+                ? <Text style={styles.hint}>Add some friends first to share with them.</Text>
+                : friends.map(f => {
+                    const sel = selectedFriends.has(f.userId);
+                    return (
+                      <TouchableOpacity key={f.userId} style={[styles.choice, sel && styles.choiceActive]}
+                        onPress={() => toggleFriend(f.userId)} activeOpacity={0.8}>
+                        <Ionicons name={sel ? 'checkmark-circle' : 'ellipse-outline'} size={20}
+                          color={sel ? C.ACCENT_HOT : C.SUBTLE} />
+                        <Text style={[styles.choiceText, sel && styles.choiceTextActive]} numberOfLines={1}>{f.displayName}</Text>
+                        <Text style={styles.friendHandle} numberOfLines={1}>@{f.handle}</Text>
+                      </TouchableOpacity>
+                    );
+                  })
+            }
+          </>
+        )}
+
+        {path === 'channel' && (
+        <>
         <Text style={styles.label}>Channel</Text>
         {loadingChannels
           ? <ActivityIndicator color={C.ACCENT} style={{ alignSelf: 'flex-start' }} />
@@ -268,19 +392,26 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
             <Ionicons name="chevron-forward" size={16} color={C.SUBTLE} />
           </TouchableOpacity>
         )}
+        </>
+        )}
+
+        {/* Creator who hasn't picked a destination yet. */}
+        {path === null && (
+          <Text style={styles.hint}>Choose where to post this video to continue.</Text>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
-        {uploading && (
+        {uploading && path === 'channel' && (
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressFill, { width: widthPct }]} />
           </View>
         )}
         <GradientButton
-          label={uploading ? 'Uploading…' : publishMode === 'schedule' ? 'Schedule post' : 'Post video'}
-          icon={publishMode === 'schedule' ? 'calendar-outline' : undefined}
-          onPress={post}
-          disabled={uploading || noChannels || !channelId}
+          label={cta.label}
+          icon={cta.icon}
+          onPress={cta.onPress}
+          disabled={cta.disabled}
         />
       </View>
 
@@ -310,14 +441,20 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
         onRequestClose={() => { setUploaded(false); navigation.popToTop(); }}>
         <View style={styles.successOverlay}>
           <View style={styles.successCard}>
-            <Ionicons name={publishMode === 'schedule' ? 'calendar' : 'checkmark-circle'} size={46} color={C.ACCENT_HOT} />
-            <Text style={styles.successTitle}>{publishMode === 'schedule' ? 'Scheduled 🗓️' : 'Uploaded 🎬'}</Text>
+            <Ionicons
+              name={path === 'friends' ? 'paper-plane' : publishMode === 'schedule' ? 'calendar' : 'checkmark-circle'}
+              size={46} color={C.ACCENT_HOT} />
+            <Text style={styles.successTitle}>
+              {path === 'friends' ? 'Sent 🎉' : publishMode === 'schedule' ? 'Scheduled 🗓️' : 'Uploaded 🎬'}
+            </Text>
             <Text style={styles.successSub}>
-              {publishMode === 'schedule'
-                ? `Goes live ${fmtSchedule(releaseAt)}${selectedChannel ? ` in ${selectedChannel.name}` : ''}.`
-                : selectedChannel
-                  ? `Processing now — going live in ${selectedChannel.name} shortly.`
-                  : 'Processing now — going live shortly.'}
+              {path === 'friends'
+                ? `Shared with ${nSel} friend${nSel === 1 ? '' : 's'} — they'll get it now.`
+                : publishMode === 'schedule'
+                  ? `Goes live ${fmtSchedule(releaseAt)}${selectedChannel ? ` in ${selectedChannel.name}` : ''}.`
+                  : selectedChannel
+                    ? `Processing now — going live in ${selectedChannel.name} shortly.`
+                    : 'Processing now — going live shortly.'}
             </Text>
             <View style={styles.successPreview}>
               {uploaded && (
@@ -362,6 +499,15 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
         </Modal>
       )}
 
+      {/* Publish-destination fork — only meaningful for creator-account users. */}
+      <PublishForkModal
+        visible={forkVisible}
+        canCreate={canCreate}
+        onPickFriends={() => { setForkVisible(false); setPath('friends'); }}
+        onPickChannel={() => { setForkVisible(false); setPath('channel'); }}
+        onClose={() => setForkVisible(false)}
+      />
+
       {/* Off-screen; only renders while baking the overlay into a shareable MP4. */}
       <ShareBaker ref={bakerRef} />
     </View>
@@ -393,6 +539,15 @@ const styles = StyleSheet.create({
     padding: SPACE.LG, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY,
   },
   hint: { color: C.SUBTLE, fontFamily: FONT.BODY, fontSize: FONT.SIZES.SM, marginBottom: SPACE.SM },
+
+  destSwitch: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, alignSelf: 'flex-start',
+    backgroundColor: C.SURFACE, borderRadius: RADIUS.FULL, borderWidth: 1, borderColor: C.ACCENT_LITE,
+    paddingVertical: 6, paddingHorizontal: SPACE.MD, marginBottom: SPACE.SM,
+  },
+  destSwitchTxt:    { color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
+  destSwitchChange: { color: C.ACCENT_HOT, fontFamily: FONT.BODY_BOLD, fontSize: FONT.SIZES.SM },
+  friendHandle:     { color: C.SUBTLE, fontFamily: FONT.BODY, fontSize: FONT.SIZES.SM, maxWidth: 120 },
 
   choice: {
     flexDirection: 'row', alignItems: 'center', gap: SPACE.SM,

@@ -4,14 +4,15 @@ import { ensurePrivateChannel } from './channels';
 
 export type FeedThread = {
   id: string;
-  video_id: string;
+  video_id: string | null;            // null for studio_share (original clip, no source video)
   video_title: string | null;
   video_thumbnail: string | null;
-  source_type: 'youtube' | 'tiktok' | 'instagram';
+  source_type: 'youtube' | 'tiktok' | 'instagram' | null;
   sender_id: string;
   created_at: string;
   sender: { handle: string; display_name: string } | null;
   my_status: 'pending' | 'seen' | 'reacted' | null; // null = I am the sender
+  thread_kind: 'reaction' | 'studio_share';
   reaction_count: number;
   // Entry point for "My Reactions" → opens the reaction viewer directly (my own
   // reaction if present, else the first one) instead of the chat thread.
@@ -20,14 +21,16 @@ export type FeedThread = {
 
 export type ThreadDetail = {
   id: string;
-  video_id: string;
+  video_id: string | null;            // null for studio_share (original clip, no source video)
   video_title: string | null;
   video_thumbnail: string | null;
-  source_type: 'youtube' | 'tiktok' | 'instagram';
+  source_type: 'youtube' | 'tiktok' | 'instagram' | null;
   sender_id: string;
   created_at: string;
   sender: { handle: string; display_name: string } | null;
   my_status: 'pending' | 'seen' | 'reacted' | null;
+  // 'reaction' = wraps a source video; 'studio_share' = an original Studio clip shared to friends.
+  thread_kind: 'reaction' | 'studio_share';
   // Sender intro attached to this share (plays before the source video / reactions).
   intro_url: string | null;
   intro_duration: number | null;
@@ -59,10 +62,11 @@ export type ReactionItem = {
 };
 
 export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
-  const { data, error } = await supabase
+  // `thread_kind` is newer than the generated DB types — query untyped so the select isn't rejected.
+  const { data, error } = await (supabase as any)
     .from('threads')
     .select(`
-      id, video_id, video_title, video_thumbnail, source_type, sender_id, created_at,
+      id, video_id, video_title, video_thumbnail, source_type, thread_kind, sender_id, created_at,
       sender:users!sender_id(handle, display_name),
       thread_members(user_id, status),
       reactions(id, user_id)
@@ -79,11 +83,12 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
       video_id: t.video_id,
       video_title: t.video_title,
       video_thumbnail: t.video_thumbnail,
-      source_type: t.source_type ?? 'youtube',
+      source_type: t.source_type ?? null,
       sender_id: t.sender_id,
       created_at: t.created_at,
       sender: t.sender,
       my_status: myMembership?.status ?? null,
+      thread_kind: (t.thread_kind as 'reaction' | 'studio_share') ?? 'reaction',
       reaction_count: t.reactions?.length ?? 0,
       my_reaction_id: myReaction?.id ?? t.reactions?.[0]?.id ?? null,
     };
@@ -140,10 +145,11 @@ export async function fetchMyReactions(userId: string): Promise<MyReaction[]> {
 }
 
 export async function fetchThread(threadId: string, userId: string): Promise<ThreadDetail | null> {
-  const { data, error } = await supabase
+  // `thread_kind` is newer than the generated DB types — query untyped so the select isn't rejected.
+  const { data, error } = await (supabase as any)
     .from('threads')
     .select(`
-      id, video_id, video_title, video_thumbnail, source_type, sender_id, created_at, intro_url, intro_duration,
+      id, video_id, video_title, video_thumbnail, source_type, thread_kind, sender_id, created_at, intro_url, intro_duration,
       sender:users!sender_id(handle, display_name),
       thread_members(user_id, status)
     `)
@@ -158,11 +164,12 @@ export async function fetchThread(threadId: string, userId: string): Promise<Thr
     video_id: data.video_id,
     video_title: data.video_title,
     video_thumbnail: (data as any).video_thumbnail ?? null,
-    source_type: (data as any).source_type ?? 'youtube',
+    source_type: (data as any).source_type ?? null,
     sender_id: data.sender_id,
     created_at: data.created_at,
     sender: (data as any).sender,
     my_status: myMembership?.status ?? null,
+    thread_kind: ((data as any).thread_kind as 'reaction' | 'studio_share') ?? 'reaction',
     intro_url: (data as any).intro_url ?? null,
     intro_duration: (data as any).intro_duration ?? null,
   };

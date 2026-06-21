@@ -69,7 +69,7 @@ export interface ReactionRecorderProps {
   embedUrl?: string;
   // Animated overlay layer for a creator (Bunny) video — replayed live over the embed.
   recipe?: OverlayRecipe | null;
-  sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny';
+  sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'studio';
   onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
@@ -109,8 +109,10 @@ export default function ReactionRecorder({
   // Creator (Bunny) source — token-authed iframe embed. Its play/pause is now bridged out
   // (BunnyVideoLayer), so it drives recording like the other sources.
   const bunnyEmbed = sourceType === 'bunny' && !!embedUrl;
-  const sourceDriven = !!videoId || (sourceType === 'instagram' && !!sourceUri) || bunnyEmbed;
   const igSource = sourceType === 'instagram' && !!sourceUri;
+  // A Studio clip shared to friends plays as a direct file source — same mechanism as Instagram.
+  const studioSource = sourceType === 'studio' && !!sourceUri;
+  const sourceDriven = !!videoId || igSource || studioSource || bunnyEmbed;
   // Instagram thread shortcode — WebView embed has no controllable player, so the
   // user starts/stops recording manually while watching the reel.
   const igWebEmbed = sourceType === 'instagram' && !!videoId && !sourceUri;
@@ -496,7 +498,7 @@ export default function ReactionRecorder({
   // PIP placement: starts on the LEFT (item 1 — third-party icons sit on the right of IG/TikTok),
   // and is draggable within `pipBounds` (item 4). For IG/TikTok keep a right-edge strip clear so
   // the PIP can't cover the platform's like/comment/share icons.
-  const isVerticalSource = sourceType === 'instagram' || sourceType === 'tiktok';
+  const isVerticalSource = sourceType === 'instagram' || sourceType === 'tiktok' || sourceType === 'studio';
   const RIGHT_ICON_STRIP = isVerticalSource ? 64 : SPACE.LG;
   const pipBounds = {
     minX: SPACE.LG,
@@ -530,7 +532,7 @@ export default function ReactionRecorder({
             autoplay={false}
           />
         </View>
-      ) : igSource ? (
+      ) : (igSource || studioSource) ? (
         <View style={styles.ytCover}>
           <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
             <InstagramPlayer

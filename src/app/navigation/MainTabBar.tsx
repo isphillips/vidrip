@@ -391,19 +391,9 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
   const go = (route: string) => { toggleMore(false); handleTabPress(route); };
   const moreActive = current === 'Friends' || current === 'Account';
 
-  // Non-studio users get the plain, flat 5-tab bar — no FAB, More, border, or badge.
-  if (!canCreate) {
-    return (
-      <View style={[styles.bar, { height: BAR_H + bottom, paddingBottom: bottom }]}>
-        <TabBtn route="Feed"     label="Feed"     active={current === 'Feed'}     toReact={toReact} onPress={() => handleTabPress('Feed')} />
-        <TabBtn route="Channels" label="Channels" active={current === 'Channels'} toReact={toReact} onPress={() => handleTabPress('Channels')} />
-        <TabBtn route="Share"    label="Browse"   active={current === 'Share'}    toReact={toReact} onPress={() => handleTabPress('Share')} />
-        <TabBtn route="Friends"  label="Friends"  active={current === 'Friends'}  toReact={toReact} onPress={() => handleTabPress('Friends')} />
-        <TabBtn route="Account"  label="Account"  active={current === 'Account'}  toReact={toReact} onPress={() => handleTabPress('Account')} />
-      </View>
-    );
-  }
-
+  // Everyone gets the Studio FAB now (the editor is open to all users). The creator-only
+  // chrome — the flowing gradient top border + STUDIO pill — stays gated by `canCreate`;
+  // the publish-time fork (friends vs channel) is what actually differentiates creators.
   return (
     <View pointerEvents="box-none">
       {/* Backdrop to dismiss the popup */}
@@ -489,9 +479,7 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
         <TabBtn route={PRIMARY[0].route} label={PRIMARY[0].label} active={current === PRIMARY[0].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[0].route)} />
         <TabBtn route={PRIMARY[1].route} label={PRIMARY[1].label} active={current === PRIMARY[1].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[1].route)} />
 
-        {canCreate ? (
-          <GlowFab onPress={() => navigation.getParent()?.navigate('Studio' as never)} />
-        ) : null}
+        <GlowFab onPress={() => navigation.getParent()?.navigate('Studio' as never)} />
 
         <TabBtn route={PRIMARY[2].route} label={PRIMARY[2].label} active={current === PRIMARY[2].route} toReact={toReact} onPress={() => handleTabPress(PRIMARY[2].route)} />
 
@@ -579,7 +567,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)',
   },
   // The Ionicons "camera" glyph sits slightly low-right in its box — nudge it up-and-left to center.
-  fabIcon: { transform: [{ translateX: -1.45 }, { translateY: -2.8 }], includeFontPadding: false },
+  fabIcon: { marginLeft: -3, marginTop: -3, includeFontPadding: false },
   fabLabel: { fontSize: 10, fontFamily: FONT.BODY_MEDIUM, color: C.WHITE, opacity: 0.9, marginTop: 1 },
   fabPlus: { color: C.WHITE, fontSize: 30, lineHeight: 32, fontWeight: '300', marginTop: -2 },
   backdrop: { position: 'absolute', left: 0, right: 0, top: -1000, bottom: 0 },

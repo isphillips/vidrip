@@ -92,8 +92,10 @@ export type ShareStackParamList = {
 export type RecordStackParamList = {
   RecordReaction: {
     threadId: string;
-    videoId: string;
-    sourceType?: 'youtube' | 'tiktok' | 'instagram';
+    videoId?: string;                    // absent for a Studio-clip reaction (no source video)
+    sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'studio';
+    // For a Studio-clip reaction the creator's clip plays as the source from this URL.
+    sourceUri?: string;
     // When the share carries a sender intro, play it before the source video.
     introUrl?: string;
     introDuration?: number;
