@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
+import { usePendingChannelReactionsStore } from '../../../store/pendingChannelReactionsStore';
 import { fetchChannelPost, commitChannelClip, uploadChannelClipRelay } from '../../../infrastructure/supabase/queries/channels';
 import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
@@ -15,13 +16,14 @@ export default function WatchYouTubePostScreen({
   route, navigation,
 }: ChannelsStackScreenProps<'WatchYouTubePost'>) {
   const { postId, channelId } = route.params;
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const enqueue = useUploadStore(s => s.enqueue);
+  const addPendingReaction = usePendingChannelReactionsStore(s => s.add);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [sourceUri, setSourceUri] = useState<string | null>(null);
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [recipe, setRecipe] = useState<OverlayRecipe | null>(null);
-  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny'>('youtube');
+  const [sourceType, setSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook'>('youtube');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -50,12 +52,27 @@ export default function WatchYouTubePostScreen({
         channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones,
         overlayRecipe: lensTrack ? faceLensRecipe(lensTrack) : null,
       });
+      // Surface the reaction under the post immediately (plays from the local copy) —
+      // before the slow relay upload — reconciled once ChannelPostScreen refetches.
+      addPendingReaction(postId, {
+        id: newPostId, channel_id: channelId, poster_id: user!.id,
+        poster: { handle: profile?.handle ?? '' },
+        post_type: 'clip', source_type: 'youtube',
+        yt_video_id: null, yt_video_title: null, yt_video_thumbnail: null,
+        video_url: null, duration: Math.round(duration), is_pinned: false,
+        created_at: new Date().toISOString(), message: null,
+        emoji_reactions: [], reaction_count: 0, has_my_reaction: true,
+        review_count: 0, has_my_review: false, parent_post_id: postId,
+        parent_yt_video_id: null, parent_source_type: 'youtube',
+      });
       await uploadChannelClipRelay(newPostId, user!.id);
     });
-  }, [channelId, postId, user, enqueue]);
+  }, [channelId, postId, user, profile, enqueue, addPendingReaction]);
 
+  // Instagram + Facebook creator reels play from a re-hosted MP4 file (sourceUri).
+  const fileBacked = sourceType === 'instagram' || sourceType === 'facebook';
   const ready = sourceType === 'bunny' ? !!embedUrl
-    : sourceType === 'instagram' ? !!sourceUri
+    : fileBacked ? !!sourceUri
     : !!videoId;
   if (!loaded || !ready) {
     return (
@@ -67,7 +84,7 @@ export default function WatchYouTubePostScreen({
 
   return (
     <ReactionRecorder
-      videoId={(sourceType === 'instagram' || sourceType === 'bunny') ? undefined : (videoId ?? undefined)}
+      videoId={(fileBacked || sourceType === 'bunny') ? undefined : (videoId ?? undefined)}
       sourceUri={sourceUri ?? undefined}
       embedUrl={embedUrl ?? undefined}
       recipe={recipe}

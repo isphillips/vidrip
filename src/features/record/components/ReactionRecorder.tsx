@@ -69,7 +69,7 @@ export interface ReactionRecorderProps {
   embedUrl?: string;
   // Animated overlay layer for a creator (Bunny) video — replayed live over the embed.
   recipe?: OverlayRecipe | null;
-  sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'studio';
+  sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'studio' | 'facebook';
   onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
@@ -109,10 +109,11 @@ export default function ReactionRecorder({
   // Creator (Bunny) source — token-authed iframe embed. Its play/pause is now bridged out
   // (BunnyVideoLayer), so it drives recording like the other sources.
   const bunnyEmbed = sourceType === 'bunny' && !!embedUrl;
-  const igSource = sourceType === 'instagram' && !!sourceUri;
-  // A Studio clip shared to friends plays as a direct file source — same mechanism as Instagram.
-  const studioSource = sourceType === 'studio' && !!sourceUri;
-  const sourceDriven = !!videoId || igSource || studioSource || bunnyEmbed;
+  // Instagram + Facebook creator reels and Studio clips shared to friends are all
+  // re-hosted MP4 files, played identically via react-native-video (the "InstagramPlayer"
+  // file player) from sourceUri.
+  const fileSource = (sourceType === 'instagram' || sourceType === 'facebook' || sourceType === 'studio') && !!sourceUri;
+  const sourceDriven = !!videoId || fileSource || bunnyEmbed;
   // Instagram thread shortcode — WebView embed has no controllable player, so the
   // user starts/stops recording manually while watching the reel.
   const igWebEmbed = sourceType === 'instagram' && !!videoId && !sourceUri;
@@ -183,6 +184,9 @@ export default function ReactionRecorder({
   const ytKeyRef = useRef(0);
   const ytStartOffsetRef = useRef(0);
   const recordingCallbackRef = useRef<((v: VideoFile) => void) | null>(null);
+  // Reject the pending stop-promise when the camera errors, so the real failure surfaces
+  // immediately instead of swallowing it and falling through to the 15s "timed out".
+  const recordingRejectRef = useRef<((e: any) => void) | null>(null);
   const speakerOverrideRef = useRef(false);
   // Whether headphones were connected at record time. Headphones → the source plays
   // in the ears, so the mic captures voice ONLY → play the live source on playback.
@@ -262,8 +266,16 @@ export default function ReactionRecorder({
 
     cameraRef.current?.startRecording({
       fileType: 'mp4',
-      onRecordingFinished: (video) => { recordingCallbackRef.current?.(video); recordingCallbackRef.current = null; },
-      onRecordingError: () => { recordingCallbackRef.current = null; setIsRecording(false); stopTimer(); StatusBar.setHidden(false, 'fade'); },
+      onRecordingFinished: (video) => { recordingCallbackRef.current?.(video); recordingCallbackRef.current = null; recordingRejectRef.current = null; },
+      onRecordingError: (error: any) => {
+        const msg = `${error?.code ?? 'error'}: ${error?.message ?? String(error)}`;
+        // Reject the pending stop-promise (if any) so handleStop surfaces the real error
+        // immediately instead of waiting out the 15s timeout.
+        recordingRejectRef.current?.(error instanceof Error ? error : new Error(msg));
+        recordingCallbackRef.current = null;
+        recordingRejectRef.current = null;
+        setIsRecording(false); stopTimer(); StatusBar.setHidden(false, 'fade');
+      },
     });
 
     setIsRecording(true);
@@ -323,7 +335,13 @@ export default function ReactionRecorder({
   useEffect(() => { finalizeRef.current = finalize; }, [finalize]);
 
   const handleStop = useCallback(async () => {
-    if (!isRecording) { return; }
+    // Re-entry guard (synchronous, since isRecording state is async): a source video that
+    // ends fires BOTH 'ended' and 'paused' (and the Bunny bridge polls paused), which would
+    // call handleStop twice — the first finalizes & uploads, the second has no active
+    // recording and times out ("Recording timed out"). hasStartedRef flips off here so
+    // onYtStateChange's later 'paused'/'ended' can't re-trigger a stop.
+    if (!isRecording || !hasStartedRef.current) { return; }
+    hasStartedRef.current = false;
     stopTimer();
     capAnim.stopAnimation();
     setIsRecording(false);
@@ -337,6 +355,7 @@ export default function ReactionRecorder({
       const video = await Promise.race([
         new Promise<VideoFile>((resolve, reject) => {
           recordingCallbackRef.current = resolve;
+          recordingRejectRef.current = reject;
           cameraRef.current?.stopRecording().catch(reject);
         }),
         new Promise<never>((_, reject) =>
@@ -532,7 +551,7 @@ export default function ReactionRecorder({
             autoplay={false}
           />
         </View>
-      ) : (igSource || studioSource) ? (
+      ) : fileSource ? (
         <View style={styles.ytCover}>
           <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
             <InstagramPlayer
@@ -736,10 +755,11 @@ export default function ReactionRecorder({
         <LensPicker lensKey={lensKey} onChange={setLensKey} topInset={topInset} />
       ))}
 
-      {/* Controls. Source-driven (reactions): start is driven by the source video,
-          but once recording you can restart or stop manually. Otherwise (private
-          clips / reviews) the manual record button starts it. */}
-      {!uploading && afterPhase === 'none' && (!sourceDriven || isRecording || igWebEmbed || bunnyEmbed) && (
+      {/* Controls. Source-driven (reactions, incl. Bunny): the source video's play/end
+          drives start/stop, so the record button must NOT show before it plays — once
+          recording, Stop/Restart still appear (via isRecording). Only IG WebView reels
+          and non-source clips/reviews use the manual record button to start. */}
+      {!uploading && afterPhase === 'none' && (!sourceDriven || isRecording || igWebEmbed) && (
         <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
           {isRecording ? (
             <>

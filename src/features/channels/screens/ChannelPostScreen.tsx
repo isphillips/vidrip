@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CameraWarmup from '../../lens/CameraWarmup';
 import {
   View, Text, Image, StyleSheet, ScrollView,
@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { useBlockStore } from '../../../store/blockStore';
+import { usePendingChannelReactionsStore } from '../../../store/pendingChannelReactionsStore';
 import {
   fetchChannelPost,
   fetchChannelPostReactions,
@@ -35,6 +36,10 @@ import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 type DlState = 'local' | 'downloading' | 'unavailable';
 
+// Stable reference for the "no pending reactions" case — a fresh `[]` in the zustand
+// selector would change identity every render and spin React into an infinite loop.
+const NO_PENDING: ChannelPost[] = [];
+
 export default function ChannelPostScreen({
   route, navigation,
 }: ChannelsStackScreenProps<'ChannelPost'>) {
@@ -47,6 +52,18 @@ export default function ChannelPostScreen({
 
   const [post, setPost] = useState<ChannelPost | null>(null);
   const [reactions, setReactions] = useState<ChannelPost[]>([]);
+  // Optimistic just-recorded reactions (any source platform) — shown under the post
+  // immediately, playable from the local copy, until the server fetch includes them.
+  const pendingReactions = usePendingChannelReactionsStore(s => s.byPost[postId] ?? NO_PENDING);
+  const reconcilePending = usePendingChannelReactionsStore(s => s.reconcile);
+  const allReactions = useMemo(
+    () => [...reactions, ...pendingReactions.filter(p => !reactions.some(r => r.id === p.id))],
+    [reactions, pendingReactions],
+  );
+  // Once the server returns a reaction, drop its optimistic twin.
+  useEffect(() => {
+    if (reactions.length) { reconcilePending(postId, reactions.map(r => r.id)); }
+  }, [reactions, postId, reconcilePending]);
   const [reviews, setReviews] = useState<ChannelReview[]>([]);
   const [reviewsAllowed, setReviewsAllowed] = useState(true);
   const [reviewsEnabled, setReviewsEnabled] = useState(false);
@@ -127,13 +144,13 @@ export default function ChannelPostScreen({
 
   // Kick off downloads for reactions that aren't cached yet
   useEffect(() => {
-    if (!reactions.length) { return; }
+    if (!allReactions.length) { return; }
 
     const initial: Record<string, DlState> = {};
-    reactions.forEach(r => { initial[r.id] = 'unavailable'; });
+    allReactions.forEach(r => { initial[r.id] = 'unavailable'; });
     setDlState(initial);
 
-    reactions.forEach(r => {
+    allReactions.forEach(r => {
       if (activeDownloadsRef.current.has(r.id)) { return; }
 
       hasLocalClip(r.id).then(cached => {
@@ -152,7 +169,7 @@ export default function ChannelPostScreen({
       });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reactions]);
+  }, [allReactions]);
 
   const handleEmojiToggle = useCallback(async (reactionId: string, emoji: string) => {
     if (!user?.id) { return; }
@@ -217,10 +234,12 @@ export default function ChannelPostScreen({
   const thumbnail = post.source_type === 'tiktok'
     ? ttThumb  // stored TikTok URL is expired; use the freshly resolved one
     : (post.yt_video_thumbnail ??
-      (post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null));
-  const hasReacted = reactions.some(r => r.poster_id === user?.id);
+      // Only YouTube IDs resolve via img.youtube.com — a Facebook/IG id there is a broken
+      // (black) image, so fall back to the ▶ placeholder for non-YouTube sources.
+      (post.source_type === 'youtube' && post.yt_video_id ? `https://img.youtube.com/vi/${post.yt_video_id}/hqdefault.jpg` : null));
+  const hasReacted = allReactions.some(r => r.poster_id === user?.id);
   // App-wide block: hide reactions/reviews authored by blocked users from the list/counts.
-  const visReactions = reactions.filter(r => !blocked.has(r.poster_id));
+  const visReactions = allReactions.filter(r => !blocked.has(r.poster_id));
   const obscured = !hasReacted && post.poster_id !== user?.id;
   const isOwner = !!ownerId && ownerId === user?.id;
   const showReviewsTab = reviewsEnabled || isOwner;
