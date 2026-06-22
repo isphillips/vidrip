@@ -1,4 +1,6 @@
 import { supabase } from '../client';
+import { DEMO_MODE } from '../../../demo/demoMode';
+import { demoFriends, demoPending } from '../../../demo/demoData';
 
 export type Friend = {
   friendshipId: string;
@@ -17,6 +19,7 @@ export type PendingRequest = {
 };
 
 export async function fetchFriends(userId: string): Promise<Friend[]> {
+  if (DEMO_MODE) { return demoFriends; }
   const [asA, asB] = await Promise.all([
     supabase.from('friendships').select('id, user_b').eq('user_a', userId).eq('status', 'accepted'),
     supabase.from('friendships').select('id, user_a').eq('user_b', userId).eq('status', 'accepted'),
@@ -43,6 +46,7 @@ export async function fetchFriends(userId: string): Promise<Friend[]> {
 }
 
 export async function fetchPendingRequests(userId: string): Promise<PendingRequest[]> {
+  if (DEMO_MODE) { return demoPending; }
   const { data, error } = await supabase
     .from('friendships')
     .select('id, user_a')

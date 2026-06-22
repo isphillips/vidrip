@@ -2,6 +2,11 @@ import { log } from '../../logging/logger';
 import RNFS from 'react-native-fs';
 import { supabase, SUPABASE_ANON_KEY } from '../client';
 import type { OverlayRecipe } from '../../../features/studio/effectRecipe';
+import { DEMO_MODE } from '../../../demo/demoMode';
+import {
+  demoMemberVideos, demoChannelUpdates, demoPublicChannels, demoCreatorChannels, demoChannelPosts, demoGroupChats,
+  demoPostReactions,
+} from '../../../demo/demoData';
 
 const STORAGE_BASE = 'https://ltpscwticavqutbzrrjb.supabase.co/storage/v1/object';
 
@@ -122,6 +127,7 @@ async function countPostsByChannel(channelIds: string[]): Promise<Map<string, nu
 }
 
 export async function fetchPublicChannels(userId: string): Promise<ChannelSummary[]> {
+  if (DEMO_MODE) { return demoPublicChannels; }
   const [channelsResult, membershipsResult] = await Promise.all([
     (supabase as any)
       .from('groups')
@@ -199,6 +205,7 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
 }
 
 export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelSummary[]> {
+  if (DEMO_MODE) { return demoCreatorChannels; }
   const [channelsResult, membershipsResult, invitesResult] = await Promise.all([
     (supabase as any)
       .from('groups')
@@ -280,13 +287,14 @@ export type MembersOnlyVideo = {
   title: string;
   thumbnail: string;
   channelTitle: string;
-  sourceType: 'youtube' | 'tiktok' | 'instagram';
+  sourceType: 'youtube' | 'tiktok' | 'instagram' | 'vidrip';
   videoUrl?: string | null;   // instagram plays from the re-hosted file (no embed)
   createdAt: string;          // recency axis for interleaving into the shorts feed
 };
 
 /** Recent source videos from JOINED Members Only channels, for the share browse grid. */
 export async function fetchMembersOnlyVideos(userId: string, limit = 30): Promise<MembersOnlyVideo[]> {
+  if (DEMO_MODE) { return demoMemberVideos; }
   // Only surface videos from Members Only channels the user has actually joined.
   const { data: memberships } = await (supabase as any)
     .from('group_members')
@@ -331,6 +339,7 @@ export async function fetchMembersOnlyVideos(userId: string, limit = 30): Promis
 }
 
 export async function fetchPrivateChannels(userId: string): Promise<ChannelSummary[]> {
+  if (DEMO_MODE) { return demoGroupChats; }
   // Two-query approach: PostgREST join-filter syntax is unreliable for this case.
   const { data: memberships, error: mErr } = await (supabase as any)
     .from('group_members')
@@ -402,6 +411,7 @@ export async function fetchPrivateChannelPeers(
   channelIds: string[],
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
+  if (DEMO_MODE) { return map; }   // demo group chats need no peer mapping
   if (channelIds.length === 0) { return map; }
   const { data, error } = await (supabase as any)
     .from('group_members')
@@ -450,6 +460,7 @@ export type ChannelUpdateSummary = {
 // user is in that have unseen updates, with a per-channel count and the most-recent unseen
 // upload time (so the Feed can slot each channel into its recency-sorted list).
 export async function fetchChannelUpdatesSummary(userId: string): Promise<ChannelUpdateSummary[]> {
+  if (DEMO_MODE) { return demoChannelUpdates; }
   const { data, error } = await (supabase as any)
     .rpc('get_channel_updates_summary', { p_user_id: userId });
   if (error) { return []; }
@@ -480,6 +491,7 @@ export async function renameGroupChat(channelId: string, name: string): Promise<
 }
 
 export async function fetchChannelPosts(channelId: string, userId?: string): Promise<ChannelPost[]> {
+  if (DEMO_MODE) { return demoChannelPosts; }
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
@@ -647,6 +659,7 @@ export async function uploadChannelAdVideo(channelId: string, localUri: string, 
 }
 
 export async function fetchChannelPostReactions(parentPostId: string): Promise<ChannelPost[]> {
+  if (DEMO_MODE) { return demoPostReactions; }
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
@@ -799,6 +812,7 @@ export async function fetchChannelReactions(channelId: string): Promise<ChannelC
 }
 
 export async function fetchChannelPost(postId: string): Promise<ChannelPost | null> {
+  if (DEMO_MODE) { return demoChannelPosts.find(p => p.id === postId) ?? demoChannelPosts[0]; }
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .select(`
@@ -918,6 +932,7 @@ export async function fetchChannelAccess(channelId: string, userId?: string): Pr
 // Rooms the user actively subscribes to (for the "Subscribed" channels section).
 // Returns ChannelSummary so they render/navigate like any other channel.
 export async function fetchSubscribedChannels(userId: string): Promise<ChannelSummary[]> {
+  if (DEMO_MODE) { return []; }   // demo: keep the Subscribed section empty (avoid dup channels)
   const nowIso = new Date().toISOString();
   const { data: subs } = await (supabase as any)
     .from('channel_subscriptions')
@@ -1305,6 +1320,7 @@ function mapReview(r: any): ChannelReview {
 
 /** Reviews on a single source post (visibility gated by RLS). */
 export async function fetchPostReviews(postId: string): Promise<ChannelReview[]> {
+  if (DEMO_MODE) { return []; }
   const { data, error } = await (supabase as any)
     .from('channel_reviews')
     .select(`
@@ -1405,6 +1421,7 @@ export async function hasReviewedPost(postId: string, userId: string): Promise<b
 export async function fetchChannelReviewSettings(
   channelId: string,
 ): Promise<{ reviewsAllowed: boolean; reviewsEnabled: boolean; inviteOnly: boolean; isListed: boolean; ownerId: string | null }> {
+  if (DEMO_MODE) { return { reviewsAllowed: true, reviewsEnabled: true, inviteOnly: false, isListed: true, ownerId: 'demo-u-13' }; }
   const { data } = await (supabase as any)
     .from('groups')
     .select('reviews_allowed, reviews_enabled, invite_only, is_public, created_by')

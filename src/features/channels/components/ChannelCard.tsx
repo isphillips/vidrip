@@ -5,6 +5,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import ExclusiveGlow from '../../../components/conversation/ExclusiveGlow';
 import { rowStateStyle, type RowState } from '../../../components/conversation/useRowState';
 import type { ChannelSummary } from '../../../infrastructure/supabase/queries/channels';
+import { DEMO_MODE } from '../../../demo/demoMode';
 
 type Props = {
   channel: ChannelSummary;
@@ -98,7 +99,7 @@ export default function ChannelCard({
           </View>
         </View>
 
-        {channel.ad_video_url ? (
+        {channel.ad_video_url || DEMO_MODE ? (
           <TouchableOpacity
             style={[styles.thumbnail, styles.introTile]}
             activeOpacity={0.85}

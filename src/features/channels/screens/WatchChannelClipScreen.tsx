@@ -27,6 +27,8 @@ import {
   removeChannelPostEmojiReaction,
   type ChannelPost,
 } from '../../../infrastructure/supabase/queries/channels';
+import { DEMO_MODE } from '../../../demo/demoMode';
+import DemoReactionScreen from '../../../demo/DemoReactionScreen';
 import {
   hasLocalClip,
   localPathForClip,
@@ -71,7 +73,14 @@ function EmojiBtn({
   );
 }
 
-export default function WatchChannelClipScreen({
+// DEMO: render the mocked reaction-watch composition (no real clip files on the sim).
+// A thin wrapper keeps the real component's hooks unconditional (rules-of-hooks safe).
+export default function WatchChannelClipScreen(props: ChannelsStackScreenProps<'WatchChannelClip'>) {
+  if (DEMO_MODE) { return <DemoReactionScreen onClose={() => props.navigation.goBack()} />; }
+  return <WatchChannelClipImpl {...props} />;
+}
+
+function WatchChannelClipImpl({
   route,
   navigation,
 }: ChannelsStackScreenProps<'WatchChannelClip'>) {

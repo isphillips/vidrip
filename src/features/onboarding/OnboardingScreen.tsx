@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, Linking, Alert, ScrollView, TouchableOpacity,
 } from 'react-native';
-import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming, withRepeat, interpolate, Extrapolation, Easing, type SharedValue } from 'react-native-reanimated';
+import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withTiming, withRepeat, withSpring, withDelay, interpolate, Extrapolation, Easing, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../theme';
 import { useAuthStore } from '../../store/authStore';
@@ -24,6 +24,8 @@ const VIDRIP_COLORS = [
   { color: '#BC3EB8' }, { color: '#AE3FC4' }, { color: '#A03FD0' },
 ];
 
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
 export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'replay'; onDone: () => void }) {
   const { top, bottom } = useSafeAreaInsets();
   const { profile } = useAuthStore();
@@ -36,17 +38,25 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
   // Plain black backdrop until the final step, where the curtain stage is unveiled
   // (black fades out) and the back curtain then raises to reveal the room.
   const cover = useSharedValue(step === STEPS - 1 ? 0 : 1);
+  // Heavy gradient scrim behind the final-step copy — fades/grows in as the paint reveals
+  // so the white text stays legible over the splatter.
+  const scrim = useSharedValue(step === STEPS - 1 ? 1 : 0);
   const [reveal, setReveal] = useState(step === STEPS - 1);
   useEffect(() => {
     const last = step === STEPS - 1;
     cover.value = withTiming(last ? 0 : 1, { duration: 600, easing: Easing.inOut(Easing.ease) });
+    scrim.value = withTiming(last ? 1 : 0, { duration: 600, easing: Easing.inOut(Easing.ease) });
     if (last) {
       const id = setTimeout(() => setReveal(true), 600);
       return () => clearTimeout(id);
     }
     setReveal(false);
-  }, [step, cover]);
+  }, [step, cover, scrim]);
   const coverStyle = useAnimatedStyle(() => ({ opacity: cover.value }));
+  const scrimStyle = useAnimatedStyle(() => ({
+    opacity: scrim.value,
+    transform: [{ scaleY: interpolate(scrim.value, [0, 1], [0.82, 1], Extrapolation.CLAMP) }],
+  }));
 
   // ── For You connect (feed OAuth) ────────────────────────────────────────────
   const { pending, clearPending } = useOAuthStore();
@@ -93,6 +103,17 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
       </Animated.View>
       {/* Paint splatter + dripping reveal, replacing the curtain on the last step. */}
       <PaintReveal active={reveal} />
+      {/* Heavy vertical gradient band behind the final-step copy (above the paint, below the text). */}
+      {step === STEPS - 1 && (
+        <AnimatedLinearGradient
+          pointerEvents="none"
+          colors={['rgba(11,5,24,0)', 'rgba(11,5,24,0.75)', 'rgba(11,5,24,0.77)', 'rgba(11,5,24,0.73)', 'rgba(11,5,24,0)']}
+          locations={[0, 0.16, 0.5, 0.84, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={[styles.copyScrim, scrimStyle]}
+        />
+      )}
       {step > 0 && (
         <TouchableOpacity style={[styles.backBtn, { top: top + SPACE.SM }]} onPress={back} hitSlop={12}>
           <Text style={styles.backText}>‹ Back</Text>
@@ -103,7 +124,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
           {step === 0 && (
             <View style={styles.center}>
               <OnboardingSlime mood="welcome" />
-              <Kicker>Members Only</Kicker>
+              <Kicker>Friends Only</Kicker>
               <Text style={styles.h1}>
                 Welcome to{'\n'}
                 {'VIDRIP'.split('').map((ch, i) => (
@@ -112,9 +133,9 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               </Text>
               <DecoDivider />
               <Text style={styles.body}>
-                You've been let in. Pour yourself something. This is where friends trade clips and react, just for each other.
+                You're in the drip. This is where you and your friends trade clips and react to each other. Nobody else, just your circle. Drippy will show you the ropes.
               </Text>
-              <Text style={styles.whisper}>Tell 'em {handle} sent you.</Text>
+              <Text style={styles.whisper}>Tell your crew {handle} sent 'em.</Text>
             </View>
           )}
 
@@ -126,8 +147,8 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <DecoDivider />
               <ForYouMock />
               <Text style={styles.body}>
-                Bring your YouTube <Text style={styles.em}>Liked videos</Text> to the table. They show up in your private{' '}
-                <Text style={styles.em}>Liked</Text> shelf when you go to share, so you always have something good on hand.
+                Pull in your YouTube <Text style={styles.em}>Liked videos</Text>. They pool into your private{' '}
+                <Text style={styles.em}>Liked</Text> stash, so there's always something good to drip to a friend.
               </Text>
               {connected ? (
                 <View style={styles.connectedRow}>
@@ -163,12 +184,18 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
             <View style={styles.center}>
               <OnboardingSlime mood="done" />
               <Kicker>You're set</Kicker>
-              <Text style={styles.h2}>The night is yours</Text>
+              <Pop delay={220} scaleFrom={0.45}>
+                <Text style={styles.h2Epic}>Let it drip</Text>
+              </Pop>
               <DecoDivider />
-              <Text style={[styles.body, { color: C.WHITE}]}>
-                That's the whole show. Share what you love. React to what they send.
-              </Text>
-              <Text style={styles.whisper}>Welcome to the club.</Text>
+              <Pop delay={420}>
+                <Text style={[styles.body, { color: C.WHITE }]}>
+                  That's the whole drop. Share what you love. React to what they send.
+                </Text>
+              </Pop>
+              <Pop delay={580}>
+                <Text style={styles.whisper}>Welcome to the club.</Text>
+              </Pop>
             </View>
           )}
         </Animated.View>
@@ -178,7 +205,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
       <View style={[styles.footer, { paddingBottom: bottom + SPACE.LG }]}>
         <Pips count={STEPS} active={step} />
         <View style={styles.ctaCol}>
-          {step === 0 && <GradientButton label="STEP INSIDE" icon="sparkles" onPress={next} />}
+          {step === 0 && <GradientButton label="DRIP IN" icon="sparkles" onPress={next} />}
 
           {step === 1 && (
             connected
@@ -191,7 +218,7 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
 
           {(step === 2 || step === 3) && <GradientButton label="NEXT" icon="arrow-forward" onPress={next} />}
 
-          {step === 4 && <GradientButton label="ENTER" icon="sparkles" onPress={onDone} />}
+          {step === 4 && <GradientButton label="LET ME IN" icon="sparkles" onPress={onDone} />}
         </View>
       </View>
     </View>
@@ -200,6 +227,23 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
 
 // ── Animated how-to demos (loop forever) ───────────────────────────────────────
 const CLAMP = Extrapolation.CLAMP;
+
+// Spring "pop": scales up past 1 then settles, with a rise + fade. Used to punch the
+// final-step words in over the paint reveal (staggered by `delay`).
+function Pop({ delay = 0, scaleFrom = 0.7, children }: { delay?: number; scaleFrom?: number; children: React.ReactNode }) {
+  const v = useSharedValue(0);
+  useEffect(() => {
+    v.value = withDelay(delay, withSpring(1, { damping: 8, stiffness: 150, mass: 0.7 }));
+  }, [v, delay]);
+  const a = useAnimatedStyle(() => ({
+    opacity: interpolate(v.value, [0, 0.55], [0, 1], CLAMP),
+    transform: [
+      { scale: interpolate(v.value, [0, 1], [scaleFrom, 1]) },     // spring overshoot → a little pop past 1
+      { translateY: interpolate(v.value, [0, 1], [16, 0], CLAMP) },
+    ],
+  }));
+  return <Animated.View style={[styles.popWrap, a]}>{children}</Animated.View>;
+}
 
 // One thumbnail that pops into the For You grid at its turn.
 function GridTile({ p, start }: { p: SharedValue<number>; start: number }) {
@@ -305,7 +349,7 @@ function ShareMock() {
       <View style={styles.dSteps}>
         <DemoStep p={p} index={1} range={[0, 0.34]} label="Browse or paste a clip" />
         <DemoStep p={p} index={2} range={[0.34, 0.6]} label="Pick a friend" />
-        <DemoStep p={p} index={3} range={[0.6, 0.97]} label="Send it over" />
+        <DemoStep p={p} index={3} range={[0.6, 0.97]} label="Drip it over" />
       </View>
     </View>
   );
@@ -421,6 +465,15 @@ const styles = StyleSheet.create({
   h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.MEDIUM, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
   vidrip: { fontFamily: 'Syne-ExtraBold', fontWeight: FONT.WEIGHTS.BOLD, letterSpacing: 0.5 },
   h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.BOLD, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
+  // Final-step payoff title — bigger, with a pink neon glow so it pops off the paint.
+  h2Epic: {
+    fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.BOLD,
+    color: C.WHITE, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1,
+    textShadowColor: 'rgba(231,61,147,0.9)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 20,
+  },
+  popWrap: { alignSelf: 'stretch', alignItems: 'center' },
+  // Vertical gradient band behind the final-step copy — feathered top/bottom (no hard clip), heavy center.
+  copyScrim: { position: 'absolute', left: 0, right: 0, top: '18%', height: '62%' },
   body: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', lineHeight: 24, maxWidth: 320 },
   em: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD },
   whisper: { fontSize: FONT.SIZES.MD, fontFamily: FONT.DISPLAY_ITALIC, fontStyle: 'italic', color: C.GOLD, textAlign: 'center', marginTop: SPACE.SM },

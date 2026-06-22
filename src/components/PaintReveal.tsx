@@ -1,39 +1,45 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming, withDelay, interpolate, Extrapolation, Easing,
-  type SharedValue,
+  useSharedValue, useAnimatedStyle, withTiming, withDelay, withSpring, withSequence,
+  interpolate, Extrapolation, Easing, type SharedValue,
 } from 'react-native-reanimated';
 
 // Brand paint colors (the drip pink→purple family).
 const COLORS = ['#E73D93', '#C42BC3', '#A03FD0', '#FF2D8B', '#7B2FF0'];
+const CLAMP = Extrapolation.CLAMP;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 // ── Drips: thin paint runs that streak down from the top edge ───────────────────
 // A narrow run + a pooled cap where it emerges + an elongated teardrop at the tip.
-type Drip = { leftPct: number; w: number; h: number; color: string; start: number };
+// Each accelerates downward (gravity ease) with a gentle sway, on its own delay.
+type Drip = { leftPct: number; w: number; h: number; color: string; delay: number; dur: number; sway: number };
 const DRIPS: Drip[] = Array.from({ length: 18 }, () => ({
   leftPct: rand(0.03, 0.97),
   w: rand(3, 9),
   h: rand(70, 360),
   color: pick(COLORS),
-  start: rand(0, 0.28),
+  delay: rand(0, 520),
+  dur: rand(900, 1700),
+  sway: rand(-7, 7),
 }));
 
 // ── Splats: chaotic clusters like paint thrown at a wall ────────────────────────
-// A ragged main blob + a scatter of droplets/specks flung out around it.
+// A ragged main blob + a scatter of droplets flung out around it. Each SMACKS in
+// with an overshoot then springs to rest; the biggest ones throw a shockwave ring.
 type Dot = { x: number; y: number; s: number };
-type Splat = { leftPct: number; topPct: number; size: number; color: string; start: number; rot: number; dots: Dot[] };
-const SPLATS: Splat[] = Array.from({ length: 20 }, () => {
-  const size = rand(12, 66);
+type Splat = { leftPct: number; topPct: number; size: number; color: string; delay: number; rot: number; dots: Dot[]; ring: boolean };
+const SPLATS: Splat[] = Array.from({ length: 22 }, () => {
+  const size = rand(12, 70);
   return {
     leftPct: rand(0.04, 0.96),
     topPct: rand(0.06, 0.86),
     size,
     color: pick(COLORS),
-    start: rand(0.1, 0.72),
+    delay: rand(0, 950),
     rot: rand(-30, 30),
+    ring: size > 42,
     dots: Array.from({ length: Math.floor(rand(4, 9)) }, () => ({
       x: rand(-size * 1.7, size * 1.7),
       y: rand(-size * 1.7, size * 1.7),
@@ -42,52 +48,17 @@ const SPLATS: Splat[] = Array.from({ length: 20 }, () => {
   };
 });
 
-// ── Roller strokes: several dark DIAGONAL roller passes behind the text ─────────
-// Overlapping translucent capsules, tilted on an angle, revealed with a scaleY grow
-// from the top OR bottom (alternating) — so some paint downward, some upward. The
-// overlap darkens the center for readability; rounded ends keep it from looking square.
-// Each stroke owns its OWN animation: a sequential delay so they paint on one at a
-// time (not all together), then a scaleY grow that lays the paint down.
-type Stroke = { xFrac: number; wFrac: number; topFrac: number; hFrac: number; opacity: number; delay: number; dur: number; angle: number; dir: 1 | -1 };
-const STROKES: Stroke[] = Array.from({ length: 6 }, (_, i) => ({
-  xFrac: 0.1 + i * 0.145 + rand(-0.03, 0.03),
-  wFrac: rand(0.15, 0.23),
-  topFrac: 0.2 + rand(-0.02, 0.04),
-  hFrac: rand(0.46, 0.6),
-  opacity: rand(0.18, 0.27),
-  delay: i * 360 + rand(0, 140),   // painted one after another
-  dur: rand(620, 900),             // how long a single stroke takes to lay down
-  angle: rand(16, 32) * (Math.random() < 0.5 ? 1 : -1),
-  dir: i % 2 === 0 ? 1 : -1,       // alternate reveal: top→bottom vs bottom→top
-}));
-
-function StrokeView({ st, W, H, active }: { st: Stroke; W: number; H: number; active: boolean }) {
-  const w = st.wFrac * W, h = st.hFrac * H;
+function DripView({ d, W, active }: { d: Drip; W: number; active: boolean }) {
   const prog = useSharedValue(0);
   useEffect(() => {
     prog.value = active
-      ? withDelay(st.delay, withTiming(1, { duration: st.dur, easing: Easing.out(Easing.cubic) }))
-      : withTiming(0, { duration: 150 });
-  }, [active, prog, st]);
+      ? withDelay(d.delay, withTiming(1, { duration: d.dur, easing: Easing.in(Easing.quad) }))  // gravity accel
+      : withTiming(0, { duration: 160 });
+  }, [active, d, prog]);
   const a = useAnimatedStyle(() => ({
-    opacity: interpolate(prog.value, [0, 0.08], [0, 1], Extrapolation.CLAMP),
-    transform: [{ scaleY: prog.value }, { rotate: `${st.angle}deg` }],
-  }));
-  return (
-    <Animated.View style={[{
-      position: 'absolute', left: st.xFrac * W, top: st.topFrac * H, width: w, height: h,
-      borderRadius: w * 0.5,   // capsule — rounded both ends, no flat/dark edge
-      backgroundColor: `rgba(0,0,0,${st.opacity})`,
-      transformOrigin: st.dir === 1 ? '50% 0%' : '50% 100%',
-    }, a]} />
-  );
-}
-
-function DripView({ d, p, W }: { d: Drip; p: SharedValue<number>; W: number }) {
-  // Slow run: grows over most of the progress with a decelerating ease.
-  const a = useAnimatedStyle(() => ({
-    height: interpolate(p.value, [d.start, d.start + 0.66], [0, d.h], Extrapolation.CLAMP),
-    opacity: interpolate(p.value, [d.start, d.start + 0.05], [0, 1], Extrapolation.CLAMP),
+    height: interpolate(prog.value, [0, 1], [0, d.h], CLAMP),
+    opacity: interpolate(prog.value, [0, 0.05], [0, 1], CLAMP),
+    transform: [{ translateX: interpolate(prog.value, [0, 0.5, 1], [0, d.sway, 0], CLAMP) }],
   }));
   return (
     <Animated.View style={[styles.drip, { left: d.leftPct * W - d.w / 2, width: d.w, backgroundColor: d.color, borderRadius: d.w / 2 }, a]}>
@@ -104,11 +75,20 @@ function DripView({ d, p, W }: { d: Drip; p: SharedValue<number>; W: number }) {
   );
 }
 
-function SplatView({ s, p, W, H }: { s: Splat; p: SharedValue<number>; W: number; H: number }) {
-  // Subtle, near-instant appearance (no bouncy overshoot) — like paint hitting a wall.
+function SplatView({ s, W, H, active }: { s: Splat; W: number; H: number; active: boolean }) {
+  // SMACK: a quick overshoot then a bouncy spring to rest (paint hitting a wall, hard).
+  const prog = useSharedValue(0);
+  useEffect(() => {
+    prog.value = active
+      ? withDelay(s.delay, withSequence(
+          withTiming(1.25, { duration: 90, easing: Easing.out(Easing.quad) }),
+          withSpring(1, { damping: 6, stiffness: 200, mass: 0.6 }),
+        ))
+      : withTiming(0, { duration: 160 });
+  }, [active, prog, s]);
   const a = useAnimatedStyle(() => ({
-    opacity: interpolate(p.value, [s.start, s.start + 0.05], [0, 1], Extrapolation.CLAMP),
-    transform: [{ scale: interpolate(p.value, [s.start, s.start + 0.12], [0.65, 1], Extrapolation.CLAMP) }],
+    opacity: interpolate(prog.value, [0, 0.05], [0, 1], CLAMP),
+    transform: [{ scale: prog.value }],
   }));
   return (
     <Animated.View style={[{ position: 'absolute', left: s.leftPct * W - s.size / 2, top: s.topPct * H - s.size / 2, width: s.size, height: s.size }, a]}>
@@ -125,25 +105,68 @@ function SplatView({ s, p, W, H }: { s: Splat; p: SharedValue<number>; W: number
   );
 }
 
+// Expanding shockwave ring thrown off by a big splat's impact.
+function Shockwave({ s, W, H, active }: { s: Splat; W: number; H: number; active: boolean }) {
+  const r = useSharedValue(0);
+  useEffect(() => {
+    r.value = active
+      ? withDelay(s.delay, withTiming(1, { duration: 540, easing: Easing.out(Easing.cubic) }))
+      : withTiming(0, { duration: 100 });
+  }, [active, r, s]);
+  const D = s.size * 1.7;
+  const a = useAnimatedStyle(() => ({
+    opacity: interpolate(r.value, [0, 0.12, 1], [0, 0.5, 0], CLAMP),
+    transform: [{ scale: interpolate(r.value, [0, 1], [0.3, 3], CLAMP) }],
+  }));
+  return (
+    <Animated.View style={[{
+      position: 'absolute', left: s.leftPct * W - D / 2, top: s.topPct * H - D / 2,
+      width: D, height: D, borderRadius: D / 2, borderWidth: 3, borderColor: s.color,
+    }, a]} />
+  );
+}
+
+// One big radial burst from center on reveal — the "drop" landing.
+function CenterBurst({ W, H, active }: { W: number; H: number; active: boolean }) {
+  const b = useSharedValue(0);
+  useEffect(() => {
+    b.value = active
+      ? withTiming(1, { duration: 720, easing: Easing.out(Easing.cubic) })
+      : withTiming(0, { duration: 120 });
+  }, [active, b]);
+  const D = Math.min(W, H) * 0.92;
+  const ring = useAnimatedStyle(() => ({
+    opacity: interpolate(b.value, [0, 0.15, 1], [0, 0.5, 0], CLAMP),
+    transform: [{ scale: interpolate(b.value, [0, 1], [0.15, 2.4], CLAMP) }],
+  }));
+  const flash = useAnimatedStyle(() => ({
+    opacity: interpolate(b.value, [0, 0.08, 0.4], [0, 0.28, 0], CLAMP),
+  }));
+  return (
+    <>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#FF2D8B' }, flash]} />
+      <Animated.View pointerEvents="none" style={[{
+        position: 'absolute', left: W / 2 - D / 2, top: H / 2 - D / 2,
+        width: D, height: D, borderRadius: D / 2, borderWidth: 6, borderColor: '#FF2D8B',
+      }, ring]} />
+    </>
+  );
+}
+
 /**
- * Final-step reveal: slow paint runs drip from the top while chaotic splatter
- * bursts across the wall. Motion is gentle; the paint shapes carry the energy.
- * Decorative — sits behind content (pointerEvents none).
+ * Final-step reveal: a center burst lands, splats SMACK in with spring overshoots and
+ * throw shockwave rings, and accelerating drips run from the top edge. Everything is its
+ * own Reanimated spring/timing keyed off `active`. A separate gradient scrim (in the
+ * onboarding screen) darkens the copy band for legibility. Decorative — pointerEvents none.
  */
 export default function PaintReveal({ active }: { active: boolean }) {
   const { width, height } = useWindowDimensions();
-  const p = useSharedValue(0);
-  useEffect(() => {
-    p.value = active
-      ? withTiming(1, { duration: 3200, easing: Easing.out(Easing.cubic) })   // slower
-      : withTiming(0, { duration: 220 });
-  }, [active, p]);
-
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {SPLATS.map((s, i) => <SplatView key={`s${i}`} s={s} p={p} W={width} H={height} />)}
-      {STROKES.map((st, i) => <StrokeView key={`r${i}`} st={st} W={width} H={height} active={active} />)}
-      {DRIPS.map((d, i) => <DripView key={`d${i}`} d={d} p={p} W={width} />)}
+      <CenterBurst W={width} H={height} active={active} />
+      {SPLATS.filter(s => s.ring).map((s, i) => <Shockwave key={`w${i}`} s={s} W={width} H={height} active={active} />)}
+      {SPLATS.map((s, i) => <SplatView key={`s${i}`} s={s} W={width} H={height} active={active} />)}
+      {DRIPS.map((d, i) => <DripView key={`d${i}`} d={d} W={width} active={active} />)}
     </View>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity, Image,
   ActivityIndicator, Alert, StatusBar, useWindowDimensions, Animated, InteractionManager,
 } from 'react-native';
 import Orientation from 'react-native-orientation-locker';
@@ -35,6 +35,15 @@ import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking'
 import { useAnonymousMode, ANON_LENS_KEY, ANON_VOICE_MOD } from '../../lens/useAnonymousMode';
 import { useUploadStore } from '../../../store/uploadStore';
 import { useBakeQueueStore } from '../../../store/bakeQueueStore';
+import { DEMO_MODE } from '../../../demo/demoMode';
+
+// DEMO/screenshot only: the simulator has no camera, so we paint this still "selfie"
+// where the live preview would be, letting the lens picker be screenshotted over a
+// realistic frame. Remove with the rest of DEMO_MODE before production.
+const DEMO_CAM = require('../../../demo/reactor-f.png');
+// DEMO/screenshot only: the "video being reacted to" — sim players render black, so we
+// paint this behind the PIP selfie. Remove with the rest of DEMO_MODE before production.
+const DEMO_MAIN = require('../../../demo/prod.png');
 
 
 function FloatingEmoji({ emoji, onDone }: { emoji: string; onDone: () => void }) {
@@ -540,6 +549,11 @@ export default function ReactionRecorder({
       {/* Source-video full-screen background (or black if no source / during afterthought) */}
       {afterPhase !== 'none' ? (
         <View style={styles.ytCover} />
+      ) : __DEV__ && DEMO_MODE && pipCamera ? (
+        // DEMO/screenshot: sim players render black, so paint the "reacted" video here.
+        <View style={styles.ytCover}>
+          <Image source={DEMO_MAIN} style={{ width, height }} resizeMode="contain" />
+        </View>
       ) : bunnyEmbed ? (
         <View style={styles.ytCover}>
           {/* Signed embed + live overlay replay; play/pause drives recording (source-driven).
@@ -697,7 +711,18 @@ export default function ReactionRecorder({
         ) : (
           <View style={StyleSheet.absoluteFill}>{camInner}</View>
         );
-      })() : __DEV__ ? (
+      })() : __DEV__ && DEMO_MODE ? (
+        // DEMO/screenshot: paint a still selfie where the (absent) sim camera would be,
+        // so the lens picker sits over a realistic frame. PIP corner when source-driven.
+        pipCamera ? (
+          <View style={[styles.pip, { bottom: bottomInset + 100, right: SPACE.LG }]}>
+            <Image source={DEMO_CAM} style={styles.demoCamPip} resizeMode="contain" />
+            {isRecording && <View style={styles.pipRecDot} />}
+          </View>
+        ) : (
+          <Image source={DEMO_CAM} style={StyleSheet.absoluteFill} resizeMode="contain" />
+        )
+      ) : __DEV__ ? (
         // Simulator placeholder so the source player + controls are still visible.
         <View style={pipCamera
           ? [styles.pip, styles.devCam, { bottom: bottomInset + 100, right: SPACE.LG }]
@@ -828,7 +853,7 @@ export default function ReactionRecorder({
 
       {/* DEV: start recording manually when the source video won't play
           (e.g. TikTok in the simulator), so the cap bar/auto-stop can be tested. */}
-      {__DEV__ && sourceDriven && !isRecording && !uploading && (
+      {__DEV__ && !DEMO_MODE && sourceDriven && !isRecording && !uploading && (
         <TouchableOpacity
           style={[styles.devStart, { bottom: bottomInset + SPACE.XL }]}
           onPress={beginRecording}
@@ -877,6 +902,7 @@ const styles = StyleSheet.create({
   backBtn: { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, paddingVertical: SPACE.MD, paddingHorizontal: SPACE.LG },
   backBtnText: { color: C.INK, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM },
   pip: { position: 'absolute', width: PIP_W, height: PIP_H, borderRadius: RADIUS.MD, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
+  demoCamPip: { width: PIP_W + 75, marginLeft: -40, height: PIP_H + 75 },
   pipRecDot: { position: 'absolute', top: SPACE.XS, right: SPACE.XS, width: 8, height: 8, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_HOT },
   toast: { position: 'absolute', alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS, borderRadius: RADIUS.FULL },
   toastText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },

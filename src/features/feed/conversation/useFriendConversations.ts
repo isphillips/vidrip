@@ -11,6 +11,7 @@ import { fetchFriends, type Friend } from '../../../infrastructure/supabase/quer
 import {
   buildFriendConversations, buildGroupConversations, mergeFeedItems, type FeedItem,
 } from './friendConversation';
+import { DEMO_MODE } from '../../../demo/demoMode';
 
 const HIDDEN_KEY = 'vidrip_hidden_threads';
 // Conversations the user has swiped to hide (delete-for-me) — keyed `f:<friendId>` / `g:<channelId>`.
@@ -44,7 +45,9 @@ export function useFriendConversations() {
       ]);
       setFriends(fr);
       setThreads(th);
-      setDmChannels(dm);
+      if (!DEMO_MODE) {
+        setDmChannels(dm);
+      }
       setHidden(h ? new Set(JSON.parse(h) as string[]) : new Set());
       setHiddenConvs(hc ? new Set(JSON.parse(hc) as string[]) : new Set());
       setPeerByChannel(await fetchPrivateChannelPeers(user.id, dm.map(c => c.id)));

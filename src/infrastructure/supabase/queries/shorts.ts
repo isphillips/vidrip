@@ -1,4 +1,6 @@
 import { supabase } from '../client';
+import { DEMO_MODE } from '../../../demo/demoMode';
+import { demoShorts } from '../../../demo/demoData';
 
 export type ShortRow = {
   videoId:      string;
@@ -27,6 +29,7 @@ export async function fetchShorts(
   limit = 50,
   offset = 0,
 ): Promise<ShortRow[]> {
+  if (DEMO_MODE) { return offset > 0 ? [] : demoShorts; }  // screenshots: one page, no dup keys
   // RPC applies channel round-robin so a creator's batch-ingested uploads don't
   // cluster (plain order-by-fetched_at clusters them). Returns rows shaped like the
   // table select below — mapRow keys are the same.
@@ -48,6 +51,7 @@ export async function fetchShorts(
 }
 
 export async function searchShorts(query: string, limit = 50): Promise<ShortRow[]> {
+  if (DEMO_MODE) { return demoShorts; }
   const { data, error } = await (supabase as any)
     .from('shorts')
     .select('video_id, title, thumbnail, channel, duration, category, fetched_at')

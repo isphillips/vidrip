@@ -1,5 +1,7 @@
 import { log } from '../../logging/logger';
 import { supabase } from '../client';
+import { DEMO_MODE } from '../../../demo/demoMode';
+import { demoThreads } from '../../../demo/demoData';
 import { resolveReactionUri, signReactionUrl } from '../../storage/reactionStorage';
 import { ensurePrivateChannel } from './channels';
 
@@ -63,6 +65,7 @@ export type ReactionItem = {
 };
 
 export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
+  if (DEMO_MODE) { return demoThreads; }
   // `thread_kind` is newer than the generated DB types — query untyped so the select isn't rejected.
   const { data, error } = await (supabase as any)
     .from('threads')

@@ -11,6 +11,7 @@ import Video from 'react-native-video';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import TikTokPlayer from '../../../components/TikTokPlayer';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import { DEMO_MODE } from '../../../demo/demoMode';
 import { useAuthStore } from '../../../store/authStore';
 import { useBlockStore } from '../../../store/blockStore';
 import { usePendingChannelReactionsStore } from '../../../store/pendingChannelReactionsStore';
@@ -149,6 +150,14 @@ export default function ChannelPostScreen({
   // Kick off downloads for reactions that aren't cached yet
   useEffect(() => {
     if (!allReactions.length) { return; }
+
+    // DEMO: there are no real clip files, so mark every reaction watchable (▶) for screenshots.
+    if (DEMO_MODE) {
+      const m: Record<string, DlState> = {};
+      allReactions.forEach(r => { m[r.id] = 'local'; });
+      setDlState(m);
+      return;
+    }
 
     const initial: Record<string, DlState> = {};
     allReactions.forEach(r => { initial[r.id] = 'unavailable'; });

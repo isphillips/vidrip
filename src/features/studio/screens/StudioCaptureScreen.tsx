@@ -22,6 +22,7 @@ import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking'
 import { useWarpFrameProcessor, warpAvailable } from '../../lens/warpLens';
 import { useAnonymousMode, ANON_LENS_KEY, ANON_VOICE_MOD } from '../../lens/useAnonymousMode';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
+import { DEMO_MODE } from '../../../demo/demoMode';
 
 const MAX_SEC = MAX_STUDIO_MS / 1000; // 180s hard cap (auto-stop)
 
@@ -213,7 +214,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
 
       {/* DEV diagnostic. Shows transformed (normalized 0..1) L eye, R eye, nose so the exact
           geometry can be read off: eyes should share ~same y (level), nose centered & below. */}
-      {__DEV__ && (
+      {__DEV__ && !DEMO_MODE && (
         <Text style={[styles.lensDebug, { bottom: top - 22 }]}>
           {lensLandmarks
             ? `L ${lensLandmarks.leftEye.x.toFixed(2)},${lensLandmarks.leftEye.y.toFixed(2)}  R ${lensLandmarks.rightEye.x.toFixed(2)},${lensLandmarks.rightEye.y.toFixed(2)}  N ${lensLandmarks.noseTip.x.toFixed(2)},${lensLandmarks.noseTip.y.toFixed(2)}`

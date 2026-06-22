@@ -1,5 +1,7 @@
 import { supabase } from '../client';
 import type { ShortRow } from './shorts';
+import { DEMO_MODE } from '../../../demo/demoMode';
+import { demoShorts } from '../../../demo/demoData';
 
 // First-party personalization — no search/recommendation API. Both helpers call
 // SECURITY DEFINER RPCs that mine reactions / shares / comments / the friend graph
@@ -50,6 +52,7 @@ export async function fetchPersonalizedShorts(
   limit = 50,
   offset = 0,
 ): Promise<ShortRow[]> {
+  if (DEMO_MODE) { return offset > 0 ? [] : demoShorts; }
   const { data, error } = await (supabase as any).rpc('fetch_personalized_shorts', {
     p_user_id: userId, p_limit: limit, p_offset: offset,
   });
@@ -75,6 +78,7 @@ export async function fetchTrending(
   limit = 50,
   offset = 0,
 ): Promise<ShortRow[]> {
+  if (DEMO_MODE) { return offset > 0 ? [] : demoShorts; }
   const { data, error } = await (supabase as any).rpc('fetch_trending', {
     p_user_id: userId, p_limit: limit, p_offset: offset,
   });

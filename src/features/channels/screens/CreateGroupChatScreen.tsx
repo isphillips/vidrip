@@ -11,6 +11,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import { createGroupChat } from '../../../infrastructure/supabase/queries/channels';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
+import { DEMO_MODE } from '../../../demo/demoMode';
 
 // Pick 2+ friends → a new group chat. Group chats are deliberately separate from
 // sending a Short to multiple friends (which stays a set of 1:1 conversations).
@@ -26,7 +27,10 @@ export default function CreateGroupChatScreen({
 
   const load = useCallback(async () => {
     if (!user) { return; }
-    try { setFriends(await fetchFriends(user.id)); }
+    try { 
+      if (DEMO_MODE) { setFriends([]) }
+      else { setFriends(await fetchFriends(user.id)); }
+    }
     finally { setLoading(false); }
   }, [user]);
 

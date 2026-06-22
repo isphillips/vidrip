@@ -1,16 +1,16 @@
-name: Android OTA
+name: iOS OTA
 
-# Roll out a Hot Updater over-the-air JS (React Native) bundle to Android testers when
-# React/JS source changes land on main. The native gate is Android-specific: only
-# android/ + dependency (package.json / yarn.lock) changes block the OTA — those need a
-# fresh AAB to Play, and OTAing JS that depends on un-shipped native code would crash
-# older installs. iOS-only native changes do NOT block the Android OTA (see ios-ota.yml).
+# Roll out a Hot Updater over-the-air JS (React Native) bundle to iOS testers when
+# React/JS source changes land on main. The native gate is iOS-specific: only
+# ios/ + dependency (package.json / yarn.lock) changes block the OTA — those need a
+# fresh build to TestFlight/App Store, and OTAing JS that depends on un-shipped native
+# code would crash older installs. android-only native changes do NOT block the iOS OTA.
 on:
   push:
     branches: [main]
 
 concurrency:
-  group: android-ota
+  group: ios-ota
   cancel-in-progress: false
 
 jobs:
@@ -31,15 +31,15 @@ jobs:
           files="$(git diff --name-only "$before" "${{ github.sha }}")"
           echo "Changed files:"; echo "$files"
           native=false; js=false
-          # Android-specific native gate (ios/ is intentionally excluded — it can't affect the Android binary).
-          echo "$files" | grep -qE '^(android/|package\.json|yarn\.lock)' && native=true
+          # iOS-specific native gate (android/ is intentionally excluded — it can't affect the iOS binary).
+          echo "$files" | grep -qE '^(ios/|package\.json|yarn\.lock)' && native=true
           echo "$files" | grep -qE '^(src/|assets/|App\.tsx|index\.js|app\.json|babel\.config\.js|metro\.config\.js)' && js=true
           echo "native=$native" >> "$GITHUB_OUTPUT"
           echo "js=$js" >> "$GITHUB_OUTPUT"
 
       - name: Skip (no JS-only change)
         if: steps.cls.outputs.native == 'true' || steps.cls.outputs.js == 'false'
-        run: echo "Native/dependency change (needs a Play build) or no JS touched — skipping OTA."
+        run: echo "Native/dependency change (needs a TestFlight build) or no JS touched — skipping OTA."
 
       - name: Set up Node
         if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
@@ -58,13 +58,13 @@ jobs:
       - name: Read app version
         id: ver
         if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
-        run: echo "value=$(grep -oP 'versionName \"\K[^\"]+' android/app/build.gradle)" >> "$GITHUB_OUTPUT"
+        run: echo "value=$(grep -m1 -oP 'MARKETING_VERSION = \K[^;]+' ios/Vidrip.xcodeproj/project.pbxproj)" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy Android OTA
+      - name: Deploy iOS OTA
         if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
         env:
           HOT_UPDATER_SUPABASE_URL: ${{ secrets.HOT_UPDATER_SUPABASE_URL }}
           HOT_UPDATER_SUPABASE_ANON_KEY: ${{ secrets.HOT_UPDATER_SUPABASE_ANON_KEY }}
           HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY }}
           HOT_UPDATER_SUPABASE_BUCKET_NAME: ${{ secrets.HOT_UPDATER_SUPABASE_BUCKET_NAME }}
-        run: npx hot-updater deploy -p android -t "${{ steps.ver.outputs.value }}" -m "$(git log -1 --pretty=%s)" -f
+        run: npx hot-updater deploy -p ios -t "${{ steps.ver.outputs.value }}" -m "$(git log -1 --pretty=%s)" -f

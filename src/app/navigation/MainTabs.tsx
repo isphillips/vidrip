@@ -96,7 +96,7 @@ function MessagesNavigator() {
     <MessagesStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <MessagesStack.Screen name="MessagesHome" component={MessagesHomeScreen} options={{ headerShown: false }} />
       <MessagesStack.Screen name="AddFriend" component={AddFriendScreen as any} options={{ title: 'Add Friend', headerBackTitle: 'Messages' }} />
-      <MessagesStack.Screen name="InviteContacts" component={InviteContactsScreen as any} options={{ title: 'Import Contacts', headerBackTitle: 'Messages' }} />
+      <MessagesStack.Screen name="InviteContacts" component={InviteContactsScreen as any} options={{ title: '', headerBackTitle: 'Messages' }} />
       <MessagesStack.Screen name="FriendConversation" component={FriendConversationScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <MessagesStack.Screen name="CreateGroupChat" component={CreateGroupChatScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <MessagesStack.Screen name="Channel" component={ChannelScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />

@@ -39,7 +39,6 @@ function Marquee({ text }: { text: string }) {
         {Array.from({ length: copies }).map((_, i) => (
           <React.Fragment key={i}>
             <Text
-              numberOfLines={1}
               style={styles.marqueeText}
               onLayout={i === 0 ? e => setTextW(e.nativeEvent.layout.width) : undefined}>
               {text}
@@ -67,7 +66,7 @@ export default function ChannelsFeedBlock({ onPress }: { onPress: () => void }) 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const total = updates.reduce((n, c) => n + c.unseen_count, 0);
-  const ticker = updates.map(c => `${c.unseen_count} new in ${c.name}`).join('     •     ');
+  const ticker = updates.map(c => `${c.unseen_count} new in ${c.name}`).join('        •        ');
 
   const active = total > 0;
 
@@ -119,6 +118,9 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_BOLD, color: C.BLACK },
   subtitleMuted: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
   marqueeWrap: { height: 18, overflow: 'hidden' },
-  marqueeRow: { flexDirection: 'row', alignItems: 'center' },
+  // Absolutely positioned so it's out of the flex flow — the row has NO width constraint, so each
+  // copy renders at its full natural width (no ellipsis / no wrap) and overflows for the scroll.
+  // top/bottom:0 vertically centers it in the 18px wrap.
+  marqueeRow: { position: 'absolute', top: 0, bottom: 0, flexDirection: 'row', alignItems: 'center' },
   marqueeText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_MEDIUM, color: C.TEAL },
 });

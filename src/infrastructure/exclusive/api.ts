@@ -1,4 +1,6 @@
 import { supabase } from '../supabase/client';
+import { DEMO_MODE } from '../../demo/demoMode';
+import { demoAwardedCollections, demoAwardGifts } from '../../demo/demoData';
 
 const STORAGE_BASE = 'https://ltpscwticavqutbzrrjb.supabase.co/storage/v1/object';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0cHNjd3RpY2F2cXV0YnpycmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMDEwMTEsImV4cCI6MjA5NTc3NzAxMX0.wHXV1IFLk7UbRWOrJWZN-sjsw8Kau0Rn6OKs29debKo';
@@ -181,6 +183,7 @@ export async function awardCollectionsToUsers(collectionIds: string[], userIds: 
 
 /** Collections the signed-in user has been awarded (for the feed's Exclusive Content list). */
 export async function fetchMyAwardedCollections(): Promise<AwardedCollection[]> {
+  if (DEMO_MODE) { return demoAwardedCollections; }
   const { data, error } = await (supabase as any).from('collection_awards')
     .select('id, awarded_at, seen_at, collection:exclusive_collections(*, channel:groups(name))')
     .order('awarded_at', { ascending: false });
@@ -194,6 +197,7 @@ export async function fetchMyAwardedCollections(): Promise<AwardedCollection[]> 
 
 /** Unopened gifts → inbox messages (merged into the feed inbox). */
 export async function fetchUnopenedAwards(): Promise<AwardGift[]> {
+  if (DEMO_MODE) { return demoAwardGifts; }
   const { data, error } = await (supabase as any).from('collection_awards')
     .select('id, awarded_at, collection:exclusive_collections(id, name, cover_url, channel:groups(name), creator:users!creator_id(display_name, handle))')
     .is('seen_at', null)
