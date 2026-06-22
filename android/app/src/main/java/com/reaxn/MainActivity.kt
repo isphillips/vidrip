@@ -43,9 +43,4 @@ class MainActivity : ReactActivity() {
       }
     }
   }
-
-  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-    super.onActivityResult(requestCode, resultCode, data)
-    ReaxnScreenRecorderModule.onActivityResult(requestCode, resultCode, data)
-  }
 }

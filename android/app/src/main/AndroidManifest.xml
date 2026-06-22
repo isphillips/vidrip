@@ -6,8 +6,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <application
       android:name=".MainApplication"
@@ -51,9 +49,5 @@
             <data android:mimeType="text/plain" />
         </intent-filter>
       </activity>
-      <service
-        android:name=".ScreenRecordService"
-        android:exported="false"
-        android:foregroundServiceType="mediaProjection" />
     </application>
 </manifest>
