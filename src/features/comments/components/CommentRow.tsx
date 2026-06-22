@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Handle from '../../../components/Handle';
 import EmojiGlyph from '../../../components/EmojiGlyph';
+import ContentActions from '../../../components/ContentActions';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useCommentThumbnail } from '../useCommentThumbnail';
 import type { ThreadRow } from '../commentTree';
@@ -100,10 +101,21 @@ function CommentRow({
             <Handle userId={comment.author_id} handle={comment.author_handle} style={cr.handle} />
             <Text style={cr.time} numberOfLines={1}> · {comment.is_friend ? '👤 ' : ''}{ts}</Text>
             <View style={{ flex: 1 }} />
-            {isOwner && (
+            {isOwner ? (
               <TouchableOpacity onPress={() => onDelete(comment)} hitSlop={8} style={cr.iconBtn}>
                 <Ionicons name="trash-outline" size={14} color={C.MUTED} />
               </TouchableOpacity>
+            ) : (
+              <View style={cr.iconBtn}>
+                <ContentActions
+                  targetType="comment"
+                  targetId={comment.id}
+                  targetUserId={comment.author_id}
+                  handle={comment.author_handle}
+                  color={C.MUTED}
+                  size={16}
+                />
+              </View>
             )}
           </View>
 

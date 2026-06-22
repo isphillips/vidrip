@@ -452,7 +452,11 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // joining/leaving a channel elsewhere is reflected here.
   useFocusEffect(useCallback(() => {
     if (!user?.id) { setMemberVideos([]); return; }
-    fetchMembersOnlyVideos(user.id).then(setMemberVideos).catch(() => {});
+    // Member videos may be native ('vidrip') clips; the browse grid only renders the
+    // three embed source types, so coerce native → youtube (default tile) for display.
+    fetchMembersOnlyVideos(user.id)
+      .then(vs => setMemberVideos(vs.map(v => ({ ...v, sourceType: v.sourceType === 'vidrip' ? 'youtube' : v.sourceType }))))
+      .catch(() => {});
   }, [user?.id]));
 
   // Android back button: close drawer or player overlay before letting navigation pop.

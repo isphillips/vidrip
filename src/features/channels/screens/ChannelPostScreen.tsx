@@ -34,6 +34,7 @@ import {
 import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import EmojiChips from '../../../components/EmojiChips';
 import Handle from '../../../components/Handle';
+import ContentActions from '../../../components/ContentActions';
 import { openProfile } from '../../../store/profileDrawerStore';
 import { formatSourceType } from '../../../utils/sourceType';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
@@ -497,6 +498,20 @@ export default function ChannelPostScreen({
       hitSlop={8}>
       <Text style={styles.backIcon}>‹</Text>
     </TouchableOpacity>
+
+    {/* Report / block this post (hidden when playing — that corner shows ✕ — and on your own post) */}
+    {!playing && post.poster_id !== user?.id && (
+      <View style={[styles.postMoreBtn, { top: top + SPACE.SM }]}>
+        <ContentActions
+          targetType="post"
+          targetId={postId}
+          targetUserId={post.poster_id}
+          handle={post.poster?.handle}
+          color={C.WHITE}
+          size={20}
+        />
+      </View>
+    )}
     </View>
   );
 }
@@ -596,6 +611,12 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   backIcon: { color: C.WHITE, fontSize: 26, lineHeight: 30, fontFamily: FONT.BODY },
+  postMoreBtn: {
+    position: 'absolute', right: SPACE.MD,
+    width: 36, height: 36, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   thumbBlind: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center', justifyContent: 'center', backgroundColor: C.BLACK,

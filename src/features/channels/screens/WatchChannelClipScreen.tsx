@@ -43,6 +43,7 @@ import type { OverlayRecipe } from '../../studio/effectRecipe';
 import { FaceLensReplay, type FaceLensTrack } from '../../lens/faceLens';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
+import ContentActions from '../../../components/ContentActions';
 
 function EmojiBtn({
   emoji, count, isMine, isDisabled, onPress,
@@ -574,6 +575,20 @@ function WatchChannelClipImpl({
         <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
 
+      {/* Report / block this clip's author */}
+      {post.poster_id !== user?.id && (
+        <View style={[styles.moreBtn, { top: topInset + SPACE.SM }]}>
+          <ContentActions
+            targetType="clip"
+            targetId={postId}
+            targetUserId={post.poster_id}
+            handle={post.poster?.handle}
+            color={C.WHITE}
+            size={20}
+          />
+        </View>
+      )}
+
       {/* Close */}
       <TouchableOpacity
         style={[styles.closeBtn, { top: topInset + SPACE.SM }]}
@@ -692,6 +707,12 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     position: 'absolute', right: SPACE.LG,
+    width: 36, height: 36, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  moreBtn: {
+    position: 'absolute', right: SPACE.LG + 44,
     width: 36, height: 36, borderRadius: RADIUS.FULL,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center', justifyContent: 'center',

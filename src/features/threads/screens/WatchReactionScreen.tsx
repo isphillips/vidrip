@@ -28,6 +28,7 @@ import Animated, {
 const PIP_H = 184;
 import Video from 'react-native-video';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import ContentActions from '../../../components/ContentActions';
 import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import { shareTextNative } from '../../../infrastructure/share/nativeShare';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -375,6 +376,7 @@ export default function WatchReactionScreen({
   }
 
   const handle = (reaction?.user as any)?.handle ?? '?';
+  const reactorId = (reaction?.user as any)?.id ?? null;
   const totalDuration = duration || (reaction?.duration ?? 0);
   const progressPct = totalDuration > 0 ? Math.min((progress / totalDuration) * 100, 100) : 0;
   const myEmojiCount = emojiReactions.filter(r => r.user_id === user?.id).length;
@@ -544,6 +546,20 @@ export default function WatchReactionScreen({
         <Ionicons name="share-outline" size={20} color={C.WHITE} />
       </TouchableOpacity>
 
+      {/* Report / block this reaction's author */}
+      {reactorId !== user?.id && (
+        <View style={[styles.moreBtn, { top: topInset + SPACE.SM }]}>
+          <ContentActions
+            targetType="reaction"
+            targetId={reactionId}
+            targetUserId={reactorId}
+            handle={handle === '?' ? null : handle}
+            color={C.WHITE}
+            size={20}
+          />
+        </View>
+      )}
+
       {/* Close */}
       <TouchableOpacity
         style={[styles.closeBtn, { top: topInset + SPACE.SM }]}
@@ -680,6 +696,12 @@ const styles = StyleSheet.create({
   closeTxt: { color: C.WHITE, fontSize: 16, fontFamily: FONT.BODY_BOLD, lineHeight: 20 },
   shareBtn: {
     position: 'absolute', right: SPACE.LG + 44,
+    width: 36, height: 36, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  moreBtn: {
+    position: 'absolute', right: SPACE.LG + 88,
     width: 36, height: 36, borderRadius: RADIUS.FULL,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center', justifyContent: 'center',

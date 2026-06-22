@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { fetchUserProfile, type PublicProfile } from '../../../infrastructure/supabase/queries/profile';
+import ContentActions from '../../../components/ContentActions';
+import { useAuthStore } from '../../../store/authStore';
 import type { FriendsStackScreenProps } from '../../../app/navigation/types';
 
 export default function UserProfileScreen({ route }: FriendsStackScreenProps<'Profile'>) {
   const { userId } = route.params;
+  const me = useAuthStore(s => s.user);
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -43,6 +46,19 @@ export default function UserProfileScreen({ route }: FriendsStackScreenProps<'Pr
       {!!profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
       {!!profile.location && <Text style={styles.location}>📍 {profile.location}</Text>}
       {memberSince && <Text style={styles.since}>Member since {memberSince}</Text>}
+
+      {/* Safety: report or block this person (hidden on your own profile). */}
+      {userId !== me?.id && (
+        <View style={styles.actions}>
+          <ContentActions
+            variant="inline"
+            targetType="user"
+            targetId={userId}
+            targetUserId={userId}
+            handle={profile.handle}
+          />
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -63,4 +79,5 @@ const styles = StyleSheet.create({
   bio: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.INK, textAlign: 'center', lineHeight: 22, marginTop: SPACE.SM, marginHorizontal: SPACE.LG },
   location: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED, marginTop: SPACE.XS },
   since: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.SUBTLE, marginTop: SPACE.XS },
+  actions: { marginTop: SPACE.XL },
 });
