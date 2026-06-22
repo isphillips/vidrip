@@ -65,10 +65,10 @@ function extractInstagramId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-// Best-effort metadata for a pasted public Reel via the official Instagram oEmbed API
-// (server-side fn keeps the app secret off the client). Every field is optional —
-// oEmbed may not return a caption, and login-walled posts return nothing — so callers
-// fall back to defaults.
+// Best-effort metadata (title/thumbnail/author) for a pasted public Reel via the
+// instagram-oembed edge fn — a tokenless Open Graph scrape, NOT Meta's oEmbed. Every field
+// is optional (login-walled/private/removed posts return nothing), so callers fall back to
+// defaults: 'Instagram Reel' for the title and the live IG WebView for playback.
 async function fetchInstagramOg(
   id: string,
 ): Promise<{ title: string; thumbnail: string; author: string }> {

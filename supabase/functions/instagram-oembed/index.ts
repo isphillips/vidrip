@@ -1,16 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-// Title / thumbnail / author for a pasted public Instagram Reel. The app secret stays server-side.
-//
-// Two sources, merged best-effort (so a missing token or a thin oEmbed response still yields a
-// thumbnail):
-//   1. Official Instagram oEmbed (instagram_oembed) — needs the "oEmbed Read" feature on the Meta app
-//      + IG_OEMBED_TOKEN ("{APP_ID}|{APP_SECRET}" or a long-lived app token). Often returns the caption
-//      + author but NO thumbnail for reels.
-//   2. Open Graph scrape — Instagram serves og:image / og:title / og:description to the Facebook
-//      crawler UA, so we read them directly. Needs no token and is what reliably gives the thumbnail.
-const OEMBED_TOKEN = (Deno.env.get("IG_OEMBED_TOKEN") ?? "").trim();
-const GRAPH_VERSION = "v19.0";
+// Title / thumbnail / author for a pasted public Instagram Reel — via an Open Graph scrape ONLY.
+// We intentionally do NOT use Instagram's oEmbed (the "oEmbed Read" Meta feature), which would need
+// separate App Review + an app token. Instagram serves og:image / og:title / og:description to the
+// Facebook link-preview crawler UA, so we read those directly — no Meta token, feature, or review,
+// and it reliably yields the thumbnail (which oEmbed often omits for reels anyway).
 // Instagram whitelists Facebook's link-preview crawler to receive Open Graph tags on public posts.
 const CRAWLER_UA =
   "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)";
@@ -57,26 +51,6 @@ function authorFromTitle(title: string | null): string | null {
   return (m?.[1] ?? title).trim() || null;
 }
 
-async function fetchOembed(url: string) {
-  if (!OEMBED_TOKEN) { return { title: null, thumbnail: null, author: null }; }
-  try {
-    const api = `https://graph.facebook.com/${GRAPH_VERSION}/instagram_oembed`
-      + `?url=${encodeURIComponent(url)}&omitscript=true`
-      + `&fields=author_name,thumbnail_url,title`
-      + `&access_token=${encodeURIComponent(OEMBED_TOKEN)}`;
-    const res = await fetch(api);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { return { title: null, thumbnail: null, author: null }; }
-    return {
-      title: (data.title ?? null) as string | null,
-      thumbnail: (data.thumbnail_url ?? null) as string | null,
-      author: (data.author_name ?? null) as string | null,
-    };
-  } catch {
-    return { title: null, thumbnail: null, author: null };
-  }
-}
-
 async function scrapeOg(url: string) {
   try {
     const res = await fetch(url, {
@@ -111,11 +85,7 @@ Deno.serve(async (req) => {
       return json({ error: "not an instagram url" }, 400);
     }
 
-    // Try both sources; oEmbed wins for caption/author, the scrape wins for the thumbnail.
-    const [oembed, scraped] = await Promise.all([fetchOembed(url), scrapeOg(url)]);
-    const title = oembed.title || scraped.title || null;
-    const thumbnail = oembed.thumbnail || scraped.thumbnail || null;
-    const author = oembed.author || scraped.author || null;
+    const { title, thumbnail, author } = await scrapeOg(url);
 
     if (!title && !thumbnail && !author) {
       // Login-walled / private / removed → let the client fall back to its defaults.

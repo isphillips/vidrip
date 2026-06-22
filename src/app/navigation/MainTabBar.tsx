@@ -371,6 +371,15 @@ function GlowFab({ onPress }: { onPress: () => void }) {
   );
 }
 
+// Full-screen immersive screens (recorders + video players) reached inside a tab's stack.
+// The bottom bar hides on these — they're nested fullScreenModals that don't cover the tab
+// bar, so otherwise the bar's strip (and the purple navTheme behind it) peeks under the
+// recorder/player. Same idea as Studio's deep-step hiding below.
+const IMMERSIVE_ROUTES = new Set([
+  'WatchYouTubePost', 'RecordReview', 'ChannelVideoRecord',
+  'WatchReaction', 'WatchReview', 'WatchChannelClip', 'WatchCreatorVideo', 'ExclusiveWatch',
+]);
+
 export default function MainTabBar({ state, navigation, canCreate }: BottomTabBarProps & { canCreate: boolean }) {
   const { bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -410,13 +419,17 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
   const badgeBorderX = flow.interpolate({ inputRange: [0, 1], outputRange: [0, -badgeSize.w] });
   const studioTextX = flow.interpolate({ inputRange: [0, 1], outputRange: [0, -studioTextSize.w] });
 
-  // Hide the whole bar during Studio's creation flow (camera / trim / filter / details) — only the
-  // Studio HOME keeps the bottom nav; the deeper full-screen steps shouldn't show it.
+  // Hide the whole bar on full-screen immersive screens reached inside a tab's stack:
+  // Studio's deep creation steps (camera / trim / filter / details), and the recorder /
+  // video-player screens. Those are nested fullScreenModals that never cover the tab bar,
+  // so otherwise the bar's strip (and the purple navTheme behind it) shows under them.
   const activeRoute = state.routes[state.index] as any;
+  const nested = activeRoute?.state;
+  const sub = nested?.routes?.[nested.index ?? (nested.routes?.length ?? 1) - 1]?.name as string | undefined;
   if (activeRoute?.name === 'Studio') {
-    const nested = activeRoute.state;
-    const sub = nested?.routes?.[nested.index ?? (nested.routes?.length ?? 1) - 1]?.name;
     if (sub && sub !== 'StudioHome') { return null; }
+  } else if (sub && IMMERSIVE_ROUTES.has(sub)) {
+    return null;
   }
 
   // Everyone gets the Studio FAB now (the editor is open to all users). The creator-only

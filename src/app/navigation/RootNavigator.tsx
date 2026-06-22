@@ -280,20 +280,23 @@ export default function RootNavigator() {
             <>
               <Root.Screen name="Main" component={MainTabs} />
               {/* Studio is now a bottom-nav tab (see MainTabs), not a root modal drawer. */}
+              {/* Full-screen camera recorders: force a BLACK modal backdrop so the app's
+                  purple navTheme background (C.BG_SOLID) never peeks through where the
+                  recorder/source-video letterbox doesn't reach the bottom edge. */}
               <Root.Screen
                 name="RecordReaction"
                 component={RecordReactionScreen}
-                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: '#000' } }}
               />
               <Root.Screen
                 name="RecordComment"
                 component={RecordCommentScreen}
-                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: '#000' } }}
               />
               <Root.Screen
                 name="RecordIntro"
                 component={RecordIntroScreen}
-                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: '#000' } }}
               />
             </>
           )

@@ -251,7 +251,7 @@ export default function ChannelPostScreen({
   const visReviews = reviews.filter(r => !blocked.has(r.reviewer_id));
   // You can review a post once you've reacted to it (and it isn't your own post),
   // and only if the creator allows reviews on this channel.
-  const canReview = reviewsAllowed && isJoined && hasReacted && post.poster_id !== user?.id && !hasReviewed;
+  const canReview = reviewsAllowed && hasReacted && post.poster_id !== user?.id && !hasReviewed;
   const formattedSourceType = formatSourceType(post.source_type);
 
   // Inline playback of the imported source video. IG/FB play from the re-hosted MP4
@@ -304,9 +304,13 @@ export default function ChannelPostScreen({
         ) : (
         <>
         {obscured ? (
-          <View style={styles.thumbBlind}>
+          // Tap the blind to start recording a reaction — reacting reveals the video.
+          <TouchableOpacity
+            style={styles.thumbBlind}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('WatchYouTubePost', { postId, channelId })}>
             <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
-          </View>
+          </TouchableOpacity>
         ) : thumbnail ? (
           <Image source={{ uri: thumbnail }} style={styles.thumb} resizeMode="cover" />
         ) : (
@@ -334,7 +338,9 @@ export default function ChannelPostScreen({
           ) : post.yt_video_title ? (
             <Text style={styles.videoTitle} numberOfLines={2}>{post.yt_video_title}</Text>
           ) : null}
-          {isJoined && post.poster_id !== user?.id && (
+          {/* No isJoined gate — reacting is the universal action (the feed passes
+              isJoined:true for this same reason); invite-only access is gated above. */}
+          {post.poster_id !== user?.id && (
             hasReacted ? (
               canReview ? (
                 <TouchableOpacity style={styles.reviewBtn} activeOpacity={0.85}
