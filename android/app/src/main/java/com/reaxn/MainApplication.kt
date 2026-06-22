@@ -11,6 +11,7 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
+import com.hotupdater.HotUpdater
 import com.mrousavy.camera.frameprocessors.FrameProcessorPluginRegistry
 
 class MainApplication : Application(), ReactApplication {
@@ -25,6 +26,10 @@ class MainApplication : Application(), ReactApplication {
             }
 
         override fun getJSMainModuleName(): String = "index"
+
+        // Load the OTA-downloaded JS bundle when one is present (falls back to the
+        // packaged bundle on a fresh install / when no update has been applied).
+        override fun getJSBundleFile(): String? = HotUpdater.getJSBundleFile(applicationContext)
 
         override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
 
