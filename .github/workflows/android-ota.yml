@@ -1,0 +1,68 @@
+name: Android OTA
+
+# Roll out a Hot Updater over-the-air JS bundle to Android testers when JS source
+# changes land on main. Native / dependency changes (android, ios, package.json,
+# yarn.lock) are intentionally skipped — those need a fresh AAB to Play, and OTAing
+# JS that depends on un-shipped native code would crash older installs.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: android-ota
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: cls
+        run: |
+          before="${{ github.event.before }}"
+          if [ -z "$before" ] || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+            before="${{ github.sha }}^"
+          fi
+          files="$(git diff --name-only "$before" "${{ github.sha }}")"
+          echo "Changed files:"; echo "$files"
+          native=false; js=false
+          echo "$files" | grep -qE '^(android/|ios/|package\.json|yarn\.lock)' && native=true
+          echo "$files" | grep -qE '^(src/|assets/|App\.tsx|index\.js|app\.json|babel\.config\.js|metro\.config\.js)' && js=true
+          echo "native=$native" >> "$GITHUB_OUTPUT"
+          echo "js=$js" >> "$GITHUB_OUTPUT"
+
+      - name: Skip (no JS-only change)
+        if: steps.cls.outputs.native == 'true' || steps.cls.outputs.js == 'false'
+        run: echo "Native/dependency change (needs a Play build) or no JS touched — skipping OTA."
+
+      - name: Set up Node
+        if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack (Yarn 3)
+        if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
+        run: corepack enable
+
+      - name: Install dependencies
+        if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
+        run: yarn install --immutable
+
+      - name: Read app version
+        id: ver
+        if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
+        run: echo "value=$(grep -oP 'versionName \"\K[^\"]+' android/app/build.gradle)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Android OTA
+        if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
+        env:
+          HOT_UPDATER_SUPABASE_URL: ${{ secrets.HOT_UPDATER_SUPABASE_URL }}
+          HOT_UPDATER_SUPABASE_ANON_KEY: ${{ secrets.HOT_UPDATER_SUPABASE_ANON_KEY }}
+          HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY }}
+          HOT_UPDATER_SUPABASE_BUCKET_NAME: ${{ secrets.HOT_UPDATER_SUPABASE_BUCKET_NAME }}
+        run: npx hot-updater deploy -p android -t "${{ steps.ver.outputs.value }}" -m "$(git log -1 --pretty=%s)"
