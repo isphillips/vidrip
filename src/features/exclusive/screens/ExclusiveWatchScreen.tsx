@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image, Modal,
@@ -5,7 +6,6 @@ import {
 import Video from 'react-native-video';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
@@ -17,8 +17,6 @@ import {
 import EmojiChips from '../../../components/EmojiChips';
 import BunnyEmbedPlayer from '../../studio/components/BunnyEmbedPlayer';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
-
-const FLOW = ['#FF4FA3', '#A05CFF', '#2DD4BF'];
 
 export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScreenProps<'ExclusiveWatch'>) {
   const { postId, channelId, title, thumbnail } = route.params;
@@ -37,7 +35,7 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
     try {
       const [r, v] = await Promise.all([fetchChannelPostReactions(postId), fetchPostReviews(postId)]);
       setReactions(r); setReviews(v);
-    } catch (e) { console.error('[exclusive] thread', e); }
+    } catch (e) { log.error('[exclusive] thread', e); }
     finally { setLoading(false); }
   }, [postId]);
 

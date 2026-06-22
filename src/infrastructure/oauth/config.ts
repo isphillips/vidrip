@@ -14,10 +14,7 @@ export type ConnectionType = 'creator' | 'feed';
 // which is itself on Cloudflare and rejects the loop). Register this exact value in the
 // Google + TikTok (+ Meta) consoles, and keep it in sync with sync-oauth's REDIRECT_URI.
 export const REDIRECT_URI = 'https://vidrip.app/api/oauth-callback';
-
-// TODO: fill from Google Cloud Console (OAuth 2.0 Client ID, iOS/Web).
 export const GOOGLE_CLIENT_ID = '571633447038-jf3jkapo7drtmfrefb2kut1etmh5pa05.apps.googleusercontent.com';
-// TODO: fill from TikTok developer portal (Client key).
 export const TIKTOK_CLIENT_KEY = 'sbawbp2z1skyo0obdt';
 // Instagram App ID (public) for "Instagram API with Instagram Login" — the creator
 // signs in with Instagram directly, no Facebook Page required. The app secret lives
@@ -26,7 +23,6 @@ export const INSTAGRAM_APP_ID = '1354410146587874';
 // Facebook App ID (public) for Facebook Login. Reels live on a Page, so the creator
 // authorizes Page access and then picks which Page to import. App secret lives in the
 // sync-oauth edge function env.
-// TODO: fill from Meta App Dashboard (App ID). Often the same Meta app as Instagram.
 export const FACEBOOK_APP_ID = '1590496342638743';
 // Graph API version pinned so a Meta-side default bump can't silently change behavior.
 export const FACEBOOK_GRAPH_VERSION = 'v21.0';

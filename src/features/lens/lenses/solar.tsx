@@ -1,7 +1,7 @@
 import React from 'react';
-import { Group, Circle, Path, Skia, RadialGradient, BlurMask, vec, type SkPath } from '@shopify/react-native-skia';
+import { Group, Circle, Path, Skia, RadialGradient, vec, type SkPath } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
-import { off, rnd, Drifter, Bloom, ScreenTint, WorldVignette, type LensProps } from '../core';
+import { rnd, Drifter, Bloom, ScreenTint, WorldVignette, type LensProps } from '../core';
 
 // Unit sun-ray: a tapering blade, apex outward at y=-1, base at the centre.
 const RAY: SkPath = (() => {

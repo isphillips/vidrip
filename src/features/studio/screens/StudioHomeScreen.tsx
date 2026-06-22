@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useState } from 'react';
 import CameraWarmup from '../../lens/CameraWarmup';
 import EffectWarmup from '../components/EffectWarmup';
@@ -56,7 +57,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
     try { setDrafts(await listDrafts()); } catch { /* local — ignore */ }
     if (user?.id) {
       try { setVideos(await fetchMyCreatorVideos(user.id)); }
-      catch (e) { console.error('[studio] load', e); }
+      catch (e) { log.error('[studio] load', e); }
     }
     setLoading(false); setRefreshing(false);
   }, [user?.id]);

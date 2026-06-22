@@ -431,3 +431,8 @@ verify_jwt = false
 # (no Supabase JWT), so disable the gateway's JWT check like the other internal cron functions.
 [functions.cleanup-shorts]
 verify_jwt = false
+
+# Meta's Data Deletion callback POSTs a signed_request with no Supabase JWT; the function
+# authenticates the request itself via the app-secret HMAC, so disable the gateway check.
+[functions.meta-data-deletion]
+verify_jwt = false

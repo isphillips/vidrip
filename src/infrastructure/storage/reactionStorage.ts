@@ -1,4 +1,4 @@
-import RNFS from 'react-native-fs';
+import { log } from '../logging/logger';
 import { supabase } from '../supabase/client';
 import { moveToReactionsDir, localPathForReaction, downloadReaction, hasLocalCopy } from './localReactionStorage';
 import type { StorageMode } from './config';
@@ -32,7 +32,7 @@ async function relayAfterthought(
       .update({ afterthought_url: url, afterthought_duration: Math.round(afterthought.duration) })
       .eq('id', reactionId);
   } catch (e) {
-    console.error('[saveReaction] afterthought relay failed:', JSON.stringify(e));
+    log.error('[saveReaction] afterthought relay failed:', JSON.stringify(e));
   }
 }
 
@@ -132,7 +132,7 @@ export async function saveReaction({
       // failing silently — and don't report a cloudUrl the row doesn't actually carry.
       if (urlErr) { cloudUrl = null; throw urlErr; }
     } catch (e) {
-      console.error('[saveReaction] cloud relay upload/link failed:', JSON.stringify(e));
+      log.error('[saveReaction] cloud relay upload/link failed:', JSON.stringify(e));
     }
 
     if (afterthought) { await relayAfterthought(userId, threadId, reactionId, afterthought); }
@@ -185,7 +185,7 @@ export async function saveReaction({
     // "Not available" while the clip sits in storage. Surface it.
     if (urlErr) { cloudUrl = null; throw urlErr; }
   } catch (e) {
-    console.error('[saveReaction] relay upload/link failed:', JSON.stringify(e));
+    log.error('[saveReaction] relay upload/link failed:', JSON.stringify(e));
   }
 
   if (afterthought) { await relayAfterthought(userId, threadId, reactionId, afterthought); }

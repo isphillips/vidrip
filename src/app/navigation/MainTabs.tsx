@@ -3,7 +3,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { C } from '../../theme';
 import MainTabBar from './MainTabBar';
-import { useAuthStore } from '../../store/authStore';
 import type {
   MainTabParamList,
   FeedStackParamList,

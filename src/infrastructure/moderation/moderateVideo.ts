@@ -1,3 +1,4 @@
+import { log } from '../logging/logger';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import ImageEditor from '@react-native-community/image-editor';
 import RNFS from 'react-native-fs';
@@ -102,11 +103,11 @@ export async function assertVideoAllowed(
       headers: { Authorization: `Bearer ${session.access_token}` },
     }));
   } catch (e) {
-    console.warn('[moderation] check failed, allowing:', e);
+    log.warn('[moderation] check failed, allowing:', e);
     return; // fail open
   }
   if (error) {
-    console.warn('[moderation] edge error, allowing:', error.message);
+    log.warn('[moderation] edge error, allowing:', error.message);
     return; // fail open
   }
   if (data && data.allowed === false) {

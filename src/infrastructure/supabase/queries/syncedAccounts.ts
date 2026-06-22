@@ -145,8 +145,15 @@ export async function setSyncedAccountEnabled(id: string, enabled: boolean): Pro
   if (error) { throw error; }
 }
 
-/** Disconnect (delete) a synced account — cascades tokens; trigger hides channel if none remain. */
+/**
+ * Disconnect a synced account AND remove the content it imported (channel_posts + re-hosted
+ * media for a creator connection, or cached feed items for a feed connection), then delete
+ * the account row. Runs server-side (service role) so a raw client delete can't leave the
+ * imported videos behind — that stale content was why the channel's video count never dropped
+ * on disconnect and reconnecting doubled it.
+ */
 export async function disconnectSyncedAccount(id: string): Promise<void> {
-  const { error } = await supabase.from('synced_accounts').delete().eq('id', id);
-  if (error) { throw error; }
+  const { data, error } = await supabase.functions.invoke('disconnect-account', { body: { accountId: id } });
+  if (error) { throw new Error(await functionErrorMessage(error)); }
+  if (data?.error) { throw new Error(data.error); }
 }

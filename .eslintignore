@@ -1,0 +1,9 @@
+node_modules/
+ios/
+android/
+coverage/
+vidrip-web/
+# Deno edge functions run on a different runtime/lint config (not the RN app).
+supabase/functions/
+# Generated / vendored
+*.config.js

@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Modal,
@@ -46,7 +47,7 @@ export default function ManageChannelMembersScreen({
       setMyRole(role);
       setMembers(list);
     } catch (e) {
-      console.error('[ManageMembers] load', e);
+      log.error('[ManageMembers] load', e);
     } finally { setLoading(false); }
   }, [channelId, user?.id]);
 

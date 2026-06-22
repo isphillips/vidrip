@@ -1,0 +1,6 @@
+{
+  "entry": ["index.js", "App.tsx", "**/*.test.{ts,tsx}"],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": ["supabase/functions/**"],
+  "ignoreBinaries": ["pod"]
+}

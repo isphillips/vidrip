@@ -395,7 +395,7 @@ export default function ChannelhamburderScreen({
   // Invite-only rooms lock their videos for anyone who isn't the owner or a member.
   const inviteLocked = inviteOnly && !isOwner && !joined;
   // TikTok: ignore the stored (expired) URL — use the freshly resolved one.
-  const ytThumb = (videoId: string | null, source: 'youtube' | 'tiktok' | 'instagram' | 'bunny', stored: string | null) =>
+  const ytThumb = (videoId: string | null, source: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook', stored: string | null) =>
     source === 'tiktok'
       ? (videoId ? ttThumbs[videoId] ?? null : null)
       : source === 'bunny'

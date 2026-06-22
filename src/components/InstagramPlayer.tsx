@@ -1,3 +1,4 @@
+import { log } from '../infrastructure/logging/logger';
 import React, {
   forwardRef, useCallback, useImperativeHandle, useRef, useState,
 } from 'react';
@@ -70,7 +71,7 @@ const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function Instag
       onProgress={(d: any) =>
         onCurrentTime?.(d.currentTime, d.seekableDuration ?? d.playableDuration ?? 0)}
       onEnd={() => { setPaused(true); emit('ended'); }}
-      onError={(e: any) => console.error('[InstagramPlayer] error:', JSON.stringify(e))}
+      onError={(e: any) => log.error('[InstagramPlayer] error:', JSON.stringify(e))}
       repeat={false}
     />
   );

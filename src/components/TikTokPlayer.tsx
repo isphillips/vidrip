@@ -149,7 +149,7 @@ const TikTokPlayer = forwardRef<TikTokPlayerHandle, Props>(function TikTokPlayer
 
   return (
     <WebView
-      ref={webRef}
+      ref={webRef as any}
       style={style}
       source={{ html, baseUrl: 'https://www.tiktok.com' }}
       originWhitelist={['*']}

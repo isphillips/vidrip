@@ -98,7 +98,7 @@ export default function WatchChannelClipScreen({
   const [parentEmbedUrl, setParentEmbedUrl] = useState<string | null>(null);   // bunny signed embed
   const [parentRecipe, setParentRecipe] = useState<OverlayRecipe | null>(null); // bunny overlay layer
   const [lensTrack, setLensTrack] = useState<FaceLensTrack | null>(null);       // this clip's AR face lens
-  const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny'>('youtube');
+  const [parentSourceType, setParentSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook'>('youtube');
 
   const videoRef = useRef<any>(null);
   const ytRef = useRef<any>(null);
@@ -353,7 +353,7 @@ export default function WatchChannelClipScreen({
     );
   }
 
-  if (loadState === 'unavailable' || !localUri) {
+  if (loadState === 'unavailable' || !localUri || !post) {
     return (
       <View style={styles.center}>
         <Text style={styles.unavailText}>Video unavailable</Text>

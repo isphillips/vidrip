@@ -22,7 +22,7 @@ export default function AuthStack() {
         headerStyle: { backgroundColor: GRADIENT_DARK[0] },
         headerTintColor: C.INK,
         headerShadowVisible: false,
-        headerBackTitleVisible: false,
+        headerBackButtonDisplayMode: 'minimal',
         contentStyle: { backgroundColor: GRADIENT_DARK[1] },
       }}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />

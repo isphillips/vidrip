@@ -162,8 +162,9 @@ export type StudioStackScreenProps<T extends keyof StudioStackParamList> =
   NativeStackScreenProps<StudioStackParamList, T>;
 
 export type RootStackParamList = {
+  Onboarding: undefined;
+  Auth: undefined;
   Main: undefined;
-  Studio: undefined;
   RecordReaction: RecordStackParamList['RecordReaction'];
   RecordComment: {
     rootSourceId: string;

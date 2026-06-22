@@ -96,7 +96,7 @@ export default function BunnyVideoLayer({
   return (
     <View style={[StyleSheet.absoluteFill, style]}>
       <WebView
-        ref={webRef}
+        ref={webRef as any}
         source={{ uri: embedUrl }}
         style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
         allowsInlineMediaPlayback

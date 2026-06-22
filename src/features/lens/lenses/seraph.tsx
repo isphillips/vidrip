@@ -1,5 +1,5 @@
 import React from 'react';
-import { Group, Circle, Skia, Path, BlurMask, SweepGradient, vec } from '@shopify/react-native-skia';
+import { Group, Skia, Path, BlurMask, SweepGradient, vec } from '@shopify/react-native-skia';
 import { useDerivedValue } from 'react-native-reanimated';
 import { MeshWire } from './_meshKit';
 import { off, GodRays, Bloom, type LensProps } from '../core';

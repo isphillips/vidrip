@@ -1,5 +1,5 @@
 import React from 'react';
-import { Group, Circle, RadialGradient, BlurMask, vec } from '@shopify/react-native-skia';
+import { Circle, BlurMask } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import { off, rnd, Sparkle, ScreenTint, WorldVignette, GlowOrb, Motes, type LensProps } from '../core';
 

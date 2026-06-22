@@ -213,12 +213,6 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
       { scale: breathe.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.04, 1] }) },
     ],
   };
-  // Tagline: subtle shimmer (opacity) + tiny drift, forever.
-  const taglineStyle = {
-    opacity: tag.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.62, 1, 0.62] }),
-    transform: [{ translateY: tag.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -3, 0] }) }],
-  };
-
   return (
     <View style={styles.root}>
       <LavaLamp />

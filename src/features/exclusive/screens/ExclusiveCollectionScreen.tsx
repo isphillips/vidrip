@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, useWindowDimensions,
@@ -23,7 +24,7 @@ export default function ExclusiveCollectionScreen({ route, navigation }: FeedSta
     try {
       const [c, v] = await Promise.all([fetchAwardedCollection(collectionId), fetchExclusiveCollectionVideos(collectionId)]);
       setCollection(c); setVideos(v);
-    } catch (e) { console.error('[exclusive] collection', e); }
+    } catch (e) { log.error('[exclusive] collection', e); }
     finally { setLoading(false); }
   }, [collectionId]);
 

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack (Yarn 3)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      # Blocking gates — these must pass.
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Test
+        run: yarn test --ci
+
+      # Report-only for now: the repo carries pre-existing lint debt (react-hooks rules in the
+      # lens/animation helpers) and knip findings that need triage. Surfaced, not yet blocking.
+      - name: Lint (report-only)
+        run: yarn lint || true
+
+      - name: Dead code (report-only)
+        run: yarn deadcode || true

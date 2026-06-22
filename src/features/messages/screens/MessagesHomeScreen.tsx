@@ -111,7 +111,7 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
             fallbackInitial={(item.conv.displayName || item.conv.handle || '?').charAt(0).toUpperCase()}
             title={item.conv.displayName || `@${item.conv.handle}`}
             subtitle={item.conv.dmUnread > 0 ? `${item.conv.dmUnread} new`
-              : item.conv.lastActivityAt > 0 ? 'Tap to chat' : 'Say hi 👋'}
+              : item.conv.lastActivityAt > 0 ? 'Tap to chat' : 'Say hi'}
             unreadCount={item.conv.dmUnread}
             state={item.conv.dmUnread > 0 ? 'unread' : 'caughtup'}
             timestamp={relativeTime(item.conv.lastActivityAt)}

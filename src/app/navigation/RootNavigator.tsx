@@ -30,8 +30,9 @@ import RecordIntroScreen from '../../features/share/screens/RecordIntroScreen';
 import OnboardingScreen from '../../features/onboarding/OnboardingScreen';
 import ScreenGradient from '../../components/ScreenGradient';
 import { useOnboarding, useOnboardingStore } from '../../features/onboarding/onboarding';
+import type { RootStackParamList } from './types';
 
-const Root = createNativeStackNavigator();
+const Root = createNativeStackNavigator<RootStackParamList>();
 
 // Dark purple base so cold-start / any uncovered area matches the app gradient
 // (instead of the default white/black flash).

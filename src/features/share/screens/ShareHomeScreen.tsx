@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, TextInput, FlatList, StyleSheet,
@@ -332,7 +333,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       setResults(prev => reset ? data : [...prev, ...data]);
       offsetRef.current += data.length;
       hasMoreRef.current = data.length === PAGE;
-    } catch (e) { console.error('[ShareHome]', e); }
+    } catch (e) { log.error('[ShareHome]', e); }
     finally { setLoading(false); setLoadingMore(false); }
   }, [user?.id]);
 
@@ -353,7 +354,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       const yt = accts.find(a => a.provider === 'youtube');
       setHasFeedConnection(!!yt);
       setFeedLastSyncedAt(yt?.last_synced_at ?? null);
-    } catch (e) { console.error('[ShareHome] forYou', e); }
+    } catch (e) { log.error('[ShareHome] forYou', e); }
     finally { setFeedLoading(false); }
   }, [user?.id]);
 
@@ -367,7 +368,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         videoId: it.videoId, title: it.title, thumbnail: it.thumbnail,
         channelTitle: it.channelTitle, sourceType: it.sourceType,
       })));
-    } catch (e) { console.error('[ShareHome] friends', e); }
+    } catch (e) { log.error('[ShareHome] friends', e); }
     finally { setFriendsFeedLoading(false); }
   }, [user?.id]);
 
@@ -403,7 +404,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
         createdAt: it.publishedAt ?? undefined,
       })));
       setRecLastFetchedAt(lastFetchedAt);
-    } catch (e) { console.error('[ShareHome] recommended', e); }
+    } catch (e) { log.error('[ShareHome] recommended', e); }
     finally { setRecLoading(false); }
   }, [user?.id]);
 
@@ -1258,7 +1259,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               ) : sv.sourceType === 'instagram' ? (
                 <View style={[styles.sourceLetterbox, { top: top + 56, bottom: bottom + 88 }]}>
                   <WebView
-                    ref={el => { wvRefs.current[i] = el; }}
+                    ref={el => { wvRefs.current[i] = el as any; }}
                     style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
                     source={{ uri: `https://www.instagram.com/reel/${sv.videoId}/?l=1` }}
                     allowsInlineMediaPlayback
@@ -1291,7 +1292,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               ) : sv.sourceType === 'tiktok' ? (
                 <View style={[styles.sourceLetterbox, { top: top + 56, bottom: bottom + 88 }]}>
                 <WebView
-                  ref={el => { wvRefs.current[i] = el; }}
+                  ref={el => { wvRefs.current[i] = el as any; }}
                   style={StyleSheet.absoluteFill}
                   source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#000;overflow:hidden;width:100vw;height:100vh}iframe{width:100vw;height:100vh;border:0}</style></head><body><iframe id="tt" src="${tikTokPlayerUrl(sv.videoId, { controls: true, autoplay: true })}" allow="autoplay;fullscreen;encrypted-media" allowfullscreen></iframe></body></html>`, baseUrl: 'https://www.tiktok.com' }}
                   allowsInlineMediaPlayback
@@ -1304,7 +1305,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 </View>
               ) : (
                 <WebView
-                  ref={el => { wvRefs.current[i] = el; }}
+                  ref={el => { wvRefs.current[i] = el as any; }}
                   style={StyleSheet.absoluteFill}
                   source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;overflow:hidden;width:100vw;height:100vh}#p{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56.25vh;height:100vh;min-width:100vw;min-height:177.78vw}#p iframe{width:100%;height:100%;border:0}</style></head><body><div id="p"></div><script>var player,ready=false,wantPlay=false;function post(m){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(JSON.stringify(m));}}function onYouTubeIframeAPIReady(){player=new YT.Player('p',{videoId:'${sv.videoId}',playerVars:{autoplay:1,mute:1,playsinline:1,controls:1,rel:0,modestbranding:1,fs:0,origin:'https://lonelycpp.github.io'},events:{onReady:function(e){ready=true;e.target.playVideo();if(wantPlay){e.target.unMute();}post({type:'yt-ready'});},onError:function(e){post({type:'yt-error',code:e.data});}}});}window.__ytPlay=function(){wantPlay=true;if(ready&&player){player.unMute();player.playVideo();}};window.__ytPause=function(){wantPlay=false;if(ready&&player){player.mute();player.pauseVideo();}};var s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);</script></body></html>`, baseUrl: 'https://lonelycpp.github.io' }}
                   allowsInlineMediaPlayback

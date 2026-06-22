@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
@@ -318,7 +319,7 @@ export default function WatchReactionScreen({
         setEmojiReactions(prev => [...prev, { id: newId, emoji, user_id: user.id! }]);
       }
     } catch (e) {
-      console.error('[handleEmojiPress] error:', String(e));
+      log.error('[handleEmojiPress] error:', String(e));
     }
     setProcessing(prev => { const n = new Set(prev); n.delete(emoji); return n; });
   }, [reaction, user?.id, processing, emojiReactions]);
@@ -397,7 +398,7 @@ export default function WatchReactionScreen({
           }}
           onProgress={(d: any) => { progressRef.current = d.currentTime; setProgress(d.currentTime); }}
           onEnd={handleEnd}
-          onError={(e: any) => console.error('[WatchReaction] error:', JSON.stringify(e))}
+          onError={(e: any) => log.error('[WatchReaction] error:', JSON.stringify(e))}
           repeat={false}
         />
       </View>

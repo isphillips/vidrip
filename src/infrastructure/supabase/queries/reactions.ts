@@ -1,3 +1,4 @@
+import { log } from '../../logging/logger';
 import RNFS from 'react-native-fs';
 import { supabase } from '../client';
 
@@ -40,7 +41,7 @@ export async function removeEmojiReaction(
     .eq('user_id', userId)
     .eq('emoji', emoji);
   if (error) {
-    console.error('[removeEmojiReaction] error:', JSON.stringify(error));
+    log.error('[removeEmojiReaction] error:', JSON.stringify(error));
     throw error;
   }
 }
@@ -76,7 +77,7 @@ export async function uploadReaction({
     .upload(uploadPath, bytes, { contentType: 'video/mp4', upsert: false });
 
   if (uploadError) {
-    console.error('[uploadReaction] storage error:', JSON.stringify(uploadError));
+    log.error('[uploadReaction] storage error:', JSON.stringify(uploadError));
     throw uploadError;
   }
 
@@ -94,7 +95,7 @@ export async function uploadReaction({
     });
 
   if (insertError) {
-    console.error('[uploadReaction] insert error:', JSON.stringify(insertError));
+    log.error('[uploadReaction] insert error:', JSON.stringify(insertError));
     throw insertError;
   }
 

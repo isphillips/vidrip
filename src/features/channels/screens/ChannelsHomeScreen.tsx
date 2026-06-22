@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, Modal,
@@ -54,7 +55,7 @@ export default function ChannelsHomeScreen({
       setMembersOnly(mo);
       setSubscribed(subd);
     } catch (e) {
-      console.error('[ChannelsHome] load error:', JSON.stringify(e));
+      log.error('[ChannelsHome] load error:', JSON.stringify(e));
     } finally {
       setLoading(false);
       setRefreshing(false);

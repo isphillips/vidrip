@@ -18,4 +18,5 @@ export default defineConfig({
     supabaseUrl: process.env.HOT_UPDATER_SUPABASE_URL!,
     supabaseServiceRoleKey: process.env.HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY!,
   }),
-});
+  // Cast: @hot-updater plugin generics skew across package versions; the runtime shape is correct.
+} as any);

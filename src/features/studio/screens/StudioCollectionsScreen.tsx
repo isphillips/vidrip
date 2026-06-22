@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator,
@@ -22,7 +23,7 @@ export default function StudioCollectionsScreen({ navigation }: StudioStackScree
   const load = useCallback(async () => {
     if (!user?.id) { setLoading(false); return; }
     try { setRows(await fetchCollectionsByCreator(user.id)); }
-    catch (e) { console.error('[studio] collections', e); }
+    catch (e) { log.error('[studio] collections', e); }
     finally { setLoading(false); }
   }, [user?.id]);
 

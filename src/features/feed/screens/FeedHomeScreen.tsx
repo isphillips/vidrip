@@ -220,7 +220,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.ACCENT} />}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>You're all caught up 🎉</Text>
+            <Text style={styles.emptyTitle}>You're all caught up!</Text>
             <Text style={styles.emptySubtitle}>New videos to react to will show up here.</Text>
           </View>
         }

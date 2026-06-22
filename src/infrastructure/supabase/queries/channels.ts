@@ -1,3 +1,4 @@
+import { log } from '../../logging/logger';
 import RNFS from 'react-native-fs';
 import { supabase, SUPABASE_ANON_KEY } from '../client';
 import type { OverlayRecipe } from '../../../features/studio/effectRecipe';
@@ -1148,7 +1149,7 @@ export async function postChannelClip(params: ChannelClipParams): Promise<string
   try {
     await uploadChannelClipRelay(postId, params.userId);
   } catch (e) {
-    console.error('[postChannelClip] cloud upload failed:', JSON.stringify(e));
+    log.error('[postChannelClip] cloud upload failed:', JSON.stringify(e));
   }
   return postId;
 }

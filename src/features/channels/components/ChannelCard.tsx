@@ -2,25 +2,9 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
-import Handle from '../../../components/Handle';
 import ExclusiveGlow from '../../../components/conversation/ExclusiveGlow';
 import { rowStateStyle, type RowState } from '../../../components/conversation/useRowState';
 import type { ChannelSummary } from '../../../infrastructure/supabase/queries/channels';
-
-// Compact "last updated" stamp: today → time (3:30 PM), within a week → weekday (Mon),
-// this year → "Jun 17", older → "Jun 17, 2025".
-function formatUpdated(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  }
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-  if (diffDays < 7) { return d.toLocaleDateString(undefined, { weekday: 'short' }); }
-  return d.toLocaleDateString(undefined, d.getFullYear() === now.getFullYear()
-    ? { month: 'short', day: 'numeric' }
-    : { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 type Props = {
   channel: ChannelSummary;
@@ -46,9 +30,6 @@ export default function ChannelCard({
 }: Props) {
   const stateStyle = state ? rowStateStyle(state, exclusiveGlow).container : null;
   const isOwner = !!userId && channel.created_by === userId;
-  const showOwnerControls = !!onToggleListed && !!onToggleInviteOnly;
-  const listed = channel.is_listed ?? channel.is_public;
-  const inviteOnly = !!channel.invite_only;
   // Public: unreacted YouTube posts. Private: unread messages.
   const hasUnread = channel.unread_count > 0;
   // Members Only channels show a letter circle (matching AccountScreen) until a

@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Platform, Image,
@@ -55,7 +56,7 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
   const load = useCallback(async () => {
     if (!user?.id) { setLoading(false); return; }
     try { setPosts(await fetchScheduledPosts(user.id)); }
-    catch (e) { console.error('[studio] calendar load', e); }
+    catch (e) { log.error('[studio] calendar load', e); }
     finally { setLoading(false); }
   }, [user?.id]);
 

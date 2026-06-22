@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
@@ -137,7 +138,7 @@ export default function VideoCommentsSheet({
         cursorRef.current = { emoji_count: last.emoji_count, created_at: last.created_at, id: last.id };
       } else if (reset) { cursorRef.current = null; }
     } catch (e) {
-      console.error('[VideoCommentsSheet] loadRoots', e);
+      log.error('[VideoCommentsSheet] loadRoots', e);
     } finally {
       setLoading(false); setLoadingMore(false);
     }
@@ -153,7 +154,7 @@ export default function VideoCommentsSheet({
       setChildrenById(prev => ({ ...prev, [parentId]: page }));
       reconcilePending(page.map(p => p.id));
     } catch (e) {
-      console.error('[VideoCommentsSheet] loadChildren', e);
+      log.error('[VideoCommentsSheet] loadChildren', e);
     }
   }, [rootSourceId, sourceType, user?.id, reconcilePending]);
 
@@ -187,7 +188,7 @@ export default function VideoCommentsSheet({
       });
       reconcilePending(ids);
     } catch (e) {
-      console.error('[VideoCommentsSheet] reloadAll', e);
+      log.error('[VideoCommentsSheet] reloadAll', e);
     }
   }, [rootSourceId, sourceType, user?.id, reconcilePending]);
 

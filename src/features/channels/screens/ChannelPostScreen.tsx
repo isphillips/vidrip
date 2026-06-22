@@ -7,6 +7,9 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Video from 'react-native-video';
+import YoutubePlayer from 'react-native-youtube-iframe';
+import TikTokPlayer from '../../../components/TikTokPlayer';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import { useBlockStore } from '../../../store/blockStore';
@@ -75,6 +78,7 @@ export default function ChannelPostScreen({
   const [belowH, setBelowH] = useState(56);
   const [ttThumb, setTtThumb] = useState<string | null>(null);  // fresh TikTok thumb
   const [loading, setLoading] = useState(true);
+  const [playing, setPlaying] = useState(false); // creator/reactor inline playback of the source video
   const [dlState, setDlState] = useState<Record<string, DlState>>({});
   const [dlPct, setDlPct] = useState<Record<string, number>>({});
   const [processing, setProcessing] = useState<Set<string>>(new Set());
@@ -250,12 +254,55 @@ export default function ChannelPostScreen({
   const canReview = reviewsAllowed && isJoined && hasReacted && post.poster_id !== user?.id && !hasReviewed;
   const formattedSourceType = formatSourceType(post.source_type);
 
+  // Inline playback of the imported source video. IG/FB play from the re-hosted MP4
+  // (video_url); YouTube/TikTok from their embeds; Bunny via the signed-embed screen.
+  // Gated to !obscured so it follows the existing reveal rule — the creator (poster) and
+  // anyone who's reacted can play; non-reactors still have to react to reveal.
+  const thumbH = Math.max(240, height - belowH - tabBarHeight);
+  const isFile = post.source_type === 'instagram' || post.source_type === 'facebook';
+  const playableSource = post.source_type === 'bunny'
+    ? true
+    : isFile ? !!post.video_url : !!post.yt_video_id;
+  const canPlay = !obscured && playableSource;
+  const onPlay = () => {
+    if (post.source_type === 'bunny') {
+      navigation.navigate('WatchCreatorVideo', { postId: post.id, title: post.yt_video_title ?? undefined });
+      return;
+    }
+    setPlaying(true);
+  };
+
   return (
     <View style={styles.container}>
       <CameraWarmup />
     <ScrollView bounces={false}>
       {/* Thumbnail / blind */}
-      <View style={[styles.thumbWrap, { height: Math.max(240, height - belowH - tabBarHeight), width: '100%', marginTop: 0 }]}>
+      <View style={[styles.thumbWrap, { height: thumbH, width: '100%', marginTop: 0 }]}>
+        {playing ? (
+          <>
+            {isFile ? (
+              <Video
+                source={{ uri: post.video_url! }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="contain"
+                controls
+                paused={false}
+                onEnd={() => setPlaying(false)}
+              />
+            ) : post.source_type === 'tiktok' ? (
+              <TikTokPlayer videoId={post.yt_video_id as string} style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+            ) : (
+              <YoutubePlayer height={thumbH} videoId={post.yt_video_id as string} play />
+            )}
+            <TouchableOpacity
+              style={[styles.backBtn, { top: top + SPACE.SM, left: undefined, right: SPACE.MD }]}
+              onPress={() => setPlaying(false)}
+              hitSlop={8}>
+              <Text style={styles.backIcon}>✕</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+        <>
         {obscured ? (
           <View style={styles.thumbBlind}>
             <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
@@ -266,6 +313,13 @@ export default function ChannelPostScreen({
           <View style={[styles.thumb, styles.thumbPlaceholder]}>
             <Text style={styles.thumbIcon}>▶</Text>
           </View>
+        )}
+
+        {/* Tap to play the imported video (creator + anyone who's reacted). */}
+        {canPlay && (
+          <TouchableOpacity style={styles.watchOverlay} activeOpacity={0.85} onPress={onPlay}>
+            <View style={styles.watchBtn}><Text style={styles.watchIcon}>▶</Text></View>
+          </TouchableOpacity>
         )}
 
         {/* Overlay — same position for both states */}
@@ -305,6 +359,8 @@ export default function ChannelPostScreen({
             )
           )}
         </View>
+        </>
+        )}
       </View>
 
       {/* Reactions / Reviews — measured so the thumbnail above sizes to land this

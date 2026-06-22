@@ -16,7 +16,6 @@ const logo = require('../../../assets/driplogo.png');
 
 const PINK = '#FF4FA3';
 const MAGENTA = C.ACCENT_HOT; // #e056fd
-const PURPLE = C.ACCENT;      // #8b22a5
 const TEAL = C.TEAL;          // #2DD4BF
 
 const SCENE_H = 212;

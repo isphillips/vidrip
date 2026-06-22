@@ -19,11 +19,11 @@ import { useReactQueueStore } from '../../../store/reactQueueStore';
 import { faceLensRecipe, type OverlayRecipe } from '../../studio/effectRecipe';
 import { C } from '../../../theme';
 import type { FaceLensTrack } from '../../lens/faceLens';
-import type { RecordStackScreenProps } from '../../../app/navigation/types';
+import type { RootStackScreenProps } from '../../../app/navigation/types';
 
 export default function RecordReactionScreen({
   route, navigation,
-}: RecordStackScreenProps<'RecordReaction'>) {
+}: RootStackScreenProps<'RecordReaction'>) {
   const {
     kind = 'thread', threadId, videoId, sourceType = 'youtube', sourceUri,
     postId, channelId, introUrl, queued = false,

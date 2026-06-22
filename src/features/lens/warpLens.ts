@@ -1,3 +1,4 @@
+import { log } from '../../infrastructure/logging/logger';
 import { useEffect, useMemo, useRef } from 'react';
 import { Skia, type SkPaint, type SkRuntimeEffect } from '@shopify/react-native-skia';
 import { useSkiaFrameProcessor, VisionCameraProxy, runAtTargetFps } from 'react-native-vision-camera';
@@ -169,8 +170,8 @@ try { plugin = VisionCameraProxy.initFrameProcessorPlugin('faceLandmarks', {}); 
 // category. (Android's "the warps won't load" is almost always one of these two lines in logcat.)
 if (__DEV__) {
   const failed = (Object.keys(EFFECTS) as EffectKey[]).filter(k => !EFFECTS[k]);
-  if (failed.length) { console.warn(`[warpLens] shader compile failed: ${failed.join(', ')} — those warps are disabled`); }
-  if (!plugin) { console.warn('[warpLens] faceLandmarks plugin not registered — face warps disabled (glitch/kaleido still work)'); }
+  if (failed.length) { log.warn(`[warpLens] shader compile failed: ${failed.join(', ')} — those warps are disabled`); }
+  if (!plugin) { log.warn('[warpLens] faceLandmarks plugin not registered — face warps disabled (glitch/kaleido still work)'); }
 }
 
 /**

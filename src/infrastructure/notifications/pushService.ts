@@ -1,3 +1,4 @@
+import { log } from '../logging/logger';
 import { Platform, AppState, PermissionsAndroid } from 'react-native';
 import { supabase } from '../supabase/client';
 
@@ -37,7 +38,7 @@ async function saveToken(userId: string, token: string, platform: 'ios' | 'andro
       { onConflict: 'user_id,platform' },
     );
   if (error) {
-    console.error('[Push] token save error:', JSON.stringify(error));
+    log.error('[Push] token save error:', JSON.stringify(error));
   }
 }
 
@@ -56,12 +57,12 @@ export async function registerPushToken(userId: string): Promise<void> {
 
   if (Platform.OS === 'android') {
     // Android 13+ requires explicit runtime permission
-    if (parseInt(Platform.Version as string, 10) >= 33) {
+    if (Number(Platform.Version) >= 33) {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        console.warn('[Push] Android notification permission denied');
+        log.warn('[Push] Android notification permission denied');
         return;
       }
     }
@@ -139,7 +140,7 @@ export function bootstrapNotifications(): () => void {
     });
 
     PushNotificationIOS.addEventListener('registrationError', (err: any) => {
-      console.error('[Push] registration error:', JSON.stringify(err));
+      log.error('[Push] registration error:', JSON.stringify(err));
     });
 
     PushNotificationIOS.addEventListener('localNotification', handleIOSNotification);

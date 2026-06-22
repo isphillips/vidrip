@@ -108,7 +108,7 @@ export function buildFriendConversations({
       conv.subtitle = 'Waiting for your reaction';
     } else {
       conv.state = 'caughtup';
-      conv.subtitle = conv.lastActivityAt > 0 ? 'Caught up' : 'Say hi 👋';
+      conv.subtitle = conv.lastActivityAt > 0 ? 'Caught up' : 'Say hi';
     }
   }
 

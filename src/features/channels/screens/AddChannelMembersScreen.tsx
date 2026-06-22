@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -39,7 +40,7 @@ export default function AddChannelMembersScreen({
       await addMemberToChannel(channelId, friend.userId);
       setExisting(prev => new Set([...prev, friend.userId]));
     } catch (e: any) {
-      console.error('[AddMembers] addMemberToChannel error:', JSON.stringify(e));
+      log.error('[AddMembers] addMemberToChannel error:', JSON.stringify(e));
       Alert.alert('Error', e?.message ?? 'Could not add member.');
     }
     setAdding(prev => { const n = new Set(prev); n.delete(friend.userId); return n; });

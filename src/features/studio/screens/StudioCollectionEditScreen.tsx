@@ -1,3 +1,4 @@
+import { log } from '../../../infrastructure/logging/logger';
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator,
@@ -62,7 +63,7 @@ export default function StudioCollectionEditScreen({ route, navigation }: Studio
         } else {
           setChannelId(cs[0]?.id ?? null);
         }
-      } catch (e) { console.error('[studio] collection load', e); }
+      } catch (e) { log.error('[studio] collection load', e); }
       finally { setLoading(false); }
     })();
   }, [user?.id, editingId]);

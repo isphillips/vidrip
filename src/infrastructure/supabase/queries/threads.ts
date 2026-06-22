@@ -1,3 +1,4 @@
+import { log } from '../../logging/logger';
 import { supabase } from '../client';
 import { resolveReactionUri, signReactionUrl } from '../../storage/reactionStorage';
 import { ensurePrivateChannel } from './channels';
@@ -253,7 +254,7 @@ export async function fetchAlreadySentRecipients(
     .rpc('get_thread_recipients', { p_sender_id: senderId, p_video_id: videoId });
 
   if (error) {
-    console.error('[fetchAlreadySentRecipients] rpc error:', JSON.stringify(error));
+    log.error('[fetchAlreadySentRecipients] rpc error:', JSON.stringify(error));
     return [];
   }
   return (data ?? []) as string[];

@@ -106,6 +106,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   const [feedAccounts, setFeedAccounts] = useState<SyncedAccount[]>([]); // 'feed'
   const [syncing, setSyncing] = useState(false);
   const [syncingType, setSyncingType] = useState<ConnectionType | null>(null);
+  const [syncingProvider, setSyncingProvider] = useState<SyncProvider | null>(null);
   const { pending, clearPending } = useOAuthStore();
 
   // Facebook reels live on a Page, so connecting returns the user's Pages for a
@@ -172,6 +173,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     }
     setSyncing(true);
     setSyncingType(connectionType);
+    setSyncingProvider(provider);
     // Facebook is two-phase: exchange the code for the user's Pages, then let them
     // pick which Page to import reels from (handled by the picker modal below).
     if (provider === 'facebook') {
@@ -191,7 +193,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           setFbPages(pages);
         })
         .catch((e: any) => Alert.alert("Couldn't connect Facebook", e?.message ?? 'Could not connect account.'))
-        .finally(() => { setSyncing(false); setSyncingType(null); });
+        .finally(() => { setSyncing(false); setSyncingType(null); setSyncingProvider(null); });
       return;
     }
     syncOAuthCode(provider, code, connectionType)
@@ -201,7 +203,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         await loadSynced();
       })
       .catch((e: any) => Alert.alert('Sync failed', e?.message ?? 'Could not connect account.'))
-      .finally(() => { setSyncing(false); setSyncingType(null); });
+      .finally(() => { setSyncing(false); setSyncingType(null); setSyncingProvider(null); });
   }, [pending, clearPending, loadSynced]);
 
   // Reopen the picker for a pending Facebook connection (connected but no Page chosen
@@ -453,6 +455,11 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                           <Text style={styles.syncDisconnect}>Disconnect</Text>
                         </TouchableOpacity>
                       </View>
+                    ) : syncing && syncingType === 'creator' && syncingProvider === key ? (
+                      <View style={styles.syncRight}>
+                        <ActivityIndicator color={C.ACCENT} size="small" />
+                        <Text style={styles.syncingText}>Connecting…</Text>
+                      </View>
                     ) : (
                       <TouchableOpacity
                         style={styles.connectBtn}
@@ -465,12 +472,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                 </View>
               );
             })}
-            {syncing && syncingType === 'creator' && (
-              <View style={styles.syncingRow}>
-                <ActivityIndicator color={C.ACCENT} size="small" />
-                <Text style={styles.syncingText}>Syncing…</Text>
-              </View>
-            )}
           </View>
         </>
       )}
