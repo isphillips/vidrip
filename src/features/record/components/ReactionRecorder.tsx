@@ -28,7 +28,8 @@ import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import DraggablePip from './DraggablePip';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
 import { faceLensRecipe } from '../../studio/effectRecipe';
-import FaceLensOverlay, { lensByKey, type FaceLensTrack } from '../../lens/faceLens';
+import { LiveFaceLens, lensByKey, SPIKE_KEY, type FaceLensTrack } from '../../lens/faceLens';
+import { useSpikeFrameProcessor } from '../../lens/spikeFrameProcessor';
 import LensPicker from '../../lens/LensPicker';
 import { MOCK_FACE } from '../../lens/useFaceLandmarks';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
@@ -158,8 +159,11 @@ export default function ReactionRecorder({
   const effLensKey = anon ? ANON_LENS_KEY : lensKey;
   // Request the full 478-pt mesh only when the active lens is a mesh lens (so its track captures the
   // mesh for replay). Inert while effLensKey is null.
-  const { frameProcessor, landmarks: liveLandmarks, startTrack, stopTrack, cancelTrack } = useFaceTracking(true, !!lensByKey(effLensKey)?.mesh);
-  const lensLandmarks = liveLandmarks ?? (effLensKey && !faceTrackingAvailable ? MOCK_FACE : null);
+  const { frameProcessor, subscribe: subscribeFace, startTrack, stopTrack, cancelTrack } = useFaceTracking(true, !!lensByKey(effLensKey)?.mesh);
+  const isSpike = effLensKey === SPIKE_KEY;
+  const spikeFrameProcessor = useSpikeFrameProcessor(isSpike);
+  // Simulator/demo builds have no native tracker — seed a mock face so the lens still shows.
+  const mockFace = effLensKey && !faceTrackingAvailable ? MOCK_FACE : null;
   // Camera-frame aspect (w/h) — shared by the live overlay and the captured track so replay
   // cover-crops the same way the preview did.
   const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
@@ -684,11 +688,12 @@ export default function ReactionRecorder({
               // MediaPipe needs RGB frames; keep the format CONSTANT across lens toggles (don't key it
               // on lensKey) so switching a lens on/off mid-session never re-negotiates the buffer.
               pixelFormat={faceTrackingAvailable ? 'rgb' : 'yuv'}
-              frameProcessor={faceTrackingAvailable && effLensKey ? frameProcessor : undefined}
+              frameProcessor={isSpike ? spikeFrameProcessor : faceTrackingAvailable && effLensKey ? frameProcessor : undefined}
             />
-            <FaceLensOverlay
+            <LiveFaceLens
               lens={effLensKey}
-              landmarks={lensLandmarks}
+              subscribe={subscribeFace}
+              fallback={mockFace}
               width={camAsPip ? PIP_W : width}
               height={camAsPip ? PIP_H : height}
               frameAspect={frameAspect}

@@ -1,11 +1,25 @@
 import type { FaceFrame, FaceLandmarks, Pt } from './types';
 
-// Hysteresis for the head "up" axis. The eyes→mouth vector foreshortens when the head pitches up or
-// down and can briefly INVERT (the mouth crossing the eye line), which snapped lenses a full 180°.
-// We remember the last up direction and (a) hold it while the vector is too short to trust, and
-// (b) refuse a sudden >90° flip (an artifact) — real head roll changes <90° per frame, so it passes.
-let _lastUp: Pt | null = null;
-let _lastEyeMid: Pt | null = null;
+// Rotation lock for the head "up" axis. The eyes→mouth vector foreshortens on steep pitch and can
+// briefly INVERT or jump during fast motion / mis-detection, snapping lenses 90–180°. So we LOCK the
+// committed axis: small, continuous changes (real head tilt) track responsively, but a SUDDEN new
+// orientation is only adopted if it holds steady for ROT_HOLD_MS. Unreliable readings hold the lock.
+let _up: Pt | null = null;     // committed (locked) up axis
+let _cand: Pt | null = null;   // a sudden new direction currently under observation
+let _candSince = 0;            // ms timestamp the candidate window started
+
+// Per-frame change up to ~this many degrees = real head motion → track it; beyond = a jump to debounce.
+const ROT_STEP_COS = Math.cos((30 * Math.PI) / 180);
+// A candidate must stay within ~this cone of itself across the window to count as "steady".
+const ROT_STABLE_COS = Math.cos((22 * Math.PI) / 180);
+// How long a sudden/flipped orientation must persist before we accept it (the "few seconds" lock).
+const ROT_HOLD_MS = 1500;
+// How fast the committed axis follows raw during normal (small) rotation. 1 = instant/snappy (1:1,
+// no added lag); lower (e.g. 0.6) trades snappiness for jitter smoothing. The jump-debounce below is
+// what provides stability, so this can stay at 1 without losing flip protection.
+const ROT_TRACK = 1.0;
+
+const nrm = (p: Pt): Pt => { const l = Math.hypot(p.x, p.y) || 1; return { x: p.x / l, y: p.y / l }; };
 
 // Offset a base anchor by `upD` pixels toward the top of the head and `sideD` pixels along the eye
 // axis (positive = toward the subject's left eye / screen-left when mirrored). Negative `upD` goes
@@ -34,18 +48,31 @@ export function faceFrame(lm: FaceLandmarks, w: number, h: number, frameAspect?:
   // Head "up" axis from the eyes→mouth line (mouth is reliably below the eyes → unambiguous down/up).
   const dx = eyeMid.x - mouth.x, dy = eyeMid.y - mouth.y;
   const dl = Math.hypot(dx, dy);
-  let up = dl > 0 ? { x: dx / dl, y: dy / dl } : { x: 0, y: -1 };
-  // Stabilize: reset on re-acquire (face jumped); otherwise hold the prior up when the eyes→mouth
-  // vector is too short to trust (steep pitch) or when the candidate would flip >90° (foreshortening
-  // artifact, not a real head inversion). Real roll moves <90°/frame and passes through.
-  const jumped = !_lastEyeMid || Math.hypot(eyeMid.x - _lastEyeMid.x, eyeMid.y - _lastEyeMid.y) > eyeDist * 1.5;
-  if (!jumped && _lastUp) {
-    const tooShort = dl < eyeDist * 0.25;
-    const flipped = up.x * _lastUp.x + up.y * _lastUp.y < 0;
-    if (tooShort || flipped) { up = _lastUp; }
+  const rawUp = dl > 0 ? nrm({ x: dx, y: dy }) : (_up ?? { x: 0, y: -1 });
+  // Rotation lock: follow small continuous changes (real head tilt) immediately, but debounce sudden
+  // jumps/flips — a glitch can't snap the lens; only a NEW orientation held steady for ROT_HOLD_MS wins.
+  const tooShort = dl < eyeDist * 0.25;   // eyes→mouth foreshortened (steep pitch) → unreliable this frame
+  const now = Date.now();
+  if (!_up) {
+    _up = rawUp; _cand = null;             // first acquisition — adopt immediately
+  } else if (!tooShort) {
+    const dotC = rawUp.x * _up.x + rawUp.y * _up.y;
+    if (dotC >= ROT_STEP_COS) {
+      // small per-frame change = real motion → track responsively
+      _up = nrm({ x: _up.x + (rawUp.x - _up.x) * ROT_TRACK, y: _up.y + (rawUp.y - _up.y) * ROT_TRACK });
+      _cand = null;
+    } else if (_cand && rawUp.x * _cand.x + rawUp.y * _cand.y >= ROT_STABLE_COS) {
+      // a sudden new orientation that's holding steady — keep timing it, adopt once it's persisted
+      _cand = rawUp;
+      if (now - _candSince >= ROT_HOLD_MS) { _up = rawUp; _cand = null; }
+    } else {
+      // sudden / unsteady jump → stay locked and (re)start the dwell window
+      _cand = rawUp; _candSince = now;
+    }
+  } else {
+    _cand = null;                          // unreliable reading — hold the lock, don't count it
   }
-  _lastUp = up;
-  _lastEyeMid = eyeMid;
+  const up = _up!;
   // `up` → crown of head, `along` → head's right axis. `rollDeg` is how far `up` is from screen-up.
   const along = { x: -up.y, y: up.x };
   const nose = { x: mx(lm.noseTip.x), y: my(lm.noseTip.y) };

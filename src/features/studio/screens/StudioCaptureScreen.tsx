@@ -16,7 +16,8 @@ import { pickVideoFromLibrary } from '../../../infrastructure/media/imagePicker'
 import { createDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import ShareBaker, { type ShareBakerHandle } from '../components/ShareBaker';
 import { faceLensRecipe } from '../effectRecipe';
-import FaceLensOverlay, { lensByKey } from '../../lens/faceLens';
+import { LiveFaceLens, lensByKey, SPIKE_KEY } from '../../lens/faceLens';
+import { useSpikeFrameProcessor } from '../../lens/spikeFrameProcessor';
 import LensPicker from '../../lens/LensPicker';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 import { useWarpFrameProcessor, warpAvailable } from '../../lens/warpLens';
@@ -49,7 +50,9 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
   const effLensKey = anon ? ANON_LENS_KEY : lensKey;
   // Pull the full 478-pt mesh only for mesh lenses (Debug + the face-mesh effects); every other lens
   // stays on the cheap 6-anchor bridge.
-  const { frameProcessor, landmarks: lensLandmarks, status: lensStatus, frameAspect: measuredAspect, startTrack, stopTrack, cancelTrack } = useFaceTracking(facing === 'front', !!lensByKey(effLensKey)?.mesh);
+  const { frameProcessor, subscribe: subscribeFace, status: lensStatus, frameAspect: measuredAspect, startTrack, stopTrack, cancelTrack } = useFaceTracking(facing === 'front', !!lensByKey(effLensKey)?.mesh);
+  const isSpike = effLensKey === SPIKE_KEY;
+  const spikeFrameProcessor = useSpikeFrameProcessor(isSpike);
   // Real camera-warp lens (e.g. Mega Eyes): bends the live pixels via a Skia frame processor. Each
   // warp lens names its shader in `warp`; non-warp lenses pass null for a passthrough processor.
   const warpKey = lensByKey(effLensKey)?.warp ?? null;
@@ -183,14 +186,16 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
             pixelFormat={faceTrackingAvailable ? 'rgb' : 'yuv'}
             enableBufferCompression={false}
             frameProcessor={
-              isWarp ? warpFrameProcessor
-                : faceTrackingAvailable && effLensKey ? frameProcessor
-                  : undefined
+              isSpike ? spikeFrameProcessor
+                : isWarp ? warpFrameProcessor
+                  : faceTrackingAvailable && effLensKey ? frameProcessor
+                    : undefined
             }
           />
-          {/* Full-screen AR lens — overlay lenses only; warp lenses are baked into the preview above. */}
-          {!isWarp && (
-            <FaceLensOverlay lens={effLensKey} landmarks={lensLandmarks} width={width} height={height} frameAspect={frameAspect} />
+          {/* Full-screen AR lens — overlay lenses only; warp + spike lenses are drawn into the preview above.
+              LiveFaceLens subscribes to the tracker and re-renders in isolation, so this screen doesn't. */}
+          {!isWarp && !isSpike && (
+            <LiveFaceLens lens={effLensKey} subscribe={subscribeFace} width={width} height={height} frameAspect={frameAspect} />
           )}
         </>
       ) : (
@@ -212,13 +217,11 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
         </TouchableOpacity>
       </View>
 
-      {/* DEV diagnostic. Shows transformed (normalized 0..1) L eye, R eye, nose so the exact
-          geometry can be read off: eyes should share ~same y (level), nose centered & below. */}
+      {/* DEV diagnostic. Live per-frame landmarks now live inside <LiveFaceLens> (off this screen's
+          render path), so this just reports tracker availability + status. */}
       {__DEV__ && !DEMO_MODE && (
         <Text style={[styles.lensDebug, { bottom: top - 22 }]}>
-          {lensLandmarks
-            ? `L ${lensLandmarks.leftEye.x.toFixed(2)},${lensLandmarks.leftEye.y.toFixed(2)}  R ${lensLandmarks.rightEye.x.toFixed(2)},${lensLandmarks.rightEye.y.toFixed(2)}  N ${lensLandmarks.noseTip.x.toFixed(2)},${lensLandmarks.noseTip.y.toFixed(2)}`
-            : `LM:no  FP:${faceTrackingAvailable ? 'yes' : 'NO'}  ${lensStatus}`}
+          {`FP:${faceTrackingAvailable ? 'yes' : 'NO'}  ${lensStatus}`}
         </Text>
       )}
 

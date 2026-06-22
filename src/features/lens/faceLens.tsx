@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Canvas } from '@shopify/react-native-skia';
 import { faceFrame, useLensClock, dequantizeMesh, type FaceLandmarks, type FaceLensTrack } from './core';
 import { lensByKey } from './lenses';
 import { ANON_LENS_KEY } from './useAnonymousMode';
+
+// SPIKE: pick this lens in the picker to A/B the UI-thread pipeline. It renders via a Skia frame
+// processor (useSpikeFrameProcessor) that draws straight on the camera frame — NOT through this
+// overlay — so FaceLensOverlay intentionally does nothing for it (the capture screen gates it out).
+export const SPIKE_KEY = 'spike';
 
 // Opaque black cover — the privacy fail-safe for anonymous mode when no face is tracked this frame.
 const Blackout = () => <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} pointerEvents="none" />;
@@ -42,6 +47,28 @@ export default function FaceLensOverlay({
         <Comp f={f} clock={clock} w={width} h={height} />
       </Canvas>
     </View>
+  );
+}
+
+// ─── Live overlay ──────────────────────────────────────────────────────────────
+// The live camera surface. Subscribes to the tracker's per-frame landmarks (see useFaceTracking) and
+// keeps them in LOCAL state, so ONLY this small component re-renders each frame — never the parent
+// capture/reaction screen, which mounts the camera, source players and lens picker (re-rendering that
+// tree 30×/sec was the main source of lens lag). `fallback` seeds a mock face on builds with no native
+// tracker (simulator/demo) so the lens still shows over a still frame.
+export function LiveFaceLens({
+  lens, subscribe, width, height, frameAspect, fallback = null,
+}: {
+  lens?: string | null;
+  subscribe: (fn: (lm: FaceLandmarks | null) => void) => () => void;
+  width: number; height: number; frameAspect?: number; fallback?: FaceLandmarks | null;
+}) {
+  const [landmarks, setLandmarks] = useState<FaceLandmarks | null>(fallback);
+  useEffect(() => subscribe(setLandmarks), [subscribe]);
+  // No native tracker (sim/demo): the subscription never fires, so seed/refresh the mock directly.
+  useEffect(() => { if (fallback) { setLandmarks(fallback); } }, [fallback]);
+  return (
+    <FaceLensOverlay lens={lens} landmarks={landmarks} width={width} height={height} frameAspect={frameAspect} />
   );
 }
 

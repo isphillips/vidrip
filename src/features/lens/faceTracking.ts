@@ -94,13 +94,14 @@ export const faceTrackingAvailable = !!plugin;
 /** Which face track is live ('mesh' = Face Landmarker, 'blaze' = BlazeFace). Exposed for diagnostics. */
 export const faceTrackKind: 'mesh' | 'blaze' = useMesh ? 'mesh' : 'blaze';
 
-// EMA factor toward each new detection. BlazeFace needs heavy easing (0.18 on iOS) to mask its
-// flicker — but that easing is exactly what reads as lag/choppiness. The mesh is far cleaner, so it
-// can chase each fresh detection much harder → snappier, tighter tracking. DEADBAND is the motion
-// below which we hold the pose; tighter for the mesh so small moves still register.
-// The mesh is clean enough to chase each detection hard (snappier, less lag). Android's JS thread +
-// re-render is slower than iOS, so the easing reads as MORE lag there — ease less (higher factor).
-const SMOOTH = faceTrackKind === 'mesh' ? (IS_ANDROID ? 0.8 : 0.6) : (IS_ANDROID ? 0.55 : 0.18);
+// Easing factor toward each detection. Mesh = 1.0 → fully instant/1:1 (max snappy; accepts a little
+// idle jitter, which is the chosen tradeoff). BlazeFace keeps a low idle floor + speed ramp (1€-filter
+// style) because it's far noisier and unusable raw. To re-introduce mesh smoothing, lower SMOOTH_IDLE
+// (e.g. 0.18) — the factor then ramps from that floor (idle) up to 1 as motion reaches MOVE_FULL.
+// DEADBAND is the motion below which we don't update at all (freezes the smallest micro-jitter; it
+// never adds lag to perceptible motion).
+const SMOOTH_IDLE = faceTrackKind === 'mesh' ? 1.0 : 0.25;
+const MOVE_FULL = faceTrackKind === 'mesh' ? 0.022 : 0.03;
 const DEADBAND = faceTrackKind === 'mesh' ? 0.004 : 0.008;
 
 // BlazeFace keypoint indices (right/left as seen in the image).
@@ -171,7 +172,15 @@ function reduce(points: number[][] | null | undefined, _aspect: number, orientat
 // landmarks. `mirror` true for the front camera. Returns landmarks=null (and a no-op processor) if
 // the plugin isn't built yet.
 export function useFaceTracking(mirror = true, withMesh = false) {
-  const [landmarks, setLandmarks] = useState<FaceLandmarks | null>(null);
+  // Per-frame landmarks are delivered by a DIRECT subscription, not React state. setState here would
+  // re-render the host screen (camera + source players + lens picker) 30×/sec — the dominant source of
+  // lens lag/jitter. Instead the tracker pushes each frame straight to the subscribed <LiveFaceLens>
+  // overlay, which holds the per-frame state in isolation, so the heavy screen never re-renders.
+  const subRef = useRef<((lm: FaceLandmarks | null) => void) | null>(null);
+  const subscribe = useCallback((fn: (lm: FaceLandmarks | null) => void) => {
+    subRef.current = fn;
+    return () => { if (subRef.current === fn) { subRef.current = null; } };
+  }, []);
   const [status, setStatus] = useState<string>('init'); // diagnostic: ok | null | <err>
   // The aspect (w/h, <1 for portrait) of the actual frame the keypoints are normalized to — measured
   // from the live frame, not guessed from `format` (which can differ from the delivered buffer and
@@ -200,14 +209,17 @@ export function useFaceTracking(mirror = true, withMesh = false) {
         ? Math.max(d(lm.noseTip, prev.noseTip), d(lm.leftEye, prev.leftEye), d(lm.rightEye, prev.rightEye), d(lm.mouthCenter, prev.mouthCenter))
         : 1;
       if (prev && moved < DEADBAND) { return; }
-      // Ease toward the detection; snap on first acquire or a big jump so markers don't crawl.
-      const out = prev && moved < SNAP ? ema(prev, lm, SMOOTH) : lm;
+      // Speed-adaptive ease: idle → SMOOTH_IDLE (heavy, kills jitter), real motion (≥MOVE_FULL) → 1
+      // (instant/snappy). Snap on first acquire or a big jump (≥SNAP) so markers don't crawl.
+      const t = Math.min(1, Math.max(0, (moved - DEADBAND) / (MOVE_FULL - DEADBAND)));
+      const a = SMOOTH_IDLE + (1 - SMOOTH_IDLE) * t;
+      const out = prev && moved < SNAP ? ema(prev, lm, a) : lm;
       smoothRef.current = out;
-      setLandmarks(out);
+      subRef.current?.(out);
     } else if (!hiddenRef.current && now - lastGoodRef.current > HIDE_MS) {
       hiddenRef.current = true;
       smoothRef.current = null;
-      setLandmarks(null);
+      subRef.current?.(null);
     }
   }, []);
   const pushJs = Worklets.createRunOnJS(push);
@@ -290,5 +302,5 @@ export function useFaceTracking(mirror = true, withMesh = false) {
     return track;
   }, []);
 
-  return { frameProcessor, landmarks, status, frameAspect, startTrack, stopTrack, cancelTrack };
+  return { frameProcessor, subscribe, status, frameAspect, startTrack, stopTrack, cancelTrack };
 }

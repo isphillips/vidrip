@@ -73,7 +73,12 @@ import { Hud } from './hud';
 import { Aviator } from './aviator';
 import { Steampunk } from './steampunk';
 
+// SPIKE: UI-thread pipeline A/B. The capture screen renders this via useSpikeFrameProcessor (draws
+// straight on the camera frame, like a warp), so this Comp is just a never-rendered catalog placeholder.
+const SpikePlaceholder: Lens['Comp'] = () => null;
+
 export const LENSES: Lens[] = [
+  { key: 'spike', label: '⚡ Spike (UI)', icon: 'flash', Comp: SpikePlaceholder },
   { key: 'debug', label: 'Debug', icon: 'bug', Comp: Debug, mesh: true },
   // "React Anonymously" — privacy silhouette. mesh:true so it tracks the head. Forced on (not just
   // picked) when the user's anonymous-mode account setting is enabled.
