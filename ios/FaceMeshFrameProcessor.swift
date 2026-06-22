@@ -17,6 +17,13 @@ import QuartzCore
   private let lock = NSLock()
   public private(set) var landmarker: FaceLandmarker?
 
+  // SNAPPINESS TOGGLE. IMAGE mode detects each frame independently — instant 1:1 tracking, no temporal
+  // smoothing (the mesh never trails / "slides" to catch up on a fast move), at the cost of a little
+  // more idle jitter and heavier per-frame compute (full detection every frame, no tracking shortcut).
+  // VIDEO mode tracks + stabilizes across frames: rock-steady when idle, but lags fast motion. Flip to
+  // false to restore VIDEO. Must rebuild the app to take effect.
+  @objc public static let useImageMode = true
+
   @objc public func warmUp() {
     lock.lock(); defer { lock.unlock() }
     if landmarker != nil { return }
@@ -37,7 +44,7 @@ import QuartzCore
     let opts = FaceLandmarkerOptions()
     opts.baseOptions.modelAssetPath = path
     opts.baseOptions.delegate = delegate
-    opts.runningMode = .video
+    opts.runningMode = useImageMode ? .image : .video
     opts.numFaces = 1
     opts.minFaceDetectionConfidence = 0.5
     opts.minFacePresenceConfidence = 0.5
@@ -86,8 +93,14 @@ public class FaceMeshFrameProcessor: FrameProcessorPlugin {
     let image: MPImage
     do { image = try MPImage(sampleBuffer: frame.buffer, orientation: orientation) }
     catch { return ["err": "no_image"] }
-    let ts = Int(CACurrentMediaTime() * 1000)
-    guard let result = try? landmarker.detect(videoFrame: image, timestampInMilliseconds: ts) else { return ["err": "detect_fail"] }
+    // IMAGE mode: per-frame detect (no timestamp). VIDEO mode: tracked detect with a monotonic ts.
+    let detected: FaceLandmarkerResult?
+    if FaceMeshShared.useImageMode {
+      detected = try? landmarker.detect(image: image)
+    } else {
+      detected = try? landmarker.detect(videoFrame: image, timestampInMilliseconds: Int(CACurrentMediaTime() * 1000))
+    }
+    guard let result = detected else { return ["err": "detect_fail"] }
     guard let face = result.faceLandmarks.first, face.count >= 468 else { return ["err": "no_face"] }
 
     // Canonical MediaPipe FaceMesh indices → 6 BlazeFace-equivalent anchors (subject-anatomical, image

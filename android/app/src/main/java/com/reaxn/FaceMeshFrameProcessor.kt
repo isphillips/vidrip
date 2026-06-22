@@ -28,8 +28,11 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
     val landmarker = detector ?: return mapOf("err" to "no_model")
     val image = frame.image ?: return mapOf("err" to "no_image")
     val mp = MediaImageBuilder(image).build()
-    val ts = android.os.SystemClock.uptimeMillis()
-    val result = try { landmarker.detectForVideo(mp, ts) } catch (e: Throwable) { return mapOf("err" to "detect_fail") }
+    // IMAGE mode: per-frame detect (no timestamp). VIDEO mode: tracked detect with a monotonic ts.
+    val result = try {
+      if (USE_IMAGE_MODE) landmarker.detect(mp)
+      else landmarker.detectForVideo(mp, android.os.SystemClock.uptimeMillis())
+    } catch (e: Throwable) { return mapOf("err" to "detect_fail") }
     val faces = result.faceLandmarks()
     if (faces.isEmpty() || faces[0].size < 468) return mapOf("err" to "no_face")
     val f = faces[0]
@@ -71,6 +74,13 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
   }
 
   companion object {
+    // SNAPPINESS TOGGLE. IMAGE mode detects each frame independently — instant 1:1 tracking, no temporal
+    // smoothing (the mesh never trails / "slides" to catch up on a fast move), at the cost of a little
+    // more idle jitter and heavier per-frame compute (full detection every frame, no tracking shortcut).
+    // VIDEO mode tracks + stabilizes across frames: rock-steady when idle, but lags fast motion. Flip to
+    // false to restore VIDEO. Must rebuild the app to take effect.
+    const val USE_IMAGE_MODE = true
+
     // One shared landmarker so the launch-time warm-up and the frame processor load the model once.
     @Volatile
     var detector: FaceLandmarker? = null
@@ -95,7 +105,7 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
           .build()
         val opts = FaceLandmarkerOptions.builder()
           .setBaseOptions(base)
-          .setRunningMode(RunningMode.VIDEO)
+          .setRunningMode(if (USE_IMAGE_MODE) RunningMode.IMAGE else RunningMode.VIDEO)
           .setNumFaces(1)
           .setMinFaceDetectionConfidence(0.5f)
           .setMinFacePresenceConfidence(0.5f)
