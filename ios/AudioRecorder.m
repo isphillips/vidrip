@@ -25,6 +25,10 @@
 
 - (void)handleAudioInterruption:(NSNotification *)notification {
   if (!_mixingEnabled) { return; }
+  // Only re-assert mixing if we're genuinely still in music PLAYBACK. A VisionCamera video recording
+  // switches the session to PlayAndRecord — and `_mixingEnabled` can linger set from an earlier music
+  // take — so without this guard an interruption mid-recording would clobber the mic. Don't fight it.
+  if (![[AVAudioSession sharedInstance].category isEqualToString:AVAudioSessionCategoryPlayback]) { return; }
   NSNumber *type = notification.userInfo[AVAudioSessionInterruptionTypeKey];
   if (type.unsignedIntegerValue == AVAudioSessionInterruptionTypeBegan) {
     // Re-assert mixing mode after brief delay to let the interruptor settle

@@ -124,6 +124,7 @@ export default function StudioAudioScreen({ route, navigation }: StudioStackScre
           muted={track ? (track.mode === 'pre' ? true : !keepOriginal) : false}
           volume={keepOriginal ? originalVolume : 0}
           mixWithOthers="mix"
+          ignoreSilentSwitch="ignore"
           onProgress={onMainProgress}
           progressUpdateInterval={150}
         />

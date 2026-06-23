@@ -18,7 +18,7 @@ import ShareBaker, { type ShareBakerHandle } from '../components/ShareBaker';
 import Video from 'react-native-video';
 import MusicPickerSheet from '../music/MusicPickerSheet';
 import { resolveTrackFile, type MusicTrack } from '../music/library';
-import { configureForMixedPlayback, configureForVideoRecording } from '../../../infrastructure/native/audioRecorder';
+import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import { faceLensRecipe } from '../effectRecipe';
 import { LiveFaceLens, lensByKey, SPIKE_KEY } from '../../lens/faceLens';
 import { useSpikeFrameProcessor } from '../../lens/spikeFrameProcessor';
@@ -169,10 +169,11 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
     elapsedRef.current = 0;
     setElapsed(0);
     // Pre-mode music: route to playback+mix so the track is audible while the (mic-off) camera records.
-    // No music: re-assert PlayAndRecord and clear _mixingEnabled so the interruption handler in
-    // AudioRecorder.m doesn't fight VisionCamera's audio session setup during this recording.
+    // No music: do NOT touch the audio session — VisionCamera owns it. On startRecording it activates
+    // play-and-record (videoRecording mode, .allowBluetooth for the AirPods mic) itself, and resets from
+    // the music/Playback state via updateCategory. A manual config here only races that setup and kills
+    // the mic (the "voice not recording" bug).
     if (preTrack) { configureForMixedPlayback().catch(() => {}); }
-    else { configureForVideoRecording().catch(() => {}); }
     cameraRef.current?.startRecording({
       fileType: 'mp4',
       onRecordingFinished: (v) => { finishRef.current?.(v); finishRef.current = null; },

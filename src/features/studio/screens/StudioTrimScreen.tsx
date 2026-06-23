@@ -172,14 +172,17 @@ export default function StudioTrimScreen({ route, navigation }: StudioStackScree
           style={StyleSheet.absoluteFill}
           resizeMode="contain"
           repeat
-          muted
+          // Play the recorded audio (voice) here so you can hear it while trimming — only mute when a
+          // music track is providing the audio instead (StudioMusicPreview below).
+          muted={!!musicTrack}
+          ignoreSilentSwitch="ignore"
           paused={!isFocused}
           onLoad={(d) => { if (!durationMs && d.duration) { setDurationMs(Math.round(d.duration * 1000)); } }}
           onProgress={onProgress}
           progressUpdateInterval={200}
         />
       </View>
-      {/* The recording's track (if any) plays here too — the filmstrip video is muted. */}
+      {/* A chosen music track plays here instead of the recorded audio. */}
       {musicTrack && <StudioMusicPreview uri={musicTrack.uri} volume={musicTrack.volume} />}
 
       <View style={styles.times}>
