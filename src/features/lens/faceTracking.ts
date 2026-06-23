@@ -210,6 +210,12 @@ export function useFaceTracking(mirror = true, withMesh = false) {
   const lastGoodRef = useRef(0);                    // last frame a face was detected (hide debounce)
   const hiddenRef = useRef(true);                   // whether markers are currently hidden
   const recRef = useRef<TrackRec | null>(null);     // active capture (during recording)
+  // DEV diagnostic: effective tracking rate = successful detections delivered to JS per second (after the
+  // back-pressure gate). A low number here means inference/pipeline can't keep up (e.g. Android CPU
+  // delegate or a slow device) — that IS the lag. ~30 = healthy; single digits = the bottleneck.
+  const fpsCountRef = useRef(0);
+  const fpsWinRef = useRef(0);
+  const detFpsRef = useRef(0);
   // Back-pressure. The frame processor only hands a new frame to the JS thread when the previous one
   // has been consumed (pending=false). Heavy mesh lenses can't render the 478-pt wireframe at 30fps, so
   // without this the per-frame runOnJS handoffs queue up and the lens replays the backlog — a smooth
@@ -219,8 +225,12 @@ export function useFaceTracking(mirror = true, withMesh = false) {
 
   const push = useCallback((lm: FaceLandmarks | null, st: string) => {
    try {
-    if (st !== statusRef.current) { statusRef.current = st; setStatus(st); }
     const now = Date.now();
+    // Roll a 1s window of successful detections → effective tracking fps (folded into the DEV status).
+    if (lm) { fpsCountRef.current++; }
+    if (now - fpsWinRef.current >= 1000) { detFpsRef.current = fpsCountRef.current; fpsCountRef.current = 0; fpsWinRef.current = now; }
+    const dispSt = st === 'ok' ? `ok ${detFpsRef.current}fps` : st;
+    if (dispSt !== statusRef.current) { statusRef.current = dispSt; setStatus(dispSt); }
     const rec = recRef.current;
     if (rec) { rec.samples.push({ t: now - rec.t0, lm }); }
     if (lm) {
