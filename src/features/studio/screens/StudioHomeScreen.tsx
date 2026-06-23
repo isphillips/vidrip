@@ -25,7 +25,7 @@ const STATUS: Record<string, { label: string; color: string }> = {
 };
 
 const STAGE_LABEL: Record<StudioDraft['stage'], string> = {
-  trim: 'Trim', filter: 'Looks', overlay: 'Overlays', details: 'Ready to post',
+  trim: 'Trim', filter: 'Looks', audio: 'Music', overlay: 'Overlays', details: 'Ready to post',
 };
 
 const ago = (ts: number) => {

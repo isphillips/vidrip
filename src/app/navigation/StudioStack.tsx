@@ -6,6 +6,7 @@ import StudioHomeScreen from '../../features/studio/screens/StudioHomeScreen';
 import StudioCaptureScreen from '../../features/studio/screens/StudioCaptureScreen';
 import StudioTrimScreen from '../../features/studio/screens/StudioTrimScreen';
 import StudioFilterScreen from '../../features/studio/screens/StudioFilterScreen';
+import StudioAudioScreen from '../../features/studio/screens/StudioAudioScreen';
 import StudioOverlayScreen from '../../features/studio/screens/StudioOverlayScreen';
 import StudioDetailsScreen from '../../features/studio/screens/StudioDetailsScreen';
 import StudioCalendarScreen from '../../features/studio/screens/StudioCalendarScreen';
@@ -23,6 +24,7 @@ export default function StudioStack() {
       <Stack.Screen name="StudioCapture" component={StudioCaptureScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="StudioTrim" component={StudioTrimScreen} />
       <Stack.Screen name="StudioFilter" component={StudioFilterScreen} />
+      <Stack.Screen name="StudioAudio" component={StudioAudioScreen} />
       <Stack.Screen name="StudioOverlay" component={StudioOverlayScreen} />
       <Stack.Screen name="StudioDetails" component={StudioDetailsScreen} />
       <Stack.Screen name="StudioCalendar" component={StudioCalendarScreen} options={{ animation: 'slide_from_bottom' }} />

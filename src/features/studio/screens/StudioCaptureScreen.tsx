@@ -13,8 +13,12 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { MAX_STUDIO_MS } from '../../../infrastructure/creatorStudio/recipe';
 import { pickVideoFromLibrary } from '../../../infrastructure/media/imagePicker';
-import { createDraft } from '../../../infrastructure/storage/studioDraftStorage';
+import { createDraft, updateDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import ShareBaker, { type ShareBakerHandle } from '../components/ShareBaker';
+import Video from 'react-native-video';
+import MusicPickerSheet from '../music/MusicPickerSheet';
+import { resolveTrackFile, type MusicTrack } from '../music/library';
+import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
 import { faceLensRecipe } from '../effectRecipe';
 import { LiveFaceLens, lensByKey, SPIKE_KEY } from '../../lens/faceLens';
 import { useSpikeFrameProcessor } from '../../lens/spikeFrameProcessor';
@@ -23,6 +27,7 @@ import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking'
 import { useWarpFrameProcessor, warpAvailable } from '../../lens/warpLens';
 import { useAnonymousMode, ANON_LENS_KEY, ANON_VOICE_MOD } from '../../lens/useAnonymousMode';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
+import { useUploadStore } from '../../../store/uploadStore';
 import { DEMO_MODE } from '../../../demo/demoMode';
 
 const MAX_SEC = MAX_STUDIO_MS / 1000; // 180s hard cap (auto-stop)
@@ -69,6 +74,22 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
+  // Global toast shown while the lens is baked into the recording (the wait before the trim screen).
+  const showUpload = useUploadStore((s) => s.show);
+  const dismissUpload = useUploadStore((s) => s.dismiss);
+
+  // Pre-mode music: a curated track that plays aloud WHILE recording (mic off). Resolved to a local
+  // file on pick so it's ready to play + to bake. When set, the recording is video-only and the track
+  // becomes the video's audio on export.
+  const [preTrack, setPreTrack] = useState<{ id: string; title: string; uri: string } | null>(null);
+  const [musicSheet, setMusicSheet] = useState(false);
+  const onPickMusic = useCallback(async (track: MusicTrack | null) => {
+    if (!track) { setPreTrack(null); return; }
+    try {
+      const uri = await resolveTrackFile(track.id, track.url);
+      setPreTrack({ id: track.id, title: track.title, uri });
+    } catch { Alert.alert('Music', 'Could not load that track — check your connection.'); }
+  }, []);
 
   const cameraRef = useRef<Camera>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -101,6 +122,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
     setRecording(false);
     setBusy(true);
     StatusBar.setHidden(false, 'fade');
+    let toastId: string | null = null;
     try {
       const video = await new Promise<VideoFile>((resolve, reject) => {
         finishRef.current = resolve;
@@ -114,25 +136,37 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       const track = effLensKey ? stopTrack() : null;
       const voiceMod = anon ? ANON_VOICE_MOD : null;
       if (track || voiceMod) {
-        try { finalUri = await bakerRef.current!.bake({ sourceUri: uri, recipe: track ? faceLensRecipe(track) : null, durationSec: elapsedRef.current, voiceMod }); }
+        toastId = showUpload('Processing video…');
+        // Bake the lens overlay at 20fps (not 30): the capture-bake snapshots every frame to a PNG, so
+        // fewer frames = the user reaches the trim screen sooner, and a 20fps overlay reads fine.
+        try { finalUri = await bakerRef.current!.bake({ sourceUri: uri, recipe: track ? faceLensRecipe(track) : null, durationSec: elapsedRef.current, voiceMod, fps: 20 }); }
         catch { finalUri = uri; }
       }
       // Persist the (lens-baked) recording as a draft immediately (survives crash/close); edits
       // autosave from here on. createDraft copies the recording into the draft's local dir.
       const draft = await createDraft(finalUri, elapsedRef.current);
+      // Pre-mode music: the recording is video-only, so the chosen track becomes the audio on export.
+      if (preTrack) {
+        await updateDraft(draft.id, {
+          audio: { tracks: [{ id: preTrack.id, uri: preTrack.uri, title: preTrack.title, volume: 1, mode: 'pre' }], keepOriginal: false, originalVolume: 1 },
+        });
+      }
       navigation.navigate('StudioTrim', { fileUri: draft.rawFile, durationSec: elapsedRef.current, draftId: draft.id });
     } catch (e: any) {
       Alert.alert('Recording', e?.message ?? 'Could not save the recording.');
     } finally {
       setBusy(false);
+      if (toastId) { dismissUpload(toastId); }
     }
-  }, [recording, navigation, effLensKey, anon, stopTrack]);
+  }, [recording, navigation, effLensKey, anon, stopTrack, showUpload, dismissUpload, preTrack]);
   stopRef.current = stop;
 
   const start = useCallback(() => {
     if (recording || !ready) { return; }
     elapsedRef.current = 0;
     setElapsed(0);
+    // Pre-mode music: route to playback+mix so the track is audible while the (mic-off) camera records.
+    if (preTrack) { configureForMixedPlayback().catch(() => {}); }
     cameraRef.current?.startRecording({
       fileType: 'mp4',
       onRecordingFinished: (v) => { finishRef.current?.(v); finishRef.current = null; },
@@ -153,7 +187,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       setElapsed(elapsedRef.current);
       if (elapsedRef.current >= MAX_SEC) { stopRef.current(); } // hard 180s cap
     }, 1000);
-  }, [recording, ready, effLensKey, startTrack, measuredAspect, cancelTrack]);
+  }, [recording, ready, effLensKey, startTrack, measuredAspect, cancelTrack, preTrack]);
 
   const importLibrary = useCallback(async () => {
     if (recording) { return; }
@@ -179,7 +213,9 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
             videoBitRate={2}
             isActive
             video
-            audio
+            // Pre-mode music: mic OFF (audio={false}) so the recording is video-only and the track
+            // becomes the audio on export. Otherwise capture the mic normally.
+            audio={!preTrack}
             // Keep the buffer format CONSTANT (RGB) across lens toggles so the session never has to
             // re-negotiate on iOS ("-8f0"/"-11800"). RGB is also required by MediaPipe's MediaImage on
             // Android here — switching to YUV made detectForVideo throw (detect_fail).
@@ -216,6 +252,14 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
           <Ionicons name="camera-reverse-outline" size={26} color={recording ? C.SUBTLE : C.WHITE} />
         </TouchableOpacity>
       </View>
+
+      {/* Pre-mode music banner: the mic is off while the chosen track plays during recording. */}
+      {preTrack && (
+        <View style={[styles.musicBanner, { top: top + 52 }]} pointerEvents="none">
+          <Ionicons name="musical-notes" size={14} color={C.WHITE} style={{ marginRight: 6 }} />
+          <Text style={styles.musicBannerTxt} numberOfLines={1}>{preTrack.title} · mic off while recording</Text>
+        </View>
+      )}
 
       {/* DEV diagnostic. Live per-frame landmarks now live inside <LiveFaceLens> (off this screen's
           render path), so this just reports tracker availability + status. */}
@@ -258,8 +302,26 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
           </View>
         </TouchableOpacity>
 
-        <View style={styles.sideBtn} />
+        <TouchableOpacity onPress={() => setMusicSheet(true)} hitSlop={10} style={styles.sideBtn} disabled={recording || busy}>
+          <Ionicons name={preTrack ? 'musical-notes' : 'musical-notes-outline'} size={26} color={recording ? C.SUBTLE : preTrack ? C.ACCENT : C.WHITE} />
+          <Text style={styles.sideTxt} numberOfLines={1}>{preTrack ? 'Music' : 'Add music'}</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Pre-mode music: plays aloud (mic is off) only while recording, starting from t=0 each take. */}
+      {recording && preTrack && (
+        <Video
+          source={{ uri: preTrack.uri }}
+          paused={false}
+          repeat
+          // eslint-disable-next-line react-native/no-inline-styles
+          style={{ width: 0, height: 0 }}
+          mixWithOthers="mix"
+          ignoreSilentSwitch="ignore"
+        />
+      )}
+
+      <MusicPickerSheet visible={musicSheet} currentId={preTrack?.id} onSelect={onPickMusic} onClose={() => setMusicSheet(false)} />
 
       {/* Off-screen Skia→MP4 baker: composites the AR lens into the recording at capture-stop. */}
       <ShareBaker ref={bakerRef} />
@@ -269,6 +331,12 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
+  musicBanner: {
+    position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center',
+    maxWidth: '80%', backgroundColor: 'rgba(160,92,255,0.85)',
+    paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
+  },
+  musicBannerTxt: { color: C.WHITE, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
   placeholder: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACE.XL },
   placeholderTxt: { color: C.MUTED, fontFamily: FONT.BODY, textAlign: 'center', lineHeight: 22 },
   topBar: {

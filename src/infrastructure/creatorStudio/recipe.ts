@@ -54,6 +54,14 @@ export type StudioRecipe = {
    *  for the "React Anonymously" mode — iOS via AVAudioUnitTimePitch, Android via SonicAudioProcessor.
    *  Omit/null = original audio copied through unchanged. */
   voiceMod?: 'deep' | null;
+  /** Music laid over the video, mixed in natively on export. Each track loops/trims to the video
+   *  length at its own `volume` (0..1). `keepOriginalAudio` mixes the music UNDER the recorded audio
+   *  (false = music replaces it, e.g. pre-mode where the recording is video-only); `originalVolume`
+   *  (0..1) scales the recorded audio when kept. A list so multi-track mixing is additive later; V1
+   *  sends one. iOS: AVMutableAudioMix per-track setVolume; Android: Media3 parallel sequences. */
+  audioTracks?: { uri: string; volume: number; startMs?: number }[] | null;
+  keepOriginalAudio?: boolean;
+  originalVolume?: number;
   /** Anonymous-mode silhouette drawn NATIVELY per output frame from a captured mesh track (instead of
    *  pre-rendered overlay PNGs — no JS frame capture, no jank). `trackFile` is a file:// path to JSON:
    *  { fps, frameAspect, meshIdx, frames:[[le,re,nose,mouth flat + faceWidth]|null], meshFrames }. */

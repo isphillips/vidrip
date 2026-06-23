@@ -1,7 +1,7 @@
 import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createThumbnail } from 'react-native-create-thumbnail';
-import type { OverlayRecipe } from '../../features/studio/effectRecipe';
+import type { OverlayRecipe, StudioAudio } from '../../features/studio/effectRecipe';
 
 // Studio drafts: the raw recording is copied to local storage the moment recording ends, edit
 // settings autosave as the user moves through the flow, and a baked video snapshot is written at
@@ -9,7 +9,7 @@ import type { OverlayRecipe } from '../../features/studio/effectRecipe';
 // index in AsyncStorage) so the user can resume from the studio's Drafts tab. Cleared on a
 // successful Bunny upload. Mirrors the RNFS conventions in localChannelClipStorage.ts.
 
-export type StudioStage = 'trim' | 'filter' | 'overlay' | 'details';
+export type StudioStage = 'trim' | 'filter' | 'audio' | 'overlay' | 'details';
 export type StudioVisibility = 'public' | 'subscribers';
 
 export type StudioDraft = {
@@ -29,6 +29,7 @@ export type StudioDraft = {
   colorMatrix?: number[] | null;      // derived (filter × adjust) — carried downstream to bake
   mirror?: boolean;
   recipe?: OverlayRecipe | null;
+  audio?: StudioAudio | null;         // music track(s) + mix settings (baked into the export)
   // Details fields:
   title?: string;
   channelId?: string | null;

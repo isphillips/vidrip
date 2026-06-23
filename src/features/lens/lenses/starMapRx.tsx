@@ -61,7 +61,7 @@ export function StarMapRx({ f, clock, w, h }: ReactiveLensProps) {
   });
   const glow = useDerivedValue(() => 2.5 + 2 * Math.abs(Math.sin(clock.value * 2.2)));
   // Reactive nebula glow behind the face (falls back to centre when no face this frame).
-  const bloomC = useDerivedValue(() => vec(f.value?.noseX ?? w / 2, f.value?.eyeMidY ?? h * 0.42));
+  const bloomC = useDerivedValue(() => vec(f.value?.nose.x ?? w / 2, f.value?.eyeMid.y ?? h * 0.42));
   const bloomR = useDerivedValue(() => (f.value?.faceW ?? w * 0.3) * 1.35);
 
   return (

@@ -106,9 +106,9 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
   // Stable so memoized Swatches don't re-render on every tap (see Swatch comment).
   const selectFilter = useCallback((k: string) => setFilterKey(k), []);
 
-  // Non-destructive: carry the look forward to overlays; the single bake happens last.
+  // Non-destructive: carry the look forward to the audio step; the single bake happens last.
   const next = useCallback(() => {
-    navigation.navigate('StudioOverlay', {
+    navigation.navigate('StudioAudio', {
       fileUri, durationSec, trimStartMs, trimEndMs,
       colorMatrix: isIdentity(liveMatrix) ? null : liveMatrix,
       mirror,

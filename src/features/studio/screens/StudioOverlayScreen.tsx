@@ -20,7 +20,7 @@ import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
 import EffectText from '../components/EffectText';
 import { useStudioAutosave } from '../useStudioAutosave';
-import { saveSnapshotVideo, updateDraft } from '../../../infrastructure/storage/studioDraftStorage';
+import { saveSnapshotVideo, updateDraft, getDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -300,12 +300,18 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
     try {
       setSelectedId(null);
       const recipe = buildRecipe();
-      // Bake only the look (trim + colour + mirror) into the stored video; the animated
-      // overlay layer rides along as a recipe and is replayed live in-app.
+      // Bake the look (trim + colour + mirror) AND the music into the stored video; the animated
+      // overlay layer rides along as a recipe and is replayed live in-app. Music is baked here so
+      // it flows to both channel upload and the friend-share overlay bake from the one snapshot.
+      const draft = draftId ? await getDraft(draftId) : null;
+      const aud = draft?.audio;
       const baseRecipe: StudioRecipe = {
         clips: [{ uri: fileUri, trimStartMs, trimEndMs }],
         colorMatrix: matrix === IDENTITY ? null : matrix,
         mirror,
+        audioTracks: aud?.tracks.length ? aud.tracks.map(t => ({ uri: t.uri, volume: t.volume })) : null,
+        keepOriginalAudio: aud ? aud.keepOriginal : undefined,
+        originalVolume: aud ? aud.originalVolume : undefined,
       };
       const { uri } = await exportRecipe(baseRecipe, durationSec ? durationSec * 1000 : undefined);
       const finalRecipe = isEmptyRecipe(recipe) ? null : recipe;

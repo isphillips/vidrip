@@ -22,11 +22,9 @@ const ANDROID_DX = 0;
 const ANDROID_DY_BLAZE = -0.05;
 const ANDROID_DY_MESH = 0;
 
-// Replay sampling rate for the captured track — 15fps is plenty for an overlay and keeps the
-// persisted track small.
+// Replay sampling rate for the captured track
 const TRACK_FPS = 30;
-// Cap live inference. The camera runs at 30fps; with the GPU delegate BlazeFace is cheap enough to
-// run every frame. Lower this if a CPU-delegate device struggles.
+// Cap live inference. The camera runs at 60fps
 const LIVE_FPS = 30;
 const r3 = (n: number) => Math.round(n * 1000) / 1000; // trim serialized track size
 

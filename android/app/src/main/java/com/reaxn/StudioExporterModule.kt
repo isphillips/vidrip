@@ -12,6 +12,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.OverlaySettings
 import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.ChannelMixingAudioProcessor
+import androidx.media3.common.audio.ChannelMixingMatrix
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
@@ -22,6 +24,7 @@ import androidx.media3.effect.RgbMatrix
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
@@ -95,8 +98,15 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
 
     buildOverlayEffect(recipe, vw, vh)?.let { videoEffects.add(it) }
 
-    // Audio effects. "React Anonymously" pitch-shifts the voice down. Sonic preserves tempo/duration
-    // (it time-stretches to compensate for the resample), so audio stays in sync with the video.
+    // Audio mix config (mirrors iOS): keep/drop the recorded audio, its volume, and any music tracks.
+    // Music is mixed via parallel EditedMediaItemSequences (one per track, looped to cover the video).
+    val keepOriginal = if (recipe.hasKey("keepOriginalAudio")) recipe.getBoolean("keepOriginalAudio") else true
+    val originalVol = if (recipe.hasKey("originalVolume")) recipe.getDouble("originalVolume").toFloat() else 1.0f
+    val musicTracks = if (recipe.hasKey("audioTracks")) recipe.getArray("audioTracks") else null
+
+    // Audio effects on the recorded track. "React Anonymously" pitch-shifts the voice down. Sonic
+    // preserves tempo/duration (it time-stretches to compensate for the resample), so audio stays in
+    // sync with the video. A ChannelMixingAudioProcessor scales the recorded volume when reduced.
     val audioProcessors = ArrayList<AudioProcessor>()
     val voiceMod = if (recipe.hasKey("voiceMod")) recipe.getString("voiceMod") else null
     if (voiceMod == "deep") {
@@ -104,10 +114,12 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
       sonic.setPitch(0.72f) // <1 = deeper; ~-5 semitones
       audioProcessors.add(sonic)
     }
+    if (keepOriginal && originalVol < 0.999f) { audioProcessors.add(volumeProcessor(originalVol)) }
 
-    val edited = EditedMediaItem.Builder(mediaItem)
+    val editedBuilder = EditedMediaItem.Builder(mediaItem)
       .setEffects(Effects(audioProcessors, videoEffects))
-      .build()
+    if (!keepOriginal) { editedBuilder.setRemoveAudio(true) } // music-only / pre-mode: drop the mic track
+    val edited = editedBuilder.build()
 
     val outFile = File(reactContext.cacheDir, "studio_${UUID.randomUUID()}.mp4")
 
@@ -123,7 +135,35 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
       })
       .build()
 
-    transformer.start(edited, outFile.absolutePath)
+    // No music → single item (unchanged path). With music → a Composition whose first sequence is the
+    // video (+ optional recorded audio) and each further sequence is a looping music track; Media3 mixes
+    // the parallel sequences' audio. Modeled as N sequences so multi-track mixing is just more entries.
+    if (musicTracks == null || musicTracks.size() == 0) {
+      transformer.start(edited, outFile.absolutePath)
+    } else {
+      val sequences = ArrayList<EditedMediaItemSequence>()
+      sequences.add(EditedMediaItemSequence.Builder(edited).build())
+      for (i in 0 until musicTracks.size()) {
+        val mt = musicTracks.getMap(i) ?: continue
+        val mUri = uriOf(mt.getString("uri")) ?: continue
+        val vol = if (mt.hasKey("volume")) mt.getDouble("volume").toFloat() else 1.0f
+        val mItem = EditedMediaItem.Builder(MediaItem.fromUri(mUri))
+          .setRemoveVideo(true)
+          .setEffects(Effects(arrayListOf<AudioProcessor>(volumeProcessor(vol)), emptyList<Effect>()))
+          .build()
+        sequences.add(EditedMediaItemSequence.Builder(mItem).setIsLooping(true).build())
+      }
+      transformer.start(Composition.Builder(sequences).build(), outFile.absolutePath)
+    }
+  }
+
+  // A volume control implemented as a channel-mixing matrix scaled by `volume` (0..1). Registers both
+  // mono and stereo identities so it applies regardless of the source's channel count.
+  private fun volumeProcessor(volume: Float): ChannelMixingAudioProcessor {
+    val p = ChannelMixingAudioProcessor()
+    p.putChannelMixingMatrix(ChannelMixingMatrix.create(1, 1).scaleBy(volume))
+    p.putChannelMixingMatrix(ChannelMixingMatrix.create(2, 2).scaleBy(volume))
+    return p
   }
 
   // ── Colour matrix ────────────────────────────────────────────────────────────

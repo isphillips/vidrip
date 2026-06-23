@@ -1,10 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Canvas } from '@shopify/react-native-skia';
 import { useSharedValue } from 'react-native-reanimated';
 import { faceFrame, meshFrameFor, useLensClock, dequantizeMesh, type FaceLandmarks, type FaceLensTrack, type MeshFrame, type ReactiveLensProps } from './core';
 import { lensByKey } from './lenses';
 import { StarMapRx } from './lenses/starMapRx';
+import { CyberMeshRx } from './lenses/cyberMeshRx';
+import { CircuitRx } from './lenses/circuitRx';
+import { NebulaRx } from './lenses/nebulaRx';
+import { PixelRx } from './lenses/pixelRx';
+import { WebRx } from './lenses/webRx';
+import { GildedRx } from './lenses/gildedRx';
 import { ANON_LENS_KEY } from './useAnonymousMode';
 
 // Lenses migrated to the reactive (UI-thread, no-React-re-render) renderer. When the active lens is in
@@ -12,6 +18,12 @@ import { ANON_LENS_KEY } from './useAnonymousMode';
 // catalog still maps the key to the legacy Comp, which replay/bake (FaceLensReplay) continue to use.
 const REACTIVE_RENDERERS: Record<string, React.FC<ReactiveLensProps>> = {
   starmap: StarMapRx,
+  cyber: CyberMeshRx,
+  circuit: CircuitRx,
+  nebula: NebulaRx,
+  pixel: PixelRx,
+  web: WebRx,
+  gilded: GildedRx,
 };
 
 // SPIKE: pick this lens in the picker to A/B the UI-thread pipeline. It renders via a Skia frame
@@ -50,6 +62,7 @@ export default function FaceLensOverlay({
   if (!def || !landmarks || width <= 0 || height <= 0) { return null; }
   const f = faceFrame(landmarks, width, height, frameAspect);
   const Comp = def.Comp;
+  if (!Comp) { return null; }  // reactive lenses render via their *Rx (REACTIVE_RENDERERS), never here
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Canvas style={StyleSheet.absoluteFill}>
@@ -141,6 +154,20 @@ export function FaceLensReplay({
   if (landmarks && meshQ && track.meshIdx) {
     landmarks = { ...landmarks, mesh: dequantizeMesh(meshQ, track.meshIdx) };
   }
+  // Converted lenses: replay through the SAME reactive renderer the camera preview uses, so the baked
+  // output matches the live look exactly (one renderer — no legacy-vs-reactive divergence).
+  const ReactiveComp = track.lensId ? REACTIVE_RENDERERS[track.lensId] : undefined;
+  if (ReactiveComp) {
+    return (
+      <ReactiveReplay
+        ReactiveComp={ReactiveComp}
+        landmarks={landmarks}
+        width={width}
+        height={height}
+        frameAspect={frameAspect ?? track.frameAspect}
+      />
+    );
+  }
   return (
     <FaceLensOverlay
       lens={track.lensId}
@@ -149,5 +176,33 @@ export function FaceLensReplay({
       height={height}
       frameAspect={frameAspect ?? track.frameAspect}
     />
+  );
+}
+
+// Drives a converted lens's reactive *Rx renderer from a sampled track frame, by pushing it into a
+// SharedValue<MeshFrame> (computed once per frame via useMemo). Used by the bake + replay so the output
+// is pixel-identical to the live camera. The bake's capture loop already proves UI-thread-driven Skia is
+// snapshotted correctly here (EffectLayer renders the same way). The SV is set in render so it's ready
+// before the bake's capture wait; the assignment is idempotent.
+function ReactiveReplay({
+  ReactiveComp, landmarks, width, height, frameAspect,
+}: {
+  ReactiveComp: React.FC<ReactiveLensProps>;
+  landmarks: FaceLandmarks | null;
+  width: number; height: number; frameAspect?: number;
+}) {
+  const face = useSharedValue<MeshFrame | null>(null);
+  const mf = useMemo(
+    () => (landmarks ? meshFrameFor(landmarks, width, height, frameAspect) : null),
+    [landmarks, width, height, frameAspect],
+  );
+  face.value = mf;
+  const clock = useLensClock(true);
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Canvas style={StyleSheet.absoluteFill}>
+        <ReactiveComp f={face} clock={clock} w={width} h={height} />
+      </Canvas>
+    </View>
   );
 }

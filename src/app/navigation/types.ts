@@ -151,6 +151,7 @@ export type StudioStackParamList = {
   // optional fields hydrate a screen's own editable state when resuming a draft.
   StudioTrim: { fileUri: string; durationSec?: number; draftId?: string; trimStartMs?: number; trimEndMs?: number };
   StudioFilter: { fileUri: string; durationSec?: number; trimStartMs: number; trimEndMs: number; draftId?: string; filterKey?: string; adjust?: Record<string, number>; mirror?: boolean };
+  StudioAudio: { fileUri: string; durationSec?: number; trimStartMs: number; trimEndMs: number; colorMatrix?: number[] | null; mirror?: boolean; draftId?: string };
   StudioOverlay: { fileUri: string; durationSec?: number; trimStartMs: number; trimEndMs: number; colorMatrix?: number[] | null; mirror?: boolean; draftId?: string; recipe?: import('../../features/studio/effectRecipe').OverlayRecipe | null };
   StudioDetails: { fileUri: string; durationSec?: number; recipe?: import('../../features/studio/effectRecipe').OverlayRecipe | null; draftId?: string; title?: string; channelId?: string | null; visibility?: 'public' | 'subscribers' };
   StudioCalendar: undefined;

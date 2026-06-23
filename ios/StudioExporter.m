@@ -293,7 +293,16 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
   // Preserve orientation — without this, portrait clips export rotated.
   vTrack.preferredTransform = srcVideo.preferredTransform;
 
-  if (srcAudio) {
+  // Audio = the recorded original (optional, gated by keepOriginalAudio) + any music tracks, blended
+  // by an AVMutableAudioMix with a per-track volume. Modeled as a list so multi-track mixing is just
+  // more entries later. Music loops to fill the trimmed video length; the original keeps its own length.
+  NSNumber *koaNum = [recipe[@"keepOriginalAudio"] isKindOfClass:[NSNumber class]] ? recipe[@"keepOriginalAudio"] : nil;
+  BOOL keepOriginal = koaNum ? [koaNum boolValue] : YES;   // absent (normal export) → keep, as before
+  float originalVol = [recipe[@"originalVolume"] isKindOfClass:[NSNumber class]] ? [recipe[@"originalVolume"] floatValue] : 1.0f;
+  NSArray *musicTracks = [recipe[@"audioTracks"] isKindOfClass:[NSArray class]] ? recipe[@"audioTracks"] : nil;
+  NSMutableArray<AVMutableAudioMixInputParameters *> *mixParams = [NSMutableArray array];
+
+  if (srcAudio && keepOriginal) {
     AVMutableCompositionTrack *aTrack =
       [comp addMutableTrackWithMediaType:AVMediaTypeAudio
                         preferredTrackID:kCMPersistentTrackID_Invalid];
@@ -308,7 +317,39 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
     } else {
       [aTrack insertTimeRange:range ofTrack:srcAudio atTime:kCMTimeZero error:nil];
     }
+    AVMutableAudioMixInputParameters *p = [AVMutableAudioMixInputParameters audioMixInputParametersWithTrack:aTrack];
+    [p setVolume:originalVol atTime:kCMTimeZero];
+    [mixParams addObject:p];
   }
+
+  for (NSDictionary *mt in musicTracks) {
+    if (![mt isKindOfClass:[NSDictionary class]]) { continue; }
+    NSURL *mu = URLFromUri(mt[@"uri"]);
+    if (!mu) { continue; }
+    AVURLAsset *ma = [AVURLAsset URLAssetWithURL:mu options:nil];
+    AVAssetTrack *mtr = [ma tracksWithMediaType:AVMediaTypeAudio].firstObject;
+    CMTime mdur = ma.duration;
+    if (!mtr || CMTIME_COMPARE_INLINE(mdur, <=, kCMTimeZero)) { continue; }
+    AVMutableCompositionTrack *mTrack =
+      [comp addMutableTrackWithMediaType:AVMediaTypeAudio
+                        preferredTrackID:kCMPersistentTrackID_Invalid];
+    // Loop the track to cover the whole trimmed video (range.duration = the composition's length).
+    CMTime filled = kCMTimeZero;
+    while (CMTIME_COMPARE_INLINE(filled, <, range.duration)) {
+      CMTime remaining = CMTimeSubtract(range.duration, filled);
+      CMTime chunk = CMTIME_COMPARE_INLINE(remaining, <, mdur) ? remaining : mdur;
+      if (![mTrack insertTimeRange:CMTimeRangeMake(kCMTimeZero, chunk) ofTrack:mtr atTime:filled error:nil]) { break; }
+      filled = CMTimeAdd(filled, chunk);
+    }
+    float vol = [mt[@"volume"] isKindOfClass:[NSNumber class]] ? [mt[@"volume"] floatValue] : 1.0f;
+    AVMutableAudioMixInputParameters *p = [AVMutableAudioMixInputParameters audioMixInputParametersWithTrack:mTrack];
+    [p setVolume:vol atTime:kCMTimeZero];
+    [mixParams addObject:p];
+  }
+
+  // Only attach a mix when something actually differs from a plain passthrough, so the normal
+  // (no-music, full-volume) export path stays byte-for-byte unchanged.
+  BOOL needsMix = mixParams.count > 0 && (musicTracks.count > 0 || !keepOriginal || originalVol < 0.999f);
 
   // Optional look baked per-frame via AVVideoComposition: mirror → color adjust →
   // preset filter, in that order. applyingCIFiltersWithHandler delivers frames already
@@ -434,6 +475,11 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
   session.outputFileType = AVFileTypeMPEG4;
   session.shouldOptimizeForNetworkUse = YES;
   if (videoComp) { session.videoComposition = videoComp; }
+  if (needsMix) {
+    AVMutableAudioMix *audioMix = [AVMutableAudioMix audioMix];
+    audioMix.inputParameters = mixParams;
+    session.audioMix = audioMix;
+  }
 
   [session exportAsynchronouslyWithCompletionHandler:^{
     switch (session.status) {

@@ -43,20 +43,14 @@ import { Aurora } from './aurora';
 import { StormCloud } from './stormCloud';
 import { Peacock } from './peacock';
 import { Cat } from './cat';
-import { CyberMesh } from './cyberMesh';
-import { StarMap } from './starMap';
-import { Gilded } from './gilded';
-import { Circuit } from './circuit';
 import { Lava } from './lava';
 import { Frostbite } from './frostbite';
-import { Nebula } from './nebula';
 import { Biohazard } from './biohazard';
 import { Bejeweled } from './bejeweled';
 import { Wildfire } from './wildfire';
 import { Voltage } from './voltage';
 import { HoloMesh } from './holoMesh';
 import { Prism } from './prism';
-import { Web } from './web';
 import { Reef } from './reef';
 import { Bloom } from './bloom';
 import { Blizzard } from './blizzard';
@@ -64,7 +58,6 @@ import { Flutter } from './flutter';
 import { Spectre } from './spectre';
 import { DemonMesh } from './demonMesh';
 import { Seraph } from './seraph';
-import { Pixel } from './pixel';
 import { Chrome } from './chrome';
 import { Scuba } from './scuba';
 import { Astronaut } from './astronaut';
@@ -89,20 +82,21 @@ export const LENSES: Lens[] = [
   { key: 'natural', label: 'Natural', icon: 'color-palette-outline', Comp: NaturalLook, mesh: true, beauty: true },
   { key: 'glam', label: 'Glam', icon: 'diamond-outline', Comp: GlamLook, mesh: true, beauty: true },
   // ── Face-mesh lenses (full 478-pt mesh) ──
-  { key: 'cyber', label: 'Cyber Mesh', icon: 'grid', Comp: CyberMesh, mesh: true },
-  { key: 'starmap', label: 'Star Map', icon: 'star-outline', Comp: StarMap, mesh: true },
-  { key: 'gilded', label: 'Gilded', icon: 'diamond-outline', Comp: Gilded, mesh: true },
-  { key: 'circuit', label: 'Circuit', icon: 'hardware-chip-outline', Comp: Circuit, mesh: true },
+  // These render via their reactive *Rx (faceLens REACTIVE_RENDERERS) for both live AND bake — no legacy Comp.
+  { key: 'cyber', label: 'Cyber Mesh', icon: 'grid', mesh: true },
+  { key: 'starmap', label: 'Star Map', icon: 'star-outline', mesh: true },
+  { key: 'gilded', label: 'Gilded', icon: 'diamond-outline', mesh: true },
+  { key: 'circuit', label: 'Circuit', icon: 'hardware-chip-outline', mesh: true },
   { key: 'lava', label: 'Lava', icon: 'thermometer', Comp: Lava, mesh: true },
   { key: 'frostbite', label: 'Frostbite', icon: 'snow-sharp', Comp: Frostbite, mesh: true },
-  { key: 'nebula', label: 'Nebula', icon: 'planet-outline', Comp: Nebula, mesh: true },
+  { key: 'nebula', label: 'Nebula', icon: 'planet-outline', mesh: true },
   { key: 'biohazard', label: 'Biohazard', icon: 'nuclear-outline', Comp: Biohazard, mesh: true },
   { key: 'bejeweled', label: 'Bejeweled', icon: 'diamond-sharp', Comp: Bejeweled, mesh: true },
   { key: 'wildfire', label: 'Wildfire', icon: 'bonfire-outline', Comp: Wildfire, mesh: true },
   { key: 'voltage', label: 'Voltage', icon: 'flash-outline', Comp: Voltage, mesh: true },
   { key: 'holomesh', label: 'Holo Mesh', icon: 'scan-outline', Comp: HoloMesh, mesh: true },
   { key: 'prism', label: 'Prism', icon: 'color-filter-outline', Comp: Prism, mesh: true },
-  { key: 'web', label: 'Web', icon: 'git-network-outline', Comp: Web, mesh: true },
+  { key: 'web', label: 'Web', icon: 'git-network-outline', mesh: true },
   { key: 'reef', label: 'Reef', icon: 'water-outline', Comp: Reef, mesh: true },
   { key: 'bloom', label: 'Bloom', icon: 'flower-outline', Comp: Bloom, mesh: true },
   { key: 'blizzard', label: 'Blizzard', icon: 'snow-outline', Comp: Blizzard, mesh: true },
@@ -110,7 +104,7 @@ export const LENSES: Lens[] = [
   { key: 'spectre', label: 'Spectre', icon: 'skull-outline', Comp: Spectre, mesh: true },
   { key: 'demonmesh', label: 'Demon', icon: 'flame-outline', Comp: DemonMesh, mesh: true },
   { key: 'seraph', label: 'Seraph', icon: 'sunny-outline', Comp: Seraph, mesh: true },
-  { key: 'pixel', label: 'Pixel', icon: 'apps-outline', Comp: Pixel, mesh: true },
+  { key: 'pixel', label: 'Pixel', icon: 'apps-outline', mesh: true },
   { key: 'chrome', label: 'Chrome', icon: 'ellipse-outline', Comp: Chrome, mesh: true },
   { key: 'scuba', label: 'Scuba', icon: 'glasses', Comp: Scuba, mesh: true },
   { key: 'astronaut', label: 'Astronaut', icon: 'rocket-outline', Comp: Astronaut, mesh: true },

@@ -47,14 +47,11 @@ export type FaceFrame = {
 // canvas size.
 export type LensProps = { f: FaceFrame; clock: SharedValue<number>; w: number; h: number };
 
-// Lean per-frame payload for the reactive mesh path. The mesh is a FLAT array of box-pixel coords
-// ([x0,y0,x1,y1,…], NaN for a missing vertex) rather than 478 nested {x,y} objects — it crosses into the
-// UI-thread SharedValue far faster (numbers clone trivially; nested objects don't). Plus the few anchors
-// a mesh lens needs for placement. Built by meshFrameFor() (reuses faceFrame's cover-crop mapping).
-export type MeshFrame = {
-  xy: number[];      // box-pixel mesh, flat; xy[2*i],xy[2*i+1] = vertex i (NaN if absent)
-  noseX: number; noseY: number; eyeMidY: number; faceW: number;
-};
+// Reactive payload for the mesh lenses: every FaceFrame anchor (so a lens can still position art via
+// eyeMid/up/along/off etc.) but with the heavy nested mesh/meshPts replaced by ONE flat pixel array
+// `xy` (xy[2i],xy[2i+1] = vertex i in box pixels, NaN if absent). Flat numbers clone into the UI-thread
+// SharedValue far faster than 478 nested {x,y} objects. Built by meshFrameFor() (full faceFrame mapping).
+export type MeshFrame = Omit<FaceFrame, 'mesh' | 'meshPts'> & { xy: number[] };
 
 // Reactive variant: `f` is a UI-thread SharedValue instead of a plain value. The lens reads it via
 // useDerivedValue, so it mounts ONCE and updates with NO React re-render — the per-frame mesh render
@@ -75,7 +72,10 @@ export type WarpKey = 'eyes' | 'bighead' | 'tinyface' | 'swirl' | 'glitch' | 'ka
 // marks lenses driven by a facial action (open mouth, etc.). `beauty: true` marks face-flattering
 // retouch/makeup lenses (skin-smooth via `warp`, or makeup via the mesh overlay). These flags drive
 // the picker tabs (see lensCategory).
-export type Lens = { key: string; label: string; icon: string; Comp: React.FC<LensProps>; warp?: WarpKey; mesh?: boolean; gesture?: boolean; beauty?: boolean };
+// `Comp` is the legacy plain-FaceFrame renderer. It's OPTIONAL because lenses migrated to the reactive
+// UI-thread path (registered in faceLens' REACTIVE_RENDERERS) render via their `*Rx` for BOTH live and
+// bake and need no legacy renderer at all.
+export type Lens = { key: string; label: string; icon: string; Comp?: React.FC<LensProps>; warp?: WarpKey; mesh?: boolean; gesture?: boolean; beauty?: boolean };
 
 // Picker grouping. Derived from the flags above (see lensCategory): beauty retouch/makeup, warp
 // pixels, mesh-driven, gesture-driven, or a plain overlay.
