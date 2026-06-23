@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: C.SURFACE, borderTopLeftRadius: RADIUS.LG, borderTopRightRadius: RADIUS.LG,
-    padding: SPACE.LG, gap: SPACE.SM, maxHeight: '70%',
+    padding: SPACE.LG, gap: SPACE.SM, maxHeight: '100%',
   },
   modalTitle: { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_SEMIBOLD, color: C.INK, marginBottom: SPACE.SM },
   menuRow: {
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   menuRowSub: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.MUTED },
   modalClose: {
     marginTop: SPACE.MD, backgroundColor: C.ACCENT, borderRadius: RADIUS.MD,
-    padding: SPACE.MD, alignItems: 'center',
+    padding: SPACE.MD, alignItems: 'center', marginBottom: SPACE.MD
   },
   modalCloseTxt: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD },
 });

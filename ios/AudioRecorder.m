@@ -117,13 +117,13 @@ RCT_EXPORT_METHOD(configureForVideoRecording:(RCTPromiseResolveBlock)resolve
   NSError *err = nil;
   AVAudioSession *session = [AVAudioSession sharedInstance];
   [session setCategory:AVAudioSessionCategoryPlayAndRecord
-              withOptions:AVAudioSessionCategoryOptionMixWithOthers |
-                          AVAudioSessionCategoryOptionDefaultToSpeaker |
-                          AVAudioSessionCategoryOptionAllowBluetooth |
-                          AVAudioSessionCategoryOptionAllowBluetoothA2DP |
-                          AVAudioSessionCategoryOptionAllowAirPlay
-                    mode:AVAudioSessionModeVideoRecording
-                   error:&err];
+                  mode:AVAudioSessionModeVideoRecording
+               options:AVAudioSessionCategoryOptionMixWithOthers |
+                       AVAudioSessionCategoryOptionDefaultToSpeaker |
+                       AVAudioSessionCategoryOptionAllowBluetooth |
+                       AVAudioSessionCategoryOptionAllowBluetoothA2DP |
+                       AVAudioSessionCategoryOptionAllowAirPlay
+                 error:&err];
   [session setActive:YES error:nil];
   NSLog(@"[AudioRecorder] configureForVideoRecording err=%@", err);
   resolve(nil);

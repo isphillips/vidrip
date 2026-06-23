@@ -34,6 +34,7 @@ import { refreshConnectedFeed } from '../../../infrastructure/supabase/queries/c
 import { buildAuthUrl, type SyncProvider, type ConnectionType } from '../../../infrastructure/oauth/config';
 import { useOnboardingStore } from '../../onboarding/onboarding';
 import AccountBlob from '../../../components/AccountBlob';
+import SlimeGearhead from '../../../components/SlimeGearhead';
 import type { AccountStackScreenProps } from '../../../app/navigation/types';
 import ChannelSettingsSheet from '../../channels/components/ChannelSettingsSheet';
 import {
@@ -371,7 +372,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           <View style={styles.syncInfo}>
             <Text style={styles.rowLabel}>Creator mode</Text>
             <Text style={styles.syncHandle} numberOfLines={2}>
-              Open a public “Members Only” channel from your connected accounts.
+              Open a private channel from your connected Creator Accounts. Manage visibility in Channel Settings.
             </Text>
           </View>
           <Switch
@@ -392,7 +393,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                   Public visibility, invite-only, rename and more.
                 </Text>
               </View>
-              <Text style={styles.settingsCog}>⚙</Text>
+              <SlimeGearhead size={28} />
             </TouchableOpacity>
           </>
         )}
@@ -688,7 +689,6 @@ const styles = StyleSheet.create({
     borderColor: C.BORDER,
   },
   divider: { height: 1, backgroundColor: C.BORDER, marginHorizontal: SPACE.LG },
-  settingsCog: { fontSize: 22, color: C.MUTED },
   sectionLabel: {
     fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD,
     textTransform: 'uppercase', letterSpacing: 1,

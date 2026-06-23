@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Alert, Pressable, Image,
   ActivityIndicator, RefreshControl, TouchableOpacity, Modal, FlatList,
-  useWindowDimensions, Animated, Easing, AppState,
+  useWindowDimensions, AppState,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import Handle from '../../../components/Handle';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Video from 'react-native-video';
 import GradientIcon from '../../../components/GradientIcon';
+import SlimeGearhead from '../../../components/SlimeGearhead';
 import { supabase } from '../../../infrastructure/supabase/client';
 import {
   fetchChannelPosts,
@@ -120,23 +121,12 @@ export default function ChannelhamburderScreen({
   const audioTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [pendingAudio, setPendingAudio] = useState<{ path: string; duration: number } | null>(null);
   const [sendingAudio, setSendingAudio] = useState(false);
-  const cogAnim = useRef(new Animated.Value(0)).current;  // 0 idle → 1 active (spin + red)
   const mountedRef = useRef(true);
   const wasGatedRef = useRef(false);   // was the paywall showing? → detect unlock
   const scrollViewRef = useRef<ScrollView>(null);
   const postsRef = useRef<ChannelPost[]>([]);   // always-current snapshot for handlers
 
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
-
-  // Cog spins + reddens when the menu opens, reverses when it closes.
-  useEffect(() => {
-    Animated.timing(cogAnim, {
-      toValue: menuVisible ? 1 : 0,
-      duration: menuVisible ? 450 : 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false, // color interpolation isn't native-driver compatible
-    }).start();
-  }, [menuVisible, cogAnim]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) { setLoading(true); }
@@ -528,10 +518,7 @@ export default function ChannelhamburderScreen({
         {isOwner && isPublic ? (
           <TouchableOpacity style={styles.menuBtn} hitSlop={8} activeOpacity={0.7}
             onPress={() => setMenuVisible(true)}>
-            <Animated.Text style={[styles.menuIcon, {
-              color: cogAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [C.INK, C.ACCENT_HOT, C.ACCENT_HOT] }),
-              transform: [{ rotate: cogAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
-            }]}>⚙</Animated.Text>
+            <SlimeGearhead size={30} active={menuVisible} />
           </TouchableOpacity>
         ) : gated ? (
           // Subscriber-mode channel, viewer isn't a subscriber — no Join/Leave here;
