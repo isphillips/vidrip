@@ -7,9 +7,8 @@ import QuartzCore
 // reduces it — on the native side, to keep the JS bridge cheap — to the SAME 6-anchor contract the
 // lighter BlazeFace plugin returns, so the JS orientation/reduce path is shared and unchanged:
 //   { points: [[x,y]×6] }  →  [0]=right eye [1]=left eye [2]=nose [3]=mouth [4]=right cheek [5]=left cheek
-// Plus two things BlazeFace can't give:
-//   bs: { jawOpen, smile, blinkL, blinkR, browUp }   — 52 ARKit-style blendshapes, curated to 5
-//   m:  [16]                                          — 4×4 facial transformation matrix (row-major)
+// Plus, on request (mesh lenses), the full 478-pt mesh: { mesh: [[x,y]×478] }. Blendshapes are NOT
+// emitted — they ran on a CPU model; JS now derives the few expression signals it uses from the mesh.
 // Registered under the JS name "faceMesh" (see FaceMeshFrameProcessor.m). Needs `face_landmarker.task`
 // bundled (Build Phases → Copy Bundle Resources). VIDEO mode tracks across frames with a monotonic ts.
 @objc public final class FaceMeshShared: NSObject {
@@ -49,7 +48,10 @@ import QuartzCore
     opts.minFaceDetectionConfidence = 0.5
     opts.minFacePresenceConfidence = 0.5
     opts.minTrackingConfidence = 0.5
-    opts.outputFaceBlendshapes = true
+    // Blendshapes OFF: MediaPipe runs them on a CPU (XNNPACK) model every frame regardless of delegate,
+    // and we only used a few signals — now derived from the GPU mesh geometry in faceFrame (smile/brow)
+    // or the anchor proxy (mouthOpen). Dropping the CPU model trims per-frame inference on every device.
+    opts.outputFaceBlendshapes = false
     // The 4×4 facial-transform matrix (a per-frame PnP solve) is not consumed in JS — skip it to save
     // inference time. Re-enable if a lens ever needs head pose.
     opts.outputFacialTransformationMatrixes = false
@@ -122,18 +124,6 @@ public class FaceMeshFrameProcessor: FrameProcessorPlugin {
       var mesh: [[Double]] = []; mesh.reserveCapacity(face.count)
       for p in face { mesh.append([Double(p.x), Double(p.y)]) }
       out["mesh"] = mesh
-    }
-
-    if let cats = result.faceBlendshapes.first?.categories {
-      var m: [String: Double] = [:]
-      for c in cats { if let n = c.categoryName { m[n] = Double(c.score) } }
-      out["bs"] = [
-        "jawOpen": m["jawOpen"] ?? 0,
-        "smile": ((m["mouthSmileLeft"] ?? 0) + (m["mouthSmileRight"] ?? 0)) / 2.0,
-        "blinkL": m["eyeBlinkLeft"] ?? 0,
-        "blinkR": m["eyeBlinkRight"] ?? 0,
-        "browUp": max(m["browInnerUp"] ?? 0, ((m["browOuterUpLeft"] ?? 0) + (m["browOuterUpRight"] ?? 0)) / 2.0),
-      ]
     }
 
     return out

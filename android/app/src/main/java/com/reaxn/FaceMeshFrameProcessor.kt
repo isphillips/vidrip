@@ -14,9 +14,8 @@ import com.mrousavy.camera.frameprocessors.VisionCameraProxy
 // reduces it — natively, to keep the JS bridge cheap — to the SAME 6-anchor contract the lighter
 // BlazeFace plugin returns, so the JS orientation/reduce path is shared and unchanged:
 //   { points: [[x,y]×6] }  →  [0]=right eye [1]=left eye [2]=nose [3]=mouth [4]=right cheek [5]=left cheek
-// Plus two things BlazeFace can't give:
-//   bs: { jawOpen, smile, blinkL, blinkR, browUp }   — 52 ARKit-style blendshapes, curated to 5
-//   m:  [16]                                          — 4×4 facial transformation matrix (row-major)
+// Plus, on request (mesh lenses), the full 478-pt mesh: { mesh: [[x,y]×478] }. Blendshapes are NOT
+// emitted — they ran on a CPU model; JS now derives the few expression signals it uses from the mesh.
 // Registered under the JS name "faceMesh" (MainApplication). Needs assets/face_landmarker.task.
 // Orientation is handled in JS (faceTracking.ts) — keypoints are returned in the raw sensor space.
 class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>?) :
@@ -55,19 +54,6 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
     // Full 478-pt mesh, only when JS asks (Debug lens) — keeps the bridge cheap by default.
     if (arguments?.get("mesh") == true) {
       out["mesh"] = f.map { listOf(it.x().toDouble(), it.y().toDouble()) }
-    }
-
-    val bsOpt = result.faceBlendshapes()
-    if (bsOpt.isPresent && bsOpt.get().isNotEmpty()) {
-      val m = HashMap<String, Double>()
-      for (c in bsOpt.get()[0]) { m[c.categoryName()] = c.score().toDouble() }
-      out["bs"] = mapOf(
-        "jawOpen" to (m["jawOpen"] ?: 0.0),
-        "smile" to (((m["mouthSmileLeft"] ?: 0.0) + (m["mouthSmileRight"] ?: 0.0)) / 2.0),
-        "blinkL" to (m["eyeBlinkLeft"] ?: 0.0),
-        "blinkR" to (m["eyeBlinkRight"] ?: 0.0),
-        "browUp" to maxOf(m["browInnerUp"] ?: 0.0, ((m["browOuterUpLeft"] ?: 0.0) + (m["browOuterUpRight"] ?: 0.0)) / 2.0),
-      )
     }
 
     return out
@@ -110,7 +96,10 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
           .setMinFaceDetectionConfidence(0.5f)
           .setMinFacePresenceConfidence(0.5f)
           .setMinTrackingConfidence(0.5f)
-          .setOutputFaceBlendshapes(true)
+          // Blendshapes OFF: MediaPipe runs them on a CPU (XNNPACK) model every frame regardless of
+          // delegate, and we only used a few signals — now derived from the GPU mesh geometry in
+          // faceFrame (smile/brow) or the anchor proxy (mouthOpen). Trims per-frame inference everywhere.
+          .setOutputFaceBlendshapes(false)
           // The 4×4 facial-transform matrix (a per-frame PnP solve) is not consumed in JS — skip it to
           // save inference time. Re-enable if a lens ever needs head pose.
           .setOutputFacialTransformationMatrixes(false)

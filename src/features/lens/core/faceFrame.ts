@@ -112,16 +112,19 @@ export function faceFrame(lm: FaceLandmarks, w: number, h: number, frameAspect?:
   // Remap the closed→open ratio to 0..1. REST/RANGE are rough (per-person): a closed mouth sits near
   // ~0.4× eye-spacing, wide open ~0.7×. Tune these two if breath effects trigger too early/late.
   const OPEN_REST = 0.45, OPEN_RANGE = 0.25;
-  let mouthOpen = Math.max(0, Math.min(1, (openRaw - OPEN_REST) / OPEN_RANGE));
-  // Mesh track: blendshapes beat the geometric proxy. jawOpen rarely exceeds ~0.5 even wide-open, so
-  // remap (rest ~0.05 → open ~0.5) to a full 0..1. blink/smile/browRaise pass through for lenses that
-  // want them (undefined on BlazeFace/replay).
-  let blink: number | undefined, smile: number | undefined, browRaise: number | undefined;
-  if (lm.bs) {
-    mouthOpen = Math.max(0, Math.min(1, (lm.bs.jawOpen - 0.05) / 0.45));
-    blink = (lm.bs.blinkL + lm.bs.blinkR) / 2;
-    smile = lm.bs.smile;
-    browRaise = lm.bs.browUp;
+  const mouthOpen = Math.max(0, Math.min(1, (openRaw - OPEN_REST) / OPEN_RANGE));
+  // Expression signals from MESH GEOMETRY — we dropped MediaPipe's CPU blendshapes model (it ran every
+  // frame for every lens just to feed these). mouthOpen keeps the anchor proxy above (works without the
+  // mesh, for gesture lenses that don't request it); smile/browRaise need the mesh, so they're only set
+  // for mesh lenses — which are the only ones that consume them. Ratios are vs eyeDist (a stable scale
+  // ref); REST/RANGE are rough first-pass values — tune on-device if a trigger fires too early/late.
+  let smile: number | undefined, browRaise: number | undefined;
+  if (lm.mesh && eyeDist > 0) {
+    const pm = (i: number) => { const p = lm.mesh![i]; return p ? { x: mx(p.x), y: my(p.y) } : undefined; };
+    const cr = pm(61), cl = pm(291);            // mouth corners → spacing widens with a smile
+    if (cr && cl) { smile = Math.max(0, Math.min(1, (Math.hypot(cr.x - cl.x, cr.y - cl.y) / eyeDist - 0.95) / 0.55)); }
+    const br = pm(105), ey = pm(159);           // right brow ↔ upper lid → gap grows when the brow lifts
+    if (br && ey) { browRaise = Math.max(0, Math.min(1, (Math.hypot(br.x - ey.x, br.y - ey.y) / eyeDist - 0.42) / 0.32)); }
   }
   return {
     le, re,
@@ -134,7 +137,6 @@ export function faceFrame(lm: FaceLandmarks, w: number, h: number, frameAspect?:
     along,
     up,
     mouthOpen,
-    blink,
     smile,
     browRaise,
     // Map into box pixels; keep canonical indexing (sparse on replay → guard holes), and a dense list

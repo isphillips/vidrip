@@ -7,18 +7,6 @@ import type { SharedValue } from 'react-native-reanimated';
 
 export type Pt = { x: number; y: number };
 
-// Curated face blendshapes (0..1), only present when the Face Landmarker (mesh) track is active —
-// BlazeFace can't produce these. They drive expression-triggered lenses far more reliably than the
-// geometric nose↔mouth proxy. Names map to MediaPipe's ARKit-style categories (smile/brow are
-// averaged across left+right on the native side).
-export type FaceBlendshapes = {
-  jawOpen: number;
-  smile: number;
-  blinkL: number;
-  blinkR: number;
-  browUp: number;
-};
-
 export type FaceLandmarks = {
   leftEye: Pt;       // subject's left eye (screen-right when facing camera, mirror handled upstream)
   rightEye: Pt;
@@ -26,7 +14,6 @@ export type FaceLandmarks = {
   mouthCenter: Pt;
   faceWidth: number; // normalized cheek-to-cheek width
   roll: number;      // head tilt in radians (atan2 across the eyes)
-  bs?: FaceBlendshapes; // mesh track only; undefined for BlazeFace and replay
   // Full 478-pt mesh in the SAME normalized preview space as the anchors (orientation/mirror already
   // applied). Opt-in (mesh lenses) — undefined unless useFaceTracking(_, withMesh) requested it. Dense
   // (all 478) live; sparse (only contour indices populated) when rebuilt from a replay track.
@@ -45,11 +32,10 @@ export type FaceFrame = {
   // (reliable); on BlazeFace it falls back to the nose↔mouth gap vs eye spacing. Lenses use it to
   // trigger effects (fire/rainbow breath) and scale their intensity.
   mouthOpen: number;
-  // Expression signals (0..1), present only on the mesh track (undefined on BlazeFace/replay). Lenses
-  // should treat undefined as "unsupported" and degrade gracefully.
-  blink?: number;     // both eyes closed
-  smile?: number;     // mouth smile
-  browRaise?: number; // eyebrows raised
+  // Expression signals (0..1), derived from mesh geometry (undefined when no mesh — e.g. anchor-only
+  // gesture lenses or replay without mesh). Lenses should treat undefined as "unsupported".
+  smile?: number;     // mouth-corner width vs rest
+  browRaise?: number; // brow ↔ eye gap vs rest
   // Mesh in box-pixel space (cover-crop applied), when requested. `mesh` keeps canonical indexing
   // (sparse on replay) for contour lookups; `meshPts` is the dense list of present points for drawing
   // a node cloud (Skia Points can't take holes).

@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { useFrameProcessor, runAtTargetFps, VisionCameraProxy } from 'react-native-vision-camera';
 import { Worklets, useSharedValue as useWorkletSharedValue } from 'react-native-worklets-core';
 import type { FaceLandmarks, FaceLensTrack } from './faceLens';
-import type { FaceBlendshapes, Pt } from './core/types';
+import type { Pt } from './core/types';
 import { MESH_TRACK_INDICES, quantizeMesh } from './core/meshContours';
 
 // The two platforms feed MediaPipe differently, so the keypoints arrive in different conventions:
@@ -62,17 +62,6 @@ function meshLerp(prev: (Pt | undefined)[] | undefined, cur: (Pt | undefined)[] 
 function ema(prev: FaceLandmarks, cur: FaceLandmarks, a: number, aMesh: number): FaceLandmarks {
   const mix = (p: number, c: number) => p + (c - p) * a;
   const mixPt = (p: { x: number; y: number }, c: { x: number; y: number }) => ({ x: mix(p.x, c.x), y: mix(p.y, c.y) });
-  // Blendshapes (mesh track only): ease toward the new values so jawOpen/blink don't strobe; reset to
-  // the fresh set when one side lacks them (track switch / first frame).
-  const bs = cur.bs && prev.bs
-    ? {
-        jawOpen: mix(prev.bs.jawOpen, cur.bs.jawOpen),
-        smile: mix(prev.bs.smile, cur.bs.smile),
-        blinkL: mix(prev.bs.blinkL, cur.bs.blinkL),
-        blinkR: mix(prev.bs.blinkR, cur.bs.blinkR),
-        browUp: mix(prev.bs.browUp, cur.bs.browUp),
-      }
-    : cur.bs;
   return {
     leftEye: mixPt(prev.leftEye, cur.leftEye),
     rightEye: mixPt(prev.rightEye, cur.rightEye),
@@ -80,21 +69,19 @@ function ema(prev: FaceLandmarks, cur: FaceLandmarks, a: number, aMesh: number):
     mouthCenter: mixPt(prev.mouthCenter, cur.mouthCenter),
     faceWidth: mix(prev.faceWidth, cur.faceWidth),
     roll: mix(prev.roll, cur.roll),
-    bs,
     mesh: meshLerp(prev.mesh, cur.mesh, aMesh), // speed-adaptive: instant when moving, damped when slow
   };
 }
 
 // SPIKE FLAG. true → use the 478-pt Face Landmarker ('faceMesh' plugin: richer, jitter-resistant
-// anchors + blendshapes + transform matrix, heavier inference). false → the lightweight BlazeFace
-// 6-keypoint detector ('faceLandmarks'). Both return the same { points: [[x,y]×6] } anchor contract,
-// so the reduce()/orientation path below is shared; the mesh additionally returns { bs, m }. Flip
-// this to A/B the two on-device. Falls back to BlazeFace automatically if the mesh plugin/model is
-// missing from the build.
+// anchors, heavier inference). false → the lightweight BlazeFace 6-keypoint detector ('faceLandmarks').
+// Both return the same { points: [[x,y]×6] } anchor contract, so the reduce()/orientation path below is
+// shared; the mesh additionally returns the full { mesh: [[x,y]×478] } on request. Flip to A/B on-device.
+// Falls back to BlazeFace automatically if the mesh plugin/model is missing from the build.
 const USE_FACE_MESH = true;
 
 // Two native plugins. Each returns { points: number[][] } ([[x,y]×6], 0..1 in the raw buffer space);
-// the mesh one also returns { bs: {...}, m: number[16] }.
+// the mesh one also returns { mesh: number[][] } when asked (mesh lenses).
 let blazePlugin: ReturnType<typeof VisionCameraProxy.initFrameProcessorPlugin> | undefined;
 let meshPlugin: ReturnType<typeof VisionCameraProxy.initFrameProcessorPlugin> | undefined;
 try { blazePlugin = VisionCameraProxy.initFrameProcessorPlugin('faceLandmarks', {}); } catch { blazePlugin = undefined; }
@@ -294,13 +281,10 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       // VisionCamera throws "expected an Object" if the 2nd arg is explicitly undefined — always pass a
       // real object.
       const res = (wantMesh ? plugin!.call(frame, { mesh: true, ori: IOS_MESH_ORI }) : plugin!.call(frame, { ori: IOS_MESH_ORI })) as unknown as
-        { points?: number[][]; bs?: FaceBlendshapes; mesh?: number[][]; err?: string } | null;
+        { points?: number[][]; mesh?: number[][]; err?: string } | null;
       // Claim the in-flight slot right before handing off; push() releases it when fully done.
       if (res && res.points) {
         const lm = reduce(res.points, aspect, ori, false, useMesh, res.mesh);
-        // Carry the mesh blendshapes through (BlazeFace returns none). faceFrame() prefers jawOpen
-        // over the geometric mouth-open proxy and exposes blink/smile/browRaise when present.
-        if (lm && res.bs) { lm.bs = res.bs; }
         pending.value = true;
         pushJs(lm, 'ok');
       } else { pending.value = true; pushJs(null, (res && res.err) || 'null'); }
