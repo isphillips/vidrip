@@ -62,9 +62,26 @@ function genId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Copy the just-recorded/imported clip into a new draft and persist it. Returns the draft. */
-export async function createDraft(srcUri: string, durationSec?: number): Promise<StudioDraft> {
-  const id = genId();
+// Copy a recorded/imported source into a local file. Handles plain file:// (incl. %-encoded paths the
+// library hands back, which RNFS.copyFile can't read raw) and iOS Photos ph:// asset URIs (a different
+// RNFS API). Overwrites any existing dest. Throws if the source genuinely can't be copied.
+async function copyToLocal(srcUri: string, destPath: string): Promise<void> {
+  if (await RNFS.exists(destPath)) { await RNFS.unlink(destPath); }
+  if (srcUri.startsWith('ph://')) {
+    await RNFS.copyAssetsVideoIOS(srcUri, destPath);          // Photos asset → real file (iOS)
+  } else {
+    await RNFS.copyFile(decodeURIComponent(strip(srcUri)), destPath);
+  }
+}
+
+/**
+ * Copy the just-recorded/imported clip into a draft and persist it. Pass `reuseId` to OVERWRITE an
+ * existing draft (a re-recorded take in the same capture session) instead of piling up a new one — the
+ * id + original createdAt are kept and every edit field is reset to a clean trim-stage draft.
+ */
+export async function createDraft(srcUri: string, durationSec?: number, reuseId?: string): Promise<StudioDraft> {
+  const existing = reuseId ? await getDraft(reuseId) : null;
+  const id = existing?.id ?? genId();
   const dir = dirFor(id);
   await ensureDir(DRAFTS_DIR);
   await ensureDir(dir);
@@ -72,12 +89,17 @@ export async function createDraft(srcUri: string, durationSec?: number): Promise
   const rawPath = `${dir}/raw.mp4`;
   let rawFile: string;
   try {
-    await RNFS.copyFile(strip(srcUri), rawPath);
+    await copyToLocal(srcUri, rawPath);
     rawFile = fileUri(rawPath);
   } catch {
-    // Some imported URIs (ph://, content://) can't be copied directly — fall back to the source so
-    // editing still works; the draft just won't have its own managed copy of the raw clip.
+    // Last resort: edit straight off the source so the flow still works; thumbnails may be unavailable
+    // if the scheme isn't readable by the thumbnailer.
     rawFile = srcUri;
+  }
+
+  // Overwriting: drop the previous baked snapshot so a resume can't surface stale footage.
+  if (existing?.snapshotFile) {
+    try { const sp = strip(existing.snapshotFile); if (await RNFS.exists(sp)) { await RNFS.unlink(sp); } } catch { /* ignore */ }
   }
 
   // Best-effort first-frame thumbnail for the drafts list.
@@ -85,14 +107,21 @@ export async function createDraft(srcUri: string, durationSec?: number): Promise
   try {
     const { path } = await createThumbnail({ url: rawFile, timeStamp: 500, format: 'jpeg' });
     const thumbPath = `${dir}/thumb.jpg`;
+    if (await RNFS.exists(thumbPath)) { await RNFS.unlink(thumbPath); }
     await RNFS.copyFile(strip(path), thumbPath);
     thumbUri = fileUri(thumbPath);
   } catch { /* no thumbnail — list falls back to a placeholder */ }
 
   const now = Date.now();
-  const draft: StudioDraft = { id, createdAt: now, updatedAt: now, stage: 'trim', durationSec, rawFile, snapshotFile: null, thumbUri };
+  // Fresh draft object — overwriting resets all edit fields (trim/look/recipe/audio/details) so a
+  // re-recorded take starts clean, keeping the same id + original createdAt.
+  const draft: StudioDraft = {
+    id, createdAt: existing?.createdAt ?? now, updatedAt: now,
+    stage: 'trim', durationSec, rawFile, snapshotFile: null, thumbUri,
+  };
   const drafts = await readIndex();
-  drafts.push(draft);
+  const i = drafts.findIndex(d => d.id === id);
+  if (i >= 0) { drafts[i] = draft; } else { drafts.push(draft); }
   await writeIndex(drafts);
   return draft;
 }

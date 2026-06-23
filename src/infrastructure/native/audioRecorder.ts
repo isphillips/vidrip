@@ -14,6 +14,11 @@ export function cancelAudioRecording(): Promise<void> {
   return _AR.cancelRecording();
 }
 
+export function configureForVideoRecording(): Promise<void> {
+  if (!_AR) { return Promise.resolve(); }
+  return _AR.configureForVideoRecording();
+}
+
 export function configureForMixedPlayback(): Promise<void> {
   if (!_AR) { return Promise.resolve(); }
   return _AR.configureForMixedPlayback();

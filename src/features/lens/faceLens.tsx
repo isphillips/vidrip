@@ -26,6 +26,24 @@ const REACTIVE_RENDERERS: Record<string, React.FC<ReactiveLensProps>> = {
   gilded: GildedRx,
 };
 
+// Bake helpers (used by ShareBaker's Skia-snapshot lens bake). Any lens registered in
+// REACTIVE_RENDERERS is baked natively-via-Skia by the shared snapshot path — no per-lens bake code.
+export function getReactiveRenderer(lensId?: string | null): React.FC<ReactiveLensProps> | undefined {
+  return lensId ? REACTIVE_RENDERERS[lensId] : undefined;
+}
+// Sample the captured track into a MeshFrame for frame `i` (rebuilding the sparse mesh first). The bake
+// loop sets this into the lens's `f` SharedValue, exactly like the live ReactiveLensHost does.
+export function sampleTrackMeshFrame(track: FaceLensTrack, i: number, width: number, height: number, frameAspect?: number): MeshFrame | null {
+  const n = track.frames.length;
+  const idx = i < 0 ? 0 : i >= n ? n - 1 : i;
+  let landmarks = track.frames[idx];
+  const meshQ = track.meshFrames?.[idx];
+  if (landmarks && meshQ && track.meshIdx) {
+    landmarks = { ...landmarks, mesh: dequantizeMesh(meshQ, track.meshIdx) };
+  }
+  return landmarks ? meshFrameFor(landmarks, width, height, frameAspect ?? track.frameAspect) : null;
+}
+
 // SPIKE: pick this lens in the picker to A/B the UI-thread pipeline. It renders via a Skia frame
 // processor (useSpikeFrameProcessor) that draws straight on the camera frame — NOT through this
 // overlay — so FaceLensOverlay intentionally does nothing for it (the capture screen gates it out).
@@ -39,7 +57,7 @@ const Blackout = () => <View style={[StyleSheet.absoluteFill, { backgroundColor:
 // registered in ./lenses/index. This module hosts the two render surfaces (live overlay + replay)
 // and re-exports the public API so existing imports from '.../faceLens' keep working.
 
-export type { Pt, FaceLandmarks, FaceFrame, Lens, LensProps, FaceLensTrack } from './core';
+export type { Pt, FaceLandmarks, FaceFrame, Lens, LensProps, FaceLensTrack, MeshFrame, ReactiveLensProps } from './core';
 export { faceFrame, off } from './core';
 export { LENSES, lensByKey, lensCategory } from './lenses';
 export type { LensCategory } from './core';

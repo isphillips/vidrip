@@ -36,6 +36,9 @@ export default function EffectPlayer({
         repeat={repeat}
         paused={paused}
         muted={muted}
+        // Studio preview: the baked audio (music + original) must be audible even with the iOS ring/
+        // silent switch on — same as the editing screens. Without this the snapshot plays silent on iOS.
+        ignoreSilentSwitch="ignore"
         onLoad={onLoad}
       />
       {showFx && box.w > 0 && (

@@ -4,7 +4,13 @@ import { useFrameProcessor, runAtTargetFps, VisionCameraProxy } from 'react-nati
 import { Worklets, useSharedValue as useWorkletSharedValue } from 'react-native-worklets-core';
 import type { FaceLandmarks, FaceLensTrack } from './faceLens';
 import type { Pt } from './core/types';
-import { MESH_TRACK_INDICES, quantizeMesh } from './core/meshContours';
+import { MESH_TRACK_INDICES, MESH_VERTS, quantizeMesh } from './core/meshContours';
+
+// Every mesh vertex (0..477). Used by the studio capture-bake, which renders the lens into the video
+// PIXELS immediately and is never persisted — so it can afford the full mesh and bake every node (dense
+// lenses like Star Map draw a dot per vertex). Reaction tracks ARE persisted to the DB, so they keep the
+// compact contour subset (MESH_TRACK_INDICES) instead.
+const ALL_MESH_INDICES: number[] = Array.from({ length: MESH_VERTS }, (_, i) => i);
 
 // The two platforms feed MediaPipe differently, so the keypoints arrive in different conventions:
 //  • iOS pins frame.orientation → coords are pre-rotated (rotated 90° + upside-down + mirrored vs the
@@ -297,10 +303,13 @@ export function useFaceTracking(mirror = true, withMesh = false) {
     recRef.current = { t0: Date.now(), lensId, frameAspect, samples: [] };
   }, []);
   const cancelTrack = useCallback(() => { recRef.current = null; }, []);
-  const stopTrack = useCallback((): FaceLensTrack | null => {
+  const stopTrack = useCallback((opts?: { fullMesh?: boolean }): FaceLensTrack | null => {
     const rec = recRef.current;
     recRef.current = null;
     if (!rec || rec.samples.length === 0) { return null; }
+    // Studio (baked into pixels, transient) keeps every vertex so dense lenses bake all their nodes;
+    // reactions (persisted) keep the compact contour subset.
+    const meshIndices = opts?.fullMesh ? ALL_MESH_INDICES : MESH_TRACK_INDICES;
     const durMs = rec.samples[rec.samples.length - 1].t;
     const n = Math.max(1, Math.ceil((durMs / 1000) * TRACK_FPS));
     const frames: (FaceLandmarks | null)[] = new Array(n).fill(null);
@@ -322,11 +331,11 @@ export function useFaceTracking(mirror = true, withMesh = false) {
         faceWidth: r3(lm.faceWidth),
         roll: r3(lm.roll),
       };
-      // Mesh lenses: persist the compact contour-subset mesh so the lens replays (full 478 is too big).
-      if (lm?.mesh) { meshFrames[i] = quantizeMesh(lm.mesh, MESH_TRACK_INDICES); hasMesh = true; }
+      // Mesh lenses: persist the picked mesh subset (full for studio bakes, contour-subset otherwise).
+      if (lm?.mesh) { meshFrames[i] = quantizeMesh(lm.mesh, meshIndices); hasMesh = true; }
     }
     const track: FaceLensTrack = { lensId: rec.lensId, fps: TRACK_FPS, frames, frameAspect: rec.frameAspect };
-    if (hasMesh) { track.meshIdx = MESH_TRACK_INDICES; track.meshFrames = meshFrames; }
+    if (hasMesh) { track.meshIdx = meshIndices; track.meshFrames = meshFrames; }
     return track;
   }, []);
 

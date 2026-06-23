@@ -86,7 +86,9 @@ export default function MusicPickerSheet({
           repeat
           // eslint-disable-next-line react-native/no-inline-styles
           style={{ width: 0, height: 0 }}
-          mixWithOthers="duck"
+          mixWithOthers="mix"
+          ignoreSilentSwitch="ignore"
+          disableAudioSessionManagement
           onError={() => setPreviewId(null)}
         />
       )}

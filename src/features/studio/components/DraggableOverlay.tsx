@@ -74,16 +74,22 @@ export default function DraggableOverlay({
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="box-none">
-      <GestureDetector gesture={gesture}>
-        <Animated.View style={style} renderToHardwareTextureAndroid={dragging} collapsable={false}>
-          <View style={selected ? styles.selected : styles.idle}>{children}</View>
-          {selected && !dragging && (
-            <TouchableOpacity onPress={onDelete} style={styles.del} hitSlop={8}>
-              <Ionicons name="close" size={14} color={C.WHITE} />
-            </TouchableOpacity>
-          )}
-        </Animated.View>
-      </GestureDetector>
+      {/* The transform wraps BOTH the gesture content and the delete button, but the button is a
+          sibling of the GestureDetector — not a descendant. Keeping it out of the gesture subtree is
+          what makes the X tappable: inside it, the pan's onBegin flips `dragging` true on touch-down
+          and the `!dragging` guard unmounted the button before its onPress could fire. */}
+      <Animated.View style={style} collapsable={false}>
+        <GestureDetector gesture={gesture}>
+          <Animated.View renderToHardwareTextureAndroid={dragging} collapsable={false}>
+            <View style={selected ? styles.selected : styles.idle}>{children}</View>
+          </Animated.View>
+        </GestureDetector>
+        {selected && !dragging && (
+          <TouchableOpacity onPress={onDelete} style={styles.del} hitSlop={8}>
+            <Ionicons name="close" size={14} color={C.WHITE} />
+          </TouchableOpacity>
+        )}
+      </Animated.View>
     </View>
   );
 }

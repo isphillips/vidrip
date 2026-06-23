@@ -52,7 +52,7 @@ export default function StudioCollectionsScreen({ navigation }: StudioStackScree
           <Ionicons name="chevron-back" size={24} color={C.INK} />
         </TouchableOpacity>
         <Text style={styles.title}>Exclusive</Text>
-        <View style={styles.iconBtn} />
+        <View/>
       </View>
 
       <FlatList
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG, paddingHorizontal: SPACE.MD },
   header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACE.MD },
   iconBtn:   { width: 40, height: 40, borderRadius: RADIUS.FULL, alignItems: 'center', justifyContent: 'center', backgroundColor: C.SURFACE_2 },
-  title:     { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
+  title:     { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, position: 'relative', left: -19 },
   list:      { gap: SPACE.SM, paddingBottom: SPACE.XXXL },
   row:       { flexDirection: 'row', alignItems: 'center', gap: SPACE.MD, backgroundColor: C.SURFACE, padding: SPACE.SM, borderRadius: RADIUS.MD },
   cover:     { width: 64, height: 64, borderRadius: RADIUS.SM, backgroundColor: C.SURFACE_2 },

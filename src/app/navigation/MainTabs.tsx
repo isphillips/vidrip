@@ -175,7 +175,6 @@ export default function MainTabs() {
           },
         })}
         options={{
-          tabBarIcon: tabIcon(require('../../assets/icon-feed.png')),
           tabBarLabel: 'Feed',
           tabBarBadge: toReact > 0 ? toReact : undefined,
           tabBarBadgeStyle: { backgroundColor: C.ACCENT_HOT, color: C.WHITE },
@@ -190,7 +189,7 @@ export default function MainTabs() {
             (navigation as any).navigate('Channels', { screen: 'ChannelsHome' });
           },
         })}
-        options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Channels' }} />
+        options={{ tabBarLabel: 'Channels' }} />
       <Tab.Screen name="Studio" component={StudioStack}
         listeners={({ navigation }) => ({
           // The center FAB lands on the Studio home; deeper creation screens are pushed in-stack.
@@ -199,14 +198,14 @@ export default function MainTabs() {
             (navigation as any).navigate('Studio', { screen: 'StudioHome' });
           },
         })}
-        options={{ tabBarIcon: tabIcon(require('../../assets/icon-channels.png')), tabBarLabel: 'Studio' }} />
+        options={{ tabBarLabel: 'Studio' }} />
       <Tab.Screen name="Share" component={ShareNavigator}
         listeners={() => ({
           // Tapping Browse always returns to the browse view (even from the Paste
           // Link panel while the tab is already active).
           tabPress: () => { useShareUiStore.getState().requestBrowse(); },
         })}
-        options={{ tabBarIcon: tabIcon(require('../../assets/icon-share.png')), tabBarLabel: 'Browse' }} />
+        options={{ tabBarLabel: 'Browse' }} />
       <Tab.Screen name="Messages" component={MessagesNavigator}
         listeners={({ navigation }) => ({
           // Tapping Messages always returns to the conversation list, regardless of how
@@ -216,7 +215,7 @@ export default function MainTabs() {
             (navigation as any).navigate('Messages', { screen: 'MessagesHome' });
           },
         })}
-        options={{ tabBarIcon: tabIcon(require('../../assets/icon-friends.png')), tabBarLabel: 'Messages' }} />
+        options={{ tabBarLabel: 'Messages' }} />
       <Tab.Screen name="Friends" component={FriendsNavigator}
         listeners={({ navigation }) => ({
           // Tapping Friends always returns to the friends list, regardless of how
@@ -226,7 +225,7 @@ export default function MainTabs() {
             (navigation as any).navigate('Friends', { screen: 'FriendsHome' });
           },
         })}
-        options={{ tabBarIcon: tabIcon(require('../../assets/icon-friends.png')), tabBarLabel: 'Friends' }} />
+        options={{ tabBarLabel: 'Friends' }} />
       <Tab.Screen name="Account" component={AccountNavigator}
         listeners={({ navigation }) => ({
           // Tapping Account always returns to the account home, regardless of how
@@ -236,7 +235,7 @@ export default function MainTabs() {
             (navigation as any).navigate('Account', { screen: 'AccountHome' });
           },
         })}
-        options={{ tabBarIcon: tabIcon(require('../../assets/icon-account.png')), tabBarLabel: 'Account' }} />
+        options={{ tabBarLabel: 'Account' }} />
     </Tab.Navigator>
   );
 }

@@ -23,20 +23,20 @@ const SHOW_STUDIO_PILL = false;
 // Repeating pink→purple→teal→purple→pink — symmetric ends so a one-period slide loops seamlessly.
 const FLOW = ['#FF4FA3', '#A05CFF', '#2DD4BF', '#A05CFF', '#FF4FA3'];
 
-const ICONS = {
-  Feed: require('../../assets/icon-feed.png'),
-  Channels: require('../../assets/icon-channels.png'),
-  Share: require('../../assets/icon-share.png'),
-  Messages: require('../../assets/icon-friends.png'), // placeholder image (bottom slimes draw the glyph, not this)
-  Friends: require('../../assets/icon-friends.png'),
-  Account: require('../../assets/icon-account.png'),
+const NAV_ITEM_NAMES = {
+  Feed: 'Feed',
+  Channels: 'Channels',
+  Share: 'Share',
+  Messages: 'Messages',
+  Friends: 'Friends',
+  Account: 'Account',
 };
 
 // Each tab is the same little slime friend — uniform + muted when idle, lit up in its own neon colour
 // with a "kind" topper glyph when selected. Each has its OWN body shape (proportions + corner radii) so
 // the five read as distinct creatures. IDLE is the shared resting tint.
 const IDLE_SLIME = '#9486AE';
-const TAB_THEME: Record<keyof typeof ICONS, { glyph: string; neon: string; shape: ViewStyle }> = {
+const TAB_THEME: Record<keyof typeof NAV_ITEM_NAMES, { glyph: string; neon: string; shape: ViewStyle }> = {
   Feed:     { glyph: 'sparkles', neon: '#FF4FA3', shape: { width: 18, height: 18, borderTopLeftRadius: 11, borderTopRightRadius: 11, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 } },     // tall + round
   Channels: { glyph: 'grid',     neon: '#A05CFF', shape: { width: 23, height: 14, borderTopLeftRadius: 8,  borderTopRightRadius: 8,  borderBottomLeftRadius: 6, borderBottomRightRadius: 6 } },     // wide + squat
   Messages: { glyph: 'mail',     neon: '#FF6A00', shape: { width: 20, height: 17, borderTopLeftRadius: 10, borderTopRightRadius: 10, borderBottomLeftRadius: 7, borderBottomRightRadius: 9 } },     // neon-orange postman
@@ -65,7 +65,7 @@ function Bubble({ burst, x, size, delay, color }: { burst: SharedValue<number>; 
 }
 
 // Each slime blinks on its own cadence so the five never blink in unison.
-const BLINK_GAP: Record<keyof typeof ICONS, number> = {
+const BLINK_GAP: Record<keyof typeof NAV_ITEM_NAMES, number> = {
   Feed: 2600, Channels: 3400, Messages: 3600, Share: 4200, Friends: 3000, Account: 3800,
 };
 
@@ -73,7 +73,7 @@ const BLINK_GAP: Record<keyof typeof ICONS, number> = {
 // Feed has little hands and nibbles a snack now and then, Channels sports TV rabbit-ear antennas, and
 // Browse wears round eyeglasses. They all blink idly. Selecting one springs a bounce + hop + bubbles
 // and swaps the muted idle tint for the tab's neon.
-function SlimeTab({ route, glyph, neon, shape, active }: { route: keyof typeof ICONS; glyph: string; neon: string; shape: ViewStyle; active: boolean }) {
+function SlimeTab({ route, glyph, neon, shape, active }: { route: keyof typeof NAV_ITEM_NAMES; glyph: string; neon: string; shape: ViewStyle; active: boolean }) {
   const pop = useSharedValue(1);
   const hop = useSharedValue(0);
   const blink = useSharedValue(1);
@@ -307,8 +307,12 @@ function SlimeTab({ route, glyph, neon, shape, active }: { route: keyof typeof I
   );
 }
 
+type TabNames = {
+
+}
+
 type TabBtnProps = {
-  route: keyof typeof ICONS;
+  route: keyof typeof NAV_ITEM_NAMES;
   label: string;
   active: boolean;
   toReact: number;

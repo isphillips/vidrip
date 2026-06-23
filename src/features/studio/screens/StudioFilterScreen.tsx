@@ -15,6 +15,7 @@ import SkiaVideoPreview from '../components/SkiaVideoPreview';
 import Slider from '../components/Slider';
 import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
+import StudioMusicPreview, { useDraftAudioTrack, useFocusReplayKey } from '../components/StudioMusicPreview';
 import { useStudioAutosave } from '../useStudioAutosave';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
@@ -85,6 +86,8 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
   const [adjust, setAdjust] = useState<AdjustState>(initAdjust ? { ...ADJUST_DEFAULT, ...initAdjust } : ADJUST_DEFAULT);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [baseThumb, setBaseThumb] = useState<string | null>(null);
+  const musicTrack = useDraftAudioTrack(draftId);
+  const replayKey = useFocusReplayKey();   // remount the Skia preview on re-focus so it replays from 0
 
   const preset = STUDIO_FILTERS.find(f => f.key === filterKey) ?? STUDIO_FILTERS[0];
   const visibleFilters = filterCat === 'all' ? STUDIO_FILTERS : STUDIO_FILTERS.filter(f => f.category === filterCat);
@@ -135,9 +138,11 @@ export default function StudioFilterScreen({ route, navigation }: StudioStackScr
 
       <View style={styles.preview} onLayout={e => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
         {box.w > 0 && (
-          <SkiaVideoPreview uri={fileUri} width={box.w} height={box.h} matrix={liveMatrix} mirror={mirror} />
+          <SkiaVideoPreview key={replayKey} uri={fileUri} width={box.w} height={box.h} matrix={liveMatrix} mirror={mirror} />
         )}
       </View>
+      {/* The chosen track plays over the (silent) look preview. */}
+      {musicTrack && <StudioMusicPreview uri={musicTrack.uri} volume={musicTrack.volume} />}
 
       <View style={styles.tools}>
         <TouchableOpacity onPress={() => setMirror(m => !m)} activeOpacity={0.85}

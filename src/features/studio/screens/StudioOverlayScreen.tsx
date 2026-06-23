@@ -18,6 +18,7 @@ import SkiaVideoPreview from '../components/SkiaVideoPreview';
 import DraggableOverlay, { type OverlayTransform } from '../components/DraggableOverlay';
 import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
+import StudioMusicPreview, { useDraftAudioTrack, useFocusReplayKey } from '../components/StudioMusicPreview';
 import EffectText from '../components/EffectText';
 import { useStudioAutosave } from '../useStudioAutosave';
 import { saveSnapshotVideo, updateDraft, getDraft } from '../../../infrastructure/storage/studioDraftStorage';
@@ -178,6 +179,8 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
   const onOverlayGesture = useCallback((active: boolean) =>
     setGesturing(c => Math.max(0, c + (active ? 1 : -1))), []);
   const layerRef = useRef<View>(null);
+  const musicTrack = useDraftAudioTrack(draftId);
+  const replayKey = useFocusReplayKey();   // remount the Skia preview on re-focus so it replays from 0
 
   // Reset spinner when user navigates back from StudioDetails — success path
   // sets exporting=true then navigates away without clearing it.
@@ -360,7 +363,7 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
       <View style={styles.previewWrap} onLayout={e => setAvail({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
         {box.w > 0 && (
           <View style={[styles.preview, { width: box.w, height: box.h }]}>
-            <SkiaVideoPreview uri={fileUri} width={box.w} height={box.h} matrix={matrix} mirror={mirror ?? false} onAspect={setAspect} />
+            <SkiaVideoPreview key={replayKey} uri={fileUri} width={box.w} height={box.h} matrix={matrix} mirror={mirror ?? false} onAspect={setAspect} />
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedId(null)} />
             {/* One shared, play-gated clock for the whole effect layer (instead of a per-component
                 fallback clock each) — also where adaptive-quality frame sampling runs. */}
@@ -387,6 +390,8 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
           </View>
         )}
       </View>
+      {/* The chosen track plays over the (silent) overlay preview; silenced during the export bake. */}
+      {musicTrack && <StudioMusicPreview uri={musicTrack.uri} volume={musicTrack.volume} paused={exporting} />}
 
       {/* Text formatting bar — visible whenever a text item is selected */}
       {selectedTxt && (

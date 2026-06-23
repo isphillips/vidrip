@@ -107,6 +107,28 @@ RCT_EXPORT_METHOD(cancelRecording:(RCTPromiseResolveBlock)resolve
   resolve(nil);
 }
 
+// Re-asserts the audio session for mic recording (PlayAndRecord) and clears the
+// mixing flag, so handleAudioInterruption won't fight VisionCamera's session setup.
+// Call this before VisionCamera startRecording when NOT in music (pre-mode) flow.
+RCT_EXPORT_METHOD(configureForVideoRecording:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  _mixingEnabled = NO;
+  NSError *err = nil;
+  AVAudioSession *session = [AVAudioSession sharedInstance];
+  [session setCategory:AVAudioSessionCategoryPlayAndRecord
+              withOptions:AVAudioSessionCategoryOptionMixWithOthers |
+                          AVAudioSessionCategoryOptionDefaultToSpeaker |
+                          AVAudioSessionCategoryOptionAllowBluetooth |
+                          AVAudioSessionCategoryOptionAllowBluetoothA2DP |
+                          AVAudioSessionCategoryOptionAllowAirPlay
+                    mode:AVAudioSessionModeVideoRecording
+                   error:&err];
+  [session setActive:YES error:nil];
+  NSLog(@"[AudioRecorder] configureForVideoRecording err=%@", err);
+  resolve(nil);
+}
+
 // Forces AVAudioSession into mixing mode so react-native-video and a
 // YouTube WebView can play simultaneously without either interrupting the other.
 RCT_EXPORT_METHOD(configureForMixedPlayback:(RCTPromiseResolveBlock)resolve

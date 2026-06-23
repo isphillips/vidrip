@@ -18,7 +18,7 @@ import ShareBaker, { type ShareBakerHandle } from '../components/ShareBaker';
 import Video from 'react-native-video';
 import MusicPickerSheet from '../music/MusicPickerSheet';
 import { resolveTrackFile, type MusicTrack } from '../music/library';
-import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
+import { configureForMixedPlayback, configureForVideoRecording } from '../../../infrastructure/native/audioRecorder';
 import { faceLensRecipe } from '../effectRecipe';
 import { LiveFaceLens, lensByKey, SPIKE_KEY } from '../../lens/faceLens';
 import { useSpikeFrameProcessor } from '../../lens/spikeFrameProcessor';
@@ -27,7 +27,6 @@ import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking'
 import { useWarpFrameProcessor, warpAvailable } from '../../lens/warpLens';
 import { useAnonymousMode, ANON_LENS_KEY, ANON_VOICE_MOD } from '../../lens/useAnonymousMode';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
-import { useUploadStore } from '../../../store/uploadStore';
 import { DEMO_MODE } from '../../../demo/demoMode';
 
 const MAX_SEC = MAX_STUDIO_MS / 1000; // 180s hard cap (auto-stop)
@@ -74,9 +73,8 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
-  // Global toast shown while the lens is baked into the recording (the wait before the trim screen).
-  const showUpload = useUploadStore((s) => s.show);
-  const dismissUpload = useUploadStore((s) => s.dismiss);
+  // Shown above the record button while the lens/voice bake runs (the wait before the trim screen).
+  const [processing, setProcessing] = useState(false);
 
   // Pre-mode music: a curated track that plays aloud WHILE recording (mic off). Resolved to a local
   // file on pick so it's ready to play + to bake. When set, the recording is video-only and the track
@@ -92,6 +90,10 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
   }, []);
 
   const cameraRef = useRef<Camera>(null);
+  // The draft created by this capture session. A re-take (record/import again before leaving the
+  // studio) overwrites it instead of piling up a new draft. Reset only by remounting this screen
+  // (i.e. tapping "New video" or returning after a save/publish).
+  const sessionDraftIdRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
   const finishRef = useRef<((v: VideoFile) => void) | null>(null);
@@ -122,7 +124,6 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
     setRecording(false);
     setBusy(true);
     StatusBar.setHidden(false, 'fade');
-    let toastId: string | null = null;
     try {
       const video = await new Promise<VideoFile>((resolve, reject) => {
         finishRef.current = resolve;
@@ -133,18 +134,20 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       // the pixels for the whole flow — no track to thread, lens visible through trim/filter/overlay.
       // Falls back to the un-lensed footage if the bake fails (never lose the recording).
       let finalUri = uri;
-      const track = effLensKey ? stopTrack() : null;
+      // fullMesh: the studio bake is into pixels + transient, so capture every vertex → dense lenses
+      // (e.g. Star Map) bake all their nodes instead of just the contour subset.
+      const track = effLensKey ? stopTrack({ fullMesh: true }) : null;
       const voiceMod = anon ? ANON_VOICE_MOD : null;
       if (track || voiceMod) {
-        toastId = showUpload('Processing video…');
-        // Bake the lens overlay at 20fps (not 30): the capture-bake snapshots every frame to a PNG, so
-        // fewer frames = the user reaches the trim screen sooner, and a 20fps overlay reads fine.
-        try { finalUri = await bakerRef.current!.bake({ sourceUri: uri, recipe: track ? faceLensRecipe(track) : null, durationSec: elapsedRef.current, voiceMod, fps: 20 }); }
+        setProcessing(true);
+        // Bake the overlay at the camera's 30fps so the baked lens matches the recording's smoothness.
+        try { finalUri = await bakerRef.current!.bake({ sourceUri: uri, recipe: track ? faceLensRecipe(track) : null, durationSec: elapsedRef.current, voiceMod, fps: 30 }); }
         catch { finalUri = uri; }
       }
       // Persist the (lens-baked) recording as a draft immediately (survives crash/close); edits
       // autosave from here on. createDraft copies the recording into the draft's local dir.
-      const draft = await createDraft(finalUri, elapsedRef.current);
+      const draft = await createDraft(finalUri, elapsedRef.current, sessionDraftIdRef.current ?? undefined);
+      sessionDraftIdRef.current = draft.id;
       // Pre-mode music: the recording is video-only, so the chosen track becomes the audio on export.
       if (preTrack) {
         await updateDraft(draft.id, {
@@ -156,9 +159,9 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
       Alert.alert('Recording', e?.message ?? 'Could not save the recording.');
     } finally {
       setBusy(false);
-      if (toastId) { dismissUpload(toastId); }
+      setProcessing(false);
     }
-  }, [recording, navigation, effLensKey, anon, stopTrack, showUpload, dismissUpload, preTrack]);
+  }, [recording, navigation, effLensKey, anon, stopTrack, preTrack]);
   stopRef.current = stop;
 
   const start = useCallback(() => {
@@ -166,7 +169,10 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
     elapsedRef.current = 0;
     setElapsed(0);
     // Pre-mode music: route to playback+mix so the track is audible while the (mic-off) camera records.
+    // No music: re-assert PlayAndRecord and clear _mixingEnabled so the interruption handler in
+    // AudioRecorder.m doesn't fight VisionCamera's audio session setup during this recording.
     if (preTrack) { configureForMixedPlayback().catch(() => {}); }
+    else { configureForVideoRecording().catch(() => {}); }
     cameraRef.current?.startRecording({
       fileType: 'mp4',
       onRecordingFinished: (v) => { finishRef.current?.(v); finishRef.current = null; },
@@ -194,7 +200,8 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
     try {
       const picked = await pickVideoFromLibrary();
       if (picked?.uri) {
-        const draft = await createDraft(picked.uri, picked.durationSec);
+        const draft = await createDraft(picked.uri, picked.durationSec, sessionDraftIdRef.current ?? undefined);
+        sessionDraftIdRef.current = draft.id;
         navigation.navigate('StudioTrim', { fileUri: draft.rawFile, durationSec: picked.durationSec, draftId: draft.id });
       }
     } catch (e: any) { Alert.alert('Import', e?.message ?? 'Could not import a video.'); }
@@ -289,6 +296,16 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
         </View>
       )}
 
+      {/* Processing pill — raised above the record button while the lens/voice bake runs. */}
+      {processing && (
+        <View style={[styles.recTimerWrap, { bottom: bottom + SPACE.XL + 96 }]} pointerEvents="none">
+          <View style={styles.processingPill}>
+            <ActivityIndicator size="small" color={C.WHITE} />
+            <Text style={styles.processingTxt}>Processing video…</Text>
+          </View>
+        </View>
+      )}
+
       {/* Bottom controls: import · record · spacer */}
       <View style={[styles.bottomBar, { bottom: bottom + SPACE.XL }]}>
         <TouchableOpacity onPress={importLibrary} hitSlop={10} style={styles.sideBtn} disabled={recording || busy}>
@@ -337,6 +354,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.MD, paddingVertical: 6, borderRadius: RADIUS.FULL,
   },
   musicBannerTxt: { color: C.WHITE, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
+  processingPill: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACE.SM,
+    backgroundColor: 'rgba(12,10,9,0.93)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM + 2, borderRadius: RADIUS.FULL,
+  },
+  processingTxt: { color: C.WHITE, fontFamily: FONT.BODY_MEDIUM, fontSize: FONT.SIZES.SM },
   placeholder: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACE.XL },
   placeholderTxt: { color: C.MUTED, fontFamily: FONT.BODY, textAlign: 'center', lineHeight: 22 },
   topBar: {

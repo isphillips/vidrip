@@ -7,11 +7,13 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, runOnJS } from 'react-native-reanimated';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { MAX_STUDIO_MS } from '../../../infrastructure/creatorStudio/recipe';
 import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
+import StudioMusicPreview, { useDraftAudioTrack } from '../components/StudioMusicPreview';
 import { useStudioAutosave } from '../useStudioAutosave';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
@@ -31,6 +33,8 @@ export default function StudioTrimScreen({ route, navigation }: StudioStackScree
   const { top } = useSafeAreaInsets();
   const { width: winW } = useWindowDimensions();
   const videoRef = useRef<VideoRef>(null);
+  const isFocused = useIsFocused();
+  const musicTrack = useDraftAudioTrack(draftId);
 
   const [durationMs, setDurationMs] = useState((durationSec ?? 0) * 1000);
   const [inMs, setInMs] = useState(0);
@@ -123,6 +127,13 @@ export default function StudioTrimScreen({ route, navigation }: StudioStackScree
     if (outMs && p.currentTime * 1000 >= outMs) { videoRef.current?.seek(inMs / 1000); }
   }, [inMs, outMs]);
 
+  // Restart the preview from the window start whenever the screen regains focus (Back included), so
+  // returning to Trim behaves like arriving fresh. Reads the live in-point via a ref to avoid reseeking
+  // mid-drag.
+  const inRef = useRef(0);
+  inRef.current = inMs;
+  useFocusEffect(useCallback(() => { videoRef.current?.seek(inRef.current / 1000); return () => {}; }, []));
+
   // Non-destructive: hand the trim window forward; the single native bake (trim +
   // filter) happens after the Looks step.
   const next = useCallback(() => {
@@ -162,11 +173,14 @@ export default function StudioTrimScreen({ route, navigation }: StudioStackScree
           resizeMode="contain"
           repeat
           muted
+          paused={!isFocused}
           onLoad={(d) => { if (!durationMs && d.duration) { setDurationMs(Math.round(d.duration * 1000)); } }}
           onProgress={onProgress}
           progressUpdateInterval={200}
         />
       </View>
+      {/* The recording's track (if any) plays here too — the filmstrip video is muted. */}
+      {musicTrack && <StudioMusicPreview uri={musicTrack.uri} volume={musicTrack.volume} />}
 
       <View style={styles.times}>
         <Text style={styles.timeTxt}>{fmt(inMs)}</Text>

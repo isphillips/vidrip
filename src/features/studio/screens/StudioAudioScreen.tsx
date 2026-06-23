@@ -1,12 +1,14 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
-import Video from 'react-native-video';
+import Video, { type VideoRef } from 'react-native-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import Slider from '../components/Slider';
 import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
+import StudioMusicPreview from '../components/StudioMusicPreview';
 import MusicPickerSheet from '../music/MusicPickerSheet';
 import { resolveTrackFile, type MusicTrack } from '../music/library';
 import { useStudioAutosave } from '../useStudioAutosave';
@@ -29,19 +31,44 @@ export default function StudioAudioScreen({ route, navigation }: StudioStackScre
   const [originalVolume, setOriginalVolume] = useState(1);
   const [sheet, setSheet] = useState(false);
   const [paused, setPaused] = useState(false);
+  // Gate audio autosave until the draft has been read, so the first (pre-hydration) save can't write a
+  // null over an existing track and wipe audio set earlier in the flow.
+  const [hydrated, setHydrated] = useState(!draftId);
+
+  const isFocused = useIsFocused();
+  const mainRef = useRef<VideoRef>(null);
+  const lastT = useRef(0);
+  const [wrapKey, setWrapKey] = useState(0);   // bumped when the preview video loops → music reseeks
+  const clipMs = durationSec ? durationSec * 1000 : undefined;
+
+  // Detect the preview loop (currentTime jumps back) and tell the music to restart in lockstep.
+  const onMainProgress = useCallback((p: { currentTime: number }) => {
+    if (p.currentTime + 0.25 < lastT.current) { setWrapKey(k => k + 1); }
+    lastT.current = p.currentTime;
+  }, []);
+
+  // Returning to this screen (Back) replays from the top — video + music together.
+  useFocusEffect(useCallback(() => {
+    mainRef.current?.seek(0);
+    lastT.current = 0;
+    setWrapKey(k => k + 1);
+    return () => {};
+  }, []));
 
   // Hydrate any existing audio (a pre-mode track from capture, or a resumed post config).
   useEffect(() => {
     if (!draftId) { return; }
     let alive = true;
     getDraft(draftId).then(d => {
+      if (!alive) { return; }
       const a = d?.audio; const t = a?.tracks?.[0];
-      if (!alive || !t) { return; }
-      setTrack({ id: t.id, title: t.title, uri: t.uri, mode: t.mode });
-      setMusicVolume(t.volume);
-      setKeepOriginal(a!.keepOriginal);
-      setOriginalVolume(a!.originalVolume);
-    }).catch(() => {});
+      if (t) {
+        setTrack({ id: t.id, title: t.title, uri: t.uri, mode: t.mode });
+        setMusicVolume(t.volume);
+        setKeepOriginal(a!.keepOriginal);
+        setOriginalVolume(a!.originalVolume);
+      }
+    }).catch(() => {}).finally(() => { if (alive) { setHydrated(true); } });
     return () => { alive = false; };
   }, [draftId]);
 
@@ -62,7 +89,12 @@ export default function StudioAudioScreen({ route, navigation }: StudioStackScre
       }
     : null;
 
-  useStudioAutosave(draftId, 'audio', { audio, durationSec, trimStartMs, trimEndMs, colorMatrix, mirror });
+  // Omit `audio` from the patch until hydrated — updateDraft merges, so leaving the key out preserves
+  // whatever audio is already on the draft (and avoids a null-overwrite during the load race).
+  useStudioAutosave(draftId, 'audio',
+    hydrated
+      ? { audio, durationSec, trimStartMs, trimEndMs, colorMatrix, mirror }
+      : { durationSec, trimStartMs, trimEndMs, colorMatrix, mirror });
 
   const next = useCallback(() => {
     navigation.navigate('StudioOverlay', { fileUri, durationSec, trimStartMs, trimEndMs, colorMatrix, mirror, draftId });
@@ -83,25 +115,20 @@ export default function StudioAudioScreen({ route, navigation }: StudioStackScre
       {/* Preview: the video plays its recorded audio (at the original volume), the music layers over it. */}
       <Pressable style={styles.preview} onPress={() => setPaused(p => !p)}>
         <Video
+          ref={mainRef}
           source={{ uri: fileUri }}
           style={StyleSheet.absoluteFill}
           resizeMode="contain"
           repeat
-          paused={paused}
+          paused={paused || !isFocused}
           muted={track ? (track.mode === 'pre' ? true : !keepOriginal) : false}
           volume={keepOriginal ? originalVolume : 0}
           mixWithOthers="mix"
+          onProgress={onMainProgress}
+          progressUpdateInterval={150}
         />
         {track && (
-          <Video
-            source={{ uri: track.uri }}
-            // eslint-disable-next-line react-native/no-inline-styles
-            style={{ width: 0, height: 0 }}
-            repeat
-            paused={paused}
-            volume={musicVolume}
-            mixWithOthers="mix"
-          />
+          <StudioMusicPreview uri={track.uri} volume={musicVolume} clipMs={clipMs} restartKey={wrapKey} paused={paused} />
         )}
         {paused && (
           <View style={styles.playOverlay} pointerEvents="none">

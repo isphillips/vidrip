@@ -433,6 +433,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
             controls
             repeat
             paused={false}
+            ignoreSilentSwitch="ignore"
           />
           <TouchableOpacity style={styles.fsClose} onPress={() => setFullscreen(false)} hitSlop={12}>
             <View style={styles.fsCloseBg}>
