@@ -102,13 +102,13 @@ export default function RecordReactionScreen({
         addPendingChannelReaction(postId, {
           id: newPostId, channel_id: channelId, poster_id: user!.id,
           poster: { handle: profile?.handle ?? '' },
-          post_type: 'clip', source_type: 'youtube',
+          post_type: 'clip', source_type: chSourceType,
           yt_video_id: null, yt_video_title: null, yt_video_thumbnail: null,
           video_url: null, duration: Math.round(duration), is_pinned: false,
           created_at: new Date().toISOString(), message: null,
           emoji_reactions: [], reaction_count: 0, has_my_reaction: true,
           review_count: 0, has_my_review: false, parent_post_id: postId,
-          parent_yt_video_id: null, parent_source_type: 'youtube',
+          parent_yt_video_id: null, parent_source_type: chSourceType,
         });
         await uploadChannelClipRelay(newPostId, user!.id);
       });

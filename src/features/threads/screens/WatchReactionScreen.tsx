@@ -26,7 +26,7 @@ import Animated, {
 
 // Height of the source player when shrunk into the corner (screen-aspect mini).
 const PIP_H = 184;
-import Video from 'react-native-video';
+import Video, { ViewType } from 'react-native-video';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import ContentActions from '../../../components/ContentActions';
 import { configureForMixedPlayback } from '../../../infrastructure/native/audioRecorder';
@@ -392,6 +392,11 @@ export default function WatchReactionScreen({
           paused={paused}
           mixWithOthers="mix"
           disableFocus={Platform.OS === 'android'}
+          // TextureView renders in the normal view hierarchy so it can't be
+          // blacked-out by window-focus changes (e.g. a Facebook overlay briefly
+          // taking the foreground). SurfaceView (the default) renders on its own
+          // hardware layer and goes black whenever another window steals focus.
+          viewType={Platform.OS === 'android' ? ViewType.TEXTURE : undefined}
           onLoad={(d: any) => {
             setDuration(d.duration);
             configureForMixedPlayback()
@@ -400,20 +405,23 @@ export default function WatchReactionScreen({
           }}
           onProgress={(d: any) => { progressRef.current = d.currentTime; setProgress(d.currentTime); }}
           onEnd={handleEnd}
-          onError={(e: any) => log.error('[WatchReaction] error:', JSON.stringify(e))}
+          onError={(e: any) => {
+            log.error('[WatchReaction] error:', JSON.stringify(e));
+            setDownloadState('unavailable');
+          }}
           repeat={false}
         />
       </View>
 
-      {/* Tap-to-play background — only when there's NO source PIP (or Instagram, which
-          can't drive the reaction via embed events so the user taps to play directly). */}
+      {/* Tap-to-play background — only when there's NO source PIP (or Instagram/Facebook,
+          which can't drive the reaction via embed events so the user taps to play directly). */}
       <Pressable
         style={StyleSheet.absoluteFill}
-        onPress={reaction?.yt_video_id && reaction.source_type !== 'instagram' ? undefined : handlePlayPause}
+        onPress={reaction?.yt_video_id && reaction.source_type !== 'instagram' && reaction.source_type !== 'facebook' ? undefined : handlePlayPause}
       />
 
       {/* Play icon — when tap-to-play is active. */}
-      {paused && (!reaction?.yt_video_id || reaction.source_type === 'instagram') && (
+      {paused && (!reaction?.yt_video_id || reaction.source_type === 'instagram' || reaction.source_type === 'facebook') && (
         <View style={styles.playOverlay} pointerEvents="none">
           <View style={styles.playCircle}>
             <Text style={styles.playIcon}>▶</Text>
@@ -425,14 +433,15 @@ export default function WatchReactionScreen({
       {!hasStarted && (
         <View style={styles.startPrompt} pointerEvents="none">
           <Text style={styles.startPromptText}>
-            {reaction?.yt_video_id && reaction.source_type !== 'instagram' ? 'Tap ▶ on the video to start' : 'Tap to play reaction'}
+            {reaction?.yt_video_id && reaction.source_type !== 'instagram' && reaction.source_type !== 'facebook' ? 'Tap ▶ on the video to start' : 'Tap to play reaction'}
           </Text>
         </View>
       )}
 
       {/* Source player — full-screen, then animates into the corner on play. Hidden once the
-          afterthought outro takes over (the reaction is finished). */}
-      {sessionReady && reaction?.yt_video_id && !srcDismissed && (
+          afterthought outro takes over (the reaction is finished). Facebook videos have no
+          controllable embed, so reactions recorded from Facebook show no source PIP. */}
+      {sessionReady && reaction?.yt_video_id && reaction.source_type !== 'facebook' && !srcDismissed && (
         <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
           {reaction.source_type === 'instagram' ? (
             <WebView
@@ -472,7 +481,7 @@ export default function WatchReactionScreen({
                 if (offset > 0) { ttRef.current?.seekTo(offset); }
               }}
             />
-          ) : (
+          ) : reaction.source_type === 'youtube' || !reaction.source_type ? (
             <View style={{ width, height, overflow: 'hidden' }}>
               <View style={{ position: 'absolute', left: ytOffsetX }}>
                 <YoutubePlayer
@@ -493,7 +502,7 @@ export default function WatchReactionScreen({
                 />
               </View>
             </View>
-          )}
+          ) : null}
         </Animated.View>
       )}
 
