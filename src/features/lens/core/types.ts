@@ -61,6 +61,21 @@ export type FaceFrame = {
 // canvas size.
 export type LensProps = { f: FaceFrame; clock: SharedValue<number>; w: number; h: number };
 
+// Lean per-frame payload for the reactive mesh path. The mesh is a FLAT array of box-pixel coords
+// ([x0,y0,x1,y1,…], NaN for a missing vertex) rather than 478 nested {x,y} objects — it crosses into the
+// UI-thread SharedValue far faster (numbers clone trivially; nested objects don't). Plus the few anchors
+// a mesh lens needs for placement. Built by meshFrameFor() (reuses faceFrame's cover-crop mapping).
+export type MeshFrame = {
+  xy: number[];      // box-pixel mesh, flat; xy[2*i],xy[2*i+1] = vertex i (NaN if absent)
+  noseX: number; noseY: number; eyeMidY: number; faceW: number;
+};
+
+// Reactive variant: `f` is a UI-thread SharedValue instead of a plain value. The lens reads it via
+// useDerivedValue, so it mounts ONCE and updates with NO React re-render — the per-frame mesh render
+// runs entirely on the UI thread (GC-managed Reanimated runtime, so no frame-processor leak risk). Used
+// by mesh lenses migrated off the React reconcile path (see ReactiveLensHost in faceLens.tsx).
+export type ReactiveLensProps = { f: SharedValue<MeshFrame | null>; clock: SharedValue<number>; w: number; h: number };
+
 // A catalog entry. `warp` (when set) names a camera-pixel-bending shader (see warpLens.ts) rather
 // than an overlay — the capture screen renders that shader via the warp frame processor instead of
 // mounting `Comp` (`Comp` is still used for replay, since the warp isn't baked into recordings yet).

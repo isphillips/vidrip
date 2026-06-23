@@ -216,7 +216,11 @@ export function GodRays({ w, h, x, y, color, count = 7, spread = 1.4, length, wi
 
 // Ambient drifting motes across the whole frame (dust, plankton, embers, snow, bokeh). Direction +1
 // = downward, -1 = rising. Reuses the looping Drifter so each mote sways + fades on its own cycle.
-export function Motes({ w, h, count, color, clock, dir = 1, sizeMin = 1.5, sizeMax = 5, star = false, seed = 0 }: {
+// React.memo: these atmospheric layers depend only on size + the (stable) clock, NOT the face — so when
+// the lens re-renders because the face moved, React skips re-reconciling all `count` particle children
+// (40+ animated sub-components in some lenses). Their animation keeps running on the UI thread untouched.
+// This is the big per-frame saving on heavy mesh lenses. (No array/object props here, so memo bails cleanly.)
+export const Motes = React.memo(function Motes({ w, h, count, color, clock, dir = 1, sizeMin = 1.5, sizeMax = 5, star = false, seed = 0 }: {
   w: number; h: number; count: number; color: string; clock: SharedValue<number>;
   dir?: 1 | -1; sizeMin?: number; sizeMax?: number; star?: boolean; seed?: number;
 }) {
@@ -235,4 +239,4 @@ export function Motes({ w, h, count, color, clock, dir = 1, sizeMin = 1.5, sizeM
       })}
     </>
   );
-}
+});

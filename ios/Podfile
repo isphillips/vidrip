@@ -8,6 +8,12 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
+# VisionCamera is used for reaction recording ONLY — never geotagging. By default
+# (v4) it compiles in its CLLocation APIs, which makes the binary reference location
+# and forces a location purpose string (ITMS-90683) we don't want. Disabling it
+# compiles that code out entirely, so no NSLocationWhenInUseUsageDescription is needed.
+$VCEnableLocation = false
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green

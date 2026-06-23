@@ -1,9 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Canvas } from '@shopify/react-native-skia';
-import { faceFrame, useLensClock, dequantizeMesh, type FaceLandmarks, type FaceLensTrack } from './core';
+import { useSharedValue } from 'react-native-reanimated';
+import { faceFrame, meshFrameFor, useLensClock, dequantizeMesh, type FaceLandmarks, type FaceLensTrack, type MeshFrame, type ReactiveLensProps } from './core';
 import { lensByKey } from './lenses';
+import { StarMapRx } from './lenses/starMapRx';
 import { ANON_LENS_KEY } from './useAnonymousMode';
+
+// Lenses migrated to the reactive (UI-thread, no-React-re-render) renderer. When the active lens is in
+// here, LiveFaceLens drives it through ReactiveLensHost instead of the per-frame-reconcile path. The
+// catalog still maps the key to the legacy Comp, which replay/bake (FaceLensReplay) continue to use.
+const REACTIVE_RENDERERS: Record<string, React.FC<ReactiveLensProps>> = {
+  starmap: StarMapRx,
+};
 
 // SPIKE: pick this lens in the picker to A/B the UI-thread pipeline. It renders via a Skia frame
 // processor (useSpikeFrameProcessor) that draws straight on the camera frame — NOT through this
@@ -56,19 +65,57 @@ export default function FaceLensOverlay({
 // capture/reaction screen, which mounts the camera, source players and lens picker (re-rendering that
 // tree 30×/sec was the main source of lens lag). `fallback` seeds a mock face on builds with no native
 // tracker (simulator/demo) so the lens still shows over a still frame.
-export function LiveFaceLens({
-  lens, subscribe, width, height, frameAspect, fallback = null,
-}: {
+type LiveProps = {
   lens?: string | null;
   subscribe: (fn: (lm: FaceLandmarks | null) => void) => () => void;
   width: number; height: number; frameAspect?: number; fallback?: FaceLandmarks | null;
-}) {
+};
+
+// Selector: reactive lenses (mesh, UI-thread render) go through ReactiveLensHost; everything else uses
+// the legacy per-frame-state host. No hooks here so the branch is safe across lens changes.
+export function LiveFaceLens(props: LiveProps) {
+  const ReactiveComp = props.lens ? REACTIVE_RENDERERS[props.lens] : undefined;
+  return ReactiveComp
+    ? <ReactiveLensHost ReactiveComp={ReactiveComp} subscribe={props.subscribe} width={props.width} height={props.height} frameAspect={props.frameAspect} />
+    : <LegacyLensHost {...props} />;
+}
+
+// Legacy host: mirrors the subscribed landmarks into local React state and renders the lens through
+// FaceLensOverlay. Each face frame re-renders THIS small component (never the parent screen).
+function LegacyLensHost({ lens, subscribe, width, height, frameAspect, fallback = null }: LiveProps) {
   const [landmarks, setLandmarks] = useState<FaceLandmarks | null>(fallback);
   useEffect(() => subscribe(setLandmarks), [subscribe]);
   // No native tracker (sim/demo): the subscription never fires, so seed/refresh the mock directly.
   useEffect(() => { if (fallback) { setLandmarks(fallback); } }, [fallback]);
   return (
     <FaceLensOverlay lens={lens} landmarks={landmarks} width={width} height={height} frameAspect={frameAspect} />
+  );
+}
+
+// Reactive host: writes each frame's FaceFrame into a SharedValue (NO setState) and mounts the lens
+// ONCE. The lens reads the SharedValue via useDerivedValue, so the per-frame mesh render runs on the UI
+// thread with zero React reconciliation — the snappiest path, and leak-free (Reanimated runtime is GC'd).
+function ReactiveLensHost({
+  ReactiveComp, subscribe, width, height, frameAspect,
+}: {
+  ReactiveComp: React.FC<ReactiveLensProps>;
+  subscribe: (fn: (lm: FaceLandmarks | null) => void) => () => void;
+  width: number; height: number; frameAspect?: number;
+}) {
+  const face = useSharedValue<MeshFrame | null>(null);
+  // meshFrameFor needs the box dims; keep them in a ref so the subscriber always reads the latest.
+  const dims = useRef({ w: width, h: height, a: frameAspect });
+  dims.current = { w: width, h: height, a: frameAspect };
+  const clock = useLensClock(true);
+  useEffect(() => subscribe((lm) => {
+    face.value = lm ? meshFrameFor(lm, dims.current.w, dims.current.h, dims.current.a) : null;
+  }), [subscribe, face]);
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Canvas style={StyleSheet.absoluteFill}>
+        <ReactiveComp f={face} clock={clock} w={width} h={height} />
+      </Canvas>
+    </View>
   );
 }
 

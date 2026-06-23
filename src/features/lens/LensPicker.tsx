@@ -15,7 +15,7 @@ type Option = { key: string | null; label: string; icon: string };
 
 // Picker tabs, in display order, each with a small glyph that hints at the category.
 const TABS: { cat: LensCategory; label: string; icon: string }[] = [
-  { cat: 'beauty', label: 'Beautify', icon: 'sparkles-outline' },
+  // { cat: 'beauty', label: 'Beautify', icon: 'sparkles-outline' },
   { cat: 'mesh', label: 'Mask', icon: 'grid-outline' },
   { cat: 'warp', label: 'Warp', icon: 'aperture-outline' },
   { cat: 'overlay', label: 'Overlay', icon: 'layers-outline' },

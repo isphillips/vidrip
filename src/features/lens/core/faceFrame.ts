@@ -1,4 +1,4 @@
-import type { FaceFrame, FaceLandmarks, Pt } from './types';
+import type { FaceFrame, FaceLandmarks, MeshFrame, Pt } from './types';
 
 // Rotation lock for the head "up" axis. The eyes→mouth vector foreshortens on steep pitch and can
 // briefly INVERT or jump during fast motion / mis-detection, snapping lenses 90–180°. So we LOCK the
@@ -26,6 +26,35 @@ const nrm = (p: Pt): Pt => { const l = Math.hypot(p.x, p.y) || 1; return { x: p.
 // down toward the chin. Keeps lens art locked to the face through head roll.
 export function off(f: FaceFrame, base: Pt, upD: number, sideD: number): Pt {
   return { x: base.x + f.up.x * upD + f.along.x * sideD, y: base.y + f.up.y * upD + f.along.y * sideD };
+}
+
+// Lean mapping for the reactive mesh path: the cover-crop math from faceFrame() (so it lands EXACTLY
+// where the overlay does), but emitting a flat pixel-coord array + the handful of anchors a mesh lens
+// needs — no nested-object mesh, no rotation lock. Cheap to compute and cheap to push to the UI thread.
+// Returns null when this frame has no mesh (anchor-only lenses don't use the reactive path).
+export function meshFrameFor(lm: FaceLandmarks, w: number, h: number, frameAspect?: number): MeshFrame | null {
+  const mesh = lm.mesh;
+  if (!mesh) { return null; }
+  const boxAspect = h > 0 ? w / h : 1;
+  let sx = w, sy = h, ox = 0, oy = 0;
+  if (frameAspect && frameAspect > 0) {
+    if (frameAspect > boxAspect) { sy = h; sx = h * frameAspect; ox = (sx - w) / 2; }
+    else { sx = w; sy = w / frameAspect; oy = (sy - h) / 2; }
+  }
+  const mx = (x: number) => x * sx - ox;
+  const my = (y: number) => y * sy - oy;
+  const xy = new Array<number>(mesh.length * 2);
+  for (let i = 0; i < mesh.length; i++) {
+    const p = mesh[i];
+    if (p) { xy[2 * i] = mx(p.x); xy[2 * i + 1] = my(p.y); }
+    else { xy[2 * i] = NaN; xy[2 * i + 1] = NaN; }
+  }
+  return {
+    xy,
+    noseX: mx(lm.noseTip.x), noseY: my(lm.noseTip.y),
+    eyeMidY: (my(lm.leftEye.y) + my(lm.rightEye.y)) / 2,
+    faceW: lm.faceWidth * sx,
+  };
 }
 
 // Maps normalized frame landmarks into box pixels, accounting for the preview's COVER crop (the

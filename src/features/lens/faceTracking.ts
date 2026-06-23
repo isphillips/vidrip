@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { useFrameProcessor, runAtTargetFps, VisionCameraProxy } from 'react-native-vision-camera';
-import { Worklets } from 'react-native-worklets-core';
+import { Worklets, useSharedValue as useWorkletSharedValue } from 'react-native-worklets-core';
 import type { FaceLandmarks, FaceLensTrack } from './faceLens';
-import type { FaceBlendshapes } from './core/types';
+import type { FaceBlendshapes, Pt } from './core/types';
 import { MESH_TRACK_INDICES, quantizeMesh } from './core/meshContours';
 
 // The two platforms feed MediaPipe differently, so the keypoints arrive in different conventions:
@@ -24,7 +24,7 @@ const ANDROID_DY_MESH = 0;
 
 // Replay sampling rate for the captured track — 15fps is plenty for an overlay and keeps the
 // persisted track small.
-const TRACK_FPS = 15;
+const TRACK_FPS = 30;
 // Cap live inference. The camera runs at 30fps; with the GPU delegate BlazeFace is cheap enough to
 // run every frame. Lower this if a CPU-delegate device struggles.
 const LIVE_FPS = 30;
@@ -45,7 +45,21 @@ const SNAP = 0.22;       // a jump bigger than this snaps instead of easing (re-
 // this long. Rides blinks / brief turns / single missed frames without strobing.
 const HIDE_MS = 2000;
 
-function ema(prev: FaceLandmarks, cur: FaceLandmarks, a: number): FaceLandmarks {
+// Speed-adaptive mesh smoothing: lerp each vertex toward the new detection by `a` (the SAME factor the
+// anchors use — ~1 during real motion so tracking stays instant, lower when slow/idle). This damps the
+// per-vertex jitter and, importantly, the unstable fits MediaPipe returns at extreme pitch (looking up),
+// which otherwise read as the mesh "flipping". Vertices absent from either frame pass through.
+function meshLerp(prev: (Pt | undefined)[] | undefined, cur: (Pt | undefined)[] | undefined, a: number): (Pt | undefined)[] | undefined {
+  if (!cur || !prev || a >= 1) { return cur; }
+  const out: (Pt | undefined)[] = new Array(cur.length);
+  for (let i = 0; i < cur.length; i++) {
+    const c = cur[i], p = prev[i];
+    out[i] = c && p ? { x: p.x + (c.x - p.x) * a, y: p.y + (c.y - p.y) * a } : c;
+  }
+  return out;
+}
+
+function ema(prev: FaceLandmarks, cur: FaceLandmarks, a: number, aMesh: number): FaceLandmarks {
   const mix = (p: number, c: number) => p + (c - p) * a;
   const mixPt = (p: { x: number; y: number }, c: { x: number; y: number }) => ({ x: mix(p.x, c.x), y: mix(p.y, c.y) });
   // Blendshapes (mesh track only): ease toward the new values so jawOpen/blink don't strobe; reset to
@@ -67,7 +81,7 @@ function ema(prev: FaceLandmarks, cur: FaceLandmarks, a: number): FaceLandmarks 
     faceWidth: mix(prev.faceWidth, cur.faceWidth),
     roll: mix(prev.roll, cur.roll),
     bs,
-    mesh: cur.mesh, // take the latest mesh (478 pts — too many to smooth, and it's debug-only)
+    mesh: meshLerp(prev.mesh, cur.mesh, aMesh), // speed-adaptive: instant when moving, damped when slow
   };
 }
 
@@ -103,6 +117,10 @@ export const faceTrackKind: 'mesh' | 'blaze' = useMesh ? 'mesh' : 'blaze';
 const SMOOTH_IDLE = faceTrackKind === 'mesh' ? 1.0 : 0.25;
 const MOVE_FULL = faceTrackKind === 'mesh' ? 0.022 : 0.03;
 const DEADBAND = faceTrackKind === 'mesh' ? 0.004 : 0.008;
+// The 478-pt mesh gets its OWN (lower) idle floor than the anchors: anchors stay maximally snappy
+// (SMOOTH_IDLE = 1), but the mesh is damped when slow/idle to kill per-vertex jitter and the unstable
+// fits at extreme pitch (the "flip"). Ramps to 1 (instant) at MOVE_FULL too, so real motion isn't slowed.
+const MESH_IDLE = 0.6;
 
 // BlazeFace keypoint indices (right/left as seen in the image).
 const RIGHT_EYE = 0;
@@ -192,8 +210,15 @@ export function useFaceTracking(mirror = true, withMesh = false) {
   const lastGoodRef = useRef(0);                    // last frame a face was detected (hide debounce)
   const hiddenRef = useRef(true);                   // whether markers are currently hidden
   const recRef = useRef<TrackRec | null>(null);     // active capture (during recording)
+  // Back-pressure. The frame processor only hands a new frame to the JS thread when the previous one
+  // has been consumed (pending=false). Heavy mesh lenses can't render the 478-pt wireframe at 30fps, so
+  // without this the per-frame runOnJS handoffs queue up and the lens replays the backlog — a smooth
+  // ~1.75s "slide" that catches up only when you stop moving. Gating to ONE in-flight frame bounds the
+  // lag to ~1 frame (the stale frames in between are dropped, so tracking stays current).
+  const pending = useWorkletSharedValue(false);
 
   const push = useCallback((lm: FaceLandmarks | null, st: string) => {
+   try {
     if (st !== statusRef.current) { statusRef.current = st; setStatus(st); }
     const now = Date.now();
     const rec = recRef.current;
@@ -213,7 +238,8 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       // (instant/snappy). Snap on first acquire or a big jump (≥SNAP) so markers don't crawl.
       const t = Math.min(1, Math.max(0, (moved - DEADBAND) / (MOVE_FULL - DEADBAND)));
       const a = SMOOTH_IDLE + (1 - SMOOTH_IDLE) * t;
-      const out = prev && moved < SNAP ? ema(prev, lm, a) : lm;
+      const aMesh = MESH_IDLE + (1 - MESH_IDLE) * t;
+      const out = prev && moved < SNAP ? ema(prev, lm, a, aMesh) : lm;
       smoothRef.current = out;
       subRef.current?.(out);
     } else if (!hiddenRef.current && now - lastGoodRef.current > HIDE_MS) {
@@ -221,7 +247,12 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       smoothRef.current = null;
       subRef.current?.(null);
     }
-  }, []);
+   } finally {
+     // Released only after this frame is fully handled (incl. the subscriber's setState), so the worklet
+     // can hand off the next one — never a backlog.
+     pending.value = false;
+   }
+  }, [pending]);
   const pushJs = Worklets.createRunOnJS(push);
 
   // Record the real frame aspect once (it doesn't change mid-session). Logged so we can confirm it
@@ -239,6 +270,9 @@ export function useFaceTracking(mirror = true, withMesh = false) {
     if (!plugin) { return; }
     runAtTargetFps(LIVE_FPS, () => {
       'worklet';
+      // Back-pressure: if the JS thread hasn't finished the previous frame, skip this one entirely (incl.
+      // the detect) — keeps tracking on the LATEST frame instead of building a backlog that "slides".
+      if (pending.value) { return; }
       // min/max is rotation-invariant, so this is the displayed portrait aspect regardless of sensor
       // orientation — the true space the keypoints live in.
       const aspect = Math.min(frame.width, frame.height) / Math.max(frame.width, frame.height);
@@ -251,15 +285,17 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       // real object.
       const res = (wantMesh ? plugin!.call(frame, { mesh: true, ori: IOS_MESH_ORI }) : plugin!.call(frame, { ori: IOS_MESH_ORI })) as unknown as
         { points?: number[][]; bs?: FaceBlendshapes; mesh?: number[][]; err?: string } | null;
+      // Claim the in-flight slot right before handing off; push() releases it when fully done.
       if (res && res.points) {
         const lm = reduce(res.points, aspect, ori, false, useMesh, res.mesh);
         // Carry the mesh blendshapes through (BlazeFace returns none). faceFrame() prefers jawOpen
         // over the geometric mouth-open proxy and exposes blink/smile/browRaise when present.
         if (lm && res.bs) { lm.bs = res.bs; }
+        pending.value = true;
         pushJs(lm, 'ok');
-      } else { pushJs(null, (res && res.err) || 'null'); }
+      } else { pending.value = true; pushJs(null, (res && res.err) || 'null'); }
     });
-  }, [pushJs, setAspectJs, mirror, withMesh]);
+  }, [pushJs, setAspectJs, mirror, withMesh, pending]);
 
   // ── Track capture ──────────────────────────────────────────────────────────
   // Start when recording begins; stop returns a time-sampled FaceLensTrack to persist with the clip;

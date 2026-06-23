@@ -1587,7 +1587,7 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - react-native-webview (13.16.1):
+  - react-native-webview (13.17.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -2577,7 +2577,7 @@ SPEC CHECKSUMS:
   react-native-skia: 3ff41b781820eca0f1f351a24e79187595c4a67f
   react-native-video: 4d7beb1e9443ed7b25a70247b8e4fb5c7bb3bcfb
   react-native-view-shot: 60117a0ac87a504a39ee9f079e632011916e7724
-  react-native-webview: 0fd07d41896b4bd1da82eeda48fa29dc2c2a1e67
+  react-native-webview: 83125076bc871aea79a1f42e7ecfbfad88498256
   react-native-worklets-core: fc853036c14fb4c05d549ec190a7b8aff8291e56
   React-nativeconfig: f7ab6c152e780b99a8c17448f2d99cf5f69a2311
   React-NativeModulesApple: 9aeb901b9bfcc9235e912445fb3cf4780a99baf4
@@ -2619,9 +2619,9 @@ SPEC CHECKSUMS:
   RNScreens: 351f431ef2a042a1887d4d90e1c1024b8ae9d123
   RNVectorIcons: d023ce4b93302120c93666cb0194f48cf4b6ecc5
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
-  VisionCamera: 0044a94f7489f19e19d5938e97dfc36f4784af3c
+  VisionCamera: 2140384716600ebf9e8f5b2b604a1fb38fb8fe87
   Yoga: fcc198acd4a55599b3468cfb6ebc526baff5f06e
 
-PODFILE CHECKSUM: 56fde902f3a0cad9ce508b8049305ced77701a17
+PODFILE CHECKSUM: 55ef558c86e2fb62dc403614bd0e1acc5657c484
 
 COCOAPODS: 1.16.2
