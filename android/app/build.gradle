@@ -158,8 +158,9 @@ dependencies {
     implementation("androidx.media3:media3-effect:$media3Version")
     implementation("androidx.media3:media3-common:$media3Version")
 
-    // MediaPipe Face Landmarker — powers the AR face-lens frame processor.
-    implementation("com.google.mediapipe:tasks-vision:0.10.14")
+    // MediaPipe Face Landmarker — powers the AR face-lens frame processor. Pinned to match iOS
+    // (MediaPipeTasksVision 0.10.35)
+    implementation("com.google.mediapipe:tasks-vision:0.10.35")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
