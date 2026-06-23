@@ -49,5 +49,13 @@
             <data android:mimeType="text/plain" />
         </intent-filter>
       </activity>
+
+      <!-- Android 12+ blocks apps from dlopen-ing vendor native libs unless declared. Without these,
+           TFLite's GPU delegate fails to load OpenCL ("libvndksupport.so not found") and the face
+           landmarker falls back to a slow backend. required=false so devices lacking a given lib are
+           unaffected. Covers Adreno (libOpenCL), Pixel, and Mali GPUs. -->
+      <uses-native-library android:name="libOpenCL.so" android:required="false" />
+      <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
+      <uses-native-library android:name="libGLES_mali.so" android:required="false" />
     </application>
 </manifest>

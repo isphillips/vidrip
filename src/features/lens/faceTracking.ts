@@ -25,9 +25,11 @@ const ANDROID_DY_MESH = 0;
 // Replay sampling rate for the captured track — 15fps is plenty for an overlay and keeps the
 // persisted track small.
 const TRACK_FPS = 30;
-// Cap live inference. The camera runs at 30fps; with the GPU delegate BlazeFace is cheap enough to
-// run every frame. Lower this if a CPU-delegate device struggles.
-const LIVE_FPS = 30;
+// Cap live inference. Kept ABOVE the camera's 30fps on purpose: runAtTargetFps compares elapsed time
+// against 1000/LIVE_FPS, so setting it EQUAL to the camera rate makes jitter (frames arriving a hair
+// under 33.3ms apart) wrongly skip ~every other frame — aliasing the effective rate down to ~15-20fps.
+// A higher cap makes that gate a no-op; the JS back-pressure gate (pending) is the real limiter.
+const LIVE_FPS = 60;
 const r3 = (n: number) => Math.round(n * 1000) / 1000; // trim serialized track size
 
 // Orientation fed to MediaPipe on iOS. Calibrated: feeding 'up' makes the FaceLandmarker output a
