@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { View, Platform, PixelRatio } from 'react-native';
+import { View, Platform, Dimensions } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import RNFS from 'react-native-fs';
 import { useSharedValue } from 'react-native-reanimated';
@@ -34,13 +34,17 @@ const MAX_FRAMES = 300;       // cap capture cost / disk for long clips (view-sh
 // cap kicks in (900 = 30s @ 30fps). Beyond that effFps eases down so processing time stays bounded.
 // Tune against real on-device timing — higher = smoother long clips but longer processing.
 const MAX_LENS_FRAMES = 900;
+// The mesh track is now keyed to each frame's CAPTURE timestamp (see faceTracking), so the baked overlay
+// already lands on the right frame — no latency to compensate. Left as a fine-tune for any small residual
+// start-offset between the recording's first frame and the first tracked frame; 0 = no shift.
+const LENS_BAKE_LEAD_MS = 0;
 const STAGE_H = 640;          // capture height in points (×scale → ~1920px on @3x)
-// Lenses bake over the in-app recording (720p → 1280px tall). Capturing the overlay any taller than the
-// source just burns PNG-encode time for pixels the composite throws away, so cap the lens stage to the
-// source height (lossless). On @3x this is ~1280px vs 1920px — ~2× less per-frame work, which funds the
-// 30fps capture. STAGE_H still floors it for low-DPR devices.
-const LENS_SRC_PX = 1280;
-const lensStageH = () => Math.min(STAGE_H, Math.round(LENS_SRC_PX / PixelRatio.get()));
+// Render the lens bake at the SAME logical height as the live preview (the window height). faceFrame
+// maps the mesh with sy = canvasHeight, and the lens art (dot radius, glow, stroke widths) is in logical
+// units — so matching the height makes the mesh map to identical coordinates and the lens look IDENTICAL
+// to live. (A shorter stage shrank the face in logical space while the fixed-size dots/glow didn't,
+// rendering the nodes wrong + lower-res.) Backing res follows dpr and supersamples onto the 720p source.
+const lensStageH = () => Math.round(Dimensions.get('window').height);
 
 const waitFrames = (n: number) =>
   new Promise<void>(res => {
@@ -85,9 +89,9 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
         return uri;
       }
       // Reactive lens → render its existing Skia renderer offscreen and snapshot each frame (fast,
-      // deterministic, all lenses share this one path). Source is the 720p recording, so cap the stage
-      // to it (lensStageH). The clock is stepped per frame so clock-driven effects (motes/glow) bake at
-      // true video time.
+      // deterministic, all lenses share this one path). Stage height = the live preview's height
+      // (lensStageH) so the lens renders pixel-identical to live. The clock is stepped per frame so
+      // clock-driven effects (motes/glow) bake at true video time.
       const ReactiveComp = getReactiveRenderer(r.faceLens?.lensId);
       if (r.faceLens && ReactiveComp) {
         const track = r.faceLens;
@@ -103,7 +107,10 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
         const lUris: string[] = [];
         for (let i = 0; i < lCount; i++) {
           const t = i / lFps;
-          face.value = sampleTrackMeshFrame(track, Math.round(t * track.fps), lw, lh, la);
+          // Sample slightly AHEAD: the track is keyed to detection-ARRIVAL time, but the video frames are
+          // at CAPTURE time, so without a lead the baked mesh trails the recorded face by the inference
+          // latency. LENS_BAKE_LEAD_MS ≈ that latency (tune on-device; 0 disables).
+          face.value = sampleTrackMeshFrame(track, Math.round((t + LENS_BAKE_LEAD_MS / 1000) * track.fps), lw, lh, la);
           clock.value = t;
           await waitFrames(2);          // let the UI thread recompute the mesh paths + repaint
           const img = canvasRef.current?.makeImageSnapshot();

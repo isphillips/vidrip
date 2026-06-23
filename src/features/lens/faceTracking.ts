@@ -40,7 +40,9 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000; // trim serialized track 
 const IOS_MESH_ORI = 'up';
 
 type TrackSample = { t: number; lm: FaceLandmarks | null };
-type TrackRec = { t0: number; lensId: string; frameAspect?: number; samples: TrackSample[] };
+// `tsBase` = the first frame's capture timestamp (host-clock ms); samples are stored relative to it so
+// the track shares the recorded video's timeline (capture time), not the JS detection-arrival time.
+type TrackRec = { t0: number; tsBase?: number; lensId: string; frameAspect?: number; samples: TrackSample[] };
 
 const SNAP = 0.22;       // a jump bigger than this snaps instead of easing (re-acquire / fast move)
 // SMOOTH (EMA factor) and DEADBAND are track-aware — the mesh is far less jittery than BlazeFace, so
@@ -197,7 +199,8 @@ export function useFaceTracking(mirror = true, withMesh = false) {
   const [frameAspect, setFrameAspect] = useState(0);
   const frameAspectRef = useRef(0);
   const statusRef = useRef('init');                 // avoid re-rendering on unchanged status
-  const smoothRef = useRef<FaceLandmarks | null>(null); // running EMA-smoothed pose
+  const smoothRef = useRef<FaceLandmarks | null>(null); // running EMA-smoothed pose (LIVE overlay)
+  const lastRawRef = useRef<FaceLandmarks | null>(null); // last RAW detection (recorded to the track — snappy)
   const lastGoodRef = useRef(0);                    // last frame a face was detected (hide debounce)
   const hiddenRef = useRef(true);                   // whether markers are currently hidden
   const recRef = useRef<TrackRec | null>(null);     // active capture (during recording)
@@ -214,7 +217,7 @@ export function useFaceTracking(mirror = true, withMesh = false) {
   // lag to ~1 frame (the stale frames in between are dropped, so tracking stays current).
   const pending = useWorkletSharedValue(false);
 
-  const push = useCallback((lm: FaceLandmarks | null, st: string) => {
+  const push = useCallback((lm: FaceLandmarks | null, st: string, ts: number) => {
    try {
     const now = Date.now();
     // Roll a 1s window of successful detections → effective tracking fps (folded into the DEV status).
@@ -222,11 +225,10 @@ export function useFaceTracking(mirror = true, withMesh = false) {
     if (now - fpsWinRef.current >= 1000) { detFpsRef.current = fpsCountRef.current; fpsCountRef.current = 0; fpsWinRef.current = now; }
     const dispSt = st === 'ok' ? `ok ${detFpsRef.current}fps` : st;
     if (dispSt !== statusRef.current) { statusRef.current = dispSt; setStatus(dispSt); }
-    const rec = recRef.current;
-    if (rec) { rec.samples.push({ t: now - rec.t0, lm }); }
     if (lm) {
       lastGoodRef.current = now;
       hiddenRef.current = false;
+      lastRawRef.current = lm;   // remember the raw detection for the track (no easing → snappy bake)
       const prev = smoothRef.current;
       // Motion = the largest displacement of any anchor (not just the nose — a head TILT pivots near
       // the nose, so the eyes carry the movement). Below the deadband we hold the pose.
@@ -234,19 +236,32 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       const moved = prev
         ? Math.max(d(lm.noseTip, prev.noseTip), d(lm.leftEye, prev.leftEye), d(lm.rightEye, prev.rightEye), d(lm.mouthCenter, prev.mouthCenter))
         : 1;
-      if (prev && moved < DEADBAND) { return; }
-      // Speed-adaptive ease: idle → SMOOTH_IDLE (heavy, kills jitter), real motion (≥MOVE_FULL) → 1
-      // (instant/snappy). Snap on first acquire or a big jump (≥SNAP) so markers don't crawl.
-      const t = Math.min(1, Math.max(0, (moved - DEADBAND) / (MOVE_FULL - DEADBAND)));
-      const a = SMOOTH_IDLE + (1 - SMOOTH_IDLE) * t;
-      const aMesh = MESH_IDLE + (1 - MESH_IDLE) * t;
-      const out = prev && moved < SNAP ? ema(prev, lm, a, aMesh) : lm;
-      smoothRef.current = out;
-      subRef.current?.(out);
+      // Below the deadband we hold the displayed pose (live doesn't update); above it we ease toward
+      // the detection. Speed-adaptive: idle → SMOOTH_IDLE (heavy, kills jitter), real motion (≥MOVE_FULL)
+      // → 1 (instant/snappy). Snap on first acquire or a big jump (≥SNAP) so markers don't crawl.
+      if (!prev || moved >= DEADBAND) {
+        const t = Math.min(1, Math.max(0, (moved - DEADBAND) / (MOVE_FULL - DEADBAND)));
+        const a = SMOOTH_IDLE + (1 - SMOOTH_IDLE) * t;
+        const aMesh = MESH_IDLE + (1 - MESH_IDLE) * t;
+        const out = prev && moved < SNAP ? ema(prev, lm, a, aMesh) : lm;
+        smoothRef.current = out;
+        subRef.current?.(out);
+      }
     } else if (!hiddenRef.current && now - lastGoodRef.current > HIDE_MS) {
       hiddenRef.current = true;
       smoothRef.current = null;
       subRef.current?.(null);
+    }
+    // Record the RAW detection (not the eased/smoothed pose) so the bake — which sits on the ground-truth
+    // recorded frames — has no easing lag; the last raw pose is HELD during brief detection gaps (matches
+    // live's hide-debounce so it doesn't flicker) and goes null once truly hidden. Key it to the frame's
+    // CAPTURE time (host-clock ms — iOS gives ms, Android ns), NOT now()/arrival time, so the mesh lands
+    // on the exact recorded frame it came from (no inference-latency trail). Live still renders smoothed.
+    const rec = recRef.current;
+    if (rec) {
+      const tsMs = IS_ANDROID ? ts / 1e6 : ts;
+      if (rec.tsBase == null) { rec.tsBase = tsMs; }
+      rec.samples.push({ t: tsMs - rec.tsBase, lm: hiddenRef.current ? null : (lm ?? lastRawRef.current) });
     }
    } finally {
      // Released only after this frame is fully handled (incl. the subscriber's setState), so the worklet
@@ -286,12 +301,14 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       // real object.
       const res = (wantMesh ? plugin!.call(frame, { mesh: true, ori: IOS_MESH_ORI }) : plugin!.call(frame, { ori: IOS_MESH_ORI })) as unknown as
         { points?: number[][]; mesh?: number[][]; err?: string } | null;
-      // Claim the in-flight slot right before handing off; push() releases it when fully done.
+      // Claim the in-flight slot right before handing off; push() releases it when fully done. The
+      // frame's capture timestamp is threaded through so the track is keyed to capture time, not arrival.
+      const ts = frame.timestamp;
       if (res && res.points) {
         const lm = reduce(res.points, aspect, ori, false, useMesh, res.mesh);
         pending.value = true;
-        pushJs(lm, 'ok');
-      } else { pending.value = true; pushJs(null, (res && res.err) || 'null'); }
+        pushJs(lm, 'ok', ts);
+      } else { pending.value = true; pushJs(null, (res && res.err) || 'null', ts); }
     });
   }, [pushJs, setAspectJs, mirror, withMesh, pending]);
 
@@ -300,6 +317,7 @@ export function useFaceTracking(mirror = true, withMesh = false) {
   // cancel discards. The selfie video is the timing master on replay, so samples are keyed to
   // recording-start and resampled to a fixed fps grid.
   const startTrack = useCallback((lensId: string, frameAspect?: number) => {
+    lastRawRef.current = null;   // fresh capture → don't hold a stale pose from a previous take
     recRef.current = { t0: Date.now(), lensId, frameAspect, samples: [] };
   }, []);
   const cancelTrack = useCallback(() => { recRef.current = null; }, []);
