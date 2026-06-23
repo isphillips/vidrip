@@ -11,7 +11,7 @@ export interface SaveReactionParams {
   mode: StorageMode;
   ytVideoId?: string;
   ytStartOffset?: number;
-  sourceType?: 'youtube' | 'tiktok' | 'instagram';
+  sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
   recordedWithHeadphones?: boolean;
   // Optional "afterthought" outro clip recorded right after the reaction; uploaded to the
   // same bucket and stored on afterthought_url/afterthought_duration to play as a post-roll.

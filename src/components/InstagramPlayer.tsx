@@ -71,7 +71,7 @@ const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function Instag
       onProgress={(d: any) =>
         onCurrentTime?.(d.currentTime, d.seekableDuration ?? d.playableDuration ?? 0)}
       onEnd={() => { setPaused(true); emit('ended'); }}
-      onError={(e: any) => log.error('[InstagramPlayer] error:', JSON.stringify(e))}
+      onError={(e: any) => { log.error('[InstagramPlayer] error:', JSON.stringify(e)); setPaused(true); emit('ended'); }}
       repeat={false}
     />
   );

@@ -10,7 +10,7 @@ export type FeedThread = {
   video_id: string | null;            // null for studio_share (original clip, no source video)
   video_title: string | null;
   video_thumbnail: string | null;
-  source_type: 'youtube' | 'tiktok' | 'instagram' | null;
+  source_type: 'youtube' | 'tiktok' | 'instagram' | 'facebook' | null;
   sender_id: string;
   created_at: string;
   sender: { handle: string; display_name: string } | null;
@@ -27,7 +27,7 @@ export type ThreadDetail = {
   video_id: string | null;            // null for studio_share (original clip, no source video)
   video_title: string | null;
   video_thumbnail: string | null;
-  source_type: 'youtube' | 'tiktok' | 'instagram' | null;
+  source_type: 'youtube' | 'tiktok' | 'instagram' | 'facebook' | null;
   sender_id: string;
   created_at: string;
   sender: { handle: string; display_name: string } | null;
@@ -50,7 +50,7 @@ export type ReactionItem = {
   emoji_reactions: { emoji: string; user_id: string }[];
   yt_video_id: string | null;
   yt_start_offset: number;
-  source_type: 'youtube' | 'tiktok' | 'instagram';
+  source_type: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
   recorded_with_headphones?: boolean;
   // Sender intro on the parent thread (plays once before this reaction is watched).
   intro_url?: string | null;
@@ -110,7 +110,7 @@ export type MyReaction = {
   video_id: string | null;
   video_title: string | null;
   video_thumbnail: string | null;
-  source_type: 'youtube' | 'tiktok' | 'instagram';
+  source_type: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
   sender: { handle: string; display_name: string } | null;
   reaction_count: number;     // total reactions on the parent thread
 };
@@ -282,7 +282,7 @@ export async function sendThread(
   videoTitle: string,
   videoThumbnail: string,
   recipientIds: string[],
-  sourceType: 'youtube' | 'tiktok' | 'instagram' = 'youtube',
+  sourceType: 'youtube' | 'tiktok' | 'instagram' | 'facebook' = 'youtube',
   // Runs after the thread row exists but BEFORE recipients are added (and thus
   // before the share push fires). Used to attach an intro; if it throws, no
   // recipient is notified and the send fails cleanly.
