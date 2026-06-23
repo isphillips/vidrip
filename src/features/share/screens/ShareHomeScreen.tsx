@@ -159,6 +159,34 @@ const CATEGORY_DESC: Record<string, string> = {
   cars:     'Cars & motors',
 };
 
+// A single grid tile. Uses the raw gesture-responder system (not TouchableOpacity) for the
+// open: TouchableOpacity's tap-classifier was rejecting most single taps on Android, so the
+// grid needed several presses to register. A plain release fires the open reliably; a local
+// `pressed` flag dims the tile on touch (the same press feedback TouchableOpacity gave) and
+// clears if the touch turns into a scroll (onResponderTerminate).
+function GridCard({ item, width, thumbHeight, onOpen }: {
+  item: VideoItem; width: number; thumbHeight: number; onOpen: () => void;
+}) {
+  const [pressed, setPressed] = useState(false);
+  return (
+    <View
+      style={[styles.card, { width, opacity: pressed ? 0.8 : 1 }]}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => false}
+      onResponderGrant={() => setPressed(true)}
+      onResponderRelease={() => { setPressed(false); onOpen(); }}
+      onResponderTerminate={() => setPressed(false)}
+      onResponderTerminationRequest={() => true}>
+      <Image source={{ uri: item.thumbnail }} style={[styles.cardThumb, { height: thumbHeight }]} resizeMode="cover" />
+      {item.duration != null && <DurationBadge seconds={item.duration} />}
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.cardChannel} numberOfLines={1}>{item.channelTitle}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenProps<'ShareHome'>) {
   const { top, bottom } = useSafeAreaInsets();
@@ -254,6 +282,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
   // player overlay
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
   const playerAnim = useRef(new Animated.Value(0)).current;
+
 
   // header search — animate the expanding input row open/closed
   const searchAnim = useRef(new Animated.Value(0)).current;
@@ -1156,14 +1185,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   )
                 }
                 renderItem={({ item, index }) => (
-                  <TouchableOpacity style={[styles.card, { width: cardW }]} onPress={() => openPlayer(item, index)} activeOpacity={0.8}>
-                    <Image source={{ uri: item.thumbnail }} style={[styles.cardThumb, { height: cardH }]} resizeMode="cover" />
-                    {item.duration != null && <DurationBadge seconds={item.duration} />}
-                    <View style={styles.cardInfo}>
-                      <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-                      <Text style={styles.cardChannel} numberOfLines={1}>{item.channelTitle}</Text>
-                    </View>
-                  </TouchableOpacity>
+                  <GridCard item={item} width={cardW} thumbHeight={cardH} onOpen={() => openPlayer(item, index)} />
                 )}
               />
             );
