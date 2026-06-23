@@ -74,12 +74,12 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
   }
 
   companion object {
-    // SNAPPINESS TOGGLE. IMAGE mode detects each frame independently — instant 1:1 tracking, no temporal
-    // smoothing (the mesh never trails / "slides" to catch up on a fast move), at the cost of a little
-    // more idle jitter and heavier per-frame compute (full detection every frame, no tracking shortcut).
-    // VIDEO mode tracks + stabilizes across frames: rock-steady when idle, but lags fast motion. Flip to
-    // false to restore VIDEO. Must rebuild the app to take effect.
-    const val USE_IMAGE_MODE = true
+    // DETECTOR MODE. VIDEO mode tracks the face across frames (a per-frame detection shortcut) — far
+    // lighter, which matters on Android GPUs/CPUs. IMAGE mode runs a FULL detection every frame: heavier,
+    // and on slower Android devices it falls badly behind (the mesh lags the face). We default to VIDEO
+    // now that the JS back-pressure gate handles the runOnJS backlog that IMAGE was briefly used to probe;
+    // VIDEO's mild temporal smoothing is also steadier when idle. Set true only to A/B. Rebuild to apply.
+    const val USE_IMAGE_MODE = false
 
     // One shared landmarker so the launch-time warm-up and the frame processor load the model once.
     @Volatile
