@@ -495,7 +495,15 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
         <TabBtn route="Feed"     label="Feed"     active={current === 'Feed'}     toReact={toReact} onPress={() => handleTabPress('Feed')} />
         <TabBtn route="Channels" label="Channels" active={current === 'Channels'} toReact={toReact} onPress={() => handleTabPress('Channels')} />
 
-        <GlowFab onPress={() => handleTabPress('Studio')} />
+        <GlowFab onPress={() => {
+          // On the Studio tab's home screen, the FAB jumps straight into a new recording. From any
+          // other tab (or screen) it behaves like a normal tab press → opens/resets Studio to its home.
+          if (current === 'Studio' && sub === 'StudioHome') {
+            (navigation.navigate as any)('Studio', { screen: 'StudioCapture' });
+          } else {
+            handleTabPress('Studio');
+          }
+        }} />
 
         <TabBtn route="Messages" label="Messages" active={current === 'Messages'} toReact={toReact} onPress={() => handleTabPress('Messages')} />
         <TabBtn route="Share"    label="Browse"   active={current === 'Share'}    toReact={toReact} onPress={() => handleTabPress('Share')} />

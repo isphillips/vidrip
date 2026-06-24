@@ -231,6 +231,15 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
         </View>
       </View>
 
+      <TouchableOpacity activeOpacity={0.9} onPress={startNew}>
+        <LinearGradient
+          colors={['#FF4FA3', '#A05CFF', '#3B82F6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={styles.newBtn}>
+          <Ionicons name="add-circle" size={22} color={C.WHITE} />
+          <Text style={styles.newBtnText}>New video</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+
       {/* Published / Scheduled / Drafts toggle */}
       <View style={styles.toggle}>
         {TABS.map(t => (
@@ -255,15 +264,6 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
                   : 'No videos yet. Tap “New video” to create your first.'}</Text>}
         renderItem={showingDrafts ? (renderDraft as any) : (renderVideo as any)}
       />
-
-      <TouchableOpacity activeOpacity={0.9} onPress={startNew}>
-        <LinearGradient
-          colors={['#FF4FA3', '#A05CFF', '#3B82F6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={styles.newBtn}>
-          <Ionicons name="add-circle" size={22} color={C.WHITE} />
-          <Text style={styles.newBtnText}>New video</Text>
-        </LinearGradient>
-      </TouchableOpacity>
     </View>
 
     {/* Full-bleed overlay OUTSIDE the padded container — the padded parent collapsed
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   title: { fontSize: FONT.SIZES.XL, textTransform: 'uppercase', fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
   newBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.SM,
-    borderRadius: RADIUS.MD, marginBottom: 50,
+    borderRadius: RADIUS.MD, marginBottom: SPACE.LG,
   },
   newBtnText: { paddingVertical: SPACE.LG, color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
   toggle: {

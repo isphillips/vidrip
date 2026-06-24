@@ -68,7 +68,7 @@ export type ChannelPost = {
   has_my_review: boolean;
   parent_post_id: string | null;
   parent_yt_video_id: string | null;
-  parent_source_type: 'youtube' | 'tiktok' | 'instagram';
+  parent_source_type: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook';
   recorded_with_headphones?: boolean;
 };
 
@@ -87,7 +87,7 @@ export type ChannelReview = {
   post_yt_video_id: string | null;
   post_yt_video_title: string | null;
   post_yt_video_thumbnail: string | null;
-  post_source_type: 'youtube' | 'tiktok' | 'instagram';
+  post_source_type: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook';
   channel_name: string | null;
 };
 
@@ -103,7 +103,7 @@ export type MyChannelReaction = {
   parent_yt_video_id: string | null;
   parent_yt_video_title: string | null;
   parent_yt_video_thumbnail: string | null;
-  parent_source_type: 'youtube' | 'tiktok' | 'instagram';
+  parent_source_type: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook';
 };
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -709,7 +709,7 @@ export type ChannelClipTile = {
   parent_yt_video_id: string | null;
   parent_yt_video_title: string | null;
   parent_yt_video_thumbnail: string | null;
-  parent_source_type: 'youtube' | 'tiktok' | 'instagram';
+  parent_source_type: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook';
 };
 
 // An unreacted source video from a channel the user has joined.

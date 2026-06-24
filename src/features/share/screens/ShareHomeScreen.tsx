@@ -65,6 +65,21 @@ function extractInstagramId(url: string): string | null {
   return m ? m[1] : null;
 }
 
+// Facebook Reels. Canonical `facebook.com/reel/<id>`, the newer `/share/r/<code>` links, classic
+// `/watch/?v=<id>` + `/<page>/videos/<id>`, and `fb.watch/<code>` short links. Returns the reel/video
+// id (or short code — resolved downstream); null if it isn't a Facebook video link.
+function extractFacebookId(url: string): string | null {
+  const patterns = [
+    /facebook\.com\/reel\/(\d+)/,
+    /facebook\.com\/share\/[rv]\/([A-Za-z0-9_-]+)/,
+    /facebook\.com\/watch\/?\?v=(\d+)/,
+    /facebook\.com\/[^/]+\/videos\/(?:[^/]+\/)?(\d+)/,
+    /fb\.watch\/([A-Za-z0-9_-]+)/,
+  ];
+  for (const p of patterns) { const m = url.match(p); if (m) { return m[1]; } }
+  return null;
+}
+
 // Best-effort metadata (title/thumbnail/author) for a pasted public Reel via the
 // instagram-oembed edge fn — a tokenless Open Graph scrape, NOT Meta's oEmbed. Every field
 // is optional (login-walled/private/removed posts return nothing), so callers fall back to
@@ -139,7 +154,7 @@ function DurationBadge({ seconds }: { seconds: number }) {
 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok' | 'instagram'; videoUrl?: string | null; duration?: number; createdAt?: string };
+type VideoItem = { videoId: string; title: string; thumbnail: string; channelTitle: string; sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'facebook'; videoUrl?: string | null; duration?: number; createdAt?: string };
 type Mode = 'browse' | 'paste';
 const PAGE = 50;
 const DRAWER_HEIGHT_PCT = 0.68;
@@ -867,6 +882,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       return () => { cancelled = true; };
     }
     if (extractInstagramId(trimmed)) { setLinkStatus('ok'); return; }
+    if (extractFacebookId(trimmed)) { setLinkStatus('ok'); return; }
     const ytId = extractYouTubeId(trimmed);
     if (!ytId) { setLinkStatus('invalid'); return; }
     setLinkStatus('checking');
@@ -918,8 +934,23 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       return;
     }
 
+    const fbId = extractFacebookId(link);
+    if (fbId) {
+      // No tokenless FB metadata scrape (unlike IG), so open with defaults. videoUrl carries the full
+      // link — the Facebook embed (plugins/video.php) needs the URL as its href, not just the id.
+      openPlayer({
+        videoId: fbId,
+        videoUrl: link,
+        title: 'Facebook Reel',
+        thumbnail: '',
+        channelTitle: '',
+        sourceType: 'facebook',
+      });
+      return;
+    }
+
     const videoId = extractYouTubeId(link);
-    if (!videoId) { Alert.alert('Invalid Link', 'Paste a YouTube Shorts, TikTok, or Instagram Reel link to continue.'); return; }
+    if (!videoId) { Alert.alert('Invalid Link', 'Paste a YouTube Shorts, TikTok, Instagram Reel, or Facebook Reel link to continue.'); return; }
     setPasting(true);
     let title = 'YouTube Short';
     let thumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
@@ -1003,13 +1034,20 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets>
           <SlimeDetective />
-          <Text style={styles.pasteLabel}>YouTube, TikTok, or Instagram URL</Text>
+          <Text style={styles.pasteLabel}>Video link</Text>
           <TextInput
             style={styles.pasteInput} value={url} onChangeText={setUrl}
-            placeholder="Paste a YouTube, TikTok, or Instagram Reel link" placeholderTextColor={C.SUBTLE}
+            placeholder="Paste a video link" placeholderTextColor={C.SUBTLE}
             autoCapitalize="none" autoCorrect={false} keyboardType="url" autoFocus
             onFocus={focusPasteScroll}
           />
+          {/* Supported sources — logos instead of a brand list, so adding a platform is one icon, no copy. */}
+          <View style={styles.pasteLogos} pointerEvents="none">
+            <Ionicons name="logo-youtube" size={17} color="#FF4D4D" />
+            <Ionicons name="logo-tiktok" size={17} color={C.MUTED} />
+            <Ionicons name="logo-instagram" size={17} color="#E66A9A" />
+            <Ionicons name="logo-facebook" size={17} color="#5A8DEF" />
+          </View>
           {linkStatus === 'tooLong' ? (
             <View style={styles.tooLongBox}>
               <Text style={styles.tooLongTitle}>Video too long</Text>
@@ -1329,6 +1367,24 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                   onLoadStart={onSlotLoadStart}
                 />
                 </View>
+              ) : sv.sourceType === 'facebook' ? (
+                <View style={[styles.sourceLetterbox, { top: top + 56, bottom: bottom + 88 }]}>
+                  <WebView
+                    ref={el => { wvRefs.current[i] = el as any; }}
+                    style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
+                    // FB's official video plugin embeds a public reel/video by its full URL (href).
+                    source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#000;overflow:hidden;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}iframe{width:100vw;height:100vh;border:0}</style></head><body><iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(sv.videoUrl || ('https://www.facebook.com/reel/' + sv.videoId))}&show_text=false&autoplay=true&mute=false&allowfullscreen=true" allow="autoplay;fullscreen;encrypted-media" allowfullscreen scrolling="no"></iframe></body></html>`, baseUrl: 'https://www.facebook.com' }}
+                    allowsInlineMediaPlayback
+                    mediaPlaybackRequiresUserAction={false}
+                    allowsFullscreenVideo={false}
+                    javaScriptEnabled
+                    // Block FB's "open in app" popups from bouncing the user out (same guard as IG).
+                    setSupportMultipleWindows={false}
+                    onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
+                    onLoad={onSlotLoad}
+                    onLoadStart={onSlotLoadStart}
+                  />
+                </View>
               ) : (
                 <WebView
                   ref={el => { wvRefs.current[i] = el as any; }}
@@ -1540,6 +1596,7 @@ const styles = StyleSheet.create({
   pasteContainer: { padding: SPACE.LG, gap: SPACE.MD, marginTop: SPACE.LG },
   pasteLabel:     { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY_SEMIBOLD, textTransform: 'uppercase', letterSpacing: 1, marginTop: SPACE.LG },
   pasteInput:     { backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER, padding: SPACE.LG, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
+  pasteLogos:     { flexDirection: 'row', justifyContent: 'center', gap: SPACE.LG, marginTop: SPACE.MD, opacity: 0.8 },
   pasteBtn:         { backgroundColor: C.ACCENT, borderRadius: RADIUS.MD, padding: SPACE.LG, alignItems: 'center' },
   pasteBtnDisabled: { opacity: 0.4 },
   pasteBtnText:     { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },

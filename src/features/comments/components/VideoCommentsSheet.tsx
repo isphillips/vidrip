@@ -35,7 +35,7 @@ const REPLY_PAGE = 50;
 interface Props {
   visible: boolean;
   rootSourceId: string;
-  sourceType: 'youtube' | 'tiktok' | 'instagram';
+  sourceType: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
   videoTitle?: string;
   refreshKey: number;
   onClose: () => void;

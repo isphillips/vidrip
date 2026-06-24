@@ -169,7 +169,7 @@ export type RootStackParamList = {
   RecordReaction: RecordStackParamList['RecordReaction'];
   RecordComment: {
     rootSourceId: string;
-    sourceType: 'youtube' | 'tiktok' | 'instagram';
+    sourceType: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
     parentCommentId?: string;
     videoTitle?: string;
   };

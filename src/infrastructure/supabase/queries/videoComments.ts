@@ -5,7 +5,7 @@ import { supabase } from '../client';
 export type VideoComment = {
   id: string;
   root_source_id: string;
-  source_type: 'youtube' | 'tiktok' | 'instagram';
+  source_type: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
   parent_comment_id: string | null;
   author_id: string;
   video_url: string | null;
@@ -32,7 +32,7 @@ export type CommentCursor = {
 /** One page of comments for a video or replies to a comment. */
 export async function fetchVideoComments(params: {
   rootSourceId: string;
-  sourceType: 'youtube' | 'tiktok' | 'instagram';
+  sourceType: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
   parentCommentId?: string | null;
   viewerId?: string | null;
   cursor?: CommentCursor | null;
@@ -76,7 +76,7 @@ export async function fetchVideoComment(commentId: string): Promise<VideoComment
 /** Insert a new comment row with video_url = null (commit step). Returns the new id. */
 export async function postVideoComment(params: {
   rootSourceId: string;
-  sourceType: 'youtube' | 'tiktok' | 'instagram';
+  sourceType: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
   parentCommentId?: string | null;
   authorId: string;
   duration: number;

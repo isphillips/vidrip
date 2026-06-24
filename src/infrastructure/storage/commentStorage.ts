@@ -85,7 +85,7 @@ async function uploadThumbnail(localVideoPath: string, authorId: string, comment
 
 interface CommitParams {
   rootSourceId: string;
-  sourceType: 'youtube' | 'tiktok' | 'instagram';
+  sourceType: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
   parentCommentId?: string | null;
   authorId: string;
   filePath: string;
