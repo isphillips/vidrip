@@ -34,8 +34,13 @@ tags:
 #   - a receding cap bar at the top (gold → red as 180s approaches), and
 #   - a countdown timer badge "MM:SS" above the record button = time REMAINING (maxDuration − elapsed),
 #     i.e. it starts at "03:00" and counts down; the recording auto-stops (handleStop) at 0.
-# The badge has no testID/stable text (it's a live clock), so there is nothing to assertVisible on
-# verbatim — verify the countdown + auto-stop visually on device.
+# The badge text is a live clock (can't assert a verbatim value), but the badge now carries a stable
+# testID, so its presence while recording IS assertable. Verify the actual countdown + auto-stop
+# visually on device.
 #
 # In __DEV__ a "DEV ▶ rec" button starts recording manually (source players don't play in the sim),
 # which lets the cap bar / auto-stop be exercised without a real source video.
+#
+# On device, once recording starts (source video plays, or DEV ▶ rec in __DEV__):
+# - assertVisible: { id: "recorder-countdown" }   # the live "MM:SS" remaining badge
+# - tapOn: { id: "recorder-stop" }                # square stop (or let it auto-stop at 0)

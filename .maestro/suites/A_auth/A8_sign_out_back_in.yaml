@@ -22,9 +22,10 @@ tags:
 - tapOn:
     id: "nav-account-blob"
 - assertVisible: "Account"
-- tapOn: "Sign Out"
+- tapOn:
+    id: "account-sign-out"
 # Sign Out raises a confirm Alert.alert('Sign Out', 'Are you sure...', [Cancel, Sign Out]).
-# Tap the destructive "Sign Out" in the dialog (same visible text).
+# Tap the destructive "Sign Out" in the dialog (native alert button, addressed by text).
 - tapOn:
     text: "Sign Out"
     index: 1

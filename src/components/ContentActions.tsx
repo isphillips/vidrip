@@ -96,12 +96,12 @@ export default function ContentActions({
         <Pressable style={styles.sheet} onPress={() => {}}>
           {step === 'menu' ? (
             <>
-              <TouchableOpacity style={styles.row} onPress={openReason} activeOpacity={0.8}>
+              <TouchableOpacity testID="content-actions-report" style={styles.row} onPress={openReason} activeOpacity={0.8}>
                 <Ionicons name="flag-outline" size={20} color={C.INK} />
                 <Text style={styles.rowTxt}>Report</Text>
               </TouchableOpacity>
               {canBlock && (
-                <TouchableOpacity style={styles.row} onPress={doBlock} activeOpacity={0.8} disabled={busy}>
+                <TouchableOpacity testID="content-actions-block" style={styles.row} onPress={doBlock} activeOpacity={0.8} disabled={busy}>
                   <Ionicons name={isBlocked ? 'lock-open-outline' : 'ban-outline'} size={20} color={C.DANGER} />
                   <Text style={[styles.rowTxt, { color: C.DANGER }]}>{isBlocked ? `Unblock ${who}` : `Block ${who}`}</Text>
                 </TouchableOpacity>
@@ -114,7 +114,7 @@ export default function ContentActions({
             <>
               <Text style={styles.title}>Why are you reporting this?</Text>
               {REASONS.map(r => (
-                <TouchableOpacity key={r.key} style={styles.row} onPress={() => submitReport(r.key)} activeOpacity={0.8}>
+                <TouchableOpacity key={r.key} testID={`content-actions-reason-${r.key}`} style={styles.row} onPress={() => submitReport(r.key)} activeOpacity={0.8}>
                   <Text style={styles.rowTxt}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -148,7 +148,7 @@ export default function ContentActions({
 
   return (
     <>
-      <TouchableOpacity onPress={openMenu} hitSlop={10} accessibilityLabel="More options" accessibilityRole="button">
+      <TouchableOpacity testID="content-actions-trigger" onPress={openMenu} hitSlop={10} accessibilityLabel="More options" accessibilityRole="button">
         <Ionicons name="ellipsis-horizontal" size={size} color={color} />
       </TouchableOpacity>
       {sheet}

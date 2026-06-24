@@ -21,12 +21,13 @@ tags:
 - assertVisible: "Studio"
 
 # Open Collections from the diamond-outline icon in the StudioHome header (top right, before the
-# calendar icon). It has no testID and no text label → point-tap the header icon.
-# - tapOn: { point: "82%,7%" }   # TODO(testID): Studio "Exclusive/Collections" (diamond) header button
+# calendar icon). It carries testID studio-collections.
+- tapOn:
+    id: "studio-collections"
 
 # Once on the Collections screen, header is "Exclusive"; new-collection CTA is "New collection".
-# - assertVisible: "Exclusive"
-# - assertVisible: "New collection"
+- assertVisible: "Exclusive"
+- assertVisible: "New collection"
 # Empty-state copy (no collections yet), exact from StudioCollectionsScreen:
 # - assertVisible: "No collections yet"
 # - assertVisible: "Group videos into exclusive collections and award them to subscribers or individual fans."

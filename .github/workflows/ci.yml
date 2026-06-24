@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'testing-*']
   pull_request:
 
 jobs:
@@ -28,6 +28,11 @@ jobs:
 
       - name: Test
         run: yarn test --ci
+
+      # Structural check of the Maestro E2E flows (no device/Maestro needed): every flow
+      # declares appId + tags + commands, and all runFlow references resolve.
+      - name: Validate E2E flows
+        run: yarn e2e:validate
 
       # Report-only for now: the repo carries pre-existing lint debt (react-hooks rules in the
       # lens/animation helpers) and knip findings that need triage. Surfaced, not yet blocking.

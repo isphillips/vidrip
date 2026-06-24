@@ -26,11 +26,17 @@ tags:
     point: "25%,40%"
 
 # In the player, open the share drawer (paper-plane send icon, bottom of the player).
-# Then pick friend B and Send. These controls need testIDs for a robust flow (catalogued).
-# - tapOn: { id: "share-send" }        # TODO(testID): GradientIcon paper-plane
-# - tapOn: ".*${TEST_HANDLE_B}.*"
-# - tapOn: "Send"
-# - assertVisible: "Sent to 1 friend!"   # toast (ShareHomeScreen)
+- assertVisible:
+    id: "share-send"
+- tapOn:
+    id: "share-send"
+- assertVisible: "Send to…"
+# Pick friend B (row testID is "share-friend-<userId>"; match by @handle since the flow
+# knows B by handle, not user id), then tap the drawer Send button.
+- tapOn: ".*${TEST_HANDLE_B}.*"
+- tapOn:
+    id: "share-drawer-send"
+# - assertVisible: "Sent to 1 friend!"   # toast (ShareHomeScreen) — needs the delivery backend
 
-# Until those testIDs exist, this flow is a MANUAL-assisted smoke: drive the player open,
-# then a human completes the send and confirms B receives it in B's Feed.
+# The send (sendThread → B receives) still depends on the share backend, so confirming B
+# actually receives it in B's Feed remains a MANUAL-assisted step until that's live.

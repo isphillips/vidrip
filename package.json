@@ -13,6 +13,7 @@
     "e2e": "maestro test .maestro --env-file .maestro/vars/local.env",
     "e2e:smoke": "maestro test .maestro --include-tags smoke --env-file .maestro/vars/local.env",
     "e2e:suite": "maestro test .maestro --include-tags ${SUITE:-suite-A} --env-file .maestro/vars/local.env",
+    "e2e:validate": "node .maestro/scripts/validate-flows.js",
     "deadcode": "knip",
     "postinstall": "patch-package",
     "prepare": "husky"

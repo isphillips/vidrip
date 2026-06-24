@@ -31,6 +31,7 @@ tags:
 #
 # With the source video playing (or via DEV ▶ rec in __DEV__) so recording begins, on a device WITHOUT
 # headphones:
-# - assertVisible: "🎧 Use headphones for cleaner audio"
+# - tapOn: { id: "recorder-record" }                       # begin recording (fires the headphones check)
+# - assertVisible: "🎧 Use headphones for cleaner audio"   # transient 3s toast (no testID — text match)
 # (With headphones connected the toast is suppressed — the source plays in-ear so the mic captures
 # voice only.)

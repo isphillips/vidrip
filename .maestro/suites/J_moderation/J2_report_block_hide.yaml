@@ -31,21 +31,26 @@ tags:
 # Tapping B's row opens the WatchReaction surface (src/features/threads/screens/
 # WatchReactionScreen.tsx). It renders <ContentActions variant="icon"> at top-right
 # (only when reactorId !== current user), i.e. an ellipsis ("ellipsis-horizontal")
-# button with accessibilityLabel "More options" that opens the moderation sheet.
+# button (testID "content-actions-trigger", accessibilityLabel "More options") that
+# opens the moderation sheet.
 - assertVisible:
-    text: "More options"        # accessibilityLabel on the ellipsis trigger
+    id: "content-actions-trigger"
     timeout: 15000
 - tapOn:
-    text: "More options"
+    id: "content-actions-trigger"
 
 # ── Report leg ───────────────────────────────────────────────────────────────
 # Sheet step 'menu' shows a "Report" row and (for others' content) a "Block @<handle>" row.
-- assertVisible: "Report"
-- tapOn: "Report"
+- assertVisible:
+    id: "content-actions-report"
+- tapOn:
+    id: "content-actions-report"
 # Step 'reason' lists the five fixed reasons (src/components/ContentActions.tsx REASONS).
 - assertVisible: "Why are you reporting this?"
-- assertVisible: "Spam or scam"
-- tapOn: "Spam or scam"
+- assertVisible:
+    id: "content-actions-reason-spam"
+- tapOn:
+    id: "content-actions-reason-spam"
 # Successful report → Alert.alert('Report received', 'Thanks for flagging this…').
 - assertVisible: "Report received"
 - tapOn: "OK"
@@ -53,11 +58,11 @@ tags:
 # ── Block leg ────────────────────────────────────────────────────────────────
 # Re-open the sheet and block B. The Block row reads "Block @<handle>" (who = @handle).
 - tapOn:
-    text: "More options"
+    id: "content-actions-trigger"
 - assertVisible:
-    text: ".*Block.*${TEST_HANDLE_B}.*"
+    id: "content-actions-block"
 - tapOn:
-    text: ".*Block.*${TEST_HANDLE_B}.*"
+    id: "content-actions-block"
 # Confirmation: Alert.alert('Block', 'Block @<handle>? You won’t see each other anywhere…',
 #   [Cancel, Block]) → on confirm useBlockStore.block(targetUserId) → Alert 'Blocked'.
 - assertVisible:
@@ -82,8 +87,9 @@ tags:
 #   ContentActions itself only offers Report + Block/Unblock.
 # - Full app-wide filtering proof (Channels posts, profile, comments authored by B all vanish,
 #   then return on Unblock) needs the broader P2 block-store seed — see G7_block_unblock_filters.yaml.
-# TODO(testID): <ContentActions> exposes NO testID on its ellipsis trigger
-#   (accessibilityLabel "More options" only), the sheet's "Report"/"Block"/"Unblock" rows, the
-#   reason rows, or the inline Report/Block buttons. Selection here leans on visible text +
-#   accessibilityLabel. Add e.g. testID="content-actions-trigger" / "content-actions-report" /
-#   "content-actions-block" / "content-actions-reason-<key>" for deterministic driving.
+# testID: <ContentActions> now exposes testID="content-actions-trigger" on its ellipsis trigger,
+#   "content-actions-report" / "content-actions-block" on the sheet's Report and Block/Unblock rows,
+#   and "content-actions-reason-<key>" on each reason row (keys: nudity, violence, harassment, spam,
+#   other). This flow drives those selectors deterministically. Native Alert dialogs (Report received /
+#   Block confirmation / Blocked) and the reason-sheet title are still matched by visible text, since
+#   those are OS-level alerts / static copy, not ContentActions controls.

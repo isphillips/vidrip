@@ -41,9 +41,9 @@ tags:
 # Maestro can't validate live camera frames; the steps below are best-effort and the
 # final assertion confirms the queue cleared.
 #
-# - tapOn: { point: "50%,90%" }      # record button (no testID — verify on device)
+# - tapOn: { id: "recorder-record" }   # record button (source-driven; appears once recording starts)
 # - ... wait ...
-# - tapOn: { point: "50%,90%" }      # stop
+# - tapOn: { id: "recorder-stop" }     # stop (square)
 - assertVisible:
     id: "tab-Feed"
 # After reacting through B's pending share, re-focus Feed and confirm B's row is gone:

@@ -1365,10 +1365,10 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                 )}
               </View>
               <View style={styles.overlayActions}>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
+                <TouchableOpacity testID="share-comments" style={styles.actionBtn} onPress={() => setCommentsOpen(true)} activeOpacity={0.8}>
                   <GradientIcon name="chatbubbles" size={22} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={openDrawer} activeOpacity={0.8}>
+                <TouchableOpacity testID="share-send" style={styles.actionBtn} onPress={openDrawer} activeOpacity={0.8}>
                   <GradientIcon name="paper-plane" size={22} />
                 </TouchableOpacity>
               </View>
@@ -1445,6 +1445,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
                     const initial  = (f.displayName ?? f.handle).charAt(0).toUpperCase();
                     return (
                       <TouchableOpacity
+                        testID={`share-friend-${f.userId}`}
                         style={[styles.friendRow, sent && styles.friendRowSent]}
                         onPress={() => toggleFriend(f.userId)}
                         activeOpacity={sent ? 1 : 0.7}>
@@ -1485,6 +1486,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               {/* Send button */}
               <View style={[styles.drawerFooter, { paddingBottom: bottom + SPACE.MD }]}>
                 <TouchableOpacity
+                  testID="share-drawer-send"
                   style={[styles.sendBtn, (selectedFriends.size === 0 || sending) && styles.sendBtnDisabled]}
                   onPress={handleSend}
                   disabled={selectedFriends.size === 0 || sending}

@@ -37,7 +37,11 @@ tags:
 #
 # With the flag seeded on, on device:
 # - assertVisible: "🕶  Anonymous"
-# Then record/stop; confirm the saved/uploaded reaction shows the silhouette + pitched voice (the
-# obscuring is in the baked pixels/audio — verify by playing the saved reaction back).
+# Then record/stop:
+# - tapOn: { id: "recorder-record" }
+# - ... wait ...
+# - tapOn: { id: "recorder-stop" }
+# Confirm the saved/uploaded reaction shows the silhouette + pitched voice (the obscuring is in the
+# baked pixels/audio — verify by playing the saved reaction back).
 #
 # Without the users.react_anonymously flag the recorder runs NORMALLY (no anon badge) — hence BLOCKED:P2.

@@ -28,9 +28,11 @@ tags:
 # Capture is camera-only. On a real device, walk the chain:
 #   Capture (record ≤180s or import) → Trim → Filter → Audio → Overlay → Details.
 # At Details, choose visibility + Post. Then return to Studio "Published" and verify the
-# row shows Uploading → Processing (→ Live after the webhook; tap refresh if delayed).
+# row shows Uploading → Processing (→ Live after the webhook; tap the per-row refresh if delayed —
+# testID studio-status-refresh-<postId>, with the new post's id interpolated).
 #
 # After posting, back on StudioHome:
 # - tapOn: "Published"
 # - assertVisible:
 #     text: "Uploading|Processing|Live"
+# - tapOn: { id: "studio-status-refresh-${POST_ID}" }   # per-row status refresh, if still not Live

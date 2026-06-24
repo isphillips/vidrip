@@ -30,6 +30,12 @@ tags:
 - tapOn:
     point: "27%,42%"
 
+# The player's on-top action row (comments + send icons) confirms the overlay opened.
+- assertVisible:
+    id: "share-comments"
+- assertVisible:
+    id: "share-send"
+
 # ── NEEDS-DEVICE: playback ───────────────────────────────────────────────────
 # The opened video plays via the source's player (YouTube/TikTok/Instagram WebView, or a Bunny embed
 # for creator clips). There is no chrome text to assert inside the player; the bottom action row

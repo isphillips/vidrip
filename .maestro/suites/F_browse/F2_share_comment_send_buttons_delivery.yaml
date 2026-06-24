@@ -24,19 +24,24 @@ tags:
 - tapOn:
     point: "27%,42%"
 
-# The player's bottom action row has two GradientIcon (Studio-styled) buttons, no testIDs / no text:
-#   - chatbubbles  → opens the comments sheet (VideoCommentsSheet)
-#   - paper-plane  → opens the share drawer (friend picker)
-# Open the share drawer via the paper-plane (right-most action button):
-# - tapOn: { point: "92%,86%" }   # TODO(testID): player "send"/paper-plane action button
+# The player's bottom action row has two GradientIcon (Studio-styled) buttons:
+#   - chatbubbles  → opens the comments sheet (VideoCommentsSheet)  → testID "share-comments"
+#   - paper-plane  → opens the share drawer (friend picker)         → testID "share-send"
+- assertVisible:
+    id: "share-comments"
+# Open the share drawer via the paper-plane action button:
+- tapOn:
+    id: "share-send"
 
 # The share drawer's title is "Send to…"; it lists friends with a filter field.
-# - assertVisible: "Send to…"
-# Pick friend B (rows are display name / @handle — no testID), then the bottom Send button:
-# - tapOn: ".*${TEST_HANDLE_B}.*"
+- assertVisible: "Send to…"
+# Pick friend B. Friend rows have testID "share-friend-<userId>"; since the flow knows B by
+# handle (not user id), match the row by its @handle text.
+- tapOn: ".*${TEST_HANDLE_B}.*"
 # The Send button text reflects the selection: "Send to 1 friend" (else "Select friends to send").
-# - assertVisible: "Send to 1 friend"
-# - tapOn: "Send to 1 friend"
+- assertVisible: "Send to 1 friend"
+- tapOn:
+    id: "share-drawer-send"
 #
 # ── BLOCKED:P2 ───────────────────────────────────────────────────────────────
 # Pressing Send runs sendThread (creates the thread + notifies B) — the delivery backend.

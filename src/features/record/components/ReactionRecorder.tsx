@@ -765,7 +765,7 @@ export default function ReactionRecorder({
 
       {/* Recording timer badge — sits just above the record button so the lens picker owns the top. */}
       {isRecording && (
-        <View style={[styles.recBadge, { bottom: bottomInset + SPACE.XL + 88 }]}>
+        <View testID="recorder-countdown" style={[styles.recBadge, { bottom: bottomInset + SPACE.XL + 88 }]}>
           <View style={styles.recDot} />
           <Text style={styles.recText}>
             {maxDuration ? fmt(Math.max(0, maxDuration - elapsed)) : fmt(elapsed)}
@@ -793,15 +793,15 @@ export default function ReactionRecorder({
         <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
           {isRecording ? (
             <>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={handleRestart} activeOpacity={0.8}>
+              <TouchableOpacity testID="recorder-restart" style={styles.secondaryBtn} onPress={handleRestart} activeOpacity={0.8}>
                 <Text style={styles.secondaryBtnIcon}>↺</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.stopBtn} onPress={handleStop} activeOpacity={0.8}>
+              <TouchableOpacity testID="recorder-stop" style={styles.stopBtn} onPress={handleStop} activeOpacity={0.8}>
                 <View style={styles.stopInner} />
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity style={styles.recordBtn} onPress={beginRecording} activeOpacity={0.8}>
+            <TouchableOpacity testID="recorder-record" style={styles.recordBtn} onPress={beginRecording} activeOpacity={0.8}>
               <View style={styles.recordInner} />
             </TouchableOpacity>
           )}
@@ -818,7 +818,7 @@ export default function ReactionRecorder({
 
       {/* Exit — available any time (discards an in-progress recording) */}
       {!uploading && afterPhase === 'none' && (
-        <TouchableOpacity style={[styles.closeBtn, { top: topInset + SPACE.SM }]} onPress={handleExit}>
+        <TouchableOpacity testID="recorder-exit" style={[styles.closeBtn, { top: topInset + SPACE.SM }]} onPress={handleExit}>
           <Text style={styles.closeTxt}>✕</Text>
         </TouchableOpacity>
       )}
@@ -830,10 +830,10 @@ export default function ReactionRecorder({
             <Text style={styles.afterTitle}>Add an afterthought?</Text>
             <Text style={styles.afterSub}>A quick clip that plays after your reaction. Sending in {countdown}s…</Text>
             <View style={styles.afterRow}>
-              <TouchableOpacity style={styles.afterSkip} onPress={() => finalize(null)} activeOpacity={0.85}>
+              <TouchableOpacity testID="afterthought-send-now" style={styles.afterSkip} onPress={() => finalize(null)} activeOpacity={0.85}>
                 <Text style={styles.afterSkipTxt}>Send now</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.afterRecord} onPress={startAfterthought} activeOpacity={0.85}>
+              <TouchableOpacity testID="afterthought-record" style={styles.afterRecord} onPress={startAfterthought} activeOpacity={0.85}>
                 <View style={styles.afterRecordDot} />
                 <Text style={styles.afterRecordTxt}>Record afterthought</Text>
               </TouchableOpacity>

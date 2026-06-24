@@ -23,8 +23,9 @@ tags:
 - assertVisible: "Account"
 
 # The Phone section is optional. Its label renders as "Phone (optional)" and the input
-# shows the placeholder "Add phone number" when empty.
+# (testID account-phone-input) shows the placeholder "Add phone number" when empty.
 - assertVisible: "Phone (optional)"
+- assertVisible: { id: "account-phone-input" }
 - assertVisible: "Add phone number"
 
 # Empty is allowed: with no value entered the field is NOT dirty, so NO "Save" button renders
@@ -36,8 +37,6 @@ tags:
 # Typing a number makes the row dirty → a "Save" button appears → handleSavePhone writes
 # users.phone via Supabase. Asserting the persisted save requires the backend write to succeed
 # (and would mutate the seeded profile), so it's left for a P2 run:
-#   - tapOn "Add phone number"; inputText "5551234567"; hideKeyboard
+#   - tapOn: { id: "account-phone-input" }; inputText "5551234567"; hideKeyboard
 #   - assertVisible "Save"; tapOn "Save"; (reopen Account → number persists)
-# TODO(testID): the phone TextInput has no testID; it's targeted here by its placeholder
-#   "Add phone number". Add testID="account-phone-input" for robustness.
 - assertVisible: "Account"

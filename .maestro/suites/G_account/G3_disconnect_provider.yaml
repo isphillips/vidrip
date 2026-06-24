@@ -24,8 +24,7 @@ tags:
 - assertVisible: "Account"
 # Creator rows (with enable toggle + Disconnect) require creator mode on.
 - tapOn:
-    text: "Creator mode"
-# TODO(testID): no testID on the Creator-mode <Switch>; add testID="account-creator-switch".
+    id: "account-creator-switch"
 
 # ── BLOCKED:P2 — disconnect + persistence ────────────────────────────────────
 # With a seeded connected provider (test account A has, say, YouTube connected as 'creator'),
@@ -37,11 +36,10 @@ tags:
 # UNBLOCKS WHEN (P2): seed a synced_accounts row (connection_type='creator', enabled=true) for the
 # test user, then:
 #   - assertVisible "Disconnect"
-#   # toggle enable, reopen Account, assert the switch persisted (no direct value assert available —
-#   #   relies on a testID; see TODO below)
+#   # toggle enable, reopen Account, assert the switch persisted via its testID:
+#   - tapOn: { id: "creator-enabled-youtube" }
+#   - assertVisible: { id: "creator-enabled-youtube" }
 #   - tapOn "Disconnect"
 #   - tapOn { text: "Disconnect", index: 1 }     # destructive button in the dialog
-#   - assertVisible "Connect"
-# TODO(testID): no testID on the per-provider enable <Switch>; add one (e.g.
-#   testID="creator-enabled-<provider>") so the persisted toggle value can be asserted.
+#   - assertVisible: { id: "connect-youtube" }   # row reverted to the plain Connect button
 - assertVisible: "Account"

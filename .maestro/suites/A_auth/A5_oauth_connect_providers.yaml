@@ -32,12 +32,8 @@ tags:
 # The FULL four-provider row set (YouTube / TikTok / Instagram / Facebook, each with Connect)
 # lives under "Creator Accounts" and ONLY renders when Creator mode is ON.
 # Enable Creator mode so all four provider rows are present to assert against.
-# NOTE: the Creator toggle is a <Switch> with no testID; target it relative to its label.
 - tapOn:
-    text: "Creator mode"
-# The switch sits to the right of the label row.
-# TODO(testID): no testID on the Creator-mode <Switch>; tapping the label row's text region
-# toggles focus but not the switch reliably. Add e.g. testID="account-creator-switch".
+    id: "account-creator-switch"
 - runFlow:
     when:
       visible: "Creator Accounts"
@@ -46,6 +42,11 @@ tags:
       - assertVisible: "TikTok"
       - assertVisible: "Instagram"
       - assertVisible: "Facebook"
+      # The four provider Connect buttons are now individually addressable by testID.
+      - assertVisible: { id: "connect-youtube" }
+      - assertVisible: { id: "connect-tiktok" }
+      - assertVisible: { id: "connect-instagram" }
+      - assertVisible: { id: "connect-facebook" }
 
 # ── BLOCKED:P1 — the actual connect round-trip ───────────────────────────────
 # Tapping a provider's "Connect" calls Linking.openURL(buildAuthUrl(...)) → leaves the app

@@ -25,14 +25,13 @@ tags:
 
 # The Facebook provider row lives under "Creator Accounts" (creator mode only). Turn it on.
 - tapOn:
-    text: "Creator mode"
-# TODO(testID): no testID on the Creator-mode <Switch>; add testID="account-creator-switch"
-# so this toggle is deterministic instead of relying on the label row.
+    id: "account-creator-switch"
 - runFlow:
     when:
       visible: "Creator Accounts"
     commands:
       - assertVisible: "Facebook"
+      - assertVisible: { id: "connect-facebook" }
 
 # ── BLOCKED:P1 — the two-phase Facebook flow ─────────────────────────────────
 # Phase 1: Connect (Facebook) → system browser → callback with code → connectFacebook()

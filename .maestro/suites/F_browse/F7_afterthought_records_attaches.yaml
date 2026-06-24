@@ -32,10 +32,11 @@ tags:
 #   sub:   "A quick clip that plays after your reaction. Sending in {n}s…"   (n counts 5→0)
 #   buttons: "Send now"  and  "Record afterthought"
 #
-# On device, after stopping the main reaction:
+# On device, after stopping the main reaction (square stop):
+# - tapOn: { id: "recorder-stop" }
 # - assertVisible: "Add an afterthought?"
-# - assertVisible: "Send now"
-# - assertVisible: "Record afterthought"
+# - assertVisible: { id: "afterthought-send-now" }
+# - assertVisible: { id: "afterthought-record" }
 # Tapping "Record afterthought" records a short selfie clip (up to 30s) that is attached to the
 # reaction on save; "Send now" (or the countdown reaching 0) sends without one.
-# - tapOn: "Record afterthought"
+# - tapOn: { id: "afterthought-record" }

@@ -33,6 +33,8 @@ tags:
 # ── NEEDS-DEVICE: react to a post ────────────────────────────────────────────
 # Open a post → "Record Your Reaction" → record → save. Camera-only.
 # - tapOn: "Record Your Reaction"
-# - ... record / stop on device ...
+# - tapOn: { id: "recorder-record" }   # record (channel reactions are source-driven)
+# - ... wait ...
+# - tapOn: { id: "recorder-stop" }     # stop on device
 - assertVisible:
     id: "tab-Channels"

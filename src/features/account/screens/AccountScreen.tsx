@@ -376,6 +376,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
             </Text>
           </View>
           <Switch
+            testID="account-creator-switch"
             value={isCreator}
             onValueChange={handleToggleCreator}
             disabled={savingCreator}
@@ -448,6 +449,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                     ) : acct ? (
                       <View style={styles.syncRight}>
                         <Switch
+                          testID={`creator-enabled-${key}`}
                           value={acct.enabled}
                           onValueChange={() => handleToggleEnabled(acct)}
                           trackColor={{ true: C.ACCENT, false: C.BORDER }}
@@ -463,6 +465,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                       </View>
                     ) : (
                       <TouchableOpacity
+                        testID={`connect-${key}`}
                         style={styles.connectBtn}
                         onPress={() => handleConnect(key)}
                         disabled={syncing}>
@@ -482,6 +485,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
       <View style={styles.section}>
         <View style={styles.phoneRow}>
           <TextInput
+            testID="account-phone-input"
             style={styles.phoneInput}
             value={phone}
             onChangeText={setPhone}
@@ -566,6 +570,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
 
       <View style={styles.section}>
         <TouchableOpacity
+          testID="account-sign-out"
           style={[styles.row, styles.rowDanger]}
           onPress={handleSignOut}
           disabled={signingOut}>

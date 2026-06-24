@@ -171,7 +171,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
           </View>
         </View>
         {item.status !== 'ready' && (
-          <TouchableOpacity onPress={() => onRefreshStatus(item)} hitSlop={10} style={styles.del} disabled={statusBusy === item.id}>
+          <TouchableOpacity testID={`studio-status-refresh-${item.id}`} onPress={() => onRefreshStatus(item)} hitSlop={10} style={styles.del} disabled={statusBusy === item.id}>
             {statusBusy === item.id
               ? <ActivityIndicator size="small" color={C.MUTED} />
               : <Ionicons name="refresh" size={18} color={C.MUTED} />}
@@ -222,10 +222,10 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
       <View style={styles.header}>
         <Text style={styles.title}>Studio</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={() => navigation.navigate('StudioCollections')} hitSlop={10}>
+          <TouchableOpacity testID="studio-collections" onPress={() => navigation.navigate('StudioCollections')} hitSlop={10}>
             <Ionicons name="diamond-outline" size={22} color={C.INK} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('StudioCalendar')} hitSlop={10}>
+          <TouchableOpacity testID="studio-calendar" onPress={() => navigation.navigate('StudioCalendar')} hitSlop={10}>
             <Ionicons name="calendar-outline" size={23} color={C.INK} />
           </TouchableOpacity>
         </View>

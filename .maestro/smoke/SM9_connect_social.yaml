@@ -22,13 +22,18 @@ tags:
     id: "tab-Feed"
 - tapOn:
     id: "nav-account-blob"
+# The Instagram provider row lives under "Creator Accounts" (creator mode only). Turn it on.
+- tapOn:
+    id: "account-creator-switch"
 - assertVisible: "Instagram"
+- assertVisible: { id: "connect-instagram" }
 
 # Tapping Instagram's "Connect" leaves the app for the system browser (P1). On a device
 # with P1 complete, authorize, return, and assert the row repaints with the handle/avatar.
-# The "Connect" label is shared by all 4 provider rows; scope the tap to the Instagram row:
+# The "Connect" label is shared by all 4 provider rows; the Instagram row's button is now
+# addressable by its own testID:
 # - tapOn:
-#     id: "connect-instagram"   # TODO(testID): add to the IG row Connect button
+#     id: "connect-instagram"
 # - assertVisible:
 #     text: "Connecting"        # spinner copy, IG row only
 

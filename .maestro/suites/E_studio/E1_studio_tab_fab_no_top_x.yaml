@@ -35,9 +35,10 @@ tags:
 #    stable signal that the nav hid. The camera surface itself is device-only.
 - assertNotVisible:
     id: "tab-Feed"
-# The Capture screen's own close control is a top-left "X" (Ionicons close — no testID, no text);
+# The Capture screen's own close control is a top-left "X" (Ionicons close, testID studio-capture-close);
 # tap it to back out and land on StudioHome again with the nav restored.
-# - tapOn: { point: "8%,7%" }   # TODO(testID): Capture close (X) button
+- tapOn:
+    id: "studio-capture-close"
 - assertVisible:
     id: "tab-Feed"
     timeout: 10000

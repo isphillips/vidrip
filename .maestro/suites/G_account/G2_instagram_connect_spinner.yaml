@@ -25,13 +25,13 @@ tags:
 
 # Instagram only appears as a provider row under "Creator Accounts" (creator mode on).
 - tapOn:
-    text: "Creator mode"
-# TODO(testID): no testID on the Creator-mode <Switch>; add testID="account-creator-switch".
+    id: "account-creator-switch"
 - runFlow:
     when:
       visible: "Creator Accounts"
     commands:
       - assertVisible: "Instagram"
+      - assertVisible: { id: "connect-instagram" }
 
 # ── BLOCKED:P1 — the syncing spinner ─────────────────────────────────────────
 # While a connect is in flight, AccountScreen.tsx renders, on the connecting provider's row only:

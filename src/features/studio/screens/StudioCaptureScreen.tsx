@@ -252,7 +252,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
 
       {/* Top bar: close + flip (timer moved above the record button so the lens picker can own the top) */}
       <View style={[styles.topBar, { top: top + SPACE.SM }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={10} style={styles.iconBtn}>
+        <TouchableOpacity testID="studio-capture-close" onPress={() => navigation.goBack()} hitSlop={10} style={styles.iconBtn}>
           <Ionicons name="close" size={26} color={C.WHITE} />
         </TouchableOpacity>
         <View />
