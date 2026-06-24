@@ -1,0 +1,54 @@
+# H3 — Exclusive watch: a granted video plays; an ungranted video is gated.
+# BLOCKED:P2 — gating is enforced server-side by RLS on the exclusive collection/post (only awarded
+# users can fetch/play). The app has no in-UI "you don't have access" screen to reach as account A,
+# because an ungranted collection simply never appears in A's rail — there's no navigable path to a
+# gated video from the client. The granted-plays leg is reachable; the ungranted leg is RLS-only.
+# Requires: P7 seed — account A is granted ${SEED_EXCLUSIVE_COLLECTION} with at least one ready video.
+appId: ${APP_ID}
+tags:
+  - suite-H
+  - needs-seed
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    text: "Exclusive Content"
+    timeout: 15000
+
+# Open the granted collection from the rail.
+- tapOn:
+    text: "${SEED_EXCLUSIVE_COLLECTION}"
+    timeout: 15000
+
+# ExclusiveCollectionScreen lists the granted videos. A ready video tile is tappable → opens
+# ExclusiveWatchScreen (title shown, big play card, "Exclusive" tag). Non-ready tiles show
+# "Processing…". The collection header subtitle reads "… · exclusive".
+- assertVisible:
+    text: "exclusive"
+    timeout: 15000
+# TODO(testID): video cells have no testID; QA taps a ready (non-"Processing…") tile by its title.
+# - tapOn:
+#     text: "<granted video title>"
+# - assertVisible: "Exclusive"     # ExclusiveWatchScreen play card tag → granted video plays
+
+# ── BLOCKED:P2 — ungranted is gated ──────────────────────────────────────────
+# There is NO client path to a video account A wasn't awarded: ungranted collections never enter
+# A's rail (RLS filters them out of fetchMyAwardedCollections), so the "gated/denied" state can't be
+# reached through the UI. Verify the gate at the data layer instead.
+# Unblock: with a SECOND collection NOT awarded to A, assert via API/SQL that A's
+# fetchExclusiveCollectionVideos / ExclusiveWatch fetch returns empty/403 (RLS denies). This is a
+# pure-backend check — see _NOTES.md (no UI surface, so no YAML assertion).
+
+# Stable end assert.
+- assertVisible:
+    text: "${SEED_EXCLUSIVE_COLLECTION}"

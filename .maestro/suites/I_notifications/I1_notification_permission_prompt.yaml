@@ -1,0 +1,38 @@
+# I1 — Notification permission prompt appears (Android 13+ runtime / iOS) at the right time.
+# NEEDS-DEVICE: the actual permission dialog is an OS-level system prompt that Maestro cannot
+#   assert on (it lives outside the app's view hierarchy). This flow only gets the app to a
+#   signed-in state where the prompt is requested; the prompt itself is verified by eye.
+# PASS-LIKELY (per static audit): the app requests POST_NOTIFICATIONS on Android 13+ and the
+#   iOS notification authorization at sign-in / first run.
+appId: ${APP_ID}
+tags:
+  - suite-I
+  - needs-device
+---
+# Cold, first-run state so the OS prompt is eligible to fire (a prior grant/deny is sticky).
+- runFlow:
+    file: ../../helpers/freshLaunch.yaml
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# Landed signed-in. On a real device, the OS notification-permission dialog appears around
+# here (token registration happens on sign-in). Maestro can't see system dialogs, so we stop
+# at the app surface and document the manual check below.
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 25000
+
+# ── NEEDS-DEVICE manual verification ─────────────────────────────────────────
+# 1. On a fresh install (no prior grant/deny), after sign-in the OS dialog should appear:
+#      Android 13+: the POST_NOTIFICATIONS runtime permission sheet.
+#      iOS: the "… Would Like to Send You Notifications" authorization alert.
+# 2. Confirm it is requested at a sensible moment (sign-in / first run), not on the very first
+#    cold splash before the user has any context.
+# 3. Tapping Allow registers the push token; Deny must not crash or block the app.
+# NOTE: there is no in-app, Maestro-assertable UI for this prompt — it is OS-owned.

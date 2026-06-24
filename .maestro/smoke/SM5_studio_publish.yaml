@@ -1,0 +1,36 @@
+# SM5 — Record + publish a Studio clip (trim → filter → overlay → details → post) → "Live".
+#
+# Requires: real device (camera capture) + P2 (publish backend) for the friends path.
+# NOTE (E2E_AUDIT SM5): the real flow has an extra AUDIO step
+# (Capture → Trim → Filter → Audio → Overlay → Details), and "Live" is set by a server
+# Bunny webhook — it is NOT observable in-app, so the final state to check is
+# "Uploading/Processing" in the Studio "Published" tab + a manual refresh.
+appId: ${APP_ID}
+tags:
+  - smoke
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "New video"
+- tapOn: "New video"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# Capture is camera-only. On a real device, walk the chain:
+#   Capture (record ≤180s or import) → Trim → Filter → Audio → Overlay → Details.
+# At Details, choose visibility + Post. Then return to Studio "Published" and verify the
+# row shows Uploading → Processing (→ Live after the webhook; tap refresh if delayed).
+#
+# After posting, back on StudioHome:
+# - tapOn: "Published"
+# - assertVisible:
+#     text: "Uploading|Processing|Live"

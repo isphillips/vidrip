@@ -1,0 +1,48 @@
+# D9 — DM compose: send an audio clip and a video clip from a friend conversation.
+# NEEDS-DEVICE: audio uses the device mic (press-and-hold); video opens the camera recorder.
+# Both lead through native capture that Maestro can't drive headlessly.
+# Requires: P7 seed (friend B to open a conversation with).
+appId: ${APP_ID}
+tags:
+  - suite-D
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Messages"
+- assertVisible: "Messages"
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# In FriendConversationScreen. The floating composer buttons have NO testID.
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# AUDIO: press-and-hold the MIC button to record (>0.5s), release → preview shows the duration,
+#        a "✕" cancel, and a "Send" button. Tap "Send" to post the audio clip.
+#   - The preview's exact controls are "✕" and "Send" (verified in FriendConversationScreen).
+# VIDEO: tap the VIDEO (videocam) button → ChannelVideoRecord opens the camera → record → send.
+#
+# TODO(testID): add testIDs to the floating MIC + VIDEO buttons (styles.barBtn) and to the audio
+#   preview "Send" / "✕". Until then they're point-tap only and the capture needs hardware.
+# - tapOn: { point: "90%,82%" }   # MIC (press-and-hold) — device only
+# - ... hold to record, release ...
+# - assertVisible: "Send"          # audio preview appeared (duration + ✕ + Send)
+# - tapOn: "Send"
+# - tapOn: { point: "90%,72%" }   # VIDEO → camera recorder — device only
+#
+# Unblocks: real device with mic + camera, plus composer/preview testIDs for assertions.
+# Reachable assert: the conversation screen mounted (header shows the friend).
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000

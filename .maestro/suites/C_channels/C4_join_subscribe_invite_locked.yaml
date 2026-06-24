@@ -1,0 +1,52 @@
+# C4 — Join a public channel (automated); subscribe + invite paths annotated.
+# BLOCKED:P2 — gated/subscriber channels subscribe via WEB CHECKOUT (no in-app purchase, per
+# App Store 3.1.1 / Play policy). The in-app paywall is read-only ("Subscribers only"), so the
+# purchase leg cannot be automated on-device.
+# Requires: P7 seed — ${SEED_CHANNEL_NAME} is a PUBLIC (not invite-only, not subscriber) channel
+# that account A is NOT already joined to.
+appId: ${APP_ID}
+tags:
+  - suite-C
+  - needs-seed
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+- tapOn:
+    text: "${SEED_CHANNEL_NAME}"
+
+# Public channel header shows a Join control ("＋ Join"); tapping it joins and flips to "✕ Leave".
+# (Idempotency note: if A is already a member the button reads "✕ Leave" instead — seed A unjoined.)
+- assertVisible: "＋ Join"
+- tapOn: "＋ Join"
+- assertVisible:
+    text: "✕ Leave"
+    timeout: 10000
+
+# ── BLOCKED:P2 — subscribe (web checkout) ────────────────────────────────────
+# A subscriber-mode channel shows the read-only paywall instead of content:
+#   - assertVisible: "Subscribers only"
+# There is NO in-app buy button — subscribing happens on the web, then the app re-checks
+# entitlement on foreground. Unblock: stub entitlement server-side (mark A subscribed) and
+# re-enter; the room should unlock and show content instead of "Subscribers only".
+#
+# ── Invite-only / locked ─────────────────────────────────────────────────────
+# An invite-only public room A isn't a member of shows a "🔒 Invite only" pill in the header
+# (no self-join). Pending invites surface "Accept" / "Decline" on the card in the Channels list.
+# Document with a dedicated invite-only seed channel if available.
+
+# Stable end assert: we are inside the channel.
+- assertVisible:
+    id: "tab-Channels"

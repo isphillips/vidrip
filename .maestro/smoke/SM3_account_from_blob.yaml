@@ -1,0 +1,51 @@
+# SM3 — Open Account from the top-nav blob → Account screen opens.
+#
+# The plan says "every tab". KNOWN GAP (E2E_AUDIT D-4): Studio home has NO account blob,
+# so this flow checks the four tabs that DO have it (Feed, Channels, Messages, Browse).
+appId: ${APP_ID}
+tags:
+  - smoke
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# From Feed
+- tapOn:
+    id: "tab-Feed"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Sign Out"     # unique to the Account screen
+- tapOn:
+    id: "tab-Feed"
+
+# From Channels
+- tapOn:
+    id: "tab-Channels"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Sign Out"
+- tapOn:
+    id: "tab-Feed"
+
+# From Messages
+- tapOn:
+    id: "tab-Messages"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Sign Out"
+- tapOn:
+    id: "tab-Feed"
+
+# From Browse
+- tapOn:
+    id: "tab-Share"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Sign Out"

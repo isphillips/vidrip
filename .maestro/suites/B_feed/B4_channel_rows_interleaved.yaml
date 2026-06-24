@@ -1,0 +1,39 @@
+# B4 — Channel rows interleaved into the Feed by their last-unseen-upload time.
+# BLOCKED:P2 — depends on server RPC get_channel_updates_summary (not in local migrations);
+# without it fetchChannelUpdatesSummary returns nothing and no channel rows appear.
+# See E2E_AUDIT B4 (FeedHomeScreen.tsx:69-77 sorts convRows + channelRows by sortAt desc).
+appId: ${APP_ID}
+tags:
+  - suite-B
+  - needs-seed
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 15000
+
+# Reachable today: the Feed renders without crashing. The interleave assertion is gated on P2.
+#
+# ── BLOCKED:P2 ───────────────────────────────────────────────────────────────
+# Once the RPC get_channel_updates_summary exists and returns per-channel last_unseen_at, a
+# channel row appears mixed BETWEEN friend/group rows ordered by recency (not pinned to a block).
+# With a seed where a channel's last unseen upload is newer than a friend share, assert the
+# channel row sorts ABOVE that friend row.
+# - assertVisible: { text: "${SEED_CHANNEL_NAME}" }
+# - assertVisible: { text: ".*${TEST_HANDLE_B}.*" }   # and verify relative on-screen order
+#
+# Unblocks: deploy get_channel_updates_summary + seed channel uploads with known timestamps.
+# Stable assert (holds regardless of P2): the Feed mounted.
+- assertVisible:
+    id: "tab-Feed"

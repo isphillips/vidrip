@@ -1,0 +1,58 @@
+# A5 — OAuth connect (YouTube/TikTok/Instagram/Facebook): Connect → system browser → return → row shows handle/avatar.
+# BLOCKED:P1 — the connect flow opens the system browser and returns via an oauth-callback deep link;
+#              the browser round-trip + real provider auth cannot be driven by Maestro.
+appId: ${APP_ID}
+tags:
+  - suite-A
+  - needs-device
+  - blocked-p1
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# Open Account from the top-nav blob (present on Feed/Channels/Messages/Browse).
+- tapOn:
+    id: "tab-Feed"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+
+# The "Liked Sources" feed section exposes a YouTube "Connect" (feed connection). Assert it.
+- assertVisible: "Liked Sources"
+- assertVisible: "YouTube"
+- assertVisible: "Connect"
+
+# The FULL four-provider row set (YouTube / TikTok / Instagram / Facebook, each with Connect)
+# lives under "Creator Accounts" and ONLY renders when Creator mode is ON.
+# Enable Creator mode so all four provider rows are present to assert against.
+# NOTE: the Creator toggle is a <Switch> with no testID; target it relative to its label.
+- tapOn:
+    text: "Creator mode"
+# The switch sits to the right of the label row.
+# TODO(testID): no testID on the Creator-mode <Switch>; tapping the label row's text region
+# toggles focus but not the switch reliably. Add e.g. testID="account-creator-switch".
+- runFlow:
+    when:
+      visible: "Creator Accounts"
+    commands:
+      - assertVisible: "Creator Accounts"
+      - assertVisible: "TikTok"
+      - assertVisible: "Instagram"
+      - assertVisible: "Facebook"
+
+# ── BLOCKED:P1 — the actual connect round-trip ───────────────────────────────
+# Tapping a provider's "Connect" calls Linking.openURL(buildAuthUrl(...)) → leaves the app
+# for the system browser → provider login → redirect back via reaxn://oauth-callback?... →
+# syncOAuthCode runs → the row flips to show the provider handle/avatar + a "Disconnect" link.
+# Maestro cannot complete the external browser auth. Reachable assertion stops at the rows above.
+# UNBLOCKS WHEN (P1): a stubbed oauth-callback deep link with a canned code is available, e.g.
+#   - openLink: "reaxn://oauth-callback?provider=youtube&type=feed&code=TEST"
+#   then assertVisible "Disconnect" on the YouTube row.
+- assertVisible: "Account"

@@ -1,0 +1,46 @@
+# B2 — Tap a friend row → doom-react chain opens the recorder on the first pending video.
+# NEEDS-DEVICE: the chain plays the source video + records camera in sync; live capture needs
+# hardware. Maestro can reach the recorder; record/stop/save is a device step.
+# Requires: P7 seed (friend B has ≥1 UNREACTED share pending to A).
+appId: ${APP_ID}
+tags:
+  - suite-B
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+
+# Friend B's pending share is an actionable row labelled by B's display name / @handle.
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# Tapping the row builds the doom-react queue (this friend's pending videos first, then the
+# rest of the Feed) and navigates to RecordReaction. On a real device:
+#   1. RecordReaction mounts — source video plays + camera records in sync.
+#   2. Tap record, let it run, tap stop.
+#   3. Reaction saves; the queue advances to the next pending video, then back to Feed.
+# Maestro can't validate live camera frames; the chain/record steps are device-only.
+# - tapOn: { point: "50%,90%" }   # TODO(testID): record control on RecordReaction (no testID)
+# - tapOn: { point: "50%,90%" }   # TODO(testID): stop control
+#
+# Unblocks: real device with camera + a seeded multi-pending state to prove the CHAIN.
+# Reachable assert: the app left Feed into the recorder stack without crashing. The recorder
+# has no stable testID, so assert the Feed tab is no longer the foreground identity is unsafe;
+# instead confirm the app is still alive by re-asserting a known tab after the (manual) flow.
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 25000

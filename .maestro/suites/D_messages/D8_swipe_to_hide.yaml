@@ -1,0 +1,52 @@
+# D8 — Swipe a conversation left → "Hide" (delete-for-me); it persists after refresh.
+# NEEDS-DEVICE: the reveal is a left-swipe gesture on a Swipeable row (reliable on a device).
+# Hide is local-only (AsyncStorage 'vidrip_hidden_convs'), survives refresh; no server delete.
+# Requires: P7 seed (account A has ≥1 conversation row to swipe).
+appId: ${APP_ID}
+tags:
+  - suite-D
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Messages"
+- assertVisible: "Messages"
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+
+# ── NEEDS-DEVICE: swipe-to-reveal ────────────────────────────────────────────
+# Swipe the row LEFT (right→left) to reveal the right-side "Hide" action, then tap it.
+# The seeded conversation row sits below the header + the channels block header; ~40% down
+# the screen is a safe row target — tune per device if it lands on the wrong row.
+- swipe:
+    start: "80%,40%"
+    end: "15%,40%"
+    duration: 500
+# The revealed action button reads "Hide" (eye-off icon + label).
+- assertVisible: "Hide"
+- tapOn: "Hide"
+
+# Row is hidden for this user only.
+- assertNotVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# Persists across a reload: pull-to-refresh and confirm it stays hidden (AsyncStorage-backed).
+- swipe:
+    start: "50%,30%"
+    end: "50%,80%"
+    duration: 600
+- assertNotVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+# NOTE: Hide is delete-FOR-ME only — the friend still sees the conversation; there's no server
+# delete RPC. Unhiding requires clearing 'vidrip_hidden_convs' (no in-app un-hide today).
+# Swipe-reveal coordinates may need tuning per device; treat the gesture as device-validated.

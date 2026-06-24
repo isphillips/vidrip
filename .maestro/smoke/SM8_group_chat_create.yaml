@@ -1,0 +1,48 @@
+# SM8 — Create a group chat with 2 friends → group opens; no duplicate on retry.
+#
+# Requires: P7 (A is friends with BOTH B and C). Dedupe-on-retry depends on the server
+# RPC `create_group_chat` (P2) — see E2E_AUDIT SM8/D6. The first half (create + open) is
+# fully automatable; the retry/dedupe assertion is gated on P2.
+appId: ${APP_ID}
+tags:
+  - smoke
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Messages"
+- tapOn:
+    id: "nav-friends-blob"
+- tapOn: "New group chat"
+- assertVisible: "New Group Chat"
+
+# Pick two friends (rows are labelled by display name or @handle).
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+- tapOn:
+    text: ".*${TEST_HANDLE_C}.*"
+- assertVisible: "Create"
+- tapOn: "Create"
+
+# Group chat opens (left the create screen).
+- assertNotVisible: "New Group Chat"
+- assertVisible:
+    id: "tab-Messages"
+
+# ── Dedupe-on-retry (needs P2) ───────────────────────────────────────────────
+# Repeat the same member set and confirm it OPENS THE SAME chat rather than making a
+# second one. Verify by group count in Messages, or that no second row appears.
+# - tapOn: { id: "nav-friends-blob" }
+# - tapOn: "New group chat"
+# - tapOn: ".*${TEST_HANDLE_B}.*"
+# - tapOn: ".*${TEST_HANDLE_C}.*"
+# - tapOn: "Create"
+# - assertNotVisible: "New Group Chat"

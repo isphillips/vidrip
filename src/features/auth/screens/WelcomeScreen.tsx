@@ -269,11 +269,13 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
           </View>
         </View>
         <GradientButton
+          testID="welcome-invite-btn"
           label="Enter Invitation Code"
           onPress={() => navigation.navigate('EnterInviteCode')}
           style={styles.button}
         />
         <TouchableOpacity
+          testID="welcome-signin-link"
           style={styles.signInLink}
           activeOpacity={0.7}
           onPress={() => navigation.navigate('SignIn')}>

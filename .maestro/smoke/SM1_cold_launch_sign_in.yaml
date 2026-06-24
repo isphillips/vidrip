@@ -1,0 +1,24 @@
+# SM1 — Cold launch -> (onboarding) -> sign in -> lands authenticated on Feed.
+#
+# DEVIATION: the plan's SM1 signs in via MAGIC LINK. A magic link can't be intercepted
+# headlessly, so E2E substitutes PASSWORD sign-in of the seeded primary account (account A),
+# which reaches the same authenticated Feed state. The magic-link path itself is verified
+# MANUALLY (suite case A2) — see README "Auth automation".
+#
+# Requires: P7 (seeded account A with a password set).
+appId: ${APP_ID}
+tags:
+  - smoke
+---
+- clearState
+- launchApp
+- assertVisible:
+    id: "welcome-signin-link"
+    timeout: 20000
+- runFlow:
+    file: ../helpers/signIn.yaml
+    env:
+      EMAIL: ${TEST_EMAIL_A}
+      PASSWORD: ${TEST_PASSWORD_A}
+- assertVisible:
+    id: "tab-Feed"

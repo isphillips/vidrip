@@ -1,0 +1,11 @@
+# Reusable subflow: tap a bottom-nav tab. Caller passes TAB via env.
+# Valid TAB values: Feed, Channels, Studio, Messages, Share (= the "Browse" tab).
+# Account/Friends are reached from the top-nav blob, not the bottom bar.
+#
+#   - runFlow:
+#       file: ../helpers/goToTab.yaml
+#       env: { TAB: Channels }
+appId: ${APP_ID}
+---
+- tapOn:
+    id: "tab-${TAB}"

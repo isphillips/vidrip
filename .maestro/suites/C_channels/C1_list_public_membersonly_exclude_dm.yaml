@@ -1,0 +1,31 @@
+# C1 — Channels list shows public + members-only channels; DM/private chats are excluded.
+# Requires: P7 seed (curated public channel ${SEED_CHANNEL_NAME} visible to account A).
+appId: ${APP_ID}
+tags:
+  - suite-C
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible: "Channels"          # ChannelsHomeScreen header
+
+# The seeded curated/public channel is listed here.
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+
+# NOTE: This Channels list is built from public + members-only + subscribed channels only
+# (ChannelsHomeScreen merges fetchPublicChannels / fetchMembersOnlyChannels /
+# fetchSubscribedChannels). 1:1 DM and private group chats live on the Messages tab and must
+# NOT surface here. There is no stable testID on a "DM channel" row to assert its absence
+# directly; QA should confirm by name that no DM/private chat title appears in this list.
+# TODO(testID): a per-card testID (e.g. channel-card-<id>) would let us assert DM rows are absent.

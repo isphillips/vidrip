@@ -1,0 +1,42 @@
+# I5 — OAuth provider returns via deep link; the app handles it without losing the session.
+# BLOCKED:P1 — the real round-trip needs LIVE OAuth providers (Google/YouTube/Instagram/Facebook),
+#   which can't run unattended in CI. This thin flow reaches the Account surface where the
+#   account-sync deep link is consumed, and documents the simulated-callback steps.
+appId: ${APP_ID}
+tags:
+  - suite-I
+  - blocked-p1
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# Reach Account — AccountScreen is where the OAuth deep link is consumed (the oauth-callback
+# edge fn 302s back into the app as `reaxn://oauth?code=…&state=…`; RootNavigator.handleDeepLink
+# parses it via parseOAuthDeepLink → useOAuthStore.setPending → AccountScreen runs the sync).
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+
+# ── BLOCKED:P1 — live OAuth round-trip ───────────────────────────────────────
+# The real flow: tap a "Connect <provider>" entry → in-app browser → provider consent →
+# https redirect to the oauth-callback edge fn → 302 to `reaxn://oauth?...` → app foregrounds
+# and runs the sync, with the existing Supabase session intact (no sign-out).
+#
+# To simulate the RETURN leg only (still can't mint a real provider code), inject the deep link
+# and assert we stay signed in on Account (session not lost):
+#   - openLink: "reaxn://oauth?code=TEST&state=TEST&provider=youtube&type=feed"
+#   - assertVisible: "Account"            # still on Account, still signed in
+#   - assertNotVisible: { id: "welcome-signin-link" }   # session preserved
+# Left commented because a bogus code makes the sync fail; the meaningful assertion (session
+# survives the deep-link bounce) needs a valid provider response → P1.
+#
+# NOTE: see A5/A6/A7 (suite A) for the OAuth connect/cancel/two-phase flows that share this
+# `reaxn://oauth…` callback; the malformed-link safety (AUDIT #2: handleDeepLink awaits
+# exchangeCodeForSession with no try/catch) is a code-level concern, not Maestro-assertable.

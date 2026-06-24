@@ -69,7 +69,7 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
           </View>
           <View style={styles.headerActions}>
             {/* Friends — opens the add-friend / new-group context window. */}
-            <TouchableOpacity hitSlop={8} activeOpacity={0.7} onPress={openMenu}>
+            <TouchableOpacity testID="nav-friends-blob" hitSlop={8} activeOpacity={0.7} onPress={openMenu}>
               <SlimeFriendsIcon size={30} active={menuOpen} />
             </TouchableOpacity>
             <TouchableOpacity hitSlop={8} activeOpacity={0.7} onPress={() => (navigation as any).getParent()?.navigate('Account')}>

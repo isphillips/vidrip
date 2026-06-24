@@ -1,0 +1,8 @@
+# Reusable subflow: clear app state and cold-launch. Use at the top of any flow that
+# must start from a known signed-out, first-run state (e.g. the auth suite).
+# Most flows that just need the app open should use `launchApp` directly (no clearState)
+# so they keep the signed-in session from a prior flow.
+appId: ${APP_ID}
+---
+- clearState
+- launchApp

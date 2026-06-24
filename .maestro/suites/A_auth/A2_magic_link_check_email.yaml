@@ -1,0 +1,53 @@
+# A2 — Magic-link sign in: enter email → "Check your email" (email preserved) → link authenticates.
+# BLOCKED:P1 — the link tap authenticates via a real email + deep link; automate only up to the
+#              "Check your email" confirmation (which needs no backend response to assert).
+appId: ${APP_ID}
+tags:
+  - suite-A
+  - blocked-p1
+---
+# Auth-screen test: must start SIGNED OUT.
+- runFlow:
+    file: ../../helpers/freshLaunch.yaml
+
+# Onboarding may precede Welcome on a fresh install — page through it if present.
+- runFlow:
+    when:
+      visible: "DRIP IN"
+    commands:
+      - tapOn: "DRIP IN"
+      - runFlow:
+          when:
+            visible: "Skip for now"
+          commands:
+            - tapOn: "Skip for now"
+      - tapOn: "NEXT"
+      - tapOn: "NEXT"
+      - tapOn: "LET ME IN"
+
+- tapOn:
+    id: "welcome-signin-link"
+# Magic Link is the default mode, but tap it to be explicit.
+- tapOn:
+    id: "signin-mode-magic"
+- tapOn:
+    id: "signin-email"
+- inputText: ${TEST_EMAIL_A}
+- hideKeyboard
+- tapOn:
+    id: "signin-submit-magic"
+
+# Confirmation view (verified in SignInScreen.tsx — the `sent` branch).
+- assertVisible: "Check your email"
+- assertVisible: "Tap the link in the email to sign in. You can close this screen."
+# Email is preserved and echoed back (lowercased). Assert the entered address shows.
+- assertVisible: ${TEST_EMAIL_A}
+
+# ── BLOCKED:P1 — manual / deep-link portion ──────────────────────────────────
+# The remaining step is: open the real email, tap the magic link (reaxn://auth/callback),
+# which authenticates the session and drops the user on the Feed tab.
+# Maestro cannot read the inbox or follow the email link, and there is no test mailbox wired up.
+# UNBLOCKS WHEN (P1): a deterministic deep link is exposed for the test account, e.g.
+#   - openLink: "reaxn://auth/callback?token=..."   # then assertVisible: { id: "tab-Feed" }
+# For now, end on a stable anchor proving we reached the confirmation screen.
+- assertVisible: "← Back"

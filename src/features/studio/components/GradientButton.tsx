@@ -15,7 +15,7 @@ const BRAND = ['#FF4FA3', '#A05CFF', '#3B82F6'];
 // border over a transparent (brand-dark) fill — a quieter, secondary treatment. Built-in disabled
 // (dim) + loading (spinner) states.
 export default function GradientButton({
-  label, onPress, disabled = false, loading = false, icon, style, variant = 'solid',
+  label, onPress, disabled = false, loading = false, icon, style, variant = 'solid', testID,
 }: {
   label: string;
   onPress: () => void;
@@ -24,6 +24,7 @@ export default function GradientButton({
   icon?: string;
   style?: StyleProp<ViewStyle>;
   variant?: 'solid' | 'outline';
+  testID?: string;
 }) {
   const dim = disabled || loading;
   // Keep the label + padding stable while loading (just swap the icon for a spinner) so the button
@@ -43,7 +44,7 @@ export default function GradientButton({
   // around the border. The label sits on top of the mask.
   if (variant === 'outline') {
     return (
-      <TouchableOpacity onPress={onPress} disabled={dim} activeOpacity={0.85} style={style}>
+      <TouchableOpacity testID={testID} onPress={onPress} disabled={dim} activeOpacity={0.85} style={style}>
         <View style={[styles.outlineWrap, dim && styles.btnDisabled]}>
           <MaskedView style={StyleSheet.absoluteFill} maskElement={<View style={styles.ring} />}>
             <LinearGradient colors={BRAND} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
@@ -60,7 +61,7 @@ export default function GradientButton({
   // words and kept the icon from coming back on the loading→idle swap. Decoupling keeps the content
   // laid out regardless of the gradient's measurement. Mirrors ScreenGradient + the outline variant.
   return (
-    <TouchableOpacity onPress={onPress} disabled={dim} activeOpacity={0.85} style={style}>
+    <TouchableOpacity testID={testID} onPress={onPress} disabled={dim} activeOpacity={0.85} style={style}>
       <View style={[styles.btn, dim && styles.btnDisabled]}>
         <LinearGradient
           colors={BRAND} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}

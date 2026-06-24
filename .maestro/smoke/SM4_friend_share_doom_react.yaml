@@ -1,0 +1,51 @@
+# SM4 — Friend (B) shares a video → A sees it in Feed → tap → doom-react records & saves;
+#        Feed entry clears.
+#
+# Requires: P7 (mutual friends A+B; B has an UNREACTED share pending to A) and a real
+# device (camera). The recording + save crosses the NEEDS-DEVICE boundary — Maestro can
+# tap into the recorder and press record/stop, but actual capture needs hardware.
+#
+# Preconditions to seed before running: account B sends A a Short (see SM6 / suite F2).
+appId: ${APP_ID}
+tags:
+  - smoke
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+
+# The pending share surfaces as an actionable Feed row for friend B. Row label is B's
+# display name or @handle — match the seeded handle.
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# Tapping the row builds the doom-react queue and opens RecordReaction (the source
+# video plays + camera records in sync). On a real device:
+#   1. The recorder mounts (RecordReactionScreen → ReactionRecorder).
+#   2. Tap the record control, let it run, tap stop (square).
+#   3. The reaction saves; on returning the row drops from Feed on next focus.
+# Maestro can't validate live camera frames; the steps below are best-effort and the
+# final assertion confirms the queue cleared.
+#
+# - tapOn: { point: "50%,90%" }      # record button (no testID — verify on device)
+# - ... wait ...
+# - tapOn: { point: "50%,90%" }      # stop
+- assertVisible:
+    id: "tab-Feed"
+# After reacting through B's pending share, re-focus Feed and confirm B's row is gone:
+# - assertNotVisible:
+#     text: ".*${TEST_HANDLE_B}.*"

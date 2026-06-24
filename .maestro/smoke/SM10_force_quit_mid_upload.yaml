@@ -1,0 +1,37 @@
+# SM10 — Force-quit mid-upload, relaunch → upload resumes/queues; no data loss; no crash.
+#
+# KNOWN GAP (E2E_AUDIT D-1 / SM10 / K1 / K2): the upload + bake queues are IN-MEMORY only
+# (zustand, no persistence). A force-quit DROPS the in-flight cloud upload — it does not
+# auto-resume. The recording file + DB row survive (written before relay) and are recovered
+# lazily on revisit. So the "resumes/queues" part is currently expected to FAIL.
+#
+# This flow verifies the part that MUST hold regardless: relaunch does NOT crash and lands
+# authenticated. Creating the mid-upload state itself needs a device (camera) — automate the
+# kill/relaunch crash check; the data-loss assertion is a documented MANUAL/device step.
+appId: ${APP_ID}
+tags:
+  - smoke
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- assertVisible:
+    id: "tab-Feed"
+
+# ── Device step: start an upload, then kill mid-flight ───────────────────────
+# On a real device: record a reaction / publish a Studio clip, and while it shows
+# "Uploading", hard-kill the app. Then:
+- stopApp
+- launchApp
+# Must relaunch cleanly to an authenticated Feed (no crash, no forced re-auth):
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 25000
+# MANUAL: confirm the recording/DB row survived and (once D-1 is fixed) the upload resumes.

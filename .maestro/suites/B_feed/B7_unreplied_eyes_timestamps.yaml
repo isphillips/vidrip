@@ -1,0 +1,32 @@
+# B7 — Unreplied rows show animated Drippy eyes + relative timestamps.
+# Requires: P7 seed (account A has an UNREPLIED friend conversation, i.e. state === 'unreplied',
+# so ConversationRow renders eyes={true}). The eyes are a visual animation — see NOTE.
+appId: ${APP_ID}
+tags:
+  - suite-B
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 15000
+
+# The unreplied friend row is present (label = B's display name / @handle). The relative
+# timestamp (e.g. "2h", "1d") is rendered by relativeTime() on the same row.
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+# NOTE: the animated eyes (DrippyEyes) are a purely visual element with NO text and NO testID —
+# Maestro cannot assert the animation. Presence of the unreplied row is the closest automatable
+# proxy; eyes + the exact relative-timestamp string are a MANUAL/visual check.
+# TODO(testID): add a testID to the eyes/timestamp on ConversationRow to make this assertable.

@@ -1,0 +1,64 @@
+# A4 — Create profile: fill the fields, submit. (Plan expected "→ Feed" + a duplicate-handle error.)
+# NOTE: GAP — the REAL behavior differs from the plan and is reflected below:
+#   * There is NO avatar field at profile creation (avatar is added later via Edit Profile).
+#   * There is NO client-side duplicate-handle error — the handle is only normalized
+#     ([a-z0-9_], lowercased); uniqueness is enforced server-side after the magic link.
+#   * Submit does NOT go straight to Feed — it calls signInWithOtp and swaps to a
+#     "Check your email" magic-link confirmation (verified in CreateProfileScreen.tsx).
+# Reaching this screen also needs a valid seeded invite code, so this is effectively BLOCKED:P2.
+appId: ${APP_ID}
+tags:
+  - suite-A
+  - needs-seed
+  - blocked-p2
+---
+# Auth-screen test: must start SIGNED OUT.
+- runFlow:
+    file: ../../helpers/freshLaunch.yaml
+
+# Page past first-run onboarding if it shows.
+- runFlow:
+    when:
+      visible: "DRIP IN"
+    commands:
+      - tapOn: "DRIP IN"
+      - runFlow:
+          when:
+            visible: "Skip for now"
+          commands:
+            - tapOn: "Skip for now"
+      - tapOn: "NEXT"
+      - tapOn: "NEXT"
+      - tapOn: "LET ME IN"
+
+# Redeem a valid code to reach CreateProfile (needs P2 seed).
+- tapOn:
+    id: "welcome-invite-btn"
+- tapOn: "XXXXX-XXXX"
+- inputText: ${SEED_VALID_INVITE_CODE}
+- hideKeyboard
+- tapOn: "Continue"
+- assertVisible: "Create your profile"
+
+# Fill the three fields (Display Name, Handle, Email). No testIDs — target by label/placeholder.
+- tapOn: "Your Name"            # Display Name placeholder
+- inputText: "QA Tester A"
+- tapOn: "yourhandle"           # Handle placeholder (auto-lowercased, [a-z0-9_])
+- inputText: ${TEST_HANDLE_A}
+- tapOn: "you@example.com"      # Email placeholder
+- inputText: ${TEST_EMAIL_A}
+- hideKeyboard
+
+# Submit. Real behavior: sends a magic link and swaps to the "check email" confirmation —
+# NOT a direct jump to Feed.
+- tapOn: "Send Magic Link"
+- assertVisible: "Check your email"
+- assertVisible: "Tap the link in the email to finish creating your profile. You can close this screen."
+
+# ── GAP / blocked tails ──────────────────────────────────────────────────────
+# * "duplicate handle → error": there is no client-side dup-handle check to assert here.
+#   A duplicate handle would surface (if at all) only after the magic-link callback creates
+#   the user server-side. Verifying that needs P1 (follow the email link) + a pre-seeded
+#   account already owning ${TEST_HANDLE_A}. Document, do not fake.
+# * "→ Feed": only reachable after tapping the real magic link (P1, see A2 tail).
+- assertVisible: "← Back"

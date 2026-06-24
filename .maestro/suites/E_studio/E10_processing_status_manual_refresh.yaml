@@ -1,0 +1,40 @@
+# E10 — Published tab shows upload/encode status; a manual refresh re-checks it.
+# BLOCKED:P2 — "Live" is flipped by a server Bunny webhook (not observable in-app); needs a real
+#              just-uploaded post + the encode backend to watch Uploading → Processing → Live.
+# Automatable: open Studio → "Published" tab loads; document the status labels + per-row refresh.
+appId: ${APP_ID}
+tags:
+  - suite-E
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_C}, PASSWORD: ${TEST_PASSWORD_C} }
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "Studio"
+
+# Published is the default tab; tap it explicitly to be deterministic.
+- tapOn: "Published"
+
+# Empty-state copy when there are no published videos (exact from StudioHomeScreen):
+- runFlow:
+    when:
+      visible: "No videos yet. Tap “New video” to create your first."
+    commands:
+      - assertVisible: "No videos yet. Tap “New video” to create your first."
+
+# ── BLOCKED:P2 ───────────────────────────────────────────────────────────────
+# With a seeded/just-uploaded post, each row shows a status dot + label, one of:
+#   "Uploading" / "Processing" / "Live" / "Failed" (STATUS map in StudioHomeScreen).
+# While not "Live", the row also shows a per-row refresh button (Ionicons "refresh", no testID) that
+# calls refreshCreatorVideoStatus to re-check on demand. Pull-to-refresh on the list re-loads too.
+# - assertVisible: "Processing"          # or "Uploading" right after posting
+# - tapOn: { point: "85%,18%" }          # TODO(testID): per-row status refresh button
+# Reaching "Live" depends on the Bunny webhook firing server-side — not triggerable from the app.

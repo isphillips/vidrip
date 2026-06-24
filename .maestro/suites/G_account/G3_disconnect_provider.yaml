@@ -1,0 +1,47 @@
+# G3 — Disconnect a connected provider; its enabled toggle state persists across reloads.
+# BLOCKED:P2 — needs an account with at least one provider already connected (seeded synced_accounts),
+#              since "Disconnect" and the enable <Switch> only render for a CONNECTED row.
+appId: ${APP_ID}
+tags:
+  - suite-G
+  - needs-seed
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+- tapOn:
+    id: "tab-Feed"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+# Creator rows (with enable toggle + Disconnect) require creator mode on.
+- tapOn:
+    text: "Creator mode"
+# TODO(testID): no testID on the Creator-mode <Switch>; add testID="account-creator-switch".
+
+# ── BLOCKED:P2 — disconnect + persistence ────────────────────────────────────
+# With a seeded connected provider (test account A has, say, YouTube connected as 'creator'),
+# the row renders an enable <Switch> and a "Disconnect" link.
+#   - Toggling the enable switch calls setSyncedAccountEnabled and persists; reopening Account
+#     should show the same on/off state (handleToggleEnabled + loadSynced on focus).
+#   - "Disconnect" → confirm Alert.alert('Disconnect', 'Disconnect <Provider>?', [Cancel, Disconnect])
+#     → disconnectSyncedAccount → the row reverts to a plain "Connect" button.
+# UNBLOCKS WHEN (P2): seed a synced_accounts row (connection_type='creator', enabled=true) for the
+# test user, then:
+#   - assertVisible "Disconnect"
+#   # toggle enable, reopen Account, assert the switch persisted (no direct value assert available —
+#   #   relies on a testID; see TODO below)
+#   - tapOn "Disconnect"
+#   - tapOn { text: "Disconnect", index: 1 }     # destructive button in the dialog
+#   - assertVisible "Connect"
+# TODO(testID): no testID on the per-provider enable <Switch>; add one (e.g.
+#   testID="creator-enabled-<provider>") so the persisted toggle value can be asserted.
+- assertVisible: "Account"

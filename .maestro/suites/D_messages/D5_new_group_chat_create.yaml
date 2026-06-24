@@ -1,0 +1,46 @@
+# D5 — "New group chat" slides in from the right (nav preserved); pick ≥2 friends → Create.
+# NEEDS-DEVICE for the VISUAL (right-slide transition / no gutter) — that can't be asserted
+# headlessly. The pick-2 + Create FLOW is automatable; we reach CreateGroupChat and exercise it.
+# Requires: P7 seed (A is friends with BOTH B and C so two rows are selectable).
+appId: ${APP_ID}
+tags:
+  - suite-D
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Messages"
+- assertVisible: "Messages"
+
+- tapOn:
+    id: "nav-friends-blob"
+- tapOn: "New group chat"
+
+# CreateGroupChat screen — exact header + initial hint (Create is disabled with <2 selected).
+- assertVisible: "New Group Chat"
+- assertVisible: "Select at least 2 friends."
+
+# Pick two friends (rows are labelled by display name / @handle). Selecting 2 enables Create.
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+- tapOn:
+    text: ".*${TEST_HANDLE_C}.*"
+- assertVisible: "Create"
+- tapOn: "Create"
+
+# Group chat opens (replace → left the picker; "New Group Chat" gone).
+- assertNotVisible: "New Group Chat"
+- assertVisible:
+    id: "tab-Messages"
+    timeout: 25000
+# NOTE (NEEDS-DEVICE): the right-slide transition + edge-to-edge (no gutter) presentation is a
+# visual property only verifiable on a device; the create flow above is the automatable part.

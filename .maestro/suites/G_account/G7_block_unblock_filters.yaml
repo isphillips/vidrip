@@ -1,0 +1,43 @@
+# G7 — Block a user → their content disappears app-wide; unblock restores it.
+# BLOCKED:P2 — needs a populated user_blocks store + seeded content authored by a second user
+#              (test account B) so there is something to filter and then restore.
+appId: ${APP_ID}
+tags:
+  - suite-G
+  - needs-seed
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# Anchor on a signed-in surface; the rest is blocked on seed data.
+- assertVisible:
+    id: "tab-Feed"
+
+# ── BLOCKED:P2 — block / unblock filtering ───────────────────────────────────
+# The block affordance is the shared <ContentActions> component (src/components/ContentActions.tsx),
+# rendered next to user-generated content (e.g. on a profile, a reaction, a shared clip). Two variants:
+#   * 'icon'   — an ellipsis button that opens a sheet with a "Block <handle>" / "Unblock <handle>" row.
+#   * 'inline' — labelled "Report" / "Block" (or "Unblock") buttons (used on profiles).
+# Block flow: tap Block → Alert.alert('Block', 'Block <who>? You won’t see each other anywhere in the
+#   app.', [Cancel, Block]) → on confirm, useBlockStore.block(targetUserId) → Alert 'Blocked',
+#   'You won’t see <who> anymore.' After this, that user's content is filtered out everywhere.
+# Unblock flow: tap Unblock → Alert.alert('Unblock', 'Unblock <who>?', [Cancel, Unblock]) → content returns.
+#
+# This needs (P2): test account B with seeded, A-visible content, so we can:
+#   1. assert B's content is visible,
+#   2. open ContentActions on it and confirm Block,
+#   3. assert B's content is now GONE across Feed/Channels/profile,
+#   4. Unblock and assert it returns.
+# TODO(testID): <ContentActions> exposes no testID on its ellipsis trigger, the sheet's Block row,
+#   or the inline Block button — add testIDs (e.g. testID="content-actions-trigger",
+#   "content-actions-block") so block/unblock can be driven deterministically.
+- assertVisible:
+    id: "tab-Feed"

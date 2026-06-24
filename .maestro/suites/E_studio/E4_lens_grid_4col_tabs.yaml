@@ -1,0 +1,42 @@
+# E4 — Lens picker: 4-column edge-to-edge grid; category tabs switch the lens set.
+# Requires: real device — the LensPicker lives on the Studio Capture (camera) screen.
+appId: ${APP_ID}
+tags:
+  - suite-E
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "New video"
+- tapOn: "New video"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# The lens picker is the gradient pill at the TOP CENTER of the Capture screen (LensPicker.tsx).
+# It shows the active lens label ("None" by default). Tapping it slides down a panel with:
+#   - a 4-column, edge-to-edge grid of lens tiles (COLS = 4, space-between, never wraps to 3), and
+#   - a row of category tabs that switch which lenses fill the grid.
+#
+# Verified tab labels (LensPicker TABS): "Mask", "Warp", "Overlay", "Interactive".
+# (The grid's first tile is always "None".)
+#
+# On device, with the camera live:
+# - tapOn: "None"            # the lens pill (label is the active lens; "None" until one is picked)
+# - assertVisible: "Mask"
+# - assertVisible: "Warp"
+# - assertVisible: "Overlay"
+# - assertVisible: "Interactive"
+# - assertVisible: "None"    # the always-present first grid tile
+# Switch tabs and confirm the grid repopulates (lens labels are data-driven from LENSES):
+# - tapOn: "Warp"
+# - tapOn: "Interactive"
+#
+# NOTE(prompt-vs-source): the spec listed the first tab as "Mesh"; the SHIPPED label is "Mask".

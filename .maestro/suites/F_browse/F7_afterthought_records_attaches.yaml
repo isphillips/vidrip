@@ -1,0 +1,41 @@
+# F7 — Afterthought: after a (non-queued) reaction stops, a 5s window offers a short outro clip that
+#      attaches to the reaction.
+# Requires: P7 (B's pending share to A) + real device (camera). The afterthought is only offered on
+#           the NON-QUEUED friend-share path (allowAfterthought = !queued); channel reactions disable it.
+appId: ${APP_ID}
+tags:
+  - suite-F
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# Record a reaction and stop it (square stop button). On the non-queued friend-share path, a 5s
+# decision overlay appears (afterPhase 'countdown'). Exact strings (ReactionRecorder):
+#   title: "Add an afterthought?"
+#   sub:   "A quick clip that plays after your reaction. Sending in {n}s…"   (n counts 5→0)
+#   buttons: "Send now"  and  "Record afterthought"
+#
+# On device, after stopping the main reaction:
+# - assertVisible: "Add an afterthought?"
+# - assertVisible: "Send now"
+# - assertVisible: "Record afterthought"
+# Tapping "Record afterthought" records a short selfie clip (up to 30s) that is attached to the
+# reaction on save; "Send now" (or the countdown reaching 0) sends without one.
+# - tapOn: "Record afterthought"

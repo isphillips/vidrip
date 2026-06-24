@@ -1,0 +1,51 @@
+# A7 — Facebook two-phase: connect returns a Pages list → pick a Page; if the picker is dismissed,
+#       the row shows "Connected, choose a Page" and offers a "Choose Page" resume.
+# BLOCKED:P1 — phase 1 needs the system-browser Facebook auth + oauth-callback, which Maestro can't drive.
+appId: ${APP_ID}
+tags:
+  - suite-A
+  - needs-device
+  - blocked-p1
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+- tapOn:
+    id: "tab-Feed"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+
+# The Facebook provider row lives under "Creator Accounts" (creator mode only). Turn it on.
+- tapOn:
+    text: "Creator mode"
+# TODO(testID): no testID on the Creator-mode <Switch>; add testID="account-creator-switch"
+# so this toggle is deterministic instead of relying on the label row.
+- runFlow:
+    when:
+      visible: "Creator Accounts"
+    commands:
+      - assertVisible: "Facebook"
+
+# ── BLOCKED:P1 — the two-phase Facebook flow ─────────────────────────────────
+# Phase 1: Connect (Facebook) → system browser → callback with code → connectFacebook()
+#          returns the user's managed Pages → the picker modal opens:
+#            title "Choose a Facebook Page", hint "Reels are imported from a Page you manage...",
+#            a list of Page rows, and a "Cancel" button.
+# Phase 2: tapping a Page row → importFacebookPage() imports that Page's reels; modal closes.
+# Dismiss path: tapping "Cancel" leaves a pending FB connection → the row shows
+#            "Connected, choose a Page" with a "Choose Page" button (handleResumeFacebook re-lists
+#            Pages from the stored token — no reconnect needed).
+# Maestro cannot complete the browser auth that produces the Pages list, so the modal can't be opened here.
+# UNBLOCKS WHEN (P1): stub the FB oauth-callback, e.g.
+#   - openLink: "reaxn://oauth-callback?provider=facebook&type=creator&code=TEST"
+#   then assertVisible "Choose a Facebook Page"; tapOn <Page row>; assertNotVisible "Choose a Facebook Page".
+#   For the dismiss path: tapOn "Cancel"; assertVisible "Connected, choose a Page"; assertVisible "Choose Page".
+- assertVisible: "Account"

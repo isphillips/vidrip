@@ -98,6 +98,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
         {/* Mode toggle */}
         <View style={styles.toggle}>
           <TouchableOpacity
+            testID="signin-mode-magic"
             style={[styles.toggleBtn, mode === 'magic' && styles.toggleBtnActive]}
             onPress={() => setMode('magic')}>
             <Text style={[styles.toggleTxt, mode === 'magic' && styles.toggleTxtActive]}>
@@ -105,6 +106,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            testID="signin-mode-password"
             style={[styles.toggleBtn, mode === 'password' && styles.toggleBtnActive]}
             onPress={() => setMode('password')}>
             <Text style={[styles.toggleTxt, mode === 'password' && styles.toggleTxtActive]}>
@@ -118,6 +120,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
         </Text>
 
         <TextInput
+          testID="signin-email"
           style={styles.input}
           value={email}
           onChangeText={setEmail}
@@ -132,6 +135,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
         {mode === 'password' && (
           <View style={styles.passwordRow}>
             <TextInput
+              testID="signin-password"
               style={styles.passwordInput}
               value={password}
               onChangeText={setPassword}
@@ -154,6 +158,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
 
         {mode === 'magic' ? (
           <GradientButton
+            testID="signin-submit-magic"
             label="Send Magic Link"
             icon="sparkles"
             onPress={handleMagicLink}
@@ -163,6 +168,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
           />
         ) : (
           <GradientButton
+            testID="signin-submit-password"
             label="Sign In"
             onPress={handlePasswordSignIn}
             disabled={!validEmail || !password}

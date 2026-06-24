@@ -1,0 +1,35 @@
+# H1 — The Feed's Exclusive rail shows awarded gifts/collections when the account has them.
+# Requires: P7 seed — account A has at least one awarded collection OR unopened gift (or run with
+# DEMO_MODE). The rail (ExclusiveRail) renders NOTHING when the user has no exclusive content, so
+# the seed is mandatory for this assertion to pass.
+appId: ${APP_ID}
+tags:
+  - suite-H
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+# Land on Feed (sign-in helper ends here; if chained, tap to be sure).
+- tapOn:
+    id: "tab-Feed"
+
+# The horizontal rail on the Feed home is headed "Exclusive Content".
+- assertVisible:
+    text: "Exclusive Content"
+    timeout: 15000
+
+# The seeded collection appears as a tile in the rail.
+- assertVisible:
+    text: "${SEED_EXCLUSIVE_COLLECTION}"
+    timeout: 15000
+
+# NOTE: An unopened award shows a "NEW" badge on its gift tile; a count bubble sits next to the
+# heading. These only appear when there's an UNOPENED gift, so they're not asserted here (the
+# seeded collection may already be opened). H2 covers the unopened-gift reveal path.

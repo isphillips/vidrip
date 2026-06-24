@@ -1,0 +1,43 @@
+# E1 — Studio is a bottom tab; FAB opens StudioHome with the bottom nav (no top X); going deeper hides the nav.
+# NOTE: deep-step assertion — on the Capture screen the bottom tabs are gone and a top X (close) appears instead.
+appId: ${APP_ID}
+tags:
+  - suite-E
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# Studio is reached by the bottom FAB (testID tab-Studio) → StudioHomeScreen.
+- tapOn:
+    id: "tab-Studio"
+# StudioHome: header "Studio" + bottom CTA "New video".
+- assertVisible: "Studio"
+- assertVisible: "New video"
+
+# Bottom nav is present on StudioHome (the other tab FABs are still mounted) and there is no top X here.
+- assertVisible:
+    id: "tab-Feed"
+- assertVisible:
+    id: "tab-Channels"
+
+# Go one step deeper into the creation chain → Capture. The bottom nav hides; the Capture screen
+# owns the camera surface and shows its own close (X) at the top instead.
+- tapOn: "New video"
+
+# ── On Capture: bottom nav is gone (deeper steps hide it). Asserting absence of a tab FAB is the
+#    stable signal that the nav hid. The camera surface itself is device-only.
+- assertNotVisible:
+    id: "tab-Feed"
+# The Capture screen's own close control is a top-left "X" (Ionicons close — no testID, no text);
+# tap it to back out and land on StudioHome again with the nav restored.
+# - tapOn: { point: "8%,7%" }   # TODO(testID): Capture close (X) button
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 10000

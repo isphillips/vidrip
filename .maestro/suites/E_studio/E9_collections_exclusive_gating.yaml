@@ -1,0 +1,37 @@
+# E9 — Collections / exclusive gating: group videos into exclusive collections, awarded to subs/fans.
+# BLOCKED:P2 — award + entitlement (who can watch) is enforced server-side (RLS); not statically verifiable.
+# Reachable: StudioHome → the Exclusive (diamond) icon → StudioCollectionsScreen (header "Exclusive").
+appId: ${APP_ID}
+tags:
+  - suite-E
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      # Collections belong to a creator.
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_C}, PASSWORD: ${TEST_PASSWORD_C} }
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "Studio"
+
+# Open Collections from the diamond-outline icon in the StudioHome header (top right, before the
+# calendar icon). It has no testID and no text label → point-tap the header icon.
+# - tapOn: { point: "82%,7%" }   # TODO(testID): Studio "Exclusive/Collections" (diamond) header button
+
+# Once on the Collections screen, header is "Exclusive"; new-collection CTA is "New collection".
+# - assertVisible: "Exclusive"
+# - assertVisible: "New collection"
+# Empty-state copy (no collections yet), exact from StudioCollectionsScreen:
+# - assertVisible: "No collections yet"
+# - assertVisible: "Group videos into exclusive collections and award them to subscribers or individual fans."
+
+# ── BLOCKED:P2 ───────────────────────────────────────────────────────────────
+# Creating a collection, adding videos, and awarding it gate visibility via RLS — an ungranted
+# viewer simply gets no rows (no client "gated" screen). Verify the granted-vs-ungranted split at
+# the data layer (mirrors Suite H / H3). The Collections UI itself is reachable per the taps above.

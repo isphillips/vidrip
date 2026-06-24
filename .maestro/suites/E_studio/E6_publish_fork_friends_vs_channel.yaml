@@ -1,0 +1,49 @@
+# E6 — Details (publish) fork: creator-only "Friends" vs "Channel" toggle; Channel locks without creator_studio.
+# Requires: real device to reach Details with a baked clip.
+# BLOCKED:P2 — actual delivery (friend share / channel post) needs the publish backend.
+# NOTE: the Friends/Channel toggle renders ONLY for is_creator users (sign in as the creator account).
+appId: ${APP_ID}
+tags:
+  - suite-E
+  - needs-device
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      # Sign in as the CREATOR account (C) — the destination fork only shows for is_creator.
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_C}, PASSWORD: ${TEST_PASSWORD_C} }
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "New video"
+- tapOn: "New video"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# Capture → Trim → Looks → Music → Overlays → Next → Details (StudioDetailsScreen, header "New video").
+#
+# Details shows a "Post to" segmented toggle for creators: "Friends" vs "Channel".
+#   - "Friends" (Path A): a "Send to" friend list + CTA "Send to friends" / "Send to N friend(s)".
+#   - "Channel" (Path B): a channel picker, "Who can watch" (Public/Subscribers), and a
+#     "When to publish" toggle ("Post now" / "Schedule"); CTA "Post video" / "Schedule post".
+#     Channel is LOCKED (disabled, lock icon) unless the creator has creator_studio (canCreate).
+#
+# On device:
+# - assertVisible: "New video"   # Details header
+# - assertVisible: "Post to"
+# - assertVisible: "Friends"
+# - assertVisible: "Channel"
+# - assertVisible: "Send to"     # default Path A (Friends) section
+# Switch to the channel fork:
+# - tapOn: "Channel"
+# - assertVisible: "Who can watch"
+# - assertVisible: "Public"
+# - assertVisible: "Subscribers"
+# - assertVisible: "When to publish"
+#
+# BLOCKED:P2 — pressing the final CTA ("Send to friends" / "Post video") performs the real
+# upload + delivery (Supabase storage / channel post). Stop at the toggle assertions above.

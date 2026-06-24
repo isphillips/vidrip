@@ -13,7 +13,7 @@ import { C } from '../theme';
 const YELLOW = '#FFD86B';
 const IDLE = '#FFFFFF';
 
-export default function AccountBlob({ size = 34, active = false }: { size?: number; active?: boolean }) {
+export default function AccountBlob({ size = 34, active = false, testID = 'nav-account-blob' }: { size?: number; active?: boolean; testID?: string }) {
   const tint = active ? YELLOW : IDLE;
   const live = useSharedValue(0);
   const blink = useSharedValue(1);
@@ -37,7 +37,10 @@ export default function AccountBlob({ size = 34, active = false }: { size?: numb
   const lidStyle = useAnimatedStyle(() => ({ transform: [{ scaleY: blink.value }] }));
 
   return (
-    <View style={[
+    <View
+      testID={testID}
+      accessibilityLabel="Account"
+      style={[
       styles.ring,
       { width: size, height: size, borderRadius: size / 2 },
       { borderColor: active ? 'rgba(255,216,107,0.7)' : 'rgba(255,255,255,0.35)' },

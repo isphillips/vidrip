@@ -79,6 +79,11 @@ yarn-error.log
 # testing
 /coverage
 
+# Maestro E2E — local creds / Maestro run artifacts (never commit real test-account passwords)
+.maestro/vars/local.env
+.maestro/**/*.local.env
+~/.maestro/tests/
+
 # Yarn
 .yarn/*
 !.yarn/patches

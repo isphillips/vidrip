@@ -1,0 +1,74 @@
+# K5 — Bottom nav hides on Studio sub-screens; Android hardware back pops back to it.
+# NEEDS-DEVICE: the StudioCapture sub-screen mounts the live camera (VisionCamera), so the
+#               capture UI only fully renders on a real device; on a simulator it shows
+#               "Camera unavailable on simulator." but the nav-hide + back behaviour still hold.
+# NOTE: `pressKey: Back` is Android-only (no iOS hardware back). The Studio sub-screens do NOT
+#       override hardware back (the only hardwareBackPress override in the app is in ShareHome,
+#       per src/features/share/screens/ShareHomeScreen.tsx) — so Android Back just pops the
+#       native stack: StudioCapture → StudioHome.
+appId: ${APP_ID}
+tags:
+  - suite-K
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# ── On StudioHome the bottom nav IS shown ────────────────────────────────────
+# tab-Studio is the centre FAB (testID="tab-Studio" on the GlowFab) → lands on StudioHome.
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "New video"
+# Sanity: a sibling tab id is present on StudioHome (bar visible). Studio home has no
+# account-blob (E2E_AUDIT D-4), so anchor on another tab's id instead.
+- assertVisible:
+    id: "tab-Feed"
+
+# ── Enter a Studio sub-screen → the whole bottom bar hides ───────────────────
+# "New video" → navigation.navigate('StudioCapture'). MainTabBar returns null whenever the
+# Studio stack's active route is anything other than 'StudioHome'
+# (src/app/navigation/MainTabBar.tsx: `if (sub && sub !== 'StudioHome') return null`).
+- tapOn: "New video"
+# The bar (and therefore every tab id) is gone on the capture sub-screen.
+- assertNotVisible:
+    id: "tab-Feed"
+- assertNotVisible:
+    id: "tab-Channels"
+- assertNotVisible:
+    id: "tab-Studio"
+
+# ── Android hardware back returns to StudioHome (and the bar comes back) ──────
+# StudioCapture has a back arrow (navigation.goBack()) and does NOT trap hardware back,
+# so the Android system Back pops StudioCapture → StudioHome.
+- pressKey: Back
+- assertVisible: "New video"          # back on StudioHome
+- assertVisible:
+    id: "tab-Feed"                    # bottom bar restored
+
+# ── Android hardware back from a pushed (non-Studio) screen ──────────────────
+# Generic check that hardware Back pops a pushed stack screen rather than exiting the app.
+# Open Account (a pushed home with a screen-unique "Account" title), then Back to the tab.
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+- pressKey: Back
+# Popped back to a tab surface (bottom bar present again); we don't assert a specific screen
+# title here because Back lands on whichever tab was last active.
+- assertVisible:
+    id: "tab-Feed"
+
+# ── Notes ────────────────────────────────────────────────────────────────────
+# - iOS has no hardware Back; the equivalent there is the edge swipe-back gesture, which is
+#   device/gesture-only and not reliably scriptable in Maestro — verify by hand on iOS.
+# - Deeper Studio steps (StudioTrim/Filter/Audio/Overlay/Details) also hide the bar by the same
+#   rule, but reaching them past StudioCapture requires a real recording (camera) — out of scope
+#   here; StudioCapture is enough to prove the nav-hide + back contract.
+# TODO(testID): StudioCapture exposes no testID on its back arrow or "Upload" control; this flow
+#   relies on the system Back key + visible "New video" / "Account" text and the tab-* ids.

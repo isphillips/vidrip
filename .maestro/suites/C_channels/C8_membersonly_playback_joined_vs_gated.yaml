@@ -1,0 +1,45 @@
+# C8 — Members-only channel playback: a joined/entitled subscriber watches; a non-member is gated.
+# BLOCKED:P2 — entitlement is set via WEB CHECKOUT (no in-app purchase). Account A can't be made a
+# subscriber on-device, so the "joined subscriber watches" leg can't be automated; the gated leg
+# (non-member sees the read-only paywall) is the reachable part.
+# Requires: P7 seed — ${SEED_MEMBERS_ONLY_CHANNEL} exists and account A is NOT a subscriber.
+appId: ${APP_ID}
+tags:
+  - suite-C
+  - needs-seed
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    text: "${SEED_MEMBERS_ONLY_CHANNEL}"
+    timeout: 15000
+- tapOn:
+    text: "${SEED_MEMBERS_ONLY_CHANNEL}"
+
+# Non-subscriber: subscriber-mode content is replaced by the read-only paywall ("Subscribers only").
+# This is the gated (non-member) leg — reachable and assertable.
+- assertVisible:
+    text: "Subscribers only"
+    timeout: 15000
+
+# ── BLOCKED:P2 — joined subscriber watches ───────────────────────────────────
+# When A is an entitled subscriber the paywall is gone and the video grid renders; tapping a tile
+# opens playback. That requires a real subscription (web checkout) — can't be set on-device.
+# Unblock: stub entitlement server-side (mark A a subscriber of ${SEED_MEMBERS_ONLY_CHANNEL}),
+# re-enter, confirm the grid shows instead of "Subscribers only", then open a video.
+#   - assertNotVisible: "Subscribers only"
+#   - ... tap a video tile → playback ...
+
+# Stable end assert.
+- assertVisible:
+    id: "tab-Channels"

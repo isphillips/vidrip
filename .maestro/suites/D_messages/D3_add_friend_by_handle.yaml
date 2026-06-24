@@ -1,0 +1,44 @@
+# D3 — Friends menu → "Add a friend" → AddFriend screen → add by handle → back to Messages.
+# Automatable: reach AddFriend, assert its copy + input, type a handle. We DON'T submit a real
+# request (avoids mutating friend state); the reachable proof is the screen + input.
+# NOTE: this screen is handle-only — there is NO invite-code entry here (codes live in Import).
+appId: ${APP_ID}
+tags:
+  - suite-D
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Messages"
+- assertVisible: "Messages"
+
+- tapOn:
+    id: "nav-friends-blob"
+- tapOn: "Add a friend"
+
+# AddFriend screen — exact copy + handle input.
+- assertVisible: "Add a Friend"
+- assertVisible: "Enter their handle and Drippy will pass along your request."
+- assertVisible: "Send Request"
+
+# Type a handle into the placeholder field (don't submit — keeps friend state clean).
+- tapOn:
+    text: "theirhandle"
+- inputText: ${TEST_HANDLE_C}
+- hideKeyboard
+# Send Request would dispatch a real friend request (Alert "Request sent!") — leave commented to
+# avoid mutating backend state.
+# - tapOn: "Send Request"
+
+# Back button returns to Messages.
+- tapOn:
+    point: "8%,8%"          # TODO(testID): AddFriend has no in-screen back button — uses the
+                            # native header back (top-left). Point-tap the header back area.
+- assertVisible: "Messages"

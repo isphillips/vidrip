@@ -1,0 +1,52 @@
+# C5 — React to a channel post; the post's reaction count increments.
+# Requires: P7 seed — ${SEED_CHANNEL_NAME} has at least one post NOT authored by account A,
+# that A has NOT yet reacted to.
+# NEEDS-DEVICE: recording a reaction needs a real camera; the record/save leg can't run headless.
+appId: ${APP_ID}
+tags:
+  - suite-C
+  - needs-seed
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+- tapOn:
+    text: "${SEED_CHANNEL_NAME}"
+
+# Public/members-only channels react by tapping a POST tile in the grid (NOT floating buttons —
+# those exist only in private DM chats; see C7). A not-yet-reacted post tile reads "React to reveal".
+# TODO(testID): grid post tiles have no testID; tapping by the "React to reveal" caption is the
+# stable handle for an obscured (not-yet-reacted) post.
+- assertVisible:
+    text: "React to reveal"
+    timeout: 15000
+- tapOn: "React to reveal"
+
+# On the post screen the primary CTA is "Record Your Reaction" (shown when it's not your post
+# and you haven't reacted yet). This is the reachable boundary before camera.
+- assertVisible:
+    text: "Record Your Reaction"
+    timeout: 15000
+
+# ── NEEDS-DEVICE: record + save the reaction ─────────────────────────────────
+# - tapOn: "Record Your Reaction"
+# - ... record / stop / save on a real device ...
+# After saving, the post screen reaction count updates: the section header changes from
+# "No reactions yet" to "1 reaction" (or N+1), and the CTA flips to "You Reacted ✓".
+# Unblock: run on a physical device with camera + mic permissions pre-granted.
+#   - assertVisible: "You Reacted ✓"
+
+# Stable end assert (reachable without a camera).
+- assertVisible: "Record Your Reaction"

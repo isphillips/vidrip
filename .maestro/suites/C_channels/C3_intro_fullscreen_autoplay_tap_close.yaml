@@ -1,0 +1,34 @@
+# C3 — Tapping a card's Intro tile opens a full-screen autoplay modal; tap anywhere closes it.
+# Requires: P7 seed — ${SEED_CHANNEL_NAME} has an intro video (ad_video_url) so the Intro tile renders.
+appId: ${APP_ID}
+tags:
+  - suite-C
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+
+# Tap the card's Intro tile → ChannelsHomeScreen opens a full-screen Video modal (paused=false,
+# auto-closes onEnd). It autoplays; there is no chrome/text to assert inside the player, so we
+# tap anywhere to dismiss (the player is a full-screen TouchableOpacity → onPress closes it).
+- tapOn: "Intro"
+- tapOn:
+    point: "50%,50%"          # tap the full-screen intro player to close it
+
+# Back on the Channels list after closing.
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 10000
+- assertVisible: "Channels"

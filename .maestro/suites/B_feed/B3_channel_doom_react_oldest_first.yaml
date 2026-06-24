@@ -1,0 +1,42 @@
+# B3 — Tap a channel row → doom-react its UNWATCHED posts oldest-first, then continue the Feed.
+# NEEDS-DEVICE: the chain records camera against each post in sync; live capture needs hardware.
+# Requires: P7 seed (account A follows creator channel C which has ≥2 UNREACTED posts).
+appId: ${APP_ID}
+tags:
+  - suite-B
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+
+# A followed channel with unseen uploads surfaces as a Feed row titled by the channel name,
+# with a "N new video(s) to react to" subtitle.
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+- tapOn:
+    text: "${SEED_CHANNEL_NAME}"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# Tapping the channel row fetches its posts, queues unwatched parent posts OLDEST-FIRST, then
+# appends the rest of the Feed's pending shares, and opens RecordReaction on the first. On device:
+#   1. RecordReaction mounts on the channel's oldest unwatched post.
+#   2. Record / stop / save; the queue advances to the next-oldest, then to Feed shares.
+# Maestro can't validate live camera frames or assert per-post ordering from the recorder UI.
+# - tapOn: { point: "50%,90%" }   # TODO(testID): record control on RecordReaction (no testID)
+# - tapOn: { point: "50%,90%" }   # TODO(testID): stop control
+#
+# Unblocks: real device + a seed of ≥2 channel posts with known created_at to prove oldest-first.
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 25000

@@ -1,0 +1,41 @@
+# F3 — Reaction recorder caps at 180s with a live countdown badge + receding cap bar.
+# Requires: P7 (mutual friends A+B; B has an UNREACTED share pending to A) + real device (camera).
+# The recorder is reached via the Feed doom-react path (same entry as SM4).
+appId: ${APP_ID}
+tags:
+  - suite-F
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# A pending friend-share from B surfaces as an actionable Feed row → tapping it opens RecordReaction.
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# RecordReactionScreen mounts ReactionRecorder with maxDuration={180} (RecordReactionScreen.tsx:181,195).
+# The source video plays in the background and drives recording; the front camera records in a PIP.
+#
+# While recording (maxDuration set), the recorder shows:
+#   - a receding cap bar at the top (gold → red as 180s approaches), and
+#   - a countdown timer badge "MM:SS" above the record button = time REMAINING (maxDuration − elapsed),
+#     i.e. it starts at "03:00" and counts down; the recording auto-stops (handleStop) at 0.
+# The badge has no testID/stable text (it's a live clock), so there is nothing to assertVisible on
+# verbatim — verify the countdown + auto-stop visually on device.
+#
+# In __DEV__ a "DEV ▶ rec" button starts recording manually (source players don't play in the sim),
+# which lets the cap bar / auto-stop be exercised without a real source video.

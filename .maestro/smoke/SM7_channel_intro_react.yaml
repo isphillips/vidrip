@@ -1,0 +1,38 @@
+# SM7 — Open a Channel, play its intro, react to a video → reaction recorded.
+#
+# Requires: P7 (creator channel C with an intro ad_video_url + at least one post) and a
+# real device (camera for the reaction).
+appId: ${APP_ID}
+tags:
+  - smoke
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+- tapOn:
+    text: "${SEED_CHANNEL_NAME}"
+
+# Play the Intro tile (full-screen autoplay, closes on end / tap).
+- tapOn: "Intro"
+- tapOn:
+    point: "50%,50%"     # tap to close the intro modal
+
+# ── NEEDS-DEVICE: react to a post ────────────────────────────────────────────
+# Open a post → "Record Your Reaction" → record → save. Camera-only.
+# - tapOn: "Record Your Reaction"
+# - ... record / stop on device ...
+- assertVisible:
+    id: "tab-Channels"

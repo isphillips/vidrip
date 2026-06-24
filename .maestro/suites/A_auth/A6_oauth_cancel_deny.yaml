@@ -1,0 +1,39 @@
+# A6 — OAuth cancel/deny → "Couldn't connect" alert; no stuck spinner; row stays on "Connect".
+# BLOCKED:P1 — requires returning from the system browser with an error/no-code via the
+#              oauth-callback deep link, which Maestro cannot drive.
+appId: ${APP_ID}
+tags:
+  - suite-A
+  - needs-device
+  - blocked-p1
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+- tapOn:
+    id: "tab-Feed"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+- assertVisible: "Liked Sources"
+- assertVisible: "Connect"
+
+# ── BLOCKED:P1 — deny/cancel branch ──────────────────────────────────────────
+# Expected: tapping Connect → browser → user cancels/denies → the callback returns
+# `error` or no `code`. The pending-OAuth effect in AccountScreen.tsx then raises
+#   Alert.alert(`Couldn't connect ${label}`, error ?? 'The login was cancelled or returned no authorization code.')
+# the syncing spinner is cleared (no stuck "Connecting…"), and the row stays on "Connect".
+# Maestro cannot make the external browser return a denial.
+# UNBLOCKS WHEN (P1): simulate the error callback, e.g.
+#   - openLink: "reaxn://oauth-callback?provider=youtube&type=feed&error=access_denied"
+#   then assertVisible "Couldn't connect YouTube"
+#        and assertNotVisible "Connecting…"
+#        and assertVisible "Connect"  (row unchanged)
+- assertVisible: "Account"

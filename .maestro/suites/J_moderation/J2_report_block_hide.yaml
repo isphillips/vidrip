@@ -1,0 +1,89 @@
+# J2 — Report a clip, then Block its author; blocked author's content is filtered app-wide.
+# Requires: P7 seed — account A has ≥1 actionable Feed share from account B (an UNREACTED
+#           share that opens the WatchReaction surface), so there is a reportable item whose
+#           author (B) can be reported/blocked, and B-authored content to confirm filtering on.
+appId: ${APP_ID}
+tags:
+  - suite-J
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+- tapOn:
+    id: "tab-Feed"
+
+# The seeded share from B surfaces as an actionable Feed row labelled with B's name/@handle.
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# ── Reach the ContentActions affordance ──────────────────────────────────────
+# Tapping B's row opens the WatchReaction surface (src/features/threads/screens/
+# WatchReactionScreen.tsx). It renders <ContentActions variant="icon"> at top-right
+# (only when reactorId !== current user), i.e. an ellipsis ("ellipsis-horizontal")
+# button with accessibilityLabel "More options" that opens the moderation sheet.
+- assertVisible:
+    text: "More options"        # accessibilityLabel on the ellipsis trigger
+    timeout: 15000
+- tapOn:
+    text: "More options"
+
+# ── Report leg ───────────────────────────────────────────────────────────────
+# Sheet step 'menu' shows a "Report" row and (for others' content) a "Block @<handle>" row.
+- assertVisible: "Report"
+- tapOn: "Report"
+# Step 'reason' lists the five fixed reasons (src/components/ContentActions.tsx REASONS).
+- assertVisible: "Why are you reporting this?"
+- assertVisible: "Spam or scam"
+- tapOn: "Spam or scam"
+# Successful report → Alert.alert('Report received', 'Thanks for flagging this…').
+- assertVisible: "Report received"
+- tapOn: "OK"
+
+# ── Block leg ────────────────────────────────────────────────────────────────
+# Re-open the sheet and block B. The Block row reads "Block @<handle>" (who = @handle).
+- tapOn:
+    text: "More options"
+- assertVisible:
+    text: ".*Block.*${TEST_HANDLE_B}.*"
+- tapOn:
+    text: ".*Block.*${TEST_HANDLE_B}.*"
+# Confirmation: Alert.alert('Block', 'Block @<handle>? You won’t see each other anywhere…',
+#   [Cancel, Block]) → on confirm useBlockStore.block(targetUserId) → Alert 'Blocked'.
+- assertVisible:
+    text: "Block .*anywhere in the app.*"
+- tapOn: "Block"
+- assertVisible: "Blocked"
+- tapOn: "OK"
+
+# ── Block filtering is the visible effect ────────────────────────────────────
+# After blocking, B's content is filtered everywhere (useBlockStore). Returning to Feed,
+# B's row should be gone. onBlocked fires to refresh/dismiss the now-blocked surface; if it
+# leaves us on the WatchReaction screen, an Android/back or tab-tap returns to Feed.
+- tapOn:
+    id: "tab-Feed"
+- assertNotVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# ── Notes / known limits ─────────────────────────────────────────────────────
+# - "Hide" (the third moderation verb in the case name) is NOT part of ContentActions; it is
+#   a separate, surface-specific affordance: swipe-to-Hide a conversation row in Messages
+#   (delete-for-me, AsyncStorage 'vidrip_hidden_convs' — automated in D8_swipe_to_hide.yaml).
+#   ContentActions itself only offers Report + Block/Unblock.
+# - Full app-wide filtering proof (Channels posts, profile, comments authored by B all vanish,
+#   then return on Unblock) needs the broader P2 block-store seed — see G7_block_unblock_filters.yaml.
+# TODO(testID): <ContentActions> exposes NO testID on its ellipsis trigger
+#   (accessibilityLabel "More options" only), the sheet's "Report"/"Block"/"Unblock" rows, the
+#   reason rows, or the inline Report/Block buttons. Selection here leans on visible text +
+#   accessibilityLabel. Add e.g. testID="content-actions-trigger" / "content-actions-report" /
+#   "content-actions-block" / "content-actions-reason-<key>" for deterministic driving.

@@ -1,0 +1,40 @@
+# C7 — Floating mic+video record buttons (Studio-style, above the nav): empty + populated states.
+# NOTE: GAP / EXPECTATION MISMATCH (E2E_AUDIT C7/D-2) — these floating record buttons render ONLY
+# in PRIVATE DM chats (ChannelScreen `!isPublic` branch). On PUBLIC and MEMBERS-ONLY channels
+# (which use the video-grid UI), they do NOT render. The spec expected them on channels; this flow
+# asserts their ABSENCE on a public channel and documents the mismatch.
+# Requires: P7 seed — ${SEED_CHANNEL_NAME} (a public/members-only channel).
+appId: ${APP_ID}
+tags:
+  - suite-C
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+- tapOn:
+    text: "${SEED_CHANNEL_NAME}"
+
+# Public/members-only channel: the grid UI is shown. The floating video + mic record bar (the
+# `barBtns` block, rendered only when `!isPublic`) must be ABSENT here. There is no text label on
+# those icon-only buttons to assert; the meaningful check is that the channel-grid surface loaded
+# (header back-nav present) while the DM-only recorder UI is not part of this screen.
+# TODO(testID): the floating record buttons (videocam + mic) have NO testID, so their absence
+# can't be asserted with assertNotVisible by id. Add e.g. channel-record-video / channel-record-mic
+# testIDs to make this gap testable directly. Until then, this is a documented expectation mismatch:
+# the buttons are correctly absent on public/members-only channels by design.
+
+# Stable end assert: we are on the (public) channel screen, not a DM chat.
+- assertVisible:
+    id: "tab-Channels"

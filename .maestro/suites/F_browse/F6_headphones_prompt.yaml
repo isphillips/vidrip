@@ -1,0 +1,36 @@
+# F6 — On record-start with no headphones, a toast prompts the user to use headphones.
+# Requires: real device — the headphones check is a native audio-route query (checkHeadphonesConnected);
+# the toast only fires inside beginRecording (camera must be live). NEEDS-DEVICE.
+appId: ${APP_ID}
+tags:
+  - suite-F
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# On record-start (beginRecording), the recorder checks the audio route. If NO headphones are
+# connected it shows a transient (3s) toast near the top. Exact text (ReactionRecorder):
+#   "🎧 Use headphones for cleaner audio"
+#
+# With the source video playing (or via DEV ▶ rec in __DEV__) so recording begins, on a device WITHOUT
+# headphones:
+# - assertVisible: "🎧 Use headphones for cleaner audio"
+# (With headphones connected the toast is suppressed — the source plays in-ear so the mic captures
+# voice only.)

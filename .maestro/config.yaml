@@ -1,0 +1,25 @@
+# Maestro workspace config for Vidrip E2E.
+# Run the whole suite:        maestro test .maestro --env-file .maestro/vars/local.env
+# Run only the smoke suite:   maestro test .maestro --include-tags smoke --env-file .maestro/vars/local.env
+# Run a single suite (e.g. B): maestro test .maestro --include-tags suite-B --env-file .maestro/vars/local.env
+#
+# Flows are discovered recursively under .maestro/. Subflows in helpers/ are runFlow
+# fragments (no `tags:` of their own) so they never execute standalone.
+flows:
+  - "smoke/*.yaml"
+  - "suites/**/*.yaml"
+
+# Run smoke first; if any smoke case fails the plan says STOP and fix before deeper testing.
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - SM1_cold_launch_sign_in
+    - SM2_bottom_nav
+    - SM3_account_from_blob
+    - SM4_friend_share_doom_react
+    - SM5_studio_publish
+    - SM6_browse_send_to_friend
+    - SM7_channel_intro_react
+    - SM8_group_chat_create
+    - SM9_connect_social
+    - SM10_force_quit_mid_upload

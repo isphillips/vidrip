@@ -1,0 +1,37 @@
+# Reusable subflow: password sign-in for a seeded account.
+# Caller passes EMAIL + PASSWORD via runFlow env. Assumes the app was just launched
+# and is signed out (Welcome screen visible). Lands on the Feed tab.
+#
+#   - runFlow:
+#       file: ../helpers/signIn.yaml
+#       env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+appId: ${APP_ID}
+---
+- tapOn:
+    id: "welcome-signin-link"
+- tapOn:
+    id: "signin-mode-password"
+- tapOn:
+    id: "signin-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "signin-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "signin-submit-password"
+# First-run onboarding replays after sign-in on a fresh install (clearState wipes the
+# `vidrip_onboarded_v1` flag). Walk its 5 scenes if present, then land on Feed.
+# CTA sequence (verified in OnboardingScreen.tsx): DRIP IN → Skip for now → NEXT → NEXT → LET ME IN.
+- runFlow:
+    when:
+      visible: "DRIP IN"
+    commands:
+      - tapOn: "DRIP IN"
+      - tapOn: "Skip for now"
+      - tapOn: "NEXT"
+      - tapOn: "NEXT"
+      - tapOn: "LET ME IN"
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 25000

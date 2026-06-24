@@ -1,0 +1,45 @@
+# F2 — Player has Studio-styled comment + send buttons; send opens a friend picker → delivered.
+# Requires: P7 (friend B in A's friends list).
+# BLOCKED:P2 — delivery (sendThread → recipient receives) needs the share backend.
+appId: ${APP_ID}
+tags:
+  - suite-F
+  - needs-seed
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Share"
+- assertVisible: "Browse ✵ Share"
+
+# Open the first grid tile → full-screen player overlay (tiles have no testID).
+- tapOn:
+    point: "27%,42%"
+
+# The player's bottom action row has two GradientIcon (Studio-styled) buttons, no testIDs / no text:
+#   - chatbubbles  → opens the comments sheet (VideoCommentsSheet)
+#   - paper-plane  → opens the share drawer (friend picker)
+# Open the share drawer via the paper-plane (right-most action button):
+# - tapOn: { point: "92%,86%" }   # TODO(testID): player "send"/paper-plane action button
+
+# The share drawer's title is "Send to…"; it lists friends with a filter field.
+# - assertVisible: "Send to…"
+# Pick friend B (rows are display name / @handle — no testID), then the bottom Send button:
+# - tapOn: ".*${TEST_HANDLE_B}.*"
+# The Send button text reflects the selection: "Send to 1 friend" (else "Select friends to send").
+# - assertVisible: "Send to 1 friend"
+# - tapOn: "Send to 1 friend"
+#
+# ── BLOCKED:P2 ───────────────────────────────────────────────────────────────
+# Pressing Send runs sendThread (creates the thread + notifies B) — the delivery backend.
+# On success a toast shows on the player: exact "Sent to 1 friend!" (plural "friends" for N>1).
+# - assertVisible: "Sent to 1 friend!"
+# Confirming B actually receives it surfaces in B's Feed (see SM4) — out of band here.

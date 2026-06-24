@@ -1,0 +1,38 @@
+# E8 — Scheduled posts are held until their release date; they live under the "Scheduled" tab.
+# BLOCKED:P2 — verifying a scheduled post stays hidden from viewers (and goes live on time) needs
+#              the publish/release backend + a seeded future-dated post.
+# Automatable: open Studio → the "Scheduled" tab loads (creator-only content; empty otherwise).
+appId: ${APP_ID}
+tags:
+  - suite-E
+  - blocked-p2
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      # Creator account owns the scheduled posts.
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_C}, PASSWORD: ${TEST_PASSWORD_C} }
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "Studio"
+
+# The Scheduled tab is always present (label gains a count when non-empty, e.g. "Scheduled (2)").
+- tapOn: "Scheduled"
+
+# Empty-state copy when nothing is scheduled (exact from StudioHomeScreen):
+- runFlow:
+    when:
+      visible: "Nothing scheduled. Pick “Schedule” when posting a video."
+    commands:
+      - assertVisible: "Nothing scheduled. Pick “Schedule” when posting a video."
+
+# ── BLOCKED:P2 ───────────────────────────────────────────────────────────────
+# With a seeded future-dated post, the Scheduled tab lists it with its release date (calendar icon +
+# formatted time, isScheduled()). Confirming it is HIDDEN from a viewer's channel until release, and
+# auto-publishes at the release time, requires the release backend (no in-app trigger). Seed via E6's
+# "Schedule" path on a creator account, then verify viewer-side out of band.

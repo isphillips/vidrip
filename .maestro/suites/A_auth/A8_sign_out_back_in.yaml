@@ -1,0 +1,41 @@
+# A8 — Sign out, then back in.
+# BLOCKED:P1 (re-auth) — SIGN-OUT itself is automatable; signing back in via magic link needs P1.
+#                        (Password sign-in is exercised by the shared helpers/signIn.yaml elsewhere.)
+appId: ${APP_ID}
+tags:
+  - suite-A
+  - blocked-p1
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# Open Account and sign out.
+- tapOn:
+    id: "tab-Feed"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+- tapOn: "Sign Out"
+# Sign Out raises a confirm Alert.alert('Sign Out', 'Are you sure...', [Cancel, Sign Out]).
+# Tap the destructive "Sign Out" in the dialog (same visible text).
+- tapOn:
+    text: "Sign Out"
+    index: 1
+
+# After signing out we are back on the Welcome screen.
+- assertVisible:
+    id: "welcome-signin-link"
+
+# ── BLOCKED:P1 — sign back in via magic link ─────────────────────────────────
+# Re-authenticating through the magic-link flow needs a real email + deep link (see A2).
+# (A password re-login IS automatable and is what helpers/signIn.yaml does — re-running that
+#  helper here would just duplicate SM1; the gap is specifically the magic-link round-trip.)
+# UNBLOCKS WHEN (P1): a deterministic auth deep link for the test account, then
+#   - openLink: "reaxn://auth/callback?token=..."  → assertVisible: { id: "tab-Feed" }

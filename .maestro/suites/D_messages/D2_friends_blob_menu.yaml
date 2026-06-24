@@ -1,0 +1,32 @@
+# D2 — Friends blob (Messages only) opens a menu with all 3 items, not clipped.
+# Automatable: open nav-friends-blob → assert the three menu items render.
+appId: ${APP_ID}
+tags:
+  - suite-D
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Messages"
+- assertVisible: "Messages"
+
+# Open the Friends context window (this blob exists on Messages, not Feed).
+- tapOn:
+    id: "nav-friends-blob"
+
+# All three menu items must be visible (not clipped off-screen) — exact menu copy.
+- assertVisible: "Add a friend"
+- assertVisible: "Import from contacts"
+- assertVisible: "New group chat"
+
+# Close the popover by tapping the backdrop; back on Messages.
+- tapOn:
+    point: "50%,90%"
+- assertVisible: "Messages"

@@ -1,0 +1,30 @@
+# D1 — Messages lists ALL conversations (incl. caught-up), no "to react" entries, newest first.
+# Requires: P7 seed (account A has ≥1 conversation). Without seed the empty state shows instead.
+appId: ${APP_ID}
+tags:
+  - suite-D
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Messages"
+
+# Messages is the full conversation home (header "Messages" is unique copy; tab labels are not).
+- assertVisible: "Messages"
+
+# Seeded conversation(s) render — a friend row labelled by display name / @handle.
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+# NOTE: Messages shows caught-up chats too and NEVER shows "N new video(s) to react to" channel
+# entries (those are Feed-only). Asserting desc sort + the absence of a "to react" channel row
+# needs a multi-row seed with known timestamps and a known channel; rows have no stable testIDs.
+# The reachable proof here is: full list renders with a known conversation present.

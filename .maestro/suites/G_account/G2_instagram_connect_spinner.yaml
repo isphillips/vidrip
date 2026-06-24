@@ -1,0 +1,46 @@
+# G2 — Connecting shows a spinner on the Instagram row (not Facebook); other rows disable while syncing.
+# BLOCKED:P1 — the "Connecting…" spinner only appears mid-OAuth (after the browser returns a code),
+#              which Maestro can't drive. Reach the Instagram row; annotate the spinner as P1.
+appId: ${APP_ID}
+tags:
+  - suite-G
+  - needs-device
+  - blocked-p1
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+- tapOn:
+    id: "tab-Feed"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+
+# Instagram only appears as a provider row under "Creator Accounts" (creator mode on).
+- tapOn:
+    text: "Creator mode"
+# TODO(testID): no testID on the Creator-mode <Switch>; add testID="account-creator-switch".
+- runFlow:
+    when:
+      visible: "Creator Accounts"
+    commands:
+      - assertVisible: "Instagram"
+
+# ── BLOCKED:P1 — the syncing spinner ─────────────────────────────────────────
+# While a connect is in flight, AccountScreen.tsx renders, on the connecting provider's row only:
+#   <ActivityIndicator/> + "Connecting…"   (gated by syncing && syncingType==='creator' && syncingProvider===key)
+# and every other provider's "Connect" button is `disabled={syncing}`.
+# That state begins only after the oauth-callback delivers a code (post system-browser auth),
+# so it cannot be triggered from Maestro. (The note "spinner on Instagram, not Facebook" reflects
+# that Facebook takes the separate two-phase Pages path — see A7 — rather than this inline spinner.)
+# UNBLOCKS WHEN (P1): stub the callback, e.g.
+#   - openLink: "reaxn://oauth-callback?provider=instagram&type=creator&code=TEST"
+#   then assertVisible "Connecting…" on the Instagram row while the sync runs.
+- assertVisible: "Account"

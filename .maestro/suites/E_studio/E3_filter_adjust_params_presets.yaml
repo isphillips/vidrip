@@ -1,0 +1,45 @@
+# E3 — Looks step: 5 adjust params (Exposure/Brightness/Contrast/Saturation/Hue) + a preset strip.
+# Requires: real device — the Looks (filter) screen needs trimmed footage to render its preview/swatches.
+appId: ${APP_ID}
+tags:
+  - suite-E
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "New video"
+- tapOn: "New video"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# Capture (record/import) → Trim → tap "Next" → the Looks screen (StudioFilterScreen, header "Looks").
+#
+# Looks has two tool toggles + a preset (filter) strip:
+#   - "Mirror" (flips the preview) and "Adjust" (opens the slider panel).
+#   - A category pill bar starting with "All", then a horizontal strip of filter SWATCHES (presets).
+#
+# Tapping "Adjust" reveals exactly 5 labelled sliders, plus "Reset"/"Done":
+# - tapOn: "Adjust"
+# - assertVisible: "Exposure"
+# - assertVisible: "Brightness"
+# - assertVisible: "Contrast"
+# - assertVisible: "Saturation"
+# - assertVisible: "Hue"
+# - assertVisible: "Reset"
+# - assertVisible: "Done"
+# - tapOn: "Done"
+#
+# Preset strip + categories (with the panel closed):
+# - assertVisible: "All"          # first category pill
+#   (swatch tiles + their labels are data-driven from STUDIO_FILTERS — no fixed string to assert)
+#
+# Stable end assert on Looks: the "Next" CTA is present.
+# - assertVisible: "Next"

@@ -1,0 +1,44 @@
+# B5 — Feed tab badge = total actionable items (friend/group shares + channel unseen);
+#       it decrements after reacting.
+# Requires: P7 seed (account A has ≥1 actionable item so a badge renders). The badge-present
+# part is automatable; the post-react UPDATE needs a device (camera) to actually react.
+appId: ${APP_ID}
+tags:
+  - suite-B
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 15000
+
+# With actionable items seeded, the Feed surfaces the corresponding rows (the badge count mirrors
+# toReactCount + channel unseen). Confirm at least one actionable row is present.
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+# TODO(testID): the bottom-tab badge bubble has no testID — Maestro can't read its numeric value.
+# Asserting the exact total requires either a badge testID or OCR. For now we assert the actionable
+# row that drives the count exists.
+#
+# ── NEEDS-DEVICE: badge decrements after reacting ────────────────────────────
+# On a real device: tap the row, record+save a reaction, return to Feed. The reacted row drops
+# and the badge total decreases by one. Camera-only.
+# - tapOn: { text: ".*${TEST_HANDLE_B}.*" }
+# - ... record / stop / save on device ...
+# - assertNotVisible: { text: ".*${TEST_HANDLE_B}.*" }   # row cleared → badge decremented
+#
+# Unblocks: device camera + a badge testID for an exact-count assertion.
+- assertVisible:
+    id: "tab-Feed"

@@ -1,0 +1,33 @@
+# C2 — Channel card shows a VIDEO count (not member count) + an Intro tile.
+# NOTE: GAP (E2E_AUDIT C2/D-7) — the card has NO last-updated/last-activity stamp. The spec
+# expected one; this flow asserts what actually renders and documents the missing stamp.
+# Requires: P7 seed — ${SEED_CHANNEL_NAME} with at least one video AND an intro (ad_video_url).
+appId: ${APP_ID}
+tags:
+  - suite-C
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+
+# ChannelCard footer renders "{N} video" / "{N} videos" (post_count) — NOT a member count.
+# Use a regex so any count matches; the word "video" is the load-bearing assertion.
+- assertVisible: ".* video(s)?"
+
+# The intro tile renders as a small "Intro" label on the card (ChannelCard introTile).
+- assertVisible: "Intro"
+
+# NOTE: There is intentionally NO last-updated / "x ago" timestamp on the card to assert —
+# this is the documented gap. Nothing to verify for the stamp; absence is the expected (buggy) state.

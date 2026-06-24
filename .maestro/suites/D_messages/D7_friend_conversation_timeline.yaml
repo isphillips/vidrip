@@ -1,0 +1,53 @@
+# D7 — Open a friend conversation → merged timeline (shares + DM clips/audio) + floating buttons.
+# NEEDS-DEVICE: the floating VIDEO/MIC composer leads into camera + mic capture. We can REACH the
+# conversation and assert the timeline / empty state; capture itself is a device step.
+# Requires: P7 seed (account A has a friend B to open). With no history, the empty state shows.
+appId: ${APP_ID}
+tags:
+  - suite-D
+  - needs-device
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Messages"
+- assertVisible: "Messages"
+
+# Open friend B's 1:1 conversation (row label = display name / @handle). From Messages this opens
+# the conversation directly (Feed would doom-react instead).
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${TEST_HANDLE_B}.*"
+
+# FriendConversationScreen mounted. The header shows the friend's name; the body is either the
+# merged timeline OR, with no history, the empty state (exact copy below).
+- runFlow:
+    when:
+      visible: "No history yet"
+    commands:
+      - assertVisible: "No history yet"
+      - assertVisible: "Share a Short or send a clip to start the conversation."
+
+# ── NEEDS-DEVICE: floating composer ──────────────────────────────────────────
+# Bottom-right floating VIDEO (videocam) + MIC buttons have NO testID and lead into capture:
+#   - VIDEO → ChannelVideoRecord (camera).
+#   - MIC   → press-and-hold to record audio → preview shows duration + "✕" + "Send".
+# TODO(testID): add testIDs to the two floating composer buttons in FriendConversationScreen
+#   (styles.barBtn). Until then they can only be point-tapped, which is device-dependent.
+# - tapOn: { point: "90%,82%" }   # MIC button (press-and-hold) — device only
+# - tapOn: { point: "90%,72%" }   # VIDEO button — opens camera, device only
+#
+# Reachable assert: we left Messages into the conversation stack and the screen rendered.
+- assertVisible:
+    text: ".*${TEST_HANDLE_B}.*"
+    timeout: 15000

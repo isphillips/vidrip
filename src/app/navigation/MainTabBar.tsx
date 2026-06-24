@@ -322,7 +322,7 @@ type TabBtnProps = {
 function TabBtn({ route, label, active, toReact, onPress }: TabBtnProps) {
   const theme = TAB_THEME[route];
   return (
-    <TouchableOpacity style={styles.tab} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity testID={`tab-${route}`} style={styles.tab} onPress={onPress} activeOpacity={0.7}>
       <View>
         <SlimeTab route={route} glyph={theme.glyph} neon={theme.neon} shape={theme.shape} active={active} />
         {route === 'Feed' && toReact > 0 && (
@@ -357,6 +357,7 @@ function GlowFab({ onPress }: { onPress: () => void }) {
         <Reanimated.View style={[styles.haloOut, haloOut]} pointerEvents="none" />
         <Reanimated.View style={[styles.haloIn, haloIn]} pointerEvents="none" />
         <Pressable
+          testID="tab-Studio"
           onPress={onPress}
           onPressIn={() => { press.value = withTiming(1, { duration: 90 }); }}
           onPressOut={() => { press.value = withTiming(0, { duration: 180 }); }}

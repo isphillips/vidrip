@@ -1,0 +1,47 @@
+# H2 — Opening a gift reveals the award and grants access (CTA into the collection).
+# Requires: P7 seed — account A has an UNOPENED gift for ${SEED_EXCLUSIVE_COLLECTION} (a gift tile
+# with a "NEW" badge in the Exclusive rail). Once opened it becomes a plain collection tile, so the
+# seed must be a fresh, unopened award.
+appId: ${APP_ID}
+tags:
+  - suite-H
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    text: "Exclusive Content"
+    timeout: 15000
+
+# Tap the unopened gift tile (carries a "NEW" badge) → GiftRevealScreen.
+# TODO(testID): gift tiles have no testID; the collection name is the stable handle on the tile.
+- tapOn:
+    text: "${SEED_EXCLUSIVE_COLLECTION}"
+    timeout: 15000
+
+# GiftReveal opens with a "Tap to open" prompt; tapping the box plays the reveal animation.
+- assertVisible:
+    text: "Tap to open"
+    timeout: 10000
+- tapOn:
+    point: "50%,45%"          # tap the gift box to open it (no testID on the Pressable)
+
+# After the reveal, the access-granting CTA appears.
+- assertVisible:
+    text: "View collection"
+    timeout: 15000
+
+# Tapping it replaces into the granted collection (ExclusiveCollectionScreen, subtitle "… · exclusive").
+- tapOn: "View collection"
+- assertVisible:
+    text: "${SEED_EXCLUSIVE_COLLECTION}"
+    timeout: 15000

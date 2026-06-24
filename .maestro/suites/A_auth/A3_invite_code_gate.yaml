@@ -1,0 +1,58 @@
+# A3 — Invite code gate: a valid code → CreateProfile (code shown); invalid/used → "Invalid Code" alert.
+# BLOCKED:P2 — needs seeded invite codes (SEED_VALID_INVITE_CODE / SEED_USED_INVITE_CODE) in the DB.
+appId: ${APP_ID}
+tags:
+  - suite-A
+  - needs-seed
+  - blocked-p2
+---
+# Auth-screen test: must start SIGNED OUT.
+- runFlow:
+    file: ../../helpers/freshLaunch.yaml
+
+# Page past first-run onboarding if it shows.
+- runFlow:
+    when:
+      visible: "DRIP IN"
+    commands:
+      - tapOn: "DRIP IN"
+      - runFlow:
+          when:
+            visible: "Skip for now"
+          commands:
+            - tapOn: "Skip for now"
+      - tapOn: "NEXT"
+      - tapOn: "NEXT"
+      - tapOn: "LET ME IN"
+
+# ── Case 1: used/invalid code → "Invalid Code" alert (verified in EnterInviteCodeScreen.tsx) ──
+- tapOn:
+    id: "welcome-invite-btn"
+- assertVisible: "Enter your invite code"
+# The input has no testID; target it by its placeholder "XXXXX-XXXX".
+- tapOn: "XXXXX-XXXX"
+- inputText: ${SEED_USED_INVITE_CODE}
+- hideKeyboard
+- tapOn: "Continue"
+# A used/invalid code raises Alert.alert('Invalid Code', ...).
+- assertVisible: "Invalid Code"
+- tapOn: "OK"
+
+# Clear the field and try the valid code → should navigate to CreateProfile.
+# (The input auto-formats: digits/letters only, dash after the first 5.)
+- tapOn: "XXXXX-XXXX"
+- eraseText: 20
+- inputText: ${SEED_VALID_INVITE_CODE}
+- hideKeyboard
+- tapOn: "Continue"
+
+# ── Case 2: valid code → CreateProfile with the code shown as a hero "ticket" ──
+- assertVisible: "Create your profile"
+- assertVisible: "Your invite"        # ticket label
+- assertVisible: "Redeemed"           # ticket "✓ Redeemed" chip
+# The redeemed code itself is rendered as gradient text on the ticket; assert it shows.
+- assertVisible: ${SEED_VALID_INVITE_CODE}
+
+# UNBLOCKS WHEN (P2): SEED_VALID_INVITE_CODE points at an unused invite_codes row and
+# SEED_USED_INVITE_CODE points at one whose used_by is non-null (so the .is('used_by', null)
+# lookup misses → Invalid Code alert).

@@ -1,0 +1,36 @@
+# B6 — Feed sorts recent-first; pull-to-refresh reloads the list without crashing.
+# Requires: P7 seed for meaningful ordering, but the pull-to-refresh + no-crash check runs
+# against any signed-in state.
+appId: ${APP_ID}
+tags:
+  - suite-B
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 15000
+
+# Pull-to-refresh: swipe DOWN from near the top of the list to trigger RefreshControl.onRefresh
+# (refresh() + loadChannels()). The flow passes if the list reloads without tearing down the app.
+- swipe:
+    start: "50%,30%"
+    end: "50%,80%"
+    duration: 600
+
+# Still alive and on Feed after the reload.
+- assertVisible:
+    id: "tab-Feed"
+    timeout: 15000
+# NOTE: exact recency ordering (newest sortAt first) needs a named multi-row seed with known
+# timestamps to assert relative on-screen order; rows otherwise have no stable testIDs.

@@ -1,0 +1,37 @@
+# E2 — Capture → Trim; a clip longer than 3 min (MAX_STUDIO_MS = 180s) is clamped to a 180s window.
+# Requires: real device (camera capture / library import). NEEDS-DEVICE past "New video".
+appId: ${APP_ID}
+tags:
+  - suite-E
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Studio"
+- assertVisible: "New video"
+- tapOn: "New video"
+
+# ── NEEDS-DEVICE from here ───────────────────────────────────────────────────
+# Capture is camera-only. On a real device, either:
+#   - record a clip with the round record button (auto-stops at the 180s hard cap), OR
+#   - tap "Upload" to import a video LONGER than 3 minutes from the library.
+# Either path lands on the Trim screen (header "Trim").
+#
+# Trim seeds the selection window to [0, min(duration, 180000ms)] — so a >3-min source opens
+# already clamped to 180s, and the right handle cannot drag the window past 180s (maxGapX in
+# StudioTrimScreen). When the selection hits the cap the screen shows the hint below.
+#
+# On device, after import/record:
+# - assertVisible: "Trim"
+# - assertVisible: "Max length is 180s."   # capHint, shown when selSec >= 180
+#
+# A stable end assert once on Trim: the "Next" CTA is present.
+# - assertVisible: "Next"

@@ -1,0 +1,36 @@
+# SM9 — Connect one social account (Instagram) → spinner on the correct row; connects.
+#
+# BLOCKED:P1 — connecting opens the provider's OAuth page in the system browser, which
+# needs real client secrets in the edge function. Without P1 the connect can't complete.
+# What IS verifiable now: the Instagram row exists and shows a "Connect" affordance, and
+# (per E2E_AUDIT G2) the spinner is scoped to the Instagram row only.
+appId: ${APP_ID}
+tags:
+  - smoke
+  - blocked-p1
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Instagram"
+
+# Tapping Instagram's "Connect" leaves the app for the system browser (P1). On a device
+# with P1 complete, authorize, return, and assert the row repaints with the handle/avatar.
+# The "Connect" label is shared by all 4 provider rows; scope the tap to the Instagram row:
+# - tapOn:
+#     id: "connect-instagram"   # TODO(testID): add to the IG row Connect button
+# - assertVisible:
+#     text: "Connecting"        # spinner copy, IG row only
+
+# MANUAL until P1: a human taps Connect on Instagram and confirms the spinner is on the
+# Instagram row (not Facebook) and other Connect buttons disable (G2).

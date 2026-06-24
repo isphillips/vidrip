@@ -1,0 +1,52 @@
+# C6 — Leave a review after reacting; the Reviews count updates.
+# Requires: P7 seed — ${SEED_CHANNEL_NAME} has reviews ENABLED, plus a post (not authored by A)
+# that A has ALREADY reacted to (review button only appears after reacting). Ideally seed A's
+# reaction so the "★ Leave a Review" CTA is present without a camera step.
+# NEEDS-DEVICE: recording the 60s review clip needs a real camera; the record/save leg is manual.
+appId: ${APP_ID}
+tags:
+  - suite-C
+  - needs-seed
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    text: "${SEED_CHANNEL_NAME}"
+    timeout: 15000
+- tapOn:
+    text: "${SEED_CHANNEL_NAME}"
+
+# Reviews-enabled public channels show filter pills: Posts · Reactions · Reviews.
+- assertVisible:
+    text: "Reviews"
+    timeout: 15000
+
+# Open a post A has already reacted to. With reviews allowed + reacted + not-own-post, the post
+# screen shows the "★ Leave a Review" CTA. (A post A already reacted to is revealed — its real
+# title shows, not "React to reveal".)
+# TODO(testID): grid post tiles have no testID; QA opens a reacted post by its visible title.
+# Reachable assert that the review entry point exists once on a qualifying post:
+# - assertVisible: "★ Leave a Review"
+
+# ── NEEDS-DEVICE: record + send the review ───────────────────────────────────
+# - tapOn: "★ Leave a Review"
+# - ... record / stop / send a 60s review on a real device ...
+# After sending, the post badge changes to "Reacted ✓  ·  Review sent ★", and the Reviews tab
+# count increments (the tile moves into the Reviews filter on the channel grid).
+# Unblock: run on a physical device with camera + mic; seed A as already-reacted so the
+# "★ Leave a Review" CTA is present.
+#   - assertVisible: "Reacted ✓  ·  Review sent ★"
+
+# Stable end assert.
+- assertVisible:
+    id: "tab-Channels"

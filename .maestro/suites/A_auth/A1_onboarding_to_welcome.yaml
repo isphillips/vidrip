@@ -1,0 +1,41 @@
+# A1 — First-run onboarding scenes play through, then land on Welcome; replays only when triggered.
+# Requires: a fresh (cleared) install so the first-run onboarding shows. PASS-LIKELY, automatable.
+appId: ${APP_ID}
+tags:
+  - suite-A
+---
+# A1, A2, A3, A4 exercise the auth/onboarding screens themselves, so they start SIGNED OUT.
+- runFlow:
+    file: ../../helpers/freshLaunch.yaml
+
+# On a fresh device the 5-scene onboarding plays before Welcome. It MAY or MAY NOT show
+# depending on whether onboarding completion is persisted independently of auth — handle both.
+# Onboarding steps (verified in src/features/onboarding/OnboardingScreen.tsx):
+#   step 0 "DRIP IN" → step 1 "CONNECT YOUTUBE" / "Skip for now" → "NEXT" ×2 → step 4 final CTA "LET ME IN".
+- runFlow:
+    when:
+      visible: "DRIP IN"
+    commands:
+      - tapOn: "DRIP IN"
+      # Step 1: skip the YouTube connect (that round-trip is its own P1 case, see A5).
+      - runFlow:
+          when:
+            visible: "Skip for now"
+          commands:
+            - tapOn: "Skip for now"
+      # Steps 2 + 3 are "NEXT"; step 4's final CTA is "LET ME IN".
+      - tapOn: "NEXT"
+      - tapOn: "NEXT"
+      - tapOn: "LET ME IN"
+
+# After onboarding (or if it was already complete) we land on the Welcome screen.
+- assertVisible:
+    id: "welcome-signin-link"
+- assertVisible:
+    id: "welcome-invite-btn"
+
+# Replay path: onboarding does NOT auto-replay on later launches — it only replays when
+# triggered from Account → "How it works" (useOnboardingStore.startReplay). That trigger
+# lives behind sign-in and is covered by the G-suite Account navigation; not re-tested here.
+# NOTE: the existing helpers/signIn.yaml taps "Get Started" to skip onboarding, but the real
+# first-run CTAs are the step labels above — that helper line is a harmless no-op (when:visible).

@@ -1,0 +1,26 @@
+# B8 — Feed empty state: "You're all caught up!" when nothing is actionable.
+# Requires: P7 seed — account A must be CAUGHT UP (no pending friend/group/channel videos).
+# NOTE: this contradicts the seed B1-B7 rely on; run it against a dedicated caught-up account
+# (or after A has reacted to everything). If A has pending items, this case will (correctly) fail.
+appId: ${APP_ID}
+tags:
+  - suite-B
+  - needs-seed
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Feed"
+
+# Exact empty-state copy (ASCII apostrophe, verbatim from FeedHomeScreen ListEmptyComponent).
+- assertVisible:
+    text: "You're all caught up!"
+    timeout: 15000
+- assertVisible: "New videos to react to will show up here."

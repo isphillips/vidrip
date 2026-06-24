@@ -1,0 +1,39 @@
+# F1 — Browse Shorts feed plays YouTube / TikTok / Instagram / creator sources.
+# Requires: real device — actual playback is a 3-slot WebView pool (YT/TikTok/IG) + Bunny embed.
+# Automatable: open Browse → assert the header + grid, scroll the grid, open a tile into the player.
+appId: ${APP_ID}
+tags:
+  - suite-F
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# Browse is the testID tab-Share. Header is the exact unicode "Browse ✵ Share".
+- tapOn:
+    id: "tab-Share"
+- assertVisible: "Browse ✵ Share"
+
+# The 2-column grid of video tiles renders below the header/feed bar. Scroll to confirm it loads + pages.
+- scroll
+- scroll
+
+# Open the first tile → full-screen player OVERLAY (in-screen, not a separate route). Tiles have no
+# testID — tap the top-left card.
+- tapOn:
+    point: "27%,42%"
+
+# ── NEEDS-DEVICE: playback ───────────────────────────────────────────────────
+# The opened video plays via the source's player (YouTube/TikTok/Instagram WebView, or a Bunny embed
+# for creator clips). There is no chrome text to assert inside the player; the bottom action row
+# (comments + send icons) is the stable on-top UI — covered in F2. Swipe left/right pages prev/next.
+# Closing the overlay (top-left ✕) returns to the grid:
+# - tapOn: { point: "8%,7%" }    # TODO(testID): player overlay close (✕)
+# - assertVisible: "Browse ✵ Share"

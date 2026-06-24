@@ -1,0 +1,46 @@
+# E7 — Drafts: leaving the editor saves a draft; resuming offers "Raw footage" vs "Last saved".
+# Requires: real device to create a draft (capture). NEEDS-DEVICE for the capture leg.
+# NOTE (E2E_AUDIT D-6): resuming an AUDIO-stage draft falls through to Trim, not Music — minor gap.
+appId: ${APP_ID}
+tags:
+  - suite-E
+  - needs-device
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+- tapOn:
+    id: "tab-Studio"
+
+# The Drafts tab is always present on StudioHome (label shows a count when non-empty, e.g. "Drafts (1)").
+- tapOn: "Drafts"
+
+# Empty-state copy (no draft seeded yet) — exact from StudioHomeScreen:
+- runFlow:
+    when:
+      visible: "No drafts. Recordings you don’t publish are saved here automatically."
+    commands:
+      - assertVisible: "No drafts. Recordings you don’t publish are saved here automatically."
+
+# ── NEEDS-DEVICE to populate Drafts ──────────────────────────────────────────
+# Create a draft: "New video" → record/import → advance at least one step → tap the "save for later"
+# control in a step header (SaveForLaterButton) to pop back to StudioHome. A draft row now appears
+# under "Drafts" (stage label is one of: "Trim" / "Looks" / "Music" / "Overlays" / "Ready to post").
+#
+# Resume it — tapping a draft row opens an Alert offering both resume modes:
+# - tapOn: { point: "50%,35%" }       # TODO(testID): a draft row in the Drafts list
+# - assertVisible: "Resume draft"
+# - assertVisible: "Pick up from your last saved progress, or start over from the raw footage?"
+# - assertVisible: "Raw footage"      # → reopens Trim from the original recording
+# - assertVisible: "Last saved"       # → jumps to the furthest saved stage
+# - tapOn: "Last saved"
+#
+# NOTE: per E2E_AUDIT D-6, "Last saved" on an audio-stage draft resumes at Trim (resumeLastSaved
+# has no 'audio' branch — it falls through to the StudioTrim default), so an audio-stage resume
+# lands on "Trim" rather than "Music".

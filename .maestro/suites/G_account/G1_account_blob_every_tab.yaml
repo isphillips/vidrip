@@ -1,0 +1,68 @@
+# G1 — Account blob reachable from every tab; the yellow blob "breathes" when active.
+# NOTE: GAP — Studio home has NO account blob (E2E_AUDIT D-4), so only the four tabs that DO
+#             have it are checked: Feed, Channels, Messages, Browse(Share). The blob's
+#             breathing/yellow-when-active animation is visual and can't be asserted by Maestro.
+appId: ${APP_ID}
+tags:
+  - suite-G
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: "welcome-signin-link"
+    commands:
+      - runFlow:
+          file: ../../helpers/signIn.yaml
+          env: { EMAIL: ${TEST_EMAIL_A}, PASSWORD: ${TEST_PASSWORD_A} }
+
+# From Feed
+- tapOn:
+    id: "tab-Feed"
+- assertVisible:
+    id: "nav-account-blob"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"       # screen-unique title (NOT the always-visible tab labels)
+- tapOn:
+    id: "tab-Feed"
+
+# From Channels
+- tapOn:
+    id: "tab-Channels"
+- assertVisible:
+    id: "nav-account-blob"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+- tapOn:
+    id: "tab-Feed"
+
+# From Messages
+- tapOn:
+    id: "tab-Messages"
+- assertVisible:
+    id: "nav-account-blob"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+- tapOn:
+    id: "tab-Feed"
+
+# From Browse (Share tab)
+- tapOn:
+    id: "tab-Share"
+- assertVisible:
+    id: "nav-account-blob"
+- tapOn:
+    id: "nav-account-blob"
+- assertVisible: "Account"
+
+# ── GAP: Studio tab ──────────────────────────────────────────────────────────
+# tab-Studio's home screen renders NO AccountBlob, so there is intentionally no
+# nav-account-blob to reach Account from there (matches SM2/SM3). Asserting its
+# absence (assertNotVisible nav-account-blob on Studio) is the documented expectation;
+# left as a note rather than a hard assert to avoid coupling to Studio's load state.
+#
+# Breathing/active-yellow tint: AccountBlob animates (yellow #FFD86B when active) — purely
+# visual, not assertable in Maestro. Verify by eye on a device.
