@@ -19,6 +19,7 @@ import { useReactQueueStore } from '../../../store/reactQueueStore';
 import { faceLensRecipe, type OverlayRecipe } from '../../studio/effectRecipe';
 import { C } from '../../../theme';
 import type { FaceLensTrack } from '../../lens/faceLens';
+import type { EmojiHit } from '../../../components/EmojiFountain';
 import type { RootStackScreenProps } from '../../../app/navigation/types';
 
 export default function RecordReactionScreen({
@@ -121,6 +122,7 @@ export default function RecordReactionScreen({
   const onSave = useCallback(async (
     filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean,
     lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null,
+    emojiTrack?: EmojiHit[],
   ) => {
     justSavedRef.current = true;   // committed → onBack advances the doom-react queue
 
@@ -167,6 +169,7 @@ export default function RecordReactionScreen({
         sourceType: storedSourceType,
         recordedWithHeadphones,
         afterthought: afterthought ?? null,
+        emojiTrack: emojiTrack ?? null,
         // Surface the reaction in the thread immediately (plays from the local
         // copy), before the relay upload finishes. Reconciled once it's fetched.
         onCommitted: (reactionId) => {

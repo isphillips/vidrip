@@ -1,53 +1,32 @@
 import React from 'react';
-import { Image, Text, View, type ImageStyle, type TextStyle, type ViewStyle } from 'react-native';
+import { Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { BlobEmoji, hasBlob, BLOB_KEYS } from './blobEmoji';
 
-// Branded emoji art lives in a single 3×2 sprite sheet (emojis.png). The unicode
-// char stays the canonical DB key; each maps to a cell that we crop out, so there's
-// one source image instead of six files. Unmapped keys fall back to the glyph.
-const SPRITE = require('../assets/emojis.png');
-const COLS = 3;
-const ROWS = 2;
+// Branded emoji art is now a set of animated "blob" characters (see ./blobEmoji): each gently breathes
+// on idle and plays an expressive burst when tapped. The unicode char stays the canonical DB key; an
+// emoji with blob art renders the blob, anything else falls back to the plain unicode glyph.
 
-// [col, row] in the sheet — Row 1: ❤️ 😂 😮, Row 2: 🔥 👏 😭.
-const EMOJI_CELL: Record<string, [number, number]> = {
-  '❤️': [0, 0],
-  '😂': [1, 0],
-  '😮': [2, 0],
-  '🔥': [0, 1],
-  '👏': [1, 1],
-  '😭': [2, 1],
-};
-
-// Canonical reaction set — use everywhere instead of hardcoding the unicode list.
-export const QUICK_EMOJIS = ['❤️', '😂', '😮', '🔥', '👏', '😭'];
+// Canonical reaction set = every emoji we have a blob for (single source of truth in ./blobEmoji), so
+// adding a blob automatically makes it a quick reaction. Use this everywhere instead of a literal list.
+export const QUICK_EMOJIS = BLOB_KEYS;
 
 export function hasCustomArt(emoji: string): boolean {
-  return !!EMOJI_CELL[emoji];
+  return hasBlob(emoji);
 }
 
 export default function EmojiGlyph({
-  emoji, size = 24, style,
+  emoji, size = 24, style, onPress, excited,
 }: {
   emoji: string;
   size?: number;
-  style?: ImageStyle | TextStyle;
+  style?: StyleProp<ViewStyle>;
+  // When provided, the blob becomes tappable: it plays its expressive animation, then calls this.
+  onPress?: () => void;
+  // Alternative trigger for sites that own their own touchable: bump this number to play the burst.
+  excited?: number;
 }) {
-  const cell = EMOJI_CELL[emoji];
-  if (cell) {
-    const [col, row] = cell;
-    return (
-      <View style={[{ width: size, height: size, overflow: 'hidden' }, style as unknown as ViewStyle]}>
-        <Image
-          source={SPRITE}
-          style={{
-            width: size * COLS,
-            height: size * ROWS,
-            transform: [{ translateX: -size * col }, { translateY: -size * row }],
-          }}
-          resizeMode="stretch"
-        />
-      </View>
-    );
+  if (hasBlob(emoji)) {
+    return <BlobEmoji emoji={emoji} size={size} style={style} onPress={onPress} excited={excited} />;
   }
-  return <Text style={[{ fontSize: size }, style as TextStyle]}>{emoji}</Text>;
+  return <Text style={[{ fontSize: size }, style as StyleProp<TextStyle>]}>{emoji}</Text>;
 }

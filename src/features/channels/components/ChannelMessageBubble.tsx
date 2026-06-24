@@ -6,6 +6,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import type { ChannelPost } from '../../../infrastructure/supabase/queries/channels';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
+import ReactionMenu from '../../../components/ReactionMenu';
 import Handle from '../../../components/Handle';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
@@ -36,10 +37,15 @@ type Props = {
   onPress: () => void;
   onEmojiToggle: (emoji: string) => void;
   onDelete: () => void;
+  // Per-message time. Hidden where a centered timestamp already groups the timeline (the friend DM).
+  showTime?: boolean;
+  // Use the iOS-style long-press ReactionMenu (lift + scrollable emoji bar) instead of the centered
+  // picker modal — the friend DM. Own messages get a Delete action in the same menu.
+  reactionMenu?: boolean;
 };
 
 export default function ChannelMessageBubble({
-  post, isMe, onPress, onEmojiToggle, onDelete,
+  post, isMe, userId, onPress, onEmojiToggle, onDelete, showTime = true, reactionMenu = false,
 }: Props) {
   const [pickerVisible, setPickerVisible] = useState(false);
 
@@ -69,9 +75,11 @@ export default function ChannelMessageBubble({
     <View style={[styles.row, isMe ? styles.rowMe : styles.rowThem]}>
       <View style={styles.group}>
         {!isMe && <Handle userId={post.poster_id} handle={post.poster?.handle ?? '?'} style={styles.handle} />}
-        <Text style={[styles.time, isMe && styles.timeMe]}>
-          {formatTime(post.created_at)}
-        </Text>
+        {showTime && (
+          <Text style={[styles.time, isMe && styles.timeMe]}>
+            {formatTime(post.created_at)}
+          </Text>
+        )}
 
         {/* Bubble + emoji badge container */}
         <View style={[styles.bubbleWrap, hasReactions && styles.bubbleWrapReactions]}>
@@ -87,24 +95,46 @@ export default function ChannelMessageBubble({
             </View>
           )}
 
-          <TouchableOpacity
-            onPress={onPress}
-            onLongPress={handleLongPress}
-            delayLongPress={400}
-            activeOpacity={0.85}
-            style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-            <View style={styles.clipRow}>
-              <View style={styles.playCircle}>
-                {post.post_type === 'audio'
-                  ? <Ionicons name="mic" size={16} color={C.WHITE} />
-                  : <Text style={styles.playIcon}>▶</Text>
-                }
+          {reactionMenu ? (
+            <ReactionMenu
+              style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}
+              emojis={QUICK_EMOJIS}
+              mine={post.emoji_reactions.filter(r => r.user_id === userId).map(r => r.emoji)}
+              onPick={onEmojiToggle}
+              onPress={onPress}
+              actions={isMe ? [{ label: 'Delete message', destructive: true, onPress: onDelete }] : undefined}>
+              <View style={styles.clipRow}>
+                <View style={styles.playCircle}>
+                  {post.post_type === 'audio'
+                    ? <Ionicons name="mic" size={16} color={C.WHITE} />
+                    : <Text style={styles.playIcon}>▶</Text>
+                  }
+                </View>
+                <Text style={[styles.duration, isMe && styles.durationMe]}>
+                  {post.duration ?? 0}s {post.post_type === 'audio' ? 'audio' : 'video'}
+                </Text>
               </View>
-              <Text style={[styles.duration, isMe && styles.durationMe]}>
-                {post.duration ?? 0}s {post.post_type === 'audio' ? 'audio' : 'video'}
-              </Text>
-            </View>
-          </TouchableOpacity>
+            </ReactionMenu>
+          ) : (
+            <TouchableOpacity
+              onPress={onPress}
+              onLongPress={handleLongPress}
+              delayLongPress={400}
+              activeOpacity={0.85}
+              style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
+              <View style={styles.clipRow}>
+                <View style={styles.playCircle}>
+                  {post.post_type === 'audio'
+                    ? <Ionicons name="mic" size={16} color={C.WHITE} />
+                    : <Text style={styles.playIcon}>▶</Text>
+                  }
+                </View>
+                <Text style={[styles.duration, isMe && styles.durationMe]}>
+                  {post.duration ?? 0}s {post.post_type === 'audio' ? 'audio' : 'video'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -122,12 +152,13 @@ export default function ChannelMessageBubble({
             <Text style={styles.pickerLabel}>React</Text>
             <View style={styles.pickerRow}>
               {QUICK_EMOJIS.map(emoji => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={styles.pickerBtn}
-                  onPress={() => { onEmojiToggle(emoji); setPickerVisible(false); }}>
-                  <EmojiGlyph emoji={emoji} size={42} />
-                </TouchableOpacity>
+                <View key={emoji} style={styles.pickerBtn}>
+                  <EmojiGlyph
+                    emoji={emoji}
+                    size={42}
+                    onPress={() => { onEmojiToggle(emoji); setPickerVisible(false); }}
+                  />
+                </View>
               ))}
             </View>
           </View>
@@ -188,7 +219,7 @@ const styles = StyleSheet.create({
     padding: SPACE.LG, gap: SPACE.MD,
   },
   pickerLabel: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED, textAlign: 'center' },
-  pickerRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  pickerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: SPACE.SM },
   pickerBtn: { padding: SPACE.SM },
   pickerEmoji: { fontSize: 30 },
 });

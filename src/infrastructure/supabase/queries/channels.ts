@@ -446,6 +446,36 @@ export async function ensurePrivateChannel(userA: string, userB: string): Promis
   return data as string;
 }
 
+/**
+ * Find the EXISTING 1:1 DM channel between two users without creating one — the private channel both
+ * are members of that isn't a group chat. Used to load real DM history on entry (vs. ensurePrivateChannel,
+ * which can mint a fresh/empty channel). Returns null if none exists.
+ */
+export async function findPrivateChannel(userId: string, friendUserId: string): Promise<string | null> {
+  const { data: mine, error: e1 } = await (supabase as any)
+    .from('group_members').select('group_id').eq('user_id', userId);
+  if (e1) { return null; }
+  const myIds: string[] = (mine ?? []).map((m: any) => m.group_id);
+  if (myIds.length === 0) { return null; }
+
+  const { data: shared, error: e2 } = await (supabase as any)
+    .from('group_members').select('group_id').eq('user_id', friendUserId).in('group_id', myIds);
+  if (e2) { return null; }
+  const sharedIds: string[] = (shared ?? []).map((m: any) => m.group_id);
+  if (sharedIds.length === 0) { return null; }
+
+  // Prefer the 1:1 (non-group) channel; oldest wins if somehow duplicated.
+  const { data: groups } = await (supabase as any)
+    .from('groups')
+    .select('id, is_group_chat, created_at')
+    .in('id', sharedIds)
+    .eq('is_public', false)
+    .order('created_at', { ascending: true });
+  const list = (groups ?? []) as any[];
+  const oneToOne = list.find(g => g.is_group_chat === false) ?? list[0];
+  return oneToOne?.id ?? null;
+}
+
 export type ChannelUpdateSummary = {
   channel_id: string;
   name: string;
@@ -1066,14 +1096,14 @@ export async function addChannelPostEmojiReaction(
   postId: string,
   userId: string,
   emoji: string,
-): Promise<string> {
-  const { data, error } = await (supabase as any)
+): Promise<void> {
+  // No `.select()` back: the insert succeeds, but reading the row back is RLS-restricted for some
+  // channel viewers, and that threw — which reverted the optimistic reaction (it showed, then vanished).
+  // Ignore duplicate-key (already reacted) so a re-add is a harmless no-op.
+  const { error } = await (supabase as any)
     .from('channel_post_emoji_reactions')
-    .insert({ post_id: postId, user_id: userId, emoji })
-    .select('id')
-    .single();
-  if (error) { throw error; }
-  return data.id;
+    .insert({ post_id: postId, user_id: userId, emoji });
+  if (error && (error as any).code !== '23505') { throw error; }
 }
 
 async function uploadClipToCloud(localPath: string, uploadPath: string): Promise<string> {

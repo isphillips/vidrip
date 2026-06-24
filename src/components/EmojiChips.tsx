@@ -8,9 +8,12 @@ type Props = {
   reactions: EmojiReactionItem[];
   userId: string | undefined;
   onToggle: (emoji: string) => void;
+  // When false, hide the "+" add button + its inline picker (reactions are added elsewhere, e.g. a
+  // long-press ReactionMenu) — this becomes a pure tally of existing reactions.
+  showAdd?: boolean;
 };
 
-export default function EmojiChips({ reactions, userId, onToggle }: Props) {
+export default function EmojiChips({ reactions, userId, onToggle, showAdd = true }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const counts = (reactions ?? []).reduce((acc: Record<string, number>, e) => {
@@ -43,23 +46,25 @@ export default function EmojiChips({ reactions, userId, onToggle }: Props) {
             <Text style={styles.count}>+{overflow}</Text>
           </View>
         )}
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => setPickerOpen(o => !o)}
-          hitSlop={4}>
-          <Text style={styles.addGlyph}>{pickerOpen ? '✕' : '+'}</Text>
-        </TouchableOpacity>
+        {showAdd && (
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => setPickerOpen(o => !o)}
+            hitSlop={4}>
+            <Text style={styles.addGlyph}>{pickerOpen ? '✕' : '+'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {pickerOpen && (
+      {showAdd && pickerOpen && (
         <View style={styles.picker}>
           {QUICK_EMOJIS.map(emoji => (
-            <TouchableOpacity
+            <EmojiGlyph
               key={emoji}
+              emoji={emoji}
+              size={26}
               onPress={() => { onToggle(emoji); setPickerOpen(false); }}
-              hitSlop={4}>
-              <EmojiGlyph emoji={emoji} size={24} />
-            </TouchableOpacity>
+            />
           ))}
         </View>
       )}
@@ -90,9 +95,9 @@ export const styles = StyleSheet.create({
   },
   addGlyph: { fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: '700', lineHeight: 16 },
   picker: {
-    flexDirection: 'row', gap: 8,
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 210,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   pickerGlyph: { fontSize: 22 },

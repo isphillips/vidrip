@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Image,
+  View, Text, StyleSheet, TouchableOpacity, Image, Pressable, ScrollView,
   ActivityIndicator, Alert, StatusBar, useWindowDimensions, Animated, InteractionManager,
 } from 'react-native';
 import Orientation from 'react-native-orientation-locker';
@@ -25,6 +25,8 @@ import {
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
+import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
+import EmojiFountain, { type EmojiFountainHandle, type EmojiHit } from '../../../components/EmojiFountain';
 import DraggablePip from './DraggablePip';
 import SourceVeil from './SourceVeil';
 import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
@@ -84,7 +86,7 @@ export interface ReactionRecorderProps {
   // Animated overlay layer for a creator (Bunny) video — replayed live over the embed.
   recipe?: OverlayRecipe | null;
   sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'studio' | 'facebook';
-  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null) => Promise<void>;
+  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null, emojiTrack?: EmojiHit[]) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
   /** Hard cap in seconds — recording auto-stops when reached (e.g. 60s reviews). */
@@ -173,6 +175,10 @@ export default function ReactionRecorder({
   const frameAspect = format ? Math.min(format.videoWidth, format.videoHeight) / Math.max(format.videoWidth, format.videoHeight) : 9 / 16;
   // Latest captured lens track, set on stop and handed to onSave.
   const lensTrackRef = useRef<FaceLensTrack | null>(null);
+  // Spam-able emoji throws captured during the take ({emoji, video-time}); replayed on watch.
+  const fountainRef = useRef<EmojiFountainHandle>(null);
+  const emojiTrackRef = useRef<EmojiHit[]>([]);
+  const lastEmitRef = useRef(0);   // rate-limit: 1 throw / second
   const lensKeyRef = useRef<string | null>(null);
   useEffect(() => { lensKeyRef.current = effLensKey; }, [effLensKey]);
   // Captured lens track for the afterthought clip (anonymous mode bakes it too).
@@ -187,6 +193,9 @@ export default function ReactionRecorder({
   // The external source starts heavily blurred behind a branded play button; revealed
   // once the user taps the video and it actually plays (one-way until a Restart).
   const [srcStarted, setSrcStarted] = useState(false);
+  // The source video's own length (seconds), captured once it loads, so the countdown
+  // and cap bar can reflect when the video actually ends (null until/unless known).
+  const [sourceDuration, setSourceDuration] = useState<number | null>(null);
   // Still frame used as the blur backdrop on the pre-record veil, for ANY source
   // (best-effort). YouTube derives instantly; the rest resolve async in the effect below.
   const [veilThumb, setVeilThumb] = useState<string | null>(
@@ -220,6 +229,16 @@ export default function ReactionRecorder({
   const handleStopRef = useRef<() => void>(() => {});
   // Receding cap bar (1 = full → 0 = time's up) when there's a hard duration limit.
   const capAnim = useRef(new Animated.Value(1)).current;
+  // Effective cap = whichever ends first, the source video or the hard maxDuration. Drives
+  // the countdown text, the cap bar, and the auto-stop. A ref so the timer reads it live.
+  const effCap = useMemo(() => {
+    const caps: number[] = [];
+    if (maxDuration && maxDuration > 0) { caps.push(maxDuration); }
+    if (sourceDuration && sourceDuration > 0) { caps.push(sourceDuration); }
+    return caps.length ? Math.min(...caps) : undefined;
+  }, [maxDuration, sourceDuration]);
+  const effCapRef = useRef<number | undefined>(effCap);
+  useEffect(() => { effCapRef.current = effCap; }, [effCap]);
   const [ytKey, setYtKey] = useState(0);
   // IG reels are tap-to-play; hide the hint + know playback began once 'playing' fires.
 
@@ -228,7 +247,7 @@ export default function ReactionRecorder({
   const [afterPhase, setAfterPhase] = useState<'none' | 'countdown' | 'recording'>('none');
   const [countdown, setCountdown] = useState(AFTERTHOUGHT_COUNTDOWN);
   const [afterElapsed, setAfterElapsed] = useState(0);
-  const mainVideoRef = useRef<{ path: string; duration: number; ytStartOffset: number; headphones: boolean; lensTrack: FaceLensTrack | null } | null>(null);
+  const mainVideoRef = useRef<{ path: string; duration: number; ytStartOffset: number; headphones: boolean; lensTrack: FaceLensTrack | null; emojiTrack: EmojiHit[] } | null>(null);
   const afterCallbackRef = useRef<((v: VideoFile) => void) | null>(null);
   const afterElapsedRef = useRef(0);
   const afterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -278,11 +297,12 @@ export default function ReactionRecorder({
     timerRef.current = setInterval(() => {
       elapsedRef.current += 1;
       setElapsed(elapsedRef.current);
-      if (maxDuration && elapsedRef.current >= maxDuration) {
-        handleStopRef.current();   // hard cap reached → finish automatically
+      const cap = effCapRef.current;
+      if (cap && elapsedRef.current >= cap) {
+        handleStopRef.current();   // effective cap reached (video end or hard cap) → finish
       }
     }, 1000);
-  }, [maxDuration]);
+  }, []);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -292,6 +312,8 @@ export default function ReactionRecorder({
     if (hasStartedRef.current) { return; }
     hasStartedRef.current = true;
     ytStartOffsetRef.current = 0;
+    emojiTrackRef.current = [];   // fresh emoji track per take
+    lastEmitRef.current = 0;
     // Begin capturing the face-lens track (per-frame landmarks) if a lens is on.
     if (lensKeyRef.current) { startTrack(lensKeyRef.current, frameAspect); }
 
@@ -306,7 +328,9 @@ export default function ReactionRecorder({
         setSpeakerToast(true);
         setTimeout(() => setSpeakerToast(false), 3000);
       }
-    } catch { recordedWithHeadphonesRef.current = false; }
+    } catch { 
+      recordedWithHeadphonesRef.current = false; 
+    }
 
     cameraRef.current?.startRecording({
       fileType: 'mp4',
@@ -325,11 +349,31 @@ export default function ReactionRecorder({
     setIsRecording(true);
     StatusBar.setHidden(true, 'fade');
     startTimer();
-    if (maxDuration) {
-      capAnim.setValue(1);
-      Animated.timing(capAnim, { toValue: 0, duration: maxDuration * 1000, useNativeDriver: false }).start();
+    // The cap bar is driven by the effect below (it retargets when the source duration resolves).
+  }, [startTimer, stopTimer, startTrack, frameAspect]);
+
+  // Throw a reaction emoji: rate-limited to 1/sec, launched on the fountain, and recorded at the
+  // current video time so it replays at the same moment when the reaction is watched back.
+  const throwEmoji = useCallback((emoji: string) => {
+    const now = Date.now();
+    if (now - lastEmitRef.current < 300) { return; }   // ~3 / second fire rate
+    lastEmitRef.current = now;
+    fountainRef.current?.emit(emoji);
+    if (hasStartedRef.current) {
+      emojiTrackRef.current.push({ e: emoji, t: Math.round(elapsedRef.current * 1000) / 1000 });
     }
-  }, [startTimer, stopTimer, maxDuration, capAnim, startTrack, frameAspect]);
+  }, []);
+
+  // Drive the receding cap bar over the EFFECTIVE cap — the source video's own duration when
+  // known, otherwise the hard maxDuration. Re-runs if the source duration resolves mid-record,
+  // so the bar (and its depletion speed) snap to the real video end instead of the 180s ceiling.
+  useEffect(() => {
+    if (!isRecording || !effCap) { return; }
+    const remaining = Math.max(0, effCap - elapsedRef.current);
+    capAnim.stopAnimation();
+    capAnim.setValue(effCap > 0 ? remaining / effCap : 0);
+    Animated.timing(capAnim, { toValue: 0, duration: remaining * 1000, useNativeDriver: false }).start();
+  }, [effCap, isRecording, capAnim]);
 
   // Commit the captured main reaction (+ optional afterthought) and exit. The save itself is
   // fast (DB row + local copy); the slow upload runs in the background via the upload store.
@@ -369,7 +413,7 @@ export default function ReactionRecorder({
 
     setUploading(true);
     try {
-      await onSave(m.path, m.duration, m.ytStartOffset, m.headphones, m.lensTrack, afterthought);
+      await onSave(m.path, m.duration, m.ytStartOffset, m.headphones, m.lensTrack, afterthought, m.emojiTrack);
       onBack();
     } catch (e: any) {
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
@@ -412,6 +456,7 @@ export default function ReactionRecorder({
         ytStartOffset: ytStartOffsetRef.current,
         headphones: recordedWithHeadphonesRef.current,
         lensTrack: lensTrackRef.current,
+        emojiTrack: emojiTrackRef.current,
       };
       // Friend-share path: offer the afterthought window. Otherwise save straight away.
       if (allowAfterthought) {
@@ -514,11 +559,21 @@ export default function ReactionRecorder({
     setYtKey(ytKeyRef.current);
   }, [stopTimer, cancelTrack, capAnim]);
 
+  // Capture the source video's own length from whichever player can report it — YouTube (getDuration),
+  // file sources (onProgress), and the TikTok / Bunny / IG embeds (their <video> / player API). Keeps
+  // the first valid value so the cap bar + auto-stop track the real end for EVERY source type.
+  const captureDuration = useCallback((d: number) => {
+    if (d > 0 && isFinite(d)) { setSourceDuration(prev => prev ?? Math.round(d)); }
+  }, []);
+
   const onYtStateChange = useCallback((state: string) => {
     if (state === 'playing') {
       skipNextPausedRef.current = true;
       setYtPlaying(true);
       setSrcStarted(true);   // tap landed on the video → reveal it (drop the blur/play button)
+      // Capture the source length so the countdown/bar reflect the real end (YouTube reports it here;
+      // the other source types report it via captureDuration from their own players/embeds).
+      ytRef.current?.getDuration?.().then((d: number) => captureDuration(d)).catch(() => {});
       beginRecording();
     } else if (state === 'paused') {
       setYtPlaying(false);
@@ -535,7 +590,7 @@ export default function ReactionRecorder({
       skipNextPausedRef.current = false;
       if (hasStartedRef.current) { handleStopRef.current(); }
     }
-  }, [beginRecording]);
+  }, [beginRecording, captureDuration]);
 
   // TikTok has no `play` prop — push ytPlaying into the player.
   useEffect(() => {
@@ -580,10 +635,6 @@ export default function ReactionRecorder({
   const letterBottom = bottomInset + 88;
   const letterH = Math.max(0, height - letterTop - letterBottom);
 
-  console.log('igWebEmbed', igWebEmbed);
-  console.log('videoId', videoId);
-  console.log('sourceType', sourceType)
-
   return (
     <View style={styles.container}>
       {/* Source-video full-screen background (or black if no source / during afterthought) */}
@@ -602,6 +653,7 @@ export default function ReactionRecorder({
             embedUrl={embedUrl as string}
             recipe={recipe}
             onStateChange={onYtStateChange}
+            onDuration={captureDuration}
             autoplay={false}
           />
         </View>
@@ -614,6 +666,7 @@ export default function ReactionRecorder({
               uri={sourceUri as string}
               style={{ width, height: letterH }}
               onChangeState={onYtStateChange}
+              onCurrentTime={(_t, dur) => captureDuration(dur)}
             />
             {/* react-native-video has no built-in controls — the veil is tappable and
                 explicitly starts playback (which begins recording). */}
@@ -635,6 +688,7 @@ export default function ReactionRecorder({
               style={{ width, height: letterH, backgroundColor: '#000' }}
               videoId={videoId}
               onChangeState={onYtStateChange}
+              onCurrentTime={(_t, dur) => captureDuration(dur)}
             />
             {!srcStarted && <SourceVeil platform="tiktok" thumbUri={veilThumb} />}
           </View>
@@ -661,6 +715,8 @@ export default function ReactionRecorder({
             onMessage={(e) => {
               try {
                 const msg = JSON.parse(e.nativeEvent.data);
+                // The reel reports its own length once known → cap bar / auto-stop track the real end.
+                if (msg.type === 'duration') { captureDuration(Number(msg.value)); return; }
                 // Tap-to-play: the user's tap starts the reel → 'playing' begins the
                 // recording (and drops the veil). Ignore 'paused' (fires during
                 // buffering); manual Stop handles early exit.
@@ -676,6 +732,7 @@ export default function ReactionRecorder({
       ) : videoId ? (() => {
         const coverW = Math.round(height * (16 / 9));
         const offsetX = -Math.round((coverW - width) / 2);
+
         return (
           <View style={styles.ytCover}>
             <View style={[styles.ytCoverInner, { left: offsetX }]}>
@@ -699,6 +756,14 @@ export default function ReactionRecorder({
           </View>
         );
       })() : <View style={styles.ytCover} />}
+
+      {/* Touch shield: once the source is playing, an invisible layer swallows taps on the
+          video so its own controls can't pause/seek it. Rendered before the camera PIP, lens
+          picker and Restart/Stop controls, so all of those stay tappable above it — the user
+          drives the take with our buttons, not the embed. */}
+      {srcStarted && afterPhase === 'none' && (
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
+      )}
 
       {/* Camera — PIP corner when a source video drives the screen, otherwise
           full-screen (private channel clips, reviews). */}
@@ -782,6 +847,23 @@ export default function ReactionRecorder({
         <FloatingEmoji key={f.id} emoji={f.emoji} onDone={() => setFloating(prev => prev.filter(x => x.id !== f.id))} />
       ))}
 
+      {/* Thrown-emoji fountain (record + the live throws), launched from the bottom-centre. */}
+      <EmojiFountain ref={fountainRef} />
+
+      {/* Emoji launcher — a vertical, scrollable strip (3 in view) above the PIP, once the source
+          is playing. Tapping throws an emoji (rate-limited to 1/sec) + records it to the track. */}
+      {srcStarted && !uploading && afterPhase === 'none' && (
+        <View style={[styles.emojiLauncher, { right: SPACE.LG, bottom: bottomInset + 100 + PIP_H + SPACE.MD }]}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.emojiLauncherContent}>
+            {QUICK_EMOJIS.map(e => (
+              <View key={e} style={styles.emojiLauncherItem}>
+                <EmojiGlyph emoji={e} size={38} onPress={() => throwEmoji(e)} />
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Speaker toast */}
       {speakerToast && (
         <View style={[styles.toast, { top: topInset + 60 }]}>
@@ -790,7 +872,7 @@ export default function ReactionRecorder({
       )}
 
       {/* Receding cap bar — gold, flaring red as the duration limit approaches */}
-      {isRecording && maxDuration ? (
+      {isRecording && effCap ? (
         <View style={[styles.capTrack, { top: topInset }]} pointerEvents="none">
           <Animated.View
             style={[styles.capFill, {
@@ -809,7 +891,7 @@ export default function ReactionRecorder({
         <View style={[styles.recBadge, { bottom: bottomInset + SPACE.XL + 88 }]}>
           <View style={styles.recDot} />
           <Text style={styles.recText}>
-            {maxDuration ? fmt(Math.max(0, maxDuration - elapsed)) : fmt(elapsed)}
+            {effCap ? fmt(Math.max(0, effCap - elapsed)) : fmt(elapsed)}
           </Text>
         </View>
       )}
@@ -950,6 +1032,10 @@ const styles = StyleSheet.create({
   pip: { position: 'absolute', width: PIP_W, height: PIP_H, borderRadius: RADIUS.MD, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
   demoCamPip: { width: PIP_W + 75, marginLeft: -40, height: PIP_H + 75 },
   pipRecDot: { position: 'absolute', top: SPACE.XS, right: SPACE.XS, width: 8, height: 8, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_HOT },
+  // Vertical emoji launcher above the PIP — height = 3 items, so exactly 3 show and the rest scroll.
+  emojiLauncher: { position: 'absolute', width: 54, height: 3 * 52, borderRadius: RADIUS.LG, backgroundColor: 'rgba(0,0,0,0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', overflow: 'hidden' },
+  emojiLauncherContent: { paddingVertical: 2, alignItems: 'center' },
+  emojiLauncherItem: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
   toast: { position: 'absolute', alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS, borderRadius: RADIUS.FULL },
   toastText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
   capTrack: { position: 'absolute', left: 0, right: 0, height: 4, backgroundColor: 'rgba(0,0,0,0.4)' },

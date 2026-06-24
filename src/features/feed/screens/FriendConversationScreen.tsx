@@ -11,9 +11,12 @@ import { useAuthStore } from '../../../store/authStore';
 import GradientIcon from '../../../components/GradientIcon';
 import DrippyEyes from '../../../components/DrippyEyes';
 import { supabase } from '../../../infrastructure/supabase/client';
-import { fetchThread, markThreadSeen } from '../../../infrastructure/supabase/queries/threads';
 import {
-  fetchChannelPosts, postChannelAudio, markChannelAsRead, ensurePrivateChannel,
+  fetchThread, markThreadSeen, fetchThreadEmojiReactions,
+  addThreadEmojiReaction, removeThreadEmojiReaction,
+} from '../../../infrastructure/supabase/queries/threads';
+import {
+  fetchChannelPosts, postChannelAudio, markChannelAsRead, ensurePrivateChannel, findPrivateChannel,
   deleteChannelPost, addChannelPostEmojiReaction, removeChannelPostEmojiReaction,
   type ChannelPost,
 } from '../../../infrastructure/supabase/queries/channels';
@@ -21,6 +24,9 @@ import {
   startAudioRecording, stopAudioRecording, cancelAudioRecording,
 } from '../../../infrastructure/native/audioRecorder';
 import ChannelMessageBubble from '../../channels/components/ChannelMessageBubble';
+import EmojiChips from '../../../components/EmojiChips';
+import ReactionMenu from '../../../components/ReactionMenu';
+import { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 const questionmark = require('../../../assets/questionmark.png');
@@ -28,7 +34,8 @@ const questionmark = require('../../../assets/questionmark.png');
 // One row of the merged friend timeline: either a video share (thread) or a DM clip/audio post.
 type TimelineItem =
   | { kind: 'share'; at: number; key: string; threadId: string; title: string;
-      thumbnail: string | null; reacted: boolean; sourceType: string }
+      thumbnail: string | null; reacted: boolean; sourceType: string;
+      emojiReactions: { emoji: string; user_id: string }[] }
   | { kind: 'post'; at: number; key: string; post: ChannelPost };
 
 const ms = (iso?: string | null) => (iso ? Date.parse(iso) || 0 : 0);
@@ -78,9 +85,10 @@ export default function FriendConversationScreen({
     if (!user) { return []; }
     const cid = channelIdRef.current;
     const limit = loadedCountRef.current;
-    const [threadDetails, posts] = await Promise.all([
+    const [threadDetails, posts, reactByThread] = await Promise.all([
       Promise.all(threadIds.map(id => fetchThread(id, user.id).catch(() => null))),
       cid ? fetchChannelPosts(cid, user.id, { limit }).catch(() => [] as ChannelPost[]) : Promise.resolve([] as ChannelPost[]),
+      fetchThreadEmojiReactions(threadIds),
     ]);
 
     const postItems: TimelineItem[] = posts
@@ -107,6 +115,7 @@ export default function FriendConversationScreen({
           ?? (t.source_type === 'youtube' && t.video_id ? `https://img.youtube.com/vi/${t.video_id}/hqdefault.jpg` : null),
         reacted: t.my_status === 'reacted',
         sourceType: t.source_type ?? 'youtube',
+        emojiReactions: reactByThread.get(t.id) ?? [],
       }))
       .filter(s => s.at >= lowerBound);
 
@@ -132,40 +141,52 @@ export default function FriendConversationScreen({
     }
   }, [buildItems]);
 
-  // Mark everything read on focus + subscribe to live DM posts.
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    loadedCountRef.current = PAGE;   // fresh window on each entry
-    draggedRef.current = false;
-    load().then(() => { if (active) { scrollToEnd(); } });
-    const cid = channelIdRef.current;
-    if (cid) { markChannelAsRead(cid).catch(() => {}); }
-    threadIds.forEach(id => markThreadSeen(id).catch(() => {}));
-
-    const cidForSub = channelIdRef.current;
-    const sub = cidForSub
-      ? supabase
-          .channel(`dm-${cidForSub}`)
-          .on('postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'channel_posts', filter: `channel_id=eq.${cidForSub}` },
-            () => { if (active) { load().then(scrollToEnd); } })
-          .subscribe()
-      : null;
-
-    return () => { active = false; if (sub) { supabase.removeChannel(sub); } };
-  }, [load, threadIds]));
-
-  // Resolve (creating if needed) the 1:1 DM channel for composing.
+  // Resolve the 1:1 DM channel — used for composing AND on entry so existing DM history loads. The
+  // conversation can arrive with a null dmChannelId (the peer→channel mapping isn't always resolved
+  // upstream), so we FIND the existing channel first (loading real history) and only create one as a
+  // fallback. Without this the timeline showed only shares until you posted a clip.
   const ensureChannel = useCallback(async (): Promise<string | null> => {
     if (channelIdRef.current) { return channelIdRef.current; }
     if (!user) { return null; }
     try {
-      const id = await ensurePrivateChannel(user.id, friendUserId);
+      const id = (await findPrivateChannel(user.id, friendUserId)) ?? (await ensurePrivateChannel(user.id, friendUserId));
       setChannelId(id);
       channelIdRef.current = id;
       return id;
     } catch { return null; }
   }, [user, friendUserId]);
+
+  // Mark everything read on focus + subscribe to live DM posts.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    let sub: ReturnType<typeof supabase.channel> | null = null;
+    loadedCountRef.current = PAGE;   // fresh window on each entry
+    draggedRef.current = false;
+
+    (async () => {
+      // Make sure the DM channel is resolved before building the timeline, so its history loads on entry.
+      if (!channelIdRef.current) { await ensureChannel(); }
+      if (!active) { return; }
+      await load();
+      if (!active) { return; }
+      scrollToEnd();
+
+      const cid = channelIdRef.current;
+      if (cid) {
+        markChannelAsRead(cid).catch(() => {});
+        sub = supabase
+          .channel(`dm-${cid}`)
+          .on('postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'channel_posts', filter: `channel_id=eq.${cid}` },
+            () => { if (active) { load().then(scrollToEnd); } })
+          .subscribe();
+      }
+    })();
+
+    threadIds.forEach(id => markThreadSeen(id).catch(() => {}));
+
+    return () => { active = false; if (sub) { supabase.removeChannel(sub); } };
+  }, [load, threadIds, ensureChannel]));
 
   // ── Audio composer ───────────────────────────────────────────────────────────
   const handleMicPressIn = useCallback(async () => {
@@ -224,6 +245,29 @@ export default function FriendConversationScreen({
     try { await deleteChannelPost(postId); await load(); } catch { /* ignore */ }
   }, [load]);
 
+  // ── Share emoji reactions (the "video to react to" cards) ─────────────────────
+  const handleShareEmojiToggle = useCallback(async (
+    share: Extract<TimelineItem, { kind: 'share' }>, emoji: string,
+  ) => {
+    if (!user) { return; }
+    const uid = user.id;
+    const mine = share.emojiReactions.some(r => r.user_id === uid && r.emoji === emoji);
+    // Optimistic: update this share's reactions in place; reconcile via load() only on failure.
+    setItems(prev => prev.map(it =>
+      it.kind === 'share' && it.threadId === share.threadId
+        ? {
+            ...it,
+            emojiReactions: mine
+              ? it.emojiReactions.filter(r => !(r.user_id === uid && r.emoji === emoji))
+              : [...it.emojiReactions, { emoji, user_id: uid }],
+          }
+        : it));
+    try {
+      if (mine) { await removeThreadEmojiReaction(share.threadId, uid, emoji); }
+      else { await addThreadEmojiReaction(share.threadId, uid, emoji); }
+    } catch { load(); }
+  }, [user, load]);
+
   const initial = (displayName || handle || '?').charAt(0).toUpperCase();
 
   return (
@@ -267,9 +311,12 @@ export default function FriendConversationScreen({
                 return (
                   <React.Fragment key={item.key}>
                     {stamp}
-                    <TouchableOpacity
+                    {/* Long-press the card → iOS-style reaction menu; a tap still opens the thread. */}
+                    <ReactionMenu
                       style={styles.shareCard}
-                      activeOpacity={0.85}
+                      emojis={QUICK_EMOJIS}
+                      mine={item.emojiReactions.filter(r => r.user_id === user?.id).map(r => r.emoji)}
+                      onPick={emoji => handleShareEmojiToggle(item, emoji)}
                       onPress={() => navigation.navigate('Thread', { threadId: item.threadId })}>
                       <View style={styles.shareThumb}>
                         {item.reacted && item.thumbnail ? (
@@ -291,7 +338,17 @@ export default function FriendConversationScreen({
                           </View>
                         )}
                       </View>
-                    </TouchableOpacity>
+                    </ReactionMenu>
+                    {item.emojiReactions.length > 0 && (
+                      <View style={styles.shareReacts}>
+                        <EmojiChips
+                          reactions={item.emojiReactions}
+                          userId={user?.id}
+                          onToggle={emoji => handleShareEmojiToggle(item, emoji)}
+                          showAdd={false}
+                        />
+                      </View>
+                    )}
                   </React.Fragment>
                 );
               }
@@ -303,6 +360,8 @@ export default function FriendConversationScreen({
                     post={item.post}
                     isMe={isMe}
                     userId={user?.id}
+                    showTime={false}
+                    reactionMenu
                     onPress={() => navigation.navigate('WatchChannelClip', { postId: item.post.id })}
                     onEmojiToggle={emoji => handleEmojiToggle(item.post, emoji)}
                     onDelete={() => handleDeletePost(item.post.id)}
@@ -384,6 +443,8 @@ const styles = StyleSheet.create({
   shareTitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
   shareMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   shareMeta: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
+  // Emoji reaction strip under a share card, indented to line up with the card's text column.
+  shareReacts: { marginTop: 4, marginBottom: 2, marginLeft: 64 + SPACE.MD + SPACE.MD },
 
   // Centered date/time separator (only shown when >1h has passed since the previous item).
   stamp: { alignSelf: 'center', textAlign: 'center', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.SUBTLE, paddingVertical: 2 },

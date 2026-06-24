@@ -33,10 +33,14 @@ export function igReelJs(muted: boolean = false): string {
   function wire(v){
     if(v.__vwired){ return; } v.__vwired=true;
     applyMute(v);
+    function postDur(){ if(v.duration&&isFinite(v.duration)){ post({type:'duration', value:v.duration}); } }
     v.addEventListener('play', function(){ if(!tapped){ try{ v.pause(); }catch(e){} } applyMute(v); });
-    v.addEventListener('playing', function(){ applyMute(v); post({type:'playing'}); });
+    v.addEventListener('playing', function(){ applyMute(v); post({type:'playing'}); postDur(); });
     v.addEventListener('ended', function(){ post({type:'ended'}); });
     v.addEventListener('pause', function(){ post({type:'paused'}); });
+    v.addEventListener('loadedmetadata', postDur);
+    v.addEventListener('durationchange', postDur);
+    postDur();
     if(!tapped){ try{ v.pause(); }catch(e){} }
   }
   function scan(){ paint(); var v=document.querySelector('video'); if(v){ wire(v); } }

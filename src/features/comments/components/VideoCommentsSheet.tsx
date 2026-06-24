@@ -70,15 +70,15 @@ function EmojiPicker({ onPick }: { onPick: (e: string) => void }) {
   return (
     <View style={ep.row}>
       {EMOJI_OPTIONS.map(e => (
-        <TouchableOpacity key={e} style={ep.btn} onPress={() => onPick(e)}>
-          <EmojiGlyph emoji={e} size={26} />
-        </TouchableOpacity>
+        <View key={e} style={ep.btn}>
+          <EmojiGlyph emoji={e} size={26} onPress={() => onPick(e)} />
+        </View>
       ))}
     </View>
   );
 }
 const ep = StyleSheet.create({
-  row: { flexDirection: 'row', paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, gap: SPACE.SM, backgroundColor: C.SURFACE, borderTopWidth: 1, borderColor: C.BORDER },
+  row: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, gap: SPACE.SM, backgroundColor: C.SURFACE, borderTopWidth: 1, borderColor: C.BORDER },
   btn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.SM, backgroundColor: C.SURFACE_2 },
 });
 

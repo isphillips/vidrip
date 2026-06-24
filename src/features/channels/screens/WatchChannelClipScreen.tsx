@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ActivityIndicator, useWindowDimensions, Platform,
+  ActivityIndicator, ScrollView, useWindowDimensions, Platform,
 } from 'react-native';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
@@ -53,19 +53,21 @@ function EmojiBtn({
 }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const [burstK, setBurstK] = useState(0);
 
   const handlePress = () => {
     scale.value = withSequence(
       withSpring(1.28, { damping: 5, stiffness: 600 }),
       withSpring(1, { damping: 14, stiffness: 400 }),
     );
+    setBurstK(k => k + 1); // play the blob's expressive burst
     onPress();
   };
 
   return (
     <Pressable onPress={handlePress} disabled={isDisabled}>
       <Animated.View style={[styles.emojiBtn, isMine && styles.emojiBtnActive, animStyle]}>
-        <EmojiGlyph emoji={emoji} size={24} />
+        <EmojiGlyph emoji={emoji} size={24} excited={burstK} />
         {count > 0 && (
           <Text style={[styles.emojiCount, isMine && styles.emojiCountActive]}>{count}</Text>
         )}
@@ -549,7 +551,10 @@ function WatchChannelClipImpl({
       {/* Emoji drawer — 😊 toggle hidden for own posts, reactions always visible */}
       <View style={[styles.emojiDrawer, { right: SPACE.MD, bottom: bottomInset + SPACE.LG }]}>
         {emojiOpen && (
-          <View style={styles.emojiList}>
+          <ScrollView
+            style={[styles.emojiList, { maxHeight: height * 0.6 }]}
+            contentContainerStyle={styles.emojiListContent}
+            showsVerticalScrollIndicator={false}>
             {QUICK_EMOJIS.map(emoji => (
               <EmojiBtn
                 key={emoji}
@@ -560,7 +565,7 @@ function WatchChannelClipImpl({
                 onPress={() => handleEmojiPress(emoji)}
               />
             ))}
-          </View>
+          </ScrollView>
         )}
         <TouchableOpacity
           style={[styles.emojiToggle, emojiOpen && styles.emojiToggleOpen]}
@@ -654,7 +659,8 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   emojiDrawer: { position: 'absolute', alignItems: 'center', gap: SPACE.SM },
-  emojiList: { alignItems: 'center', gap: SPACE.SM, marginBottom: SPACE.SM },
+  emojiList: { width: 52, marginBottom: SPACE.SM },
+  emojiListContent: { alignItems: 'center', gap: SPACE.SM },
   emojiToggle: {
     width: 44, height: 44, borderRadius: RADIUS.FULL,
     backgroundColor: 'rgba(255,255,255,0.18)',

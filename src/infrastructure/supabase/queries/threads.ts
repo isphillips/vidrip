@@ -179,6 +179,59 @@ export async function fetchThread(threadId: string, userId: string): Promise<Thr
   };
 }
 
+// Quick emoji reactions on SHARES (threads). Fetched SEPARATELY from fetchThread (not as an embedded
+// join) so a thread still loads if the thread_emoji_reactions table isn't deployed yet — the query just
+// returns nothing. Batched by thread id → map.
+export async function fetchThreadEmojiReactions(
+  threadIds: string[],
+): Promise<Map<string, { emoji: string; user_id: string }[]>> {
+  const map = new Map<string, { emoji: string; user_id: string }[]>();
+  if (threadIds.length === 0) { return map; }
+  try {
+    const { data, error } = await (supabase as any)
+      .from('thread_emoji_reactions')
+      .select('thread_id, emoji, user_id')
+      .in('thread_id', threadIds);
+    if (error || !data) { return map; }
+    for (const r of data) {
+      if (!map.has(r.thread_id)) { map.set(r.thread_id, []); }
+      map.get(r.thread_id)!.push({ emoji: r.emoji, user_id: r.user_id });
+    }
+  } catch { /* table not deployed yet → no reactions, shares still load */ }
+  return map;
+}
+
+// Toggle a quick emoji reaction on a SHARE (thread). Scoped by RLS to thread members; idempotent via the
+// unique (thread_id, user_id, emoji) constraint.
+export async function addThreadEmojiReaction(threadId: string, userId: string, emoji: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('thread_emoji_reactions')
+    .upsert({ thread_id: threadId, user_id: userId, emoji }, { onConflict: 'thread_id,user_id,emoji' });
+  if (error) { throw error; }
+}
+
+// The reaction's recorded emoji-throw track ({e,t}[]). Fetched separately + error-swallowed so a
+// missing `emoji_track` column (pre-deploy) degrades to "no throws" rather than breaking the reaction.
+export async function fetchReactionEmojiTrack(reactionId: string): Promise<{ e: string; t: number }[]> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from('reactions').select('emoji_track').eq('id', reactionId).single();
+    const track = (data as any)?.emoji_track;
+    if (error || !Array.isArray(track)) { return []; }
+    return track;
+  } catch { return []; }
+}
+
+export async function removeThreadEmojiReaction(threadId: string, userId: string, emoji: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('thread_emoji_reactions')
+    .delete()
+    .eq('thread_id', threadId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji);
+  if (error) { throw error; }
+}
+
 async function hydrateReaction(raw: any): Promise<ReactionItem> {
   const base: ReactionItem = {
     ...raw,

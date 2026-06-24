@@ -11,6 +11,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  ScrollView,
   useWindowDimensions,
 } from 'react-native';
 import Animated, {
@@ -36,7 +37,8 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
 import { igReelJs } from '../../shared/igReelPlayer';
 import { supabase } from '../../../infrastructure/supabase/client';
-import { fetchReactionById, fetchReactions, type ReactionItem } from '../../../infrastructure/supabase/queries/threads';
+import { fetchReactionById, fetchReactions, fetchReactionEmojiTrack, type ReactionItem } from '../../../infrastructure/supabase/queries/threads';
+import EmojiFountain, { type EmojiFountainHandle, type EmojiHit } from '../../../components/EmojiFountain';
 import { downloadAndCache, recordReactionDownload } from '../../../infrastructure/storage/reactionStorage';
 import {
   fetchEmojiReactions,
@@ -66,12 +68,14 @@ function EmojiBtn({
 }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const [burstK, setBurstK] = useState(0);
 
   const handlePress = () => {
     scale.value = withSequence(
       withSpring(1.28, { damping: 5, stiffness: 600 }),
       withSpring(1,    { damping: 14, stiffness: 400 }),
     );
+    setBurstK(k => k + 1); // play the blob's expressive burst
     onPress();
   };
 
@@ -80,7 +84,7 @@ function EmojiBtn({
   return (
     <Pressable onPress={handlePress} disabled={isDisabled}>
       <Animated.View style={[styles.emojiBtn, isMine && styles.emojiBtnActive, animStyle]}>
-        <EmojiGlyph emoji={emoji} size={24} />
+        <EmojiGlyph emoji={emoji} size={24} excited={burstK} />
         {count > 0 && (
           <Text style={[styles.emojiCount, isMine && styles.emojiCountActive]}>
             {count}
@@ -132,6 +136,23 @@ export default function WatchReactionScreen({
   const siblingIdsRef = useRef<string[]>([]);
   // Latest reaction playhead (seconds) — read by the source-sync loop without re-running it.
   const progressRef = useRef(0);
+  // Replay of the reactor's emoji throws ({e,t}[]), re-emitted as playback crosses each t.
+  const fountainRef = useRef<EmojiFountainHandle>(null);
+  const emojiTrackRef = useRef<EmojiHit[]>([]);
+  const firedRef = useRef(0);          // index into the sorted track of the next throw to fire
+  const lastReplayTimeRef = useRef(0); // detect loop/seek-back to re-arm
+
+  // Re-emit throws whose timestamp playback has reached; re-arm when the clip loops/seeks back.
+  const replayEmojis = useCallback((t: number) => {
+    const track = emojiTrackRef.current;
+    if (track.length === 0) { return; }
+    if (t + 0.25 < lastReplayTimeRef.current) { firedRef.current = 0; }
+    lastReplayTimeRef.current = t;
+    while (firedRef.current < track.length && track[firedRef.current].t <= t) {
+      fountainRef.current?.emit(track[firedRef.current].e);
+      firedRef.current += 1;
+    }
+  }, []);
 
   // Load reaction + emoji reactions
   useEffect(() => {
@@ -140,6 +161,9 @@ export default function WatchReactionScreen({
         if (!r) { setDownloadState('unavailable'); setLoading(false); return; }
         setReaction(r);
         fetchEmojiReactions(r.id).then(setEmojiReactions).catch(() => {});
+        fetchReactionEmojiTrack(r.id)
+          .then(t => { emojiTrackRef.current = [...t].sort((a, b) => a.t - b.t); firedRef.current = 0; lastReplayTimeRef.current = 0; })
+          .catch(() => {});
         if (r.thread_id) {
           fetchReactions(r.thread_id)
             .then(list => { siblingIdsRef.current = list.map(x => x.id); })
@@ -403,7 +427,7 @@ export default function WatchReactionScreen({
               .then(() => setSessionReady(true))
               .catch(() => setSessionReady(true));
           }}
-          onProgress={(d: any) => { progressRef.current = d.currentTime; setProgress(d.currentTime); }}
+          onProgress={(d: any) => { progressRef.current = d.currentTime; setProgress(d.currentTime); replayEmojis(d.currentTime); }}
           onEnd={handleEnd}
           onError={(e: any) => {
             log.error('[WatchReaction] error:', JSON.stringify(e));
@@ -506,6 +530,9 @@ export default function WatchReactionScreen({
         </Animated.View>
       )}
 
+      {/* Replayed emoji throws — re-emitted as playback reaches each recorded timestamp. */}
+      <EmojiFountain ref={fountainRef} />
+
       {/* Handle + timer */}
       <View style={[styles.infoBar, { top: topInset + SPACE.SM }]} pointerEvents="none">
         <Text style={styles.handle}>@{handle}</Text>
@@ -515,7 +542,10 @@ export default function WatchReactionScreen({
       {/* Emoji drawer — right side, collapses into toggle button */}
       <View style={[styles.emojiDrawer, { right: SPACE.MD, bottom: bottomInset + SPACE.LG }]}>
         {emojiOpen && (
-          <View style={styles.emojiList}>
+          <ScrollView
+            style={[styles.emojiList, { maxHeight: height * 0.6 }]}
+            contentContainerStyle={styles.emojiListContent}
+            showsVerticalScrollIndicator={false}>
             {QUICK_EMOJIS.map((emoji) => {
               const count = emojiReactions.filter(r => r.emoji === emoji).length;
               const isMine = emojiReactions.some(r => r.emoji === emoji && r.user_id === user?.id);
@@ -531,7 +561,7 @@ export default function WatchReactionScreen({
                 />
               );
             })}
-          </View>
+          </ScrollView>
         )}
 
         {/* Toggle button */}
@@ -643,9 +673,12 @@ const styles = StyleSheet.create({
     gap: SPACE.SM,
   },
   emojiList: {
+    width: 52,
+    marginBottom: SPACE.SM,
+  },
+  emojiListContent: {
     alignItems: 'center',
     gap: SPACE.SM,
-    marginBottom: SPACE.SM,
   },
   emojiToggle: {
     width: 44, height: 44,

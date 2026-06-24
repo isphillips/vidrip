@@ -23,7 +23,7 @@ const BRIDGE_JS = `(function(){
     var vw=v.videoWidth||r.width, vh=v.videoHeight||r.height;
     var scale=Math.min(r.width/vw, r.height/vh) || 1;
     var pw=vw*scale, ph=vh*scale;
-    var m={ x:r.left+(r.width-pw)/2, y:r.top+(r.height-ph)/2, w:pw, h:ph, playing:!v.paused };
+    var m={ x:r.left+(r.width-pw)/2, y:r.top+(r.height-ph)/2, w:pw, h:ph, playing:!v.paused, dur:(isFinite(v.duration)?v.duration:0) };
     if(extra){ for(var k in extra){ m[k]=extra[k]; } }
     window.ReactNativeWebView.postMessage(JSON.stringify(m));
   }
@@ -53,12 +53,14 @@ const muteJs = (m: boolean) =>
   `(function(){function go(){var v=document.querySelector('video'); if(!v){return setTimeout(go,200);} v.muted=${m};} go(); true;})();`;
 
 export default function BunnyVideoLayer({
-  embedUrl, recipe, onStateChange, onFirstFrame, autoplay = true, muted = false, style,
+  embedUrl, recipe, onStateChange, onFirstFrame, onDuration, autoplay = true, muted = false, style,
 }: {
   embedUrl: string;
   recipe?: OverlayRecipe | null;
   onStateChange?: (state: BunnyPlayState) => void;
   onFirstFrame?: () => void;
+  // The source video's own length (seconds), once the embed's <video> reports it.
+  onDuration?: (seconds: number) => void;
   // When false, playback requires a user gesture (no autoplay) — e.g. the reaction recorder,
   // where the user's tap to play is also what starts the recording.
   autoplay?: boolean;
@@ -79,6 +81,7 @@ export default function BunnyVideoLayer({
     try {
       const m = JSON.parse(e.nativeEvent.data);
       if (m.firstFrame && !firstFrameSent.current) { firstFrameSent.current = true; setFirstFrame(true); onFirstFrame?.(); }
+      if (typeof m.dur === 'number' && m.dur > 0) { onDuration?.(m.dur); }
       if (typeof m.x === 'number' && m.w > 0) { setRect({ x: m.x, y: m.y, w: m.w, h: m.h }); }
       if (m.ended) { setPlaying(false); prevPlaying.current = false; onStateChange?.('ended'); return; }
       if (typeof m.playing === 'boolean') {
