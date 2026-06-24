@@ -490,9 +490,11 @@ export async function renameGroupChat(channelId: string, name: string): Promise<
   if (error) { throw new Error(error.message ?? 'Could not rename group chat'); }
 }
 
-export async function fetchChannelPosts(channelId: string, userId?: string): Promise<ChannelPost[]> {
+export async function fetchChannelPosts(
+  channelId: string, userId?: string, opts?: { limit?: number },
+): Promise<ChannelPost[]> {
   if (DEMO_MODE) { return demoChannelPosts; }
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('channel_posts')
     .select(`
       id, channel_id, poster_id, post_type, source_type, message,
@@ -511,6 +513,9 @@ export async function fetchChannelPosts(channelId: string, userId?: string): Pro
     .eq('is_exclusive', false)
     .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false });
+  // Paginated callers (the DM conversation) take the latest N; everyone else gets the full set.
+  if (opts?.limit) { query = query.limit(opts.limit); }
+  const { data, error } = await query;
 
   if (error) { throw error; }
 

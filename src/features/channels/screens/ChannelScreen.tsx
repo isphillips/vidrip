@@ -83,6 +83,13 @@ export default function ChannelhamburderScreen({
   const [posts, setPosts] = useState<ChannelPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Paginate posts (channels can get large): load the latest PAGE, grow the window as the user scrolls
+  // toward the older end (up in the chat feed, down in the Members-Only grid).
+  const PAGE = 20;
+  const loadedCountRef = useRef(PAGE);
+  const draggedRef = useRef(false);   // armed on first user drag so the mount scroll-to-bottom can't trigger loadMore
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [joined, setJoined] = useState(isJoinedParam);
   const [reviewsEnabled, setReviewsEnabled] = useState(false);
   const [inviteOnly, setInviteOnly] = useState(!!inviteOnlyParam);
@@ -131,8 +138,8 @@ export default function ChannelhamburderScreen({
   const load = useCallback(async (silent = false) => {
     if (!silent) { setLoading(true); }
     try {
-      const data = await fetchChannelPosts(channelId, user?.id);
-      if (mountedRef.current) { setPosts(data); }
+      const data = await fetchChannelPosts(channelId, user?.id, { limit: loadedCountRef.current });
+      if (mountedRef.current) { setPosts(data); setHasMore(data.length >= loadedCountRef.current); }
       fetchChannelAccess(channelId, user?.id)
         .then(a => {
           if (!mountedRef.current) { return; }
@@ -165,6 +172,16 @@ export default function ChannelhamburderScreen({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
+
+  // Grow the loaded window by a page (older posts). Silent refetch keeps the current scroll position
+  // (the chat ScrollView's maintainVisibleContentPosition prevents a jump; the grid just appends).
+  const loadMore = useCallback(() => {
+    if (!hasMore || loadingMore || loading) { return; }
+    setLoadingMore(true);
+    loadedCountRef.current += PAGE;
+    load(true).finally(() => setLoadingMore(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loadingMore, loading, load]);
 
   // Keep postsRef in sync
   useEffect(() => { postsRef.current = posts; }, [posts]);
@@ -216,6 +233,8 @@ export default function ChannelhamburderScreen({
   }, [channelId]);
 
   useEffect(() => {
+    loadedCountRef.current = PAGE;   // fresh window when the channel changes
+    draggedRef.current = false;
     load().then(() => {
       if (!isPublic) {
         // Give the ScrollView one frame to render before scrolling to bottom
@@ -603,6 +622,9 @@ export default function ChannelhamburderScreen({
             numColumns={2}
             contentContainerStyle={gridTiles.length === 0 ? styles.emptyContainer : styles.grid}
             columnWrapperStyle={styles.gridRow}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={loadingMore ? <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.XL }} /> : null}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}
             ListEmptyComponent={
               <View style={styles.center}>
@@ -682,17 +704,25 @@ export default function ChannelhamburderScreen({
           <ScrollView
             ref={scrollViewRef}
             contentContainerStyle={[posts.length === 0 ? styles.emptyContainer : undefined, styles.msgPad]}
+            scrollEventThrottle={16}
+            onScrollBeginDrag={() => { draggedRef.current = true; }}
+            onScroll={e => { if (draggedRef.current && e.nativeEvent.contentOffset.y <= 60) { loadMore(); } }}
+            // Anchor the viewport when older messages prepend at the top (no jump-to-bottom).
+            maintainVisibleContentPosition={posts.length ? { minIndexForVisible: 1 } : undefined}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}>
             {posts.length === 0 ? (
               <View style={styles.center}><Text style={styles.emptyText}>No messages yet</Text></View>
             ) : (
-              [...posts].reverse().map(item => (
-                <ChannelMessageBubble key={item.id} post={item}
-                  isMe={item.poster_id === user?.id} userId={user?.id}
-                  onPress={() => navigation.navigate('WatchChannelClip', { postId: item.id })}
-                  onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)}
-                  onDelete={() => handleDeletePost(item.id)} />
-              ))
+              <>
+                {loadingMore && <ActivityIndicator color={C.ACCENT} style={{ paddingVertical: SPACE.MD }} />}
+                {[...posts].reverse().map(item => (
+                  <ChannelMessageBubble key={item.id} post={item}
+                    isMe={item.poster_id === user?.id} userId={user?.id}
+                    onPress={() => navigation.navigate('WatchChannelClip', { postId: item.id })}
+                    onEmojiToggle={emoji => handleEmojiToggle(item.id, emoji)}
+                    onDelete={() => handleDeletePost(item.id)} />
+                ))}
+              </>
             )}
           </ScrollView>
         </>

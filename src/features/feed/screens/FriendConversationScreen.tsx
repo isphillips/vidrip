@@ -32,6 +32,18 @@ type TimelineItem =
   | { kind: 'post'; at: number; key: string; post: ChannelPost };
 
 const ms = (iso?: string | null) => (iso ? Date.parse(iso) || 0 : 0);
+const PAGE = 20;   // DM messages loaded per page (latest first; scroll up for older)
+
+// Compact date + time for a timeline item - "Jun 12, 3:42 PM" (adds the year for items from past years).
+const fmtStamp = (at: number): string => {
+  if (!at) { return ''; }
+  const d = new Date(at);
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+};
 
 export default function FriendConversationScreen({
   route, navigation,
@@ -40,7 +52,7 @@ export default function FriendConversationScreen({
   const { user } = useAuthStore();
   const { friendUserId, displayName, handle, avatarUrl, threadIds = [] } = route.params;
 
-  // DM channel may not exist yet (friend we've only shared with) — created lazily on compose.
+  // DM channel may not exist yet (friend we've only shared with), created lazily on compose.
   const [channelId, setChannelId] = useState<string | null>(route.params.dmChannelId ?? null);
   const channelIdRef = useRef<string | null>(channelId);
   channelIdRef.current = channelId;
@@ -48,6 +60,11 @@ export default function FriendConversationScreen({
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Upward pagination: load the latest PAGE messages, grow the window as the user scrolls up.
+  const loadedCountRef = useRef(PAGE);
+  const draggedRef = useRef(false);   // armed on first user drag so the mount scroll-to-bottom can't trigger loadMore
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Audio composer state (mirrors ChannelScreen's mic flow).
   const [isHoldingMic, setIsHoldingMic] = useState(false);
@@ -60,10 +77,23 @@ export default function FriendConversationScreen({
   const buildItems = useCallback(async (): Promise<TimelineItem[]> => {
     if (!user) { return []; }
     const cid = channelIdRef.current;
+    const limit = loadedCountRef.current;
     const [threadDetails, posts] = await Promise.all([
       Promise.all(threadIds.map(id => fetchThread(id, user.id).catch(() => null))),
-      cid ? fetchChannelPosts(cid, user.id).catch(() => [] as ChannelPost[]) : Promise.resolve([] as ChannelPost[]),
+      cid ? fetchChannelPosts(cid, user.id, { limit }).catch(() => [] as ChannelPost[]) : Promise.resolve([] as ChannelPost[]),
     ]);
+
+    const postItems: TimelineItem[] = posts
+      .filter(p => p.post_type !== 'status' || !!p.message)
+      .map(p => ({ kind: 'post' as const, at: ms(p.created_at), key: `post:${p.id}`, post: p }));
+
+    // DM messages are paginated (latest `limit`); a full page means there are older ones to scroll up to.
+    const more = posts.length >= limit;
+    setHasMore(more);
+    // Window the (bounded, fully-loaded) shares to the loaded message range, so an old share can't show
+    // above messages that haven't been paged in yet. Once every message is loaded, show all shares.
+    const oldestPostAt = postItems.reduce((m, p) => (p.at && p.at < m ? p.at : m), Infinity);
+    const lowerBound = more && oldestPostAt !== Infinity ? oldestPostAt : 0;
 
     const shareItems: TimelineItem[] = threadDetails
       .filter(Boolean)
@@ -77,14 +107,21 @@ export default function FriendConversationScreen({
           ?? (t.source_type === 'youtube' && t.video_id ? `https://img.youtube.com/vi/${t.video_id}/hqdefault.jpg` : null),
         reacted: t.my_status === 'reacted',
         sourceType: t.source_type ?? 'youtube',
-      }));
-
-    const postItems: TimelineItem[] = posts
-      .filter(p => p.post_type !== 'status' || !!p.message)
-      .map(p => ({ kind: 'post' as const, at: ms(p.created_at), key: `post:${p.id}`, post: p }));
+      }))
+      .filter(s => s.at >= lowerBound);
 
     return [...shareItems, ...postItems].sort((a, b) => a.at - b.at);
   }, [user, threadIds]);
+
+  // Scroll-up handler: grow the window by one page and refetch (load() keeps the current scroll via the
+  // ScrollView's maintainVisibleContentPosition — no jump-to-bottom).
+  const loadMore = useCallback(() => {
+    if (!hasMore || loadingMore || loading) { return; }
+    setLoadingMore(true);
+    loadedCountRef.current += PAGE;
+    load().finally(() => setLoadingMore(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loadingMore, loading]);
 
   const load = useCallback(async () => {
     try {
@@ -98,6 +135,8 @@ export default function FriendConversationScreen({
   // Mark everything read on focus + subscribe to live DM posts.
   useFocusEffect(useCallback(() => {
     let active = true;
+    loadedCountRef.current = PAGE;   // fresh window on each entry
+    draggedRef.current = false;
     load().then(() => { if (active) { scrollToEnd(); } });
     const cid = channelIdRef.current;
     if (cid) { markChannelAsRead(cid).catch(() => {}); }
@@ -207,53 +246,79 @@ export default function FriendConversationScreen({
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={[items.length === 0 ? styles.emptyContainer : styles.list]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={C.ACCENT_HOT} />}>
+          scrollEventThrottle={16}
+          onScrollBeginDrag={() => { draggedRef.current = true; }}
+          onScroll={e => { if (draggedRef.current && e.nativeEvent.contentOffset.y <= 60) { loadMore(); } }}
+          // Keep the viewport anchored when older messages are prepended at the top (no jump-to-bottom).
+          maintainVisibleContentPosition={items.length ? { minIndexForVisible: 1 } : undefined}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadedCountRef.current = PAGE; load(); }} tintColor={C.ACCENT_HOT} />}>
           {items.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No history yet</Text>
               <Text style={styles.emptySubtitle}>Share a Short or send a clip to start the conversation.</Text>
             </View>
           ) : (
-            items.map(item => item.kind === 'share' ? (
-              <TouchableOpacity
-                key={item.key}
-                style={styles.shareCard}
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('Thread', { threadId: item.threadId })}>
-                <View style={styles.shareThumb}>
-                  {item.reacted && item.thumbnail ? (
-                    <Image source={{ uri: item.thumbnail }} style={styles.shareThumbImg} />
-                  ) : (
-                    <View style={styles.shareThumbBlind}><Image source={questionmark} style={styles.shareThumbBlindImg} resizeMode="contain" /></View>
-                  )}
-                </View>
-                <View style={styles.shareInfo}>
-                  <Text style={styles.shareTitle} numberOfLines={2}>
-                    {item.reacted ? item.title : 'Sent you a video to react to'}
-                  </Text>
-                  {item.reacted ? (
-                    <Text style={styles.shareMeta}>✓ Reacted · tap to view</Text>
-                  ) : (
-                    <View style={styles.shareMetaRow}>
-                      <DrippyEyes size={12} />
-                      <Text style={styles.shareMeta}>Tap to react</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ) : (
-              <ChannelMessageBubble
-                key={item.key}
-                post={item.post}
-                isMe={item.post.poster_id === user?.id}
-                userId={user?.id}
-                onPress={() => navigation.navigate('WatchChannelClip', { postId: item.post.id })}
-                onEmojiToggle={emoji => handleEmojiToggle(item.post, emoji)}
-                onDelete={() => handleDeletePost(item.post.id)}
-              />
-            ))
+            items.map((item, i) => {
+              // Centered timestamp, shown only when >1h has passed since the previous item (declutter).
+              const stamp = (i === 0 || item.at - items[i - 1].at > 3_600_000)
+                ? <Text style={styles.stamp}>{fmtStamp(item.at)}</Text>
+                : null;
+              if (item.kind === 'share') {
+                return (
+                  <React.Fragment key={item.key}>
+                    {stamp}
+                    <TouchableOpacity
+                      style={styles.shareCard}
+                      activeOpacity={0.85}
+                      onPress={() => navigation.navigate('Thread', { threadId: item.threadId })}>
+                      <View style={styles.shareThumb}>
+                        {item.reacted && item.thumbnail ? (
+                          <Image source={{ uri: item.thumbnail }} style={styles.shareThumbImg} />
+                        ) : (
+                          <View style={styles.shareThumbBlind}><Image source={questionmark} style={styles.shareThumbBlindImg} resizeMode="contain" /></View>
+                        )}
+                      </View>
+                      <View style={styles.shareInfo}>
+                        <Text style={styles.shareTitle} numberOfLines={2}>
+                          {item.reacted ? item.title : 'Sent you a video to react to'}
+                        </Text>
+                        {item.reacted ? (
+                          <Text style={styles.shareMeta}>✓ Reacted · tap to view</Text>
+                        ) : (
+                          <View style={styles.shareMetaRow}>
+                            <DrippyEyes size={12} />
+                            <Text style={styles.shareMeta}>Tap to react</Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  </React.Fragment>
+                );
+              }
+              const isMe = item.post.poster_id === user?.id;
+              return (
+                <React.Fragment key={item.key}>
+                  {stamp}
+                  <ChannelMessageBubble
+                    post={item.post}
+                    isMe={isMe}
+                    userId={user?.id}
+                    onPress={() => navigation.navigate('WatchChannelClip', { postId: item.post.id })}
+                    onEmojiToggle={emoji => handleEmojiToggle(item.post, emoji)}
+                    onDelete={() => handleDeletePost(item.post.id)}
+                  />
+                </React.Fragment>
+              );
+            })
           )}
         </ScrollView>
+      )}
+
+      {/* Loading older messages (scroll-up pagination) */}
+      {loadingMore && (
+        <View style={[styles.loadingMore, { top: top + 64 }]} pointerEvents="none">
+          <ActivityIndicator color={C.ACCENT} size="small" />
+        </View>
       )}
 
       {/* Pending audio preview */}
@@ -319,6 +384,10 @@ const styles = StyleSheet.create({
   shareTitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
   shareMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   shareMeta: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
+
+  // Centered date/time separator (only shown when >1h has passed since the previous item).
+  stamp: { alignSelf: 'center', textAlign: 'center', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.SUBTLE, paddingVertical: 2 },
+  loadingMore: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
 
   // Composer — floating record buttons, fixed bottom-right above the nav, stacked, Studio-style (shadowed pill).
   barBtns: { position: 'absolute', right: SPACE.LG, alignItems: 'center', gap: SPACE.MD },
