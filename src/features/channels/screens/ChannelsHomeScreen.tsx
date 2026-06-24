@@ -296,8 +296,7 @@ const styles = StyleSheet.create({
   introPlayer: { flex: 1, backgroundColor: '#000' },
   header: { 
     flexDirection: 'row', alignItems: 'center', 
-    paddingHorizontal: SPACE.LG, marginTop: 9,
-    paddingBottom: SPACE.SM
+    paddingHorizontal: SPACE.LG, marginTop: 9
   },
   acctBtn: { marginLeft: 'auto', marginTop: 9 },
   title: {
