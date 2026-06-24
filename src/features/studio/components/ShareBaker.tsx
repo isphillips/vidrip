@@ -26,7 +26,12 @@ async function writeSilhouetteTrack(track: FaceLensTrack): Promise<string> {
   return `file://${path}`;
 }
 
-export type BakeOpts = { sourceUri: string; recipe?: OverlayRecipe | null; durationSec: number; fps?: number; voiceMod?: 'deep' | null };
+export type BakeOpts = {
+  sourceUri: string; recipe?: OverlayRecipe | null; durationSec: number; fps?: number; voiceMod?: 'deep' | null;
+  // Branded attribution watermark (a full-frame transparent PNG from WatermarkStamper) composited on top
+  // of the output. Only passed on OUTBOUND shares; absent for in-app channel/friend bakes.
+  watermark?: { uri: string; width: number; height: number } | null;
+};
 export type ShareBakerHandle = { bake: (opts: BakeOpts) => Promise<string> };
 
 const MAX_FRAMES = 300;       // cap capture cost / disk for long clips (view-shot path)
@@ -72,12 +77,12 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
   const [lensJob, setLensJob] = useState<{ Comp: React.FC<ReactiveLensProps>; w: number; h: number } | null>(null);
 
   useImperativeHandle(ref, () => ({
-    bake: async ({ sourceUri, recipe, durationSec, fps = 30, voiceMod = null }) => {
-      // No overlay AND no audio change → nothing to bake; the source already is the final video.
-      if (isEmptyRecipe(recipe) && !voiceMod) { return sourceUri; }
-      // Voice-only bake (e.g. anonymous mode with the silhouette somehow empty): process audio only.
+    bake: async ({ sourceUri, recipe, durationSec, fps = 30, voiceMod = null, watermark = null }) => {
+      // No overlay AND no audio change AND no watermark → nothing to bake; the source is the final video.
+      if (isEmptyRecipe(recipe) && !voiceMod && !watermark) { return sourceUri; }
+      // No overlay but a watermark and/or voice change → a single export pass stamps them onto the source.
       if (isEmptyRecipe(recipe)) {
-        const { uri: vUri } = await exportRecipe({ clips: [{ uri: sourceUri }], colorMatrix: null, mirror: false, voiceMod });
+        const { uri: vUri } = await exportRecipe({ clips: [{ uri: sourceUri }], colorMatrix: null, mirror: false, voiceMod, watermark });
         return vUri;
       }
       const r = recipe!;
@@ -85,7 +90,7 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
       // → no jank). Android stays on the PNG-capture path below until its native compositor lands.
       if (Platform.OS === 'ios' && r.faceLens?.lensId === ANON_LENS_KEY && r.faceLens.meshFrames?.length) {
         const trackFile = await writeSilhouetteTrack(r.faceLens);
-        const { uri } = await exportRecipe({ clips: [{ uri: sourceUri }], colorMatrix: null, mirror: false, voiceMod, silhouette: { trackFile } });
+        const { uri } = await exportRecipe({ clips: [{ uri: sourceUri }], colorMatrix: null, mirror: false, voiceMod, silhouette: { trackFile }, watermark });
         return uri;
       }
       // Reactive lens → render its existing Skia renderer offscreen and snapshot each frame (fast,
@@ -130,6 +135,7 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
           mirror: false,
           overlayFrames: { uris: lUris, fps: lFps, overlap: 0, width: lw, height: lh },
           voiceMod,
+          watermark,
         });
         // The native export has consumed the PNGs — clean them up so long clips don't pile up in cache.
         Promise.all(lUris.map(u => RNFS.unlink(u.replace(/^file:\/\//, '')).catch(() => {}))).catch(() => {});
@@ -171,6 +177,7 @@ const ShareBaker = forwardRef<ShareBakerHandle>((_props, ref) => {
         mirror: false,
         overlayFrames: { uris, fps: effFps, overlap: 0, width: w, height: h },
         voiceMod,                     // anonymous mode pitch-shifts the audio on export
+        watermark,
       });
       return uri;
     },

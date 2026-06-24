@@ -19,13 +19,17 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
-import { IG_REEL_JS, TapToPlayHint } from '../../shared/igReelPlayer';
+import { IG_REEL_JS } from '../../shared/igReelPlayer';
 import {
   checkHeadphonesConnected,
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import DraggablePip from './DraggablePip';
+import SourceVeil from './SourceVeil';
+import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
+import { createThumbnail } from 'react-native-create-thumbnail';
+import { supabase } from '../../../infrastructure/supabase/client';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
 import { faceLensRecipe } from '../../studio/effectRecipe';
 import { LiveFaceLens, lensByKey, SPIKE_KEY, type FaceLensTrack } from '../../lens/faceLens';
@@ -180,6 +184,14 @@ export default function ReactionRecorder({
   const dismissUpload = useUploadStore((s) => s.dismiss);
   const requestBake = useBakeQueueStore((s) => s.requestBake);
   const [ytPlaying, setYtPlaying] = useState(false);
+  // The external source starts heavily blurred behind a branded play button; revealed
+  // once the user taps the video and it actually plays (one-way until a Restart).
+  const [srcStarted, setSrcStarted] = useState(false);
+  // Still frame used as the blur backdrop on the pre-record veil, for ANY source
+  // (best-effort). YouTube derives instantly; the rest resolve async in the effect below.
+  const [veilThumb, setVeilThumb] = useState<string | null>(
+    videoId && sourceType === 'youtube' ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null,
+  );
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -210,7 +222,6 @@ export default function ReactionRecorder({
   const capAnim = useRef(new Animated.Value(1)).current;
   const [ytKey, setYtKey] = useState(0);
   // IG reels are tap-to-play; hide the hint + know playback began once 'playing' fires.
-  const [igStarted, setIgStarted] = useState(false);
 
   // Afterthought outro: after the main reaction stops, a short window to optionally record a
   // selfie clip that plays after the video for the viewer. 'none' = normal flow.
@@ -241,6 +252,26 @@ export default function ReactionRecorder({
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Resolve a still frame for EVERY source so the veil is always a real blur (best-effort;
+  // a null leaves a frosted scrim only if every lookup fails). Re-hosted IG/FB/Studio files
+  // → thumbnailer; TikTok → API; live IG reel → OG scrape; YouTube → derived URL.
+  useEffect(() => {
+    let alive = true;
+    const set = (u: string | null | undefined) => { if (alive && u) { setVeilThumb(u); } };
+    if (fileSource && sourceUri) {
+      createThumbnail({ url: sourceUri, timeStamp: 100, format: 'jpeg' }).then(({ path }) => set(path)).catch(() => {});
+    } else if (sourceType === 'tiktok' && videoId) {
+      resolveTikTokThumbnail(videoId).then(set).catch(() => {});
+    } else if (sourceType === 'instagram' && videoId) {
+      supabase.functions
+        .invoke('instagram-oembed', { body: { url: `https://www.instagram.com/reel/${videoId}/` } })
+        .then(({ data }: any) => set(data?.thumbnail)).catch(() => {});
+    } else if (videoId) {
+      set(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);   // youtube
+    }
+    return () => { alive = false; };
+  }, [sourceType, videoId, sourceUri, fileSource]);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); }
@@ -478,7 +509,7 @@ export default function ReactionRecorder({
     if (speakerOverrideRef.current) { restoreAudioRoute().catch(() => {}); speakerOverrideRef.current = false; }
     cancelTrack();         // discard the in-progress lens capture; next start re-begins it
     await cameraRef.current?.stopRecording().catch(() => {});
-    setIgStarted(false);   // reel remounts → show tap-to-play again
+    setSrcStarted(false);  // re-blur the source so the next take starts behind the play button
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
   }, [stopTimer, cancelTrack, capAnim]);
@@ -487,6 +518,7 @@ export default function ReactionRecorder({
     if (state === 'playing') {
       skipNextPausedRef.current = true;
       setYtPlaying(true);
+      setSrcStarted(true);   // tap landed on the video → reveal it (drop the blur/play button)
       beginRecording();
     } else if (state === 'paused') {
       setYtPlaying(false);
@@ -548,6 +580,10 @@ export default function ReactionRecorder({
   const letterBottom = bottomInset + 88;
   const letterH = Math.max(0, height - letterTop - letterBottom);
 
+  console.log('igWebEmbed', igWebEmbed);
+  console.log('videoId', videoId);
+  console.log('sourceType', sourceType)
+
   return (
     <View style={styles.container}>
       {/* Source-video full-screen background (or black if no source / during afterthought) */}
@@ -579,14 +615,14 @@ export default function ReactionRecorder({
               style={{ width, height: letterH }}
               onChangeState={onYtStateChange}
             />
-            {/* react-native-video has no built-in controls — tap to start (which begins recording). */}
-            {!ytPlaying && (
-              <TouchableOpacity
-                style={[StyleSheet.absoluteFill, styles.igPlayOverlay]}
-                activeOpacity={0.85}
-                onPress={() => igRef.current?.play()}>
-                <View style={styles.igPlayBtn}><Text style={styles.igPlayIcon}>▶</Text></View>
-              </TouchableOpacity>
+            {/* react-native-video has no built-in controls — the veil is tappable and
+                explicitly starts playback (which begins recording). */}
+            {!srcStarted && (
+              <SourceVeil
+                platform={sourceType === 'facebook' ? 'facebook' : sourceType === 'studio' ? 'generic' : 'instagram'}
+                thumbUri={veilThumb}
+                onPress={() => igRef.current?.play()}
+              />
             )}
           </View>
         </View>
@@ -600,6 +636,7 @@ export default function ReactionRecorder({
               videoId={videoId}
               onChangeState={onYtStateChange}
             />
+            {!srcStarted && <SourceVeil platform="tiktok" thumbUri={veilThumb} />}
           </View>
         </View>
       ) : videoId && sourceType === 'instagram' ? (
@@ -625,16 +662,15 @@ export default function ReactionRecorder({
               try {
                 const msg = JSON.parse(e.nativeEvent.data);
                 // Tap-to-play: the user's tap starts the reel → 'playing' begins the
-                // recording. Ignore 'paused' (fires during buffering); manual Stop
-                // handles early exit.
-                if (msg.type === 'playing') { setIgStarted(true); }
+                // recording (and drops the veil). Ignore 'paused' (fires during
+                // buffering); manual Stop handles early exit.
                 if (msg.type && msg.type !== 'paused') { onYtStateChange(msg.type); }
               } catch { /* ignore non-JSON messages */ }
             }}
           />
-          {/* Tap the reel to start (and begin recording). pointerEvents none so the
-              tap reaches the WebView — the real touch that composites the video. */}
-          {!igStarted && <TapToPlayHint />}
+          {/* Pointer-transparent veil — the tap reaches the WebView reel (the real touch
+              that composites + plays the video, which begins recording). */}
+          {!srcStarted && <SourceVeil platform="instagram" thumbUri={veilThumb} />}
           </View>
         </View>
       ) : videoId ? (() => {
@@ -655,6 +691,11 @@ export default function ReactionRecorder({
                 webViewStyle={YT_WV_STYLE}
               />
             </View>
+
+            {/* Pre-record veil: heavy blur of the video's own frame + a crisp YouTube
+                play button. Pointer-transparent, so the tap passes through to YouTube's
+                real play button underneath (which plays + starts recording). */}
+            {!srcStarted && <SourceVeil platform="youtube" thumbUri={veilThumb} />}
           </View>
         );
       })() : <View style={styles.ytCover} />}
@@ -743,7 +784,7 @@ export default function ReactionRecorder({
 
       {/* Speaker toast */}
       {speakerToast && (
-        <View style={[styles.toast, { top: topInset + SPACE.XL }]}>
+        <View style={[styles.toast, { top: topInset + 60 }]}>
           <Text style={styles.toastText}>🎧 Use headphones for cleaner audio</Text>
         </View>
       )}

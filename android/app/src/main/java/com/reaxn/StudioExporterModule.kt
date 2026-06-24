@@ -186,7 +186,9 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
     override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray = matrix
   }
 
-  // ── Overlay (static PNG or captured frame loop) ───────────────────────────────
+  // ── Overlay (static PNG or captured frame loop) + branded watermark ───────────
+  // Composites the recipe's overlay/lens layer, then the attribution watermark on TOP (added last →
+  // drawn last → over everything). Both are full-frame transparent PNGs scaled to fill.
   private fun buildOverlayEffect(recipe: ReadableMap, vw: Int, vh: Int): OverlayEffect? {
     val framesDict = if (recipe.hasKey("overlayFrames")) recipe.getMap("overlayFrames") else null
     val overlayDict = if (recipe.hasKey("overlay")) recipe.getMap("overlay") else null
@@ -208,7 +210,19 @@ class StudioExporterModule(private val reactContext: ReactApplicationContext) :
       overlayDict != null -> loadBitmap(overlayDict.getString("uri"), vw, vh)?.let { BitmapOverlay.createStaticBitmapOverlay(it) }
       else -> null
     }
-    return overlay?.let { OverlayEffect(com.google.common.collect.ImmutableList.of(it)) }
+
+    val overlays = ArrayList<TextureOverlay>()
+    overlay?.let { overlays.add(it) }
+
+    // Branded attribution watermark — full-frame PNG with the badge in a corner, on top of everything.
+    val watermarkDict = if (recipe.hasKey("watermark")) recipe.getMap("watermark") else null
+    if (watermarkDict != null) {
+      loadBitmap(watermarkDict.getString("uri"), vw, vh)?.let {
+        overlays.add(BitmapOverlay.createStaticBitmapOverlay(it))
+      }
+    }
+
+    return if (overlays.isEmpty()) null else OverlayEffect(com.google.common.collect.ImmutableList.copyOf(overlays))
   }
 
   // Loads a PNG and scales it to the video display size so it composites 1:1 (fills the frame).

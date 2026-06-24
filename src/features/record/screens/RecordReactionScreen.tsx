@@ -10,7 +10,7 @@ import { localPathForReaction } from '../../../infrastructure/storage/localReact
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import { STORAGE_MODE } from '../../../infrastructure/storage/config';
 import {
-  fetchChannelPost, commitChannelClip, uploadChannelClipRelay,
+  fetchChannelPost, fetchChannelPosts, commitChannelClip, uploadChannelClipRelay,
 } from '../../../infrastructure/supabase/queries/channels';
 import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
 import ReactionRecorder from '../components/ReactionRecorder';
@@ -26,9 +26,12 @@ export default function RecordReactionScreen({
 }: RootStackScreenProps<'RecordReaction'>) {
   const {
     kind = 'thread', threadId, videoId, sourceType = 'youtube', sourceUri,
-    postId, channelId, introUrl, queued = false,
+    postId: paramPostId, channelId, resolveChannel, introUrl, queued = false,
   } = route.params;
-  const isChannel = kind === 'channel' || !!postId;
+  // Channel doom-react resolves the first pending post lazily (so the tap transitions
+  // instantly), meaning the post id can arrive after mount — hold it in state.
+  const [postId, setPostId] = useState<string | undefined>(paramPostId);
+  const isChannel = kind === 'channel' || !!paramPostId || !!resolveChannel;
   const { user, profile } = useAuthStore();
   const enqueue = useUploadStore(s => s.enqueue);
   const addPendingReaction = usePendingReactionsStore(s => s.add);
@@ -48,6 +51,36 @@ export default function RecordReactionScreen({
   const [chRecipe, setChRecipe] = useState<OverlayRecipe | null>(null);
   const [chSourceType, setChSourceType] =
     useState<'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook'>('youtube');
+
+  // Channel doom-react: resolve this channel's first pending post on mount (so the tap
+  // could transition instantly), then chain its remaining posts AHEAD of the already-queued
+  // feed-thread tail. With nothing pending, fall through to that tail, else just back out.
+  useEffect(() => {
+    if (!resolveChannel || paramPostId || !channelId) { return; }
+    let active = true;
+    fetchChannelPosts(channelId, user?.id).then(posts => {
+      if (!active) { return; }
+      const targets = posts
+        .filter(p => p.parent_post_id == null && p.poster_id !== user?.id && !p.has_my_reaction
+          && (p.post_type === 'youtube' || p.post_type === 'creator'))
+        .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+      if (targets.length === 0) {
+        const next = useReactQueueStore.getState().shiftNext();
+        if (next) { navigation.replace('RecordReaction', { ...next, queued: true }); }
+        else { navigation.goBack(); }
+        return;
+      }
+      const [first, ...rest] = targets;
+      const q = useReactQueueStore.getState();
+      q.setQueue([
+        ...rest.map(p => ({ kind: 'channel' as const, postId: p.id, channelId })),
+        ...q.queue,
+      ]);
+      setPostId(first.id);
+    }).catch(() => { if (active) { navigation.goBack(); } });
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolveChannel, paramPostId, channelId, user?.id]);
 
   useEffect(() => {
     if (!isChannel || !postId) { return; }

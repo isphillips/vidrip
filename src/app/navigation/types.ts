@@ -134,6 +134,10 @@ export type RecordStackParamList = {
     // Channel-post target — the source video + bunny embed/recipe are resolved lazily on mount.
     postId?: string;
     channelId?: string;
+    // Channel doom-react: resolve the channel's FIRST pending post lazily on mount, so tapping a
+    // channel transitions to the recorder instantly (it shows its loading state) instead of blocking
+    // on a fetch first.
+    resolveChannel?: boolean;
     // When the share carries a sender intro, play it before the source video.
     introUrl?: string;
     introDuration?: number;

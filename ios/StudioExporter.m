@@ -363,6 +363,13 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
   NSURL *overlayURL = overlayDict ? URLFromUri(overlayDict[@"uri"]) : nil;
   CIImage *overlayCI = overlayURL ? [CIImage imageWithContentsOfURL:overlayURL] : nil;
 
+  // Branded attribution watermark — a full-frame transparent PNG (badge baked into a corner) composited
+  // LAST so it sits on top of the video + overlay/lens. Scaled to fill exactly like the overlay; only sent
+  // on outbound shares. Loaded once.
+  NSDictionary *watermarkDict = [recipe[@"watermark"] isKindOfClass:[NSDictionary class]] ? recipe[@"watermark"] : nil;
+  NSURL *watermarkURL = watermarkDict ? URLFromUri(watermarkDict[@"uri"]) : nil;
+  CIImage *watermarkCI = watermarkURL ? [CIImage imageWithContentsOfURL:watermarkURL] : nil;
+
   // Animated overlay: a real-time-sampled frame loop. We composite the time-matched frame
   // onto each output frame and crossfade the last `overlap` frames back into the first so
   // the repeat has no visible seam. Takes precedence over the static overlay.
@@ -396,7 +403,7 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
   }
 
   AVVideoComposition *videoComp = nil;
-  if (colorMatrix || mirror || overlayCI || frames || silTrack) {
+  if (colorMatrix || mirror || overlayCI || frames || silTrack || watermarkCI) {
     videoComp = [AVVideoComposition videoCompositionWithAsset:comp
       applyingCIFiltersWithHandler:^(AVAsynchronousCIImageFilteringRequest *request) {
         CGRect extent = request.sourceImage.extent;
@@ -452,6 +459,18 @@ RCT_EXPORT_METHOD(export:(NSDictionary *)recipe
             [over setValue:out forKey:kCIInputBackgroundImageKey];
             out = over.outputImage ?: out;
           }
+        }
+
+        // Branded watermark — always on top of the video + any overlay/silhouette. Full-frame PNG, scaled
+        // to fill (same as the overlay), so the corner badge baked into it lands where it was authored.
+        if (watermarkCI) {
+          CGRect we = watermarkCI.extent;
+          CIImage *wm = [watermarkCI imageByApplyingTransform:CGAffineTransformMakeScale(extent.size.width / we.size.width,
+                                                                                         extent.size.height / we.size.height)];
+          CIFilter *over = [CIFilter filterWithName:@"CISourceOverCompositing"];
+          [over setValue:[wm imageByCroppingToRect:extent] forKey:kCIInputImageKey];
+          [over setValue:out forKey:kCIInputBackgroundImageKey];
+          out = over.outputImage ?: out;
         }
         [request finishWithImage:[out imageByCroppingToRect:extent] context:nil];
       }];

@@ -10691,6 +10691,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-share@npm:^12.3.1":
+  version: 12.3.1
+  resolution: "react-native-share@npm:12.3.1"
+  checksum: 57ad39b11efd501908acd2a20cfee8989630c6aac5fbceb5adb804b5d5bc49b8ffb6a0b15301c2dea5c2d3e880376db7a8bfdd14207510d2c2b8cc25a2d1d379
+  languageName: node
+  linkType: hard
+
 "react-native-url-polyfill@npm:^3.0.0":
   version: 3.0.0
   resolution: "react-native-url-polyfill@npm:3.0.0"
@@ -12487,6 +12494,7 @@ __metadata:
     react-native-reanimated: 3.16.7
     react-native-safe-area-context: ^5.8.0
     react-native-screens: 4.4.0
+    react-native-share: ^12.3.1
     react-native-url-polyfill: ^3.0.0
     react-native-vector-icons: ^10.3.0
     react-native-video: ^6.19.2

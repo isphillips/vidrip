@@ -23,8 +23,8 @@ import { useFeedStore } from '../../../store/feedStore';
 import { useAuthStore } from '../../../store/authStore';
 import { useReactQueueStore, type ReactTarget } from '../../../store/reactQueueStore';
 import {
-  renameGroupChat, fetchChannelUpdatesSummary, fetchChannelPosts,
-  type ChannelUpdateSummary, type ChannelPost,
+  renameGroupChat, fetchChannelUpdatesSummary,
+  type ChannelUpdateSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 import ConversationRow from '../../../components/conversation/ConversationRow';
 import { relativeTime } from '../../../utils/relativeTime';
@@ -99,17 +99,11 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     return true;
   };
 
-  // Doom-react a channel: start on its first unwatched video, chain through the channel's
-  // remaining pending posts, then continue through the rest of the Feed's pending shares.
-  const startChannelDoomReact = async (chId: string, chName: string, isMembersOnly: boolean) => {
-    let posts: ChannelPost[] = [];
-    try { posts = await fetchChannelPosts(chId, user?.id); } catch { /* ignore */ }
-    const channelTargets: ReactTarget[] = posts
-      .filter(p => p.parent_post_id == null && p.poster_id !== user?.id && !p.has_my_reaction
-        && (p.post_type === 'youtube' || p.post_type === 'creator'))
-      .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))   // oldest unwatched first
-      .map(p => ({ kind: 'channel' as const, postId: p.id, channelId: chId }));
-
+  // Doom-react a channel: transition to the recorder instantly, resolving the channel's first
+  // unwatched post lazily there (so we don't block the tap on a fetch). The Feed-thread tail is
+  // known synchronously, so it goes into the queue now; the record screen prepends the channel's
+  // own remaining posts ahead of it once they load.
+  const startChannelDoomReact = (chId: string) => {
     const threadTargets: ReactTarget[] = threads
       .filter(t => t.sender_id !== user?.id && t.my_status !== 'reacted'
         && t.thread_kind !== 'studio_share' && !!t.video_id)
@@ -117,19 +111,10 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         kind: 'thread' as const, threadId: t.id, videoId: t.video_id ?? undefined,
         sourceType: (t.source_type ?? undefined) as ReactTarget['sourceType'],
       }));
-
-    const ordered = [...channelTargets, ...threadTargets];
-    if (ordered.length === 0) {
-      // Nothing pending after all — just open the channel.
-      (navigation as any).navigate('Channel', {
-        channelId: chId, channelName: chName,
-        isPublic: true, isJoined: true, isOwner: false, isMembersOnly, isGroupChat: false,
-      });
-      return;
-    }
-    const [first, ...rest] = ordered;
-    setQueue(rest);
-    (navigation as any).getParent()?.navigate('RecordReaction', { ...first, queued: true });
+    setQueue(threadTargets);
+    (navigation as any).getParent()?.navigate('RecordReaction', {
+      kind: 'channel', channelId: chId, resolveChannel: true, queued: true,
+    });
   };
 
   // Long-press a group chat → rename it (any member can; empty reverts to auto name).
@@ -279,9 +264,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             unreadCount={item.channel.unseen_count}
             state="unread"
             timestamp={relativeTime(item.sortAt)}
-            onPress={() => startChannelDoomReact(
-              item.channel.channel_id, item.channel.name, item.channel.is_members_only,
-            )}
+            onPress={() => startChannelDoomReact(item.channel.channel_id)}
           />
         )}
       />

@@ -66,6 +66,12 @@ export type StudioRecipe = {
    *  pre-rendered overlay PNGs — no JS frame capture, no jank). `trackFile` is a file:// path to JSON:
    *  { fps, frameAspect, meshIdx, frames:[[le,re,nose,mouth flat + faceWidth]|null], meshFrames }. */
   silhouette?: { trackFile: string } | null;
+  /** Branded attribution watermark composited on top of EVERYTHING (video + overlay/lens) on export.
+   *  A full-frame transparent PNG (rendered at the output aspect, badge baked into a corner) that native
+   *  fill-scales over the output — the same mechanism as `overlay`, but always-on-top and independent of
+   *  it. Only stamped on OUTBOUND shares (TikTok/IG/etc.) so the clip self-attributes off-platform; in-app
+   *  channel/friend posts stay clean. width/height are the PNG's point size. */
+  watermark?: { uri: string; width: number; height: number } | null;
   output?: { width?: number; height?: number; fps?: number; bitrate?: number };
 };
 

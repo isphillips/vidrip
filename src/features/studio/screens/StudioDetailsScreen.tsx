@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Alert, Animated, Modal, Share, Platform,
+  ActivityIndicator, Alert, Animated, Modal, Platform,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import Video from 'react-native-video';
+import RNFS from 'react-native-fs';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -20,6 +21,8 @@ import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
 import EffectPlayer from '../components/EffectPlayer';
 import ShareBaker, { type ShareBakerHandle } from '../components/ShareBaker';
+import WatermarkStamper, { type WatermarkStamperHandle } from '../components/WatermarkStamper';
+import { shareVideoFile } from '../../../infrastructure/share/shareVideoFile';
 import { isEmptyRecipe } from '../effectRecipe';
 import { useStudioAutosave } from '../useStudioAutosave';
 import { deleteDraft } from '../../../infrastructure/storage/studioDraftStorage';
@@ -58,6 +61,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   const [releaseAt, setReleaseAt]     = useState<Date>(() => new Date(Date.now() + 60 * 60 * 1000)); // default +1h
   const [iosPicker, setIosPicker]     = useState(false);
   const bakerRef = useRef<ShareBakerHandle>(null);
+  const stamperRef = useRef<WatermarkStamperHandle>(null);
   const progress  = useRef(new Animated.Value(0)).current;
   const uploadRef = useRef<UploadHandle | null>(null);
 
@@ -211,18 +215,29 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
     }
   };
 
-  // Bake the overlay into the MP4 (only when sharing OUT) then open the OS share sheet.
+  // Share OUT to other apps (TikTok / IG / Stories / Messages…). Every outbound clip is stamped with a
+  // branded watermark baked into the pixels, so it self-attributes off-platform, then the OS share sheet
+  // opens with a caption. (In-app friend/channel posts stay clean — the watermark is share-out only.)
   const shareWithEffects = async () => {
     if (sharing || uploading) { return; }
     setSharing(true);
+    let wmUri: string | null = null;
     try {
-      const out = isEmptyRecipe(recipe)
-        ? fileUri
-        : await bakerRef.current!.bake({ sourceUri: fileUri, recipe, durationSec: durationSec ?? 0 });
-      await Share.share({ url: out });
+      // Probe the baked source's display aspect so the watermark renders at the right shape (no stretch).
+      let aspect = 9 / 16;
+      try {
+        const t = await createThumbnail({ url: fileUri, timeStamp: 100, format: 'jpeg' });
+        if (t.width > 0 && t.height > 0) { aspect = t.width / t.height; }
+      } catch { /* fall back to 9:16 portrait */ }
+      const wm = await stamperRef.current!.stamp({ aspect });
+      wmUri = wm.uri;
+      // Always bake (even an empty recipe) so the watermark is stamped onto the pixels.
+      const out = await bakerRef.current!.bake({ sourceUri: fileUri, recipe, durationSec: durationSec ?? 0, watermark: wm });
+      await shareVideoFile(out, { title: title.trim() || undefined });
     } catch (e: any) {
       Alert.alert('Share failed', e?.message ?? 'Could not prepare the video.');
     } finally {
+      if (wmUri) { RNFS.unlink(wmUri.replace(/^file:\/\//, '')).catch(() => {}); }
       setSharing(false);
     }
   };
@@ -508,8 +523,9 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
         </Modal>
       )}
 
-      {/* Off-screen; only renders while baking the overlay into a shareable MP4. */}
+      {/* Off-screen; only renders while baking the overlay / branded watermark into a shareable MP4. */}
       <ShareBaker ref={bakerRef} />
+      <WatermarkStamper ref={stamperRef} />
     </View>
   );
 }
