@@ -23,6 +23,7 @@ import { relativeTime } from '../../../utils/relativeTime';
 import GradientButton from '../../studio/components/GradientButton';
 import AccountBlob from '../../../components/AccountBlob';
 import SlimeFriendsIcon from '../../../components/SlimeFriendsIcon';
+import GroupAvatarGrid from '../../../components/conversation/GroupAvatarGrid';
 import ChannelsFeedBlock from '../../feed/components/ChannelsFeedBlock';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useFriendConversations, convKey } from '../../feed/conversation/useFriendConversations';
@@ -127,7 +128,7 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
           />
         ) : (
           <ConversationRow
-            avatarUrl={null}
+            customAvatar={<GroupAvatarGrid members={item.group.memberAvatars} />}
             fallbackInitial="👥"
             title={item.group.name}
             subtitle={item.group.unreadCount > 0

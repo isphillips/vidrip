@@ -853,7 +853,7 @@ export default function ReactionRecorder({
       {/* Emoji launcher — a vertical, scrollable strip (3 in view) above the PIP, once the source
           is playing. Tapping throws an emoji (rate-limited to 1/sec) + records it to the track. */}
       {srcStarted && !uploading && afterPhase === 'none' && (
-        <View style={[styles.emojiLauncher, { right: SPACE.LG, bottom: bottomInset + 100 + PIP_H + SPACE.MD }]}>
+        <View style={[styles.emojiLauncher, { right: SPACE.SM, bottom: bottomInset + 100 + PIP_H + SPACE.MD }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.emojiLauncherContent}>
             {QUICK_EMOJIS.map(e => (
               <View key={e} style={styles.emojiLauncherItem}>

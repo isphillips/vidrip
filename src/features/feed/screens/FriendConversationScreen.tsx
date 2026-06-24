@@ -40,6 +40,20 @@ type TimelineItem =
 
 const ms = (iso?: string | null) => (iso ? Date.parse(iso) || 0 : 0);
 const PAGE = 20;   // DM messages loaded per page (latest first; scroll up for older)
+// Stable empty fallback for the threadIds param — a fresh `[]` default would change identity every
+// render, churning buildItems/load and re-running the focus effect (which intermittently cancelled
+// the in-flight load via its `active` guard → "DMs sometimes don't load").
+const EMPTY_IDS: string[] = [];
+
+// Fetch the DM messages with one retry — a single network/RLS blip used to resolve to [] (the
+// catch in buildItems), blanking the DM history intermittently ("DMs sometimes don't load").
+async function loadChannelPostsResilient(cid: string, uid: string, limit: number): Promise<ChannelPost[]> {
+  try { return await fetchChannelPosts(cid, uid, { limit }); }
+  catch {
+    await new Promise(r => setTimeout(r, 400));
+    try { return await fetchChannelPosts(cid, uid, { limit }); } catch { return []; }
+  }
+}
 
 // Compact date + time for a timeline item - "Jun 12, 3:42 PM" (adds the year for items from past years).
 const fmtStamp = (at: number): string => {
@@ -57,7 +71,9 @@ export default function FriendConversationScreen({
 }: FeedStackScreenProps<'FriendConversation'>) {
   const { top, bottom: safeBottom } = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const { friendUserId, displayName, handle, avatarUrl, threadIds = [] } = route.params;
+  const { friendUserId, displayName, handle, avatarUrl } = route.params;
+  // Stable reference (see EMPTY_IDS) so the focus effect doesn't re-run every render.
+  const threadIds = route.params.threadIds ?? EMPTY_IDS;
 
   // DM channel may not exist yet (friend we've only shared with), created lazily on compose.
   const [channelId, setChannelId] = useState<string | null>(route.params.dmChannelId ?? null);
@@ -87,8 +103,8 @@ export default function FriendConversationScreen({
     const limit = loadedCountRef.current;
     const [threadDetails, posts, reactByThread] = await Promise.all([
       Promise.all(threadIds.map(id => fetchThread(id, user.id).catch(() => null))),
-      cid ? fetchChannelPosts(cid, user.id, { limit }).catch(() => [] as ChannelPost[]) : Promise.resolve([] as ChannelPost[]),
-      fetchThreadEmojiReactions(threadIds),
+      cid ? loadChannelPostsResilient(cid, user.id, limit) : Promise.resolve([] as ChannelPost[]),
+      fetchThreadEmojiReactions(threadIds).catch(() => new Map<string, { emoji: string; user_id: string }[]>()),
     ]);
 
     const postItems: TimelineItem[] = posts
@@ -148,12 +164,16 @@ export default function FriendConversationScreen({
   const ensureChannel = useCallback(async (): Promise<string | null> => {
     if (channelIdRef.current) { return channelIdRef.current; }
     if (!user) { return null; }
-    try {
-      const id = (await findPrivateChannel(user.id, friendUserId)) ?? (await ensurePrivateChannel(user.id, friendUserId));
-      setChannelId(id);
-      channelIdRef.current = id;
-      return id;
-    } catch { return null; }
+    // Resolve (find existing, else create) with one retry — a transient failure here used to leave
+    // channelId null, so the timeline showed shares but no DM history until a manual refresh.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const id = (await findPrivateChannel(user.id, friendUserId)) ?? (await ensurePrivateChannel(user.id, friendUserId));
+        if (id) { setChannelId(id); channelIdRef.current = id; return id; }
+      } catch { /* fall through to retry */ }
+      if (attempt === 0) { await new Promise(r => setTimeout(r, 400)); }
+    }
+    return null;
   }, [user, friendUserId]);
 
   // Mark everything read on focus + subscribe to live DM posts.
@@ -166,7 +186,9 @@ export default function FriendConversationScreen({
     (async () => {
       // Make sure the DM channel is resolved before building the timeline, so its history loads on entry.
       if (!channelIdRef.current) { await ensureChannel(); }
-      if (!active) { return; }
+      // Always complete the load (setItems is safe on a still-mounted screen) — bailing here on a
+      // transient `active` flip was a way the timeline could end up empty. Only the post-load side
+      // effects (scroll, realtime subscribe) are gated on still being focused.
       await load();
       if (!active) { return; }
       scrollToEnd();

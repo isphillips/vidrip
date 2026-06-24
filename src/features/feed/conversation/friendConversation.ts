@@ -1,5 +1,5 @@
 import type { FeedThread } from '../../../infrastructure/supabase/queries/threads';
-import type { ChannelSummary } from '../../../infrastructure/supabase/queries/channels';
+import type { ChannelSummary, GroupMember } from '../../../infrastructure/supabase/queries/channels';
 import type { Friend } from '../../../infrastructure/supabase/queries/friends';
 import type { RowState } from '../../../components/conversation/useRowState';
 
@@ -128,10 +128,12 @@ export type GroupConversation = {
   lastActivityAt: number;
   unreadCount: number;
   state: RowState;
+  memberAvatars: GroupMember[];
 };
 
 export function buildGroupConversations(
   dmChannels: ChannelSummary[],
+  memberAvatarMap: Map<string, GroupMember[]> = new Map(),
 ): GroupConversation[] {
   return dmChannels
     .filter(c => c.is_group_chat === true) // group chats are explicitly flagged
@@ -142,6 +144,7 @@ export function buildGroupConversations(
       lastActivityAt: c.last_message_at ? Date.parse(c.last_message_at) || 0 : 0,
       unreadCount: c.unread_count,
       state: (c.unread_count > 0 ? 'unread' : 'caughtup') as RowState,
+      memberAvatars: memberAvatarMap.get(c.id) ?? [],
     }))
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 }

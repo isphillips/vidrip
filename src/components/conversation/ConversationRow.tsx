@@ -12,6 +12,8 @@ import { rowStateStyle, type RowState } from './useRowState';
 export type ConversationRowProps = {
   avatarUrl?: string | null;
   fallbackInitial: string;
+  // Replaces the avatar slot entirely (e.g. GroupAvatarGrid for group chats).
+  customAvatar?: React.ReactNode;
   title: string;
   subtitle?: string | null;
   unreadCount?: number;
@@ -31,6 +33,7 @@ export type ConversationRowProps = {
 export default function ConversationRow({
   avatarUrl,
   fallbackInitial,
+  customAvatar,
   title,
   subtitle,
   unreadCount = 0,
@@ -59,7 +62,7 @@ export default function ConversationRow({
         activeOpacity={0.85}>
         <View style={styles.body}>
           <View>
-            {avatarUrl ? (
+            {customAvatar ? customAvatar : avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatar} resizeMode="cover" />
             ) : (
               <View style={styles.avatarFallback}>

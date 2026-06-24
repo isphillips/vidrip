@@ -417,7 +417,9 @@ export async function fetchPrivateChannelPeers(
     .from('group_members')
     .select('group_id, user_id')
     .in('group_id', channelIds);
-  if (error) { return map; }
+  // Throw (don't silently return an EMPTY map) so callers can tell a transient failure from a real
+  // "no peers" result — an empty map here unmaps every DM channel and collapses conversations.
+  if (error) { throw error; }
 
   // group_id → set of member ids (excluding me)
   const peers = new Map<string, Set<string>>();
@@ -429,6 +431,57 @@ export async function fetchPrivateChannelPeers(
   for (const [groupId, members] of peers) {
     if (members.size === 1) { map.set(groupId, [...members][0]); }
   }
+  return map;
+}
+
+export type GroupMember = { url: string | null; initial: string };
+
+// Fetches up to 4 other-member avatar + initial data per group chat channel — used for the
+// iOS-style multi-avatar grid in the Messages list.
+// Fetches up to 4 other-member avatar + initial data per group chat channel.
+// Uses the get_channel_members SECURITY DEFINER RPC to bypass the group_members RLS
+// policy (which only exposes the calling user's own membership row), then does a single
+// batch users query for avatar_urls.
+export async function fetchGroupChatMemberAvatars(
+  userId: string,
+  channelIds: string[],
+): Promise<Map<string, GroupMember[]>> {
+  const map = new Map<string, GroupMember[]>();
+  if (DEMO_MODE || channelIds.length === 0) { return map; }
+
+  // Step 1: get member ids + handles per channel via SECURITY DEFINER RPC.
+  const rpcResults = await Promise.all(
+    channelIds.map(async channelId => {
+      const { data } = await (supabase as any)
+        .rpc('get_channel_members', { p_channel_id: channelId });
+      const others = (data ?? []).filter((m: any) => m.user_id !== userId);
+      return { channelId, members: others.slice(0, 4) as any[] };
+    }),
+  );
+
+  // Step 2: batch-fetch avatar_urls from users (likely readable for authenticated users).
+  const allUserIds = [...new Set(rpcResults.flatMap(r => r.members.map((m: any) => m.user_id as string)))];
+  const avatarByUser = new Map<string, string | null>();
+  if (allUserIds.length > 0) {
+    const { data: users } = await (supabase as any)
+      .from('users')
+      .select('id, avatar_url')
+      .in('id', allUserIds);
+    for (const u of (users ?? [])) { avatarByUser.set(u.id, u.avatar_url ?? null); }
+  }
+
+  // Step 3: build the final map.
+  for (const { channelId, members } of rpcResults) {
+    if (!members.length) { continue; }
+    const result: GroupMember[] = members.map((m: any) => {
+      const name: string = m.display_name || m.handle || '?';
+      // avatar_url may come from the RPC (if it includes it) or from the users batch.
+      const url = (m.avatar_url as string | undefined) ?? avatarByUser.get(m.user_id) ?? null;
+      return { url, initial: name.charAt(0).toUpperCase() };
+    });
+    map.set(channelId, result);
+  }
+
   return map;
 }
 
@@ -966,6 +1019,51 @@ export async function fetchChannelAccess(channelId: string, userId?: string): Pr
 
 // Rooms the user actively subscribes to (for the "Subscribed" channels section).
 // Returns ChannelSummary so they render/navigate like any other channel.
+// Every creator channel the CURRENT user owns — regardless of listed/hidden/private — so an owner
+// always sees their own channels (the public sections drop unlisted/hidden ones). is_members_only=true
+// is the creator-channel marker, which also keeps DMs/group chats out.
+export async function fetchMyChannels(userId: string): Promise<ChannelSummary[]> {
+  if (DEMO_MODE) { return []; }
+  const { data, error } = await (supabase as any)
+    .from('groups')
+    .select(`
+      id, name, description, is_public, created_by, member_count, avatar_url, invite_only, subscriber_mode,
+      pinned_video_id, pinned_video_title, pinned_video_thumbnail, ad_video_url, ad_video_duration,
+      owner:users!created_by(handle, avatar_url)
+    `)
+    .eq('created_by', userId)
+    .eq('is_members_only', true)
+    .order('member_count', { ascending: false });
+  if (error) { throw error; }
+
+  const postCounts = await countPostsByChannel((data ?? []).map((c: any) => c.id));
+
+  return ((data ?? []) as any[]).map((c) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description ?? null,
+    is_public: c.is_public,
+    created_by: c.created_by,
+    owner: c.owner ?? null,
+    pinned_video_id: c.pinned_video_id ?? null,
+    pinned_video_title: c.pinned_video_title ?? null,
+    pinned_video_thumbnail: c.pinned_video_thumbnail ?? null,
+    ad_video_url: c.ad_video_url ?? null,
+    ad_video_duration: c.ad_video_duration ?? null,
+    member_count: c.member_count ?? 0,
+    post_count: postCounts.get(c.id) ?? 0,
+    is_joined: true,
+    unread_count: 0,
+    last_message_at: null,
+    is_members_only: true,
+    invite_only: !!c.invite_only,
+    subscriber_mode: !!c.subscriber_mode,
+    is_listed: !!c.is_public,
+    invite_status: 'owner' as ChannelSummary['invite_status'],
+    avatar_url: c.avatar_url ?? null,
+  })) as ChannelSummary[];
+}
+
 export async function fetchSubscribedChannels(userId: string): Promise<ChannelSummary[]> {
   if (DEMO_MODE) { return []; }   // demo: keep the Subscribed section empty (avoid dup channels)
   const nowIso = new Date().toISOString();

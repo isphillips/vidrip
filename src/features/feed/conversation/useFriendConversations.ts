@@ -1,11 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../../store/authStore';
 import { useBlockStore } from '../../../store/blockStore';
 import { fetchFeedThreads, type FeedThread } from '../../../infrastructure/supabase/queries/threads';
 import {
-  fetchPrivateChannels, fetchPrivateChannelPeers, type ChannelSummary,
+  fetchPrivateChannels, fetchPrivateChannelPeers, fetchGroupChatMemberAvatars,
+  type ChannelSummary, type GroupMember,
 } from '../../../infrastructure/supabase/queries/channels';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import {
@@ -28,29 +29,45 @@ export function useFriendConversations() {
   const [threads, setThreads] = useState<FeedThread[]>([]);
   const [dmChannels, setDmChannels] = useState<ChannelSummary[]>([]);
   const [peerByChannel, setPeerByChannel] = useState<Map<string, string>>(new Map());
+  const [groupMemberAvatars, setGroupMemberAvatars] = useState<Map<string, GroupMember[]>>(new Map());
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [hiddenConvs, setHiddenConvs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const loadGenRef = useRef(0);
   const load = useCallback(async () => {
     if (!user) { return; }
+    const gen = ++loadGenRef.current;   // newest load wins; older ones discard their results
     try {
       const [fr, th, dm, h, hc] = await Promise.all([
-        fetchFriends(user.id),
-        fetchFeedThreads(user.id),
-        fetchPrivateChannels(user.id),
-        AsyncStorage.getItem(HIDDEN_KEY),
-        AsyncStorage.getItem(HIDDEN_CONV_KEY),
+        fetchFriends(user.id).catch(() => null),
+        fetchFeedThreads(user.id).catch(() => null),
+        fetchPrivateChannels(user.id).catch(() => null),
+        AsyncStorage.getItem(HIDDEN_KEY).catch(() => null),
+        AsyncStorage.getItem(HIDDEN_CONV_KEY).catch(() => null),
       ]);
-      setFriends(fr);
-      setThreads(th);
-      if (!DEMO_MODE) {
-        setDmChannels(dm);
-      }
+      // Peers map each DM channel → its friend, so they're essential before showing the list and are
+      // applied together with dmChannels (a stale/empty map would unmap every DM conversation,
+      // collapsing it to its share-only "reaction request" form). Resolved before any setState.
+      const peers = dm ? await fetchPrivateChannelPeers(user.id, dm.map(c => c.id)).catch(() => null) : null;
+      if (gen !== loadGenRef.current) { return; }   // a newer load superseded this one
+      // Apply only what succeeded — a transient failure keeps the prior slice instead of blanking it.
+      if (fr) { setFriends(fr); }
+      if (th) { setThreads(th); }
+      if (!DEMO_MODE && dm) { setDmChannels(dm); }
+      if (peers) { setPeerByChannel(peers); }
       setHidden(h ? new Set(JSON.parse(h) as string[]) : new Set());
       setHiddenConvs(hc ? new Set(JSON.parse(hc) as string[]) : new Set());
-      setPeerByChannel(await fetchPrivateChannelPeers(user.id, dm.map(c => c.id)));
+
+      // Group-chat member avatars are cosmetic — load them in the BACKGROUND so the conversation
+      // list shows immediately and the avatars fill in (gen-guarded so a stale load can't apply).
+      const groupIds = (dm ?? []).filter(c => c.is_group_chat).map(c => c.id);
+      if (groupIds.length > 0) {
+        fetchGroupChatMemberAvatars(user.id, groupIds)
+          .then(av => { if (gen === loadGenRef.current) { setGroupMemberAvatars(av); } })
+          .catch(() => {});
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -76,9 +93,9 @@ export function useFriendConversations() {
       friends, threads, dmChannels, peerByChannel,
       myId: user.id, blocked, hidden,
     });
-    return mergeFeedItems(friendConvos, buildGroupConversations(dmChannels))
+    return mergeFeedItems(friendConvos, buildGroupConversations(dmChannels, groupMemberAvatars))
       .filter(it => !hiddenConvs.has(convKey(it)));
-  }, [friends, threads, dmChannels, peerByChannel, user, blocked, hidden, hiddenConvs]);
+  }, [friends, threads, dmChannels, peerByChannel, groupMemberAvatars, user, blocked, hidden, hiddenConvs]);
 
   // Total items still needing my attention — drives the bottom-tab Feed badge.
   const toReactCount = useMemo(
