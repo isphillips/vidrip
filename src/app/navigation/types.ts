@@ -170,6 +170,8 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Auth: undefined;
   Main: undefined;
+  // Friend requests — a root modal (close button), since it's opened from every tab header.
+  FriendRequests: undefined;
   RecordReaction: RecordStackParamList['RecordReaction'];
   RecordComment: {
     rootSourceId: string;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { C, FONT, SPACE } from '../../../theme';
 
@@ -39,6 +39,10 @@ export interface SourceVeilProps {
   /** When set, the veil is tappable and calls this — for file players that need an explicit play().
    *  When omitted, the veil is pointer-transparent so the tap reaches the embedded player underneath. */
   onPress?: () => void;
+  /** While true, show a spinner instead of the play button and ABSORB taps with no visual feedback —
+   *  for sources whose player needs a moment to become tappable (e.g. the Facebook iframe), so an
+   *  early tap can't flash the source through or be wasted. */
+  loading?: boolean;
 }
 
 /**
@@ -46,7 +50,7 @@ export interface SourceVeilProps {
  * first frame) + a crisp, platform-branded play button, until the user taps to play
  * (which also starts recording). Shown only before the source begins playing.
  */
-export default function SourceVeil({ platform, thumbUri, onPress }: SourceVeilProps) {
+export default function SourceVeil({ platform, thumbUri, onPress, loading }: SourceVeilProps) {
   const blur = Platform.OS === 'ios' ? 32 : 20;
   const inner = (
     <>
@@ -58,12 +62,30 @@ export default function SourceVeil({ platform, thumbUri, onPress }: SourceVeilPr
       )}
       <View style={styles.scrim} />
       <View style={styles.center}>
-        <BrandButton platform={platform} />
-        <Text style={styles.hint}>Tap the video to play &amp; react</Text>
+        {loading ? (
+          <>
+            <ActivityIndicator color={C.WHITE} size="large" />
+            <Text style={styles.hint}>Loading…</Text>
+          </>
+        ) : (
+          <>
+            <BrandButton platform={platform} />
+            <Text style={styles.hint}>Tap the video to play &amp; react</Text>
+          </>
+        )}
       </View>
     </>
   );
 
+  // Loading: claim the responder to swallow taps WITH NO opacity flash (a TouchableOpacity would dim
+  // and reveal the source). The host arms the real tap-through once its player is ready.
+  if (loading) {
+    return (
+      <View style={StyleSheet.absoluteFill} onStartShouldSetResponder={() => true} onResponderRelease={() => {}}>
+        {inner}
+      </View>
+    );
+  }
   if (onPress) {
     return (
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={0.92} onPress={onPress}>

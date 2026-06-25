@@ -199,8 +199,15 @@ export default function RecordReactionScreen({
   }
 
   if (isChannel) {
-    const fileBacked = chSourceType === 'instagram' || chSourceType === 'facebook';
-    const ready = chSourceType === 'bunny' ? !!chEmbedUrl : fileBacked ? !!chSourceUri : !!chVideoId;
+    // Instagram is always re-hosted to a file. Facebook can be EITHER: an imported clip (file) OR a
+    // shared public reel (no file → plays via the FB embed in ReactionRecorder), so it's ready with
+    // either a source uri or a video id.
+    const fileBacked = chSourceType === 'instagram';
+    const ready =
+      chSourceType === 'bunny' ? !!chEmbedUrl
+      : chSourceType === 'instagram' ? !!chSourceUri
+      : chSourceType === 'facebook' ? (!!chSourceUri || !!chVideoId)
+      : !!chVideoId;
     if (!chReady || !ready) {
       return <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} size="large" /></View>;
     }

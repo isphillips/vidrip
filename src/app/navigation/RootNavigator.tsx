@@ -27,6 +27,7 @@ import MfaChallengeScreen from '../../features/auth/screens/MfaChallengeScreen';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
 import RecordCommentScreen from '../../features/comments/screens/RecordCommentScreen';
 import RecordIntroScreen from '../../features/share/screens/RecordIntroScreen';
+import FriendRequestsScreen from '../../features/friends/screens/FriendRequestsScreen';
 import OnboardingScreen from '../../features/onboarding/OnboardingScreen';
 import ScreenGradient from '../../components/ScreenGradient';
 import { useOnboarding, useOnboardingStore } from '../../features/onboarding/onboarding';
@@ -283,6 +284,12 @@ export default function RootNavigator() {
               {/* Full-screen camera recorders: force a BLACK modal backdrop so the app's
                   purple navTheme background (C.BG_SOLID) never peeks through where the
                   recorder/source-video letterbox doesn't reach the bottom edge. */}
+              {/* Friend requests — a dismissable modal (close button) reachable from every tab header. */}
+              <Root.Screen
+                name="FriendRequests"
+                component={FriendRequestsScreen}
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
               <Root.Screen
                 name="RecordReaction"
                 component={RecordReactionScreen}

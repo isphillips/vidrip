@@ -77,6 +77,20 @@ const floatStyles = StyleSheet.create({
   emoji: { position: 'absolute', bottom: 120, alignSelf: 'center', fontSize: 36 },
 });
 
+// Pulsing red dot for the "recording" badges.
+function BlinkingDot() {
+  const blink = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(blink, { toValue: 0.2, duration: 600, useNativeDriver: true }),
+      Animated.timing(blink, { toValue: 1, duration: 600, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [blink]);
+  return <Animated.View style={[styles.recDot, { opacity: blink }]} />;
+}
+
 export interface ReactionRecorderProps {
   videoId?: string;
   // Instagram has no embed player — its source plays from this re-hosted file URL.
@@ -133,6 +147,9 @@ export default function ReactionRecorder({
   // Instagram thread shortcode — WebView embed has no controllable player, so the
   // user starts/stops recording manually while watching the reel.
   const igWebEmbed = sourceType === 'instagram' && !!videoId && !sourceUri;
+  // Public Facebook reel embed — cross-origin, so we can't read its duration; hide the cap bar + timer
+  // (they'd show a misleading 180s countdown). The hard cap still auto-stops as a safety net.
+  const fbReel = sourceType === 'facebook' && !!videoId && !sourceUri;
   // Camera shows as a PIP corner whenever a source video fills the screen behind it.
   const pipCamera = sourceDriven;
 
@@ -193,6 +210,10 @@ export default function ReactionRecorder({
   // The external source starts heavily blurred behind a branded play button; revealed
   // once the user taps the video and it actually plays (one-way until a Restart).
   const [srcStarted, setSrcStarted] = useState(false);
+  // Facebook only: its cross-origin iframe has no playback bridge, so we commit on the tap. Gate that
+  // on the iframe actually being loaded — tapping before it's ready used to start a videoless recording
+  // and raise the touch shield, leaving the user unable to tap FB's play button.
+  const [fbReady, setFbReady] = useState(false);
   // The source video's own length (seconds), captured once it loads, so the countdown
   // and cap bar can reflect when the video actually ends (null until/unless known).
   const [sourceDuration, setSourceDuration] = useState<number | null>(null);
@@ -555,6 +576,7 @@ export default function ReactionRecorder({
     cancelTrack();         // discard the in-progress lens capture; next start re-begins it
     await cameraRef.current?.stopRecording().catch(() => {});
     setSrcStarted(false);  // re-blur the source so the next take starts behind the play button
+    setFbReady(false);     // the FB WebView remounts (ytKey) → wait for its iframe to reload
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
   }, [stopTimer, cancelTrack, capAnim]);
@@ -729,6 +751,46 @@ export default function ReactionRecorder({
           {!srcStarted && <SourceVeil platform="instagram" thumbUri={veilThumb} />}
           </View>
         </View>
+      ) : videoId && sourceType === 'facebook' ? (
+        // Public Facebook reel: the plugins/video.php iframe is cross-origin (no play/pause bridge and
+        // no autoplay), so the user taps FB's own play button to start it. We SPY on that tap via the
+        // responder capture (return false → don't intercept) to begin recording — but ONLY once the
+        // iframe has loaded (fbReady), otherwise an early tap starts a videoless recording and raises
+        // the shield with nothing to play. Until then the veil ABSORBS taps so none are wasted/stuck.
+        <View style={styles.ytCover}>
+          <View
+            style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}
+            onStartShouldSetResponderCapture={() => {
+              if (!srcStarted && fbReady) { setSrcStarted(true); beginRecording(); }
+              return false; // let the tap reach FB's play button inside the iframe
+            }}>
+            <WebView
+              key={ytKey}
+              style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
+              source={{
+                html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#000;overflow:hidden;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}iframe{width:100vw;height:100vh;border:0}</style></head><body><iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(videoId.startsWith('http') ? videoId : `https://www.facebook.com/reel/${videoId}`)}&show_text=false&autoplay=false&mute=false&allowfullscreen=true" allow="autoplay;fullscreen;encrypted-media" allowfullscreen scrolling="no"></iframe></body></html>`,
+                baseUrl: 'https://www.facebook.com',
+              }}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo={false}
+              javaScriptEnabled
+              domStorageEnabled
+              setSupportMultipleWindows={false}
+              onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:') || req.url.startsWith('data:')}
+              // Signal readiness when the FB iframe finishes loading (a timer is the fallback if its
+              // load event already fired / never does), so the tap-to-record only arms once it's playable.
+              injectedJavaScript={`(function(){var f=document.querySelector('iframe');var sent=false;function r(){if(sent)return;sent=true;window.ReactNativeWebView&&window.ReactNativeWebView.postMessage('fb-ready');}if(f){f.addEventListener('load',r);}setTimeout(r,2200);})(); true;`}
+              onMessage={e => { if (e.nativeEvent.data === 'fb-ready') { setFbReady(true); } }}
+            />
+            {/* Blurred branded veil. While the iframe loads it shows a spinner and ABSORBS taps (no
+                flash) so you wait instead of tapping early; once ready it's pointer-transparent and the
+                crisp play button appears, so a single tap reaches FB's play and arms recording. */}
+            {!srcStarted && (
+              <SourceVeil platform="facebook" thumbUri={veilThumb} loading={!fbReady} />
+            )}
+          </View>
+        </View>
       ) : videoId ? (() => {
         const coverW = Math.round(height * (16 / 9));
         const offsetX = -Math.round((coverW - width) / 2);
@@ -852,7 +914,7 @@ export default function ReactionRecorder({
 
       {/* Emoji launcher — a vertical, scrollable strip (3 in view) above the PIP, once the source
           is playing. Tapping throws an emoji (rate-limited to 1/sec) + records it to the track. */}
-      {srcStarted && !uploading && afterPhase === 'none' && (
+      {(srcStarted || isRecording) && !uploading && afterPhase === 'none' && (
         <View style={[styles.emojiLauncher, { right: SPACE.SM, bottom: bottomInset + 100 + PIP_H + SPACE.MD }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.emojiLauncherContent}>
             {QUICK_EMOJIS.map(e => (
@@ -871,8 +933,9 @@ export default function ReactionRecorder({
         </View>
       )}
 
-      {/* Receding cap bar — gold, flaring red as the duration limit approaches */}
-      {isRecording && effCap ? (
+      {/* Receding cap bar — gold, flaring red as the duration limit approaches. Hidden for FB reels
+          (no real duration → the bar would just count down the 180s hard cap, which is misleading). */}
+      {isRecording && effCap && !fbReel ? (
         <View style={[styles.capTrack, { top: topInset }]} pointerEvents="none">
           <Animated.View
             style={[styles.capFill, {
@@ -886,12 +949,13 @@ export default function ReactionRecorder({
         </View>
       ) : null}
 
-      {/* Recording timer badge — sits just above the record button so the lens picker owns the top. */}
+      {/* Recording badge — sits just above the record button so the lens picker owns the top. FB reels
+          have no real duration, so they show a static "Recording in progress…" instead of a countdown. */}
       {isRecording && (
         <View style={[styles.recBadge, { bottom: bottomInset + SPACE.XL + 88 }]}>
-          <View style={styles.recDot} />
+          <BlinkingDot />
           <Text style={styles.recText}>
-            {effCap ? fmt(Math.max(0, effCap - elapsed)) : fmt(elapsed)}
+            {fbReel ? 'Recording in progress…' : (effCap ? fmt(Math.max(0, effCap - elapsed)) : fmt(elapsed))}
           </Text>
         </View>
       )}
@@ -968,7 +1032,7 @@ export default function ReactionRecorder({
       {afterPhase === 'recording' && (
         <>
           <View style={[styles.recBadge, { top: topInset + SPACE.SM }]}>
-            <View style={styles.recDot} />
+            <BlinkingDot />
             <Text style={styles.recText}>{fmt(Math.max(0, AFTERTHOUGHT_MAX - afterElapsed))}</Text>
           </View>
           <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>

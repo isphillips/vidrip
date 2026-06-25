@@ -34,6 +34,7 @@ import { refreshConnectedFeed } from '../../../infrastructure/supabase/queries/c
 import { buildAuthUrl, type SyncProvider, type ConnectionType } from '../../../infrastructure/oauth/config';
 import { useOnboardingStore } from '../../onboarding/onboarding';
 import AccountBlob from '../../../components/AccountBlob';
+import FriendsMenu from '../../../components/FriendsMenu';
 import SlimeGearhead from '../../../components/SlimeGearhead';
 import type { AccountStackScreenProps } from '../../../app/navigation/types';
 import ChannelSettingsSheet from '../../channels/components/ChannelSettingsSheet';
@@ -289,7 +290,10 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     <View style={styles.screen}>
       <View style={[styles.navbar, { paddingTop: top + SPACE.MD }]}>
         <Text style={styles.navTitle}>Account</Text>
-        <View style={styles.navActions}><AccountBlob size={34} active /></View>
+        <View style={styles.navActions}>
+          <FriendsMenu size={30} />
+          <AccountBlob size={34} active />
+        </View>
       </View>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Avatar — tap to edit profile */}

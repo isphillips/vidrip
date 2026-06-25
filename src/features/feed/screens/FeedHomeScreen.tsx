@@ -18,6 +18,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AccountBlob from '../../../components/AccountBlob';
+import FriendsMenu from '../../../components/FriendsMenu';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useFeedStore } from '../../../store/feedStore';
 import { useAuthStore } from '../../../store/authStore';
@@ -178,13 +179,16 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
               />
             </MaskedView>
           </View>
-          <TouchableOpacity
-            style={styles.acctBtn}
-            hitSlop={10}
-            activeOpacity={0.7}
-            onPress={() => (navigation as any).getParent()?.navigate('Account')}>
-            <AccountBlob size={34} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <FriendsMenu size={30} />
+            <TouchableOpacity
+              style={styles.acctBtn}
+              hitSlop={10}
+              activeOpacity={0.7}
+              onPress={() => (navigation as any).getParent()?.navigate('Account')}>
+              <AccountBlob size={34} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -323,7 +327,8 @@ const styles = StyleSheet.create({
     color: C.BLACK,
   },
   titleVi: { color: C.WHITE },
-  acctBtn: { marginLeft: 'auto', marginTop: 6 },
+  acctBtn: { marginTop: 6 },
+  headerActions: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: SPACE.MD },
   newGroupBtn: {
     marginLeft: 'auto', marginTop: 4,
     width: 40, height: 40, borderRadius: 20,

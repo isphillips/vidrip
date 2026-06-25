@@ -12,6 +12,7 @@ import Reanimated, {
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { supabase } from '../../../infrastructure/supabase/client';
 import AccountBlob from '../../../components/AccountBlob';
+import FriendsMenu from '../../../components/FriendsMenu';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
 import {
@@ -198,10 +199,13 @@ export default function ChannelsHomeScreen({
             <Ionicons name="chevron-down" size={14} color={C.MUTED} />
           </TouchableOpacity>
         </Reanimated.View>
-        <TouchableOpacity style={styles.acctBtn} hitSlop={10} activeOpacity={0.7}
-          onPress={() => (navigation as any).getParent()?.navigate('Account')}>
-          <AccountBlob size={34} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <FriendsMenu size={30} />
+          <TouchableOpacity hitSlop={10} activeOpacity={0.7}
+            onPress={() => (navigation as any).getParent()?.navigate('Account')}>
+            <AccountBlob size={34} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -299,6 +303,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.LG, marginTop: 9
   },
   acctBtn: { marginLeft: 'auto', marginTop: 9 },
+  headerRight: { marginLeft: 'auto', marginTop: 9, flexDirection: 'row', alignItems: 'center', gap: SPACE.MD },
   title: {
     fontSize: FONT.SIZES.XL,
     fontFamily: FONT.DISPLAY_BOLD,

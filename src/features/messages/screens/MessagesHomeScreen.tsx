@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Animated,
   TouchableOpacity,
   Pressable,
   KeyboardAvoidingView,
@@ -22,7 +21,7 @@ import ConversationRow from '../../../components/conversation/ConversationRow';
 import { relativeTime } from '../../../utils/relativeTime';
 import GradientButton from '../../studio/components/GradientButton';
 import AccountBlob from '../../../components/AccountBlob';
-import SlimeFriendsIcon from '../../../components/SlimeFriendsIcon';
+import FriendsMenu from '../../../components/FriendsMenu';
 import GroupAvatarGrid from '../../../components/conversation/GroupAvatarGrid';
 import ChannelsFeedBlock from '../../feed/components/ChannelsFeedBlock';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -45,17 +44,6 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
     refresh();
   };
 
-  // Friends context window — an animated popover from the header (Add a friend / New group chat).
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuAnim = useRef(new Animated.Value(0)).current;
-  const openMenu = () => {
-    setMenuOpen(true);
-    Animated.spring(menuAnim, { toValue: 1, useNativeDriver: true, damping: 14, stiffness: 220, mass: 0.7 }).start();
-  };
-  const closeMenu = () => {
-    Animated.timing(menuAnim, { toValue: 0, duration: 140, useNativeDriver: true })
-      .start(({ finished }) => { if (finished) { setMenuOpen(false); } });
-  };
 
   if (loading) {
     return <View style={styles.center}><ActivityIndicator color={C.ACCENT} /></View>;
@@ -69,10 +57,8 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
             <Text style={[styles.wordmarkText, styles.titleVi]}>Messages</Text>
           </View>
           <View style={styles.headerActions}>
-            {/* Friends — opens the add-friend / new-group context window. */}
-            <TouchableOpacity hitSlop={8} activeOpacity={0.7} onPress={openMenu}>
-              <SlimeFriendsIcon size={30} active={menuOpen} />
-            </TouchableOpacity>
+            {/* Friends — shared menu (requests / add / contacts / group chat) with a pending-request badge. */}
+            <FriendsMenu size={30} />
             <TouchableOpacity hitSlop={8} activeOpacity={0.7} onPress={() => (navigation as any).getParent()?.navigate('Account')}>
               <AccountBlob size={34} />
             </TouchableOpacity>
@@ -152,41 +138,6 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
           </Swipeable>
         )}
       />
-
-      {/* Friends context window — Add a friend / New group chat. */}
-      <Modal visible={menuOpen} transparent animationType="none" onRequestClose={closeMenu}>
-        <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu}>
-          <Animated.View style={[
-            styles.menuCard,
-            { top: top + 52 },
-            {
-              opacity: menuAnim,
-              transform: [
-                { scale: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) },
-                { translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) },
-              ],
-            },
-          ]}>
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}
-              onPress={() => { closeMenu(); navigation.navigate('AddFriend'); }}>
-              <Ionicons name="person-add-outline" size={20} color={C.ACCENT_HOT} />
-              <Text style={styles.menuItemText}>Add a friend</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}
-              onPress={() => { closeMenu(); navigation.navigate('InviteContacts'); }}>
-              <Ionicons name="people-circle-outline" size={20} color={C.ACCENT_HOT} />
-              <Text style={styles.menuItemText}>Import from contacts</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}
-              onPress={() => { closeMenu(); navigation.navigate('CreateGroupChat'); }}>
-              <Ionicons name="people-outline" size={20} color={C.ACCENT_HOT} />
-              <Text style={styles.menuItemText}>New group chat</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
-      </Modal>
 
       {/* Rename group chat — native slide-up branded bottom sheet (any member can rename). */}
       <Modal visible={!!renaming} transparent animationType="slide" onRequestClose={() => setRenaming(null)}>

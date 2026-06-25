@@ -15,6 +15,7 @@ import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import GradientButton from '../../studio/components/GradientButton';
 import GradientIcon from '../../../components/GradientIcon';
 import AccountBlob from '../../../components/AccountBlob';
+import FriendsMenu from '../../../components/FriendsMenu';
 import SlimeDetective from '../components/SlimeDetective';
 import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
 import { IG_REEL_JS, TapToPlayHint } from '../../shared/igReelPlayer';
@@ -1007,6 +1008,7 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
               <Ionicons name={searchOpen ? 'close' : 'search'} size={22} color={C.INK} />
             </TouchableOpacity>
           )}
+          <FriendsMenu size={30} />
           <TouchableOpacity hitSlop={10} activeOpacity={0.7} style={styles.accountButton}
             onPress={() => (rootNav as any).getParent()?.navigate('Account')}>
             <AccountBlob size={34} />
