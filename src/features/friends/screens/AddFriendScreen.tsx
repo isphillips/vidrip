@@ -10,10 +10,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import ScreenGradient from '../../../components/ScreenGradient';
 import { useAuthStore } from '../../../store/authStore';
 import { sendFriendRequest } from '../../../infrastructure/supabase/queries/friends';
 import SlimeFriend from '../components/SlimeFriend';
 import GradientButton from '../../studio/components/GradientButton';
+import ModalCloseButton from '../../../components/ModalCloseButton';
 import type { FriendsStackScreenProps } from '../../../app/navigation/types';
 
 export default function AddFriendScreen({ navigation }: FriendsStackScreenProps<'AddFriend'>) {
@@ -45,9 +47,11 @@ export default function AddFriendScreen({ navigation }: FriendsStackScreenProps<
   const isValid = trimmedHandle.length >= 3;
 
   return (
+    <ScreenGradient>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ModalCloseButton />
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.scroll}
@@ -79,6 +83,7 @@ export default function AddFriendScreen({ navigation }: FriendsStackScreenProps<
         />
       </ScrollView>
     </KeyboardAvoidingView>
+    </ScreenGradient>
   );
 }
 

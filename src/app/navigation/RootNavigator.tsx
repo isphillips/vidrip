@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { ActivityIndicator, Linking, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import type { NavigationContainerRef } from '@react-navigation/native';
 import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
@@ -28,12 +28,38 @@ import RecordReactionScreen from '../../features/record/screens/RecordReactionSc
 import RecordCommentScreen from '../../features/comments/screens/RecordCommentScreen';
 import RecordIntroScreen from '../../features/share/screens/RecordIntroScreen';
 import FriendRequestsScreen from '../../features/friends/screens/FriendRequestsScreen';
+import AddFriendScreen from '../../features/friends/screens/AddFriendScreen';
+import InviteContactsScreen from '../../features/friends/screens/InviteContactsScreen';
+import InviteManagementScreen from '../../features/friends/screens/InviteManagementScreen';
+import FriendsHomeScreen from '../../features/friends/screens/FriendsHomeScreen';
+import UserProfileScreen from '../../features/friends/screens/UserProfileScreen';
+import CreateGroupChatScreen from '../../features/channels/screens/CreateGroupChatScreen';
 import OnboardingScreen from '../../features/onboarding/OnboardingScreen';
+import CreatorOnboardingScreen from '../../features/onboarding/creator/CreatorOnboardingScreen';
+import { CREATOR_INTRO } from '../../features/onboarding/config';
 import ScreenGradient from '../../components/ScreenGradient';
+import SplashScene from '../../components/splash/SplashScene';
 import { useOnboarding, useOnboardingStore } from '../../features/onboarding/onboarding';
 import type { RootStackParamList } from './types';
 
 const Root = createNativeStackNavigator<RootStackParamList>();
+
+// The "Friend list" root modal is a tiny stack so tapping a friend can push their Profile WITHIN the
+// modal (back to the list), while the list itself shows a close-X. Its other actions (add friend,
+// import contacts, invite codes) bubble out to their own root modals.
+const FriendsModal = createNativeStackNavigator();
+function FriendListModal() {
+  return (
+    <FriendsModal.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.BG_SOLID } }}>
+      <FriendsModal.Screen name="List" component={FriendsHomeScreen as any} />
+      <FriendsModal.Screen
+        name="Profile"
+        component={UserProfileScreen as any}
+        options={{ headerShown: true, title: 'Profile', headerTintColor: C.INK, headerStyle: { backgroundColor: C.BG_SOLID } }}
+      />
+    </FriendsModal.Navigator>
+  );
+}
 
 // Dark purple base so cold-start / any uncovered area matches the app gradient
 // (instead of the default white/black flash).
@@ -45,6 +71,11 @@ export default function RootNavigator() {
   const replaying = useOnboardingStore(s => s.replaying);
   const endReplay = useOnboardingStore(s => s.endReplay);
   const navRef = useRef<NavigationContainerRef<any>>(null);
+  // The animated launch scene stays mounted on top until it dissolves itself (once the app is ready).
+  const [splashGone, setSplashGone] = useState(false);
+  // Closed-launch creator intro: a signed-out visitor gets the cinematic creator pitch instead of the
+  // login wall (CREATOR_INTRO). Tapping its "log in" link forces the auth flow for this session.
+  const [authForced, setAuthForced] = useState(false);
 
   // One-time setup
   useEffect(() => {
@@ -120,7 +151,7 @@ export default function RootNavigator() {
     };
   }, []);
 
-  // Pending deep-link navigation (Share-to-Vidrip paste, or a reaxn://reaction link).
+  // Pending deep-link navigation (Share-to-Vidrip paste, or a vidrip://reaction link).
   // A link can arrive before the NavigationContainer mounts (cold start shows a
   // loading spinner first), so navRef may be null on a timer. Instead run whenever a
   // pending item exists AND the container is ready: from this effect (warm start /
@@ -193,13 +224,13 @@ export default function RootNavigator() {
   };
 
   const handleDeepLink = async (url: string) => {
-    if (!url.startsWith('reaxn://')) { return; }
+    if (!url.startsWith('vidrip://')) { return; }
 
-    // OS "Share to Vidrip" (Android ACTION_SEND rewritten to reaxn://share, or the
+    // OS "Share to Vidrip" (Android ACTION_SEND rewritten to vidrip://share, or the
     // iOS Share Extension) → pull the link out and stash it. The navigation to the
     // Share tab is driven by the effect below, once the navigator + session are
     // actually ready (on a cold start the link arrives before they mount).
-    if (url.startsWith('reaxn://share')) {
+    if (url.startsWith('vidrip://share')) {
       const query = url.split('?')[1] ?? '';
       const text = new URLSearchParams(query).get('text');
       if (text) {
@@ -210,18 +241,18 @@ export default function RootNavigator() {
       return;
     }
 
-    // reaxn://reaction/<id> — a shared Vidrip reaction link → open that reaction.
-    if (url.startsWith('reaxn://reaction/')) {
-      const id = url.slice('reaxn://reaction/'.length).split(/[?#/]/)[0];
+    // vidrip://reaction/<id> — a shared Vidrip reaction link → open that reaction.
+    if (url.startsWith('vidrip://reaction/')) {
+      const id = url.slice('vidrip://reaction/'.length).split(/[?#/]/)[0];
       if (id) { useShareIntentStore.getState().setPendingReactionId(id); }
       return;
     }
 
-    // reaxn://channel/<id>?subscribed=1 — returning from the web subscribe flow.
+    // vidrip://channel/<id>?subscribed=1 — returning from the web subscribe flow.
     // Stash it; runPendingNavigation opens it once the navigator + session are
     // ready (handles cold start, where the link arrives before they mount).
-    if (url.startsWith('reaxn://channel/')) {
-      const id = url.slice('reaxn://channel/'.length).split(/[?#/]/)[0];
+    if (url.startsWith('vidrip://channel/')) {
+      const id = url.slice('vidrip://channel/'.length).split(/[?#/]/)[0];
       const justSubscribed = /[?&]subscribed=1/.test(url);
       if (id) { useShareIntentStore.getState().setPendingChannel({ id, justSubscribed }); }
       return;
@@ -246,24 +277,21 @@ export default function RootNavigator() {
   };
 
   // Wait for the onboarding flag and the MFA check to load too, so signed-in users
-  // don't flash the app before the second-factor gate.
-  if (isLoading || (session && !onbReady) || (session && !mfaChecked)) {
-    return (
-      <View style={{ flex: 1, backgroundColor: C.BG_SOLID, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={C.ACCENT} />
-      </View>
-    );
-  }
-
-  // Signed in but second factor outstanding → block on the TOTP challenge.
-  if (session && mfaRequired) {
-    return <MfaChallengeScreen onVerified={recheckMfa} />;
-  }
-
+  // don't flash the app before the second-factor gate. The animated launch scene
+  // (SplashScene) covers the app until everything below is ready, then dissolves itself.
+  const appReady = !(isLoading || (session && !onbReady) || (session && !mfaChecked));
   const showOnboarding = !!session && (!onboarded || replaying);
 
-  return (
-    <NavigationContainer ref={navRef} theme={navTheme} onReady={runPendingNavigation}>
+  let content: React.ReactNode;
+  if (!appReady) {
+    // Bare backdrop (matches navTheme + the splash sky) — the splash overlays it until ready.
+    content = <View style={{ flex: 1, backgroundColor: C.BG_SOLID }} />;
+  } else if (session && mfaRequired) {
+    // Signed in but second factor outstanding → block on the TOTP challenge.
+    content = <MfaChallengeScreen onVerified={recheckMfa} />;
+  } else {
+    content = (
+      <NavigationContainer ref={navRef} theme={navTheme} onReady={runPendingNavigation}>
       <Root.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
           showOnboarding ? (
@@ -284,11 +312,40 @@ export default function RootNavigator() {
               {/* Full-screen camera recorders: force a BLACK modal backdrop so the app's
                   purple navTheme background (C.BG_SOLID) never peeks through where the
                   recorder/source-video letterbox doesn't reach the bottom edge. */}
-              {/* Friend requests — a dismissable modal (close button) reachable from every tab header. */}
+              {/* Friends experience — dismissable modals (close button, no back) reachable from every
+                  tab header via the FriendsMenu. */}
               <Root.Screen
                 name="FriendRequests"
                 component={FriendRequestsScreen}
-                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                options={{ presentation: 'modal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: C.BG_SOLID } }}
+              />
+              <Root.Screen
+                name="FriendList"
+                component={FriendListModal}
+                // Swipe-to-dismiss stays ON; FriendsHomeScreen temporarily disables it (via
+                // getParent().setOptions) only while a finger is on the A–Z rail, so dragging the
+                // rail can't accidentally close the modal.
+                options={{ presentation: 'modal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: C.BG_SOLID } }}
+              />
+              <Root.Screen
+                name="FindFriend"
+                component={AddFriendScreen as any}
+                options={{ presentation: 'modal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: C.BG_SOLID } }}
+              />
+              <Root.Screen
+                name="ImportContacts"
+                component={InviteContactsScreen as any}
+                options={{ presentation: 'modal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: C.BG_SOLID } }}
+              />
+              <Root.Screen
+                name="InviteCodes"
+                component={InviteManagementScreen as any}
+                options={{ presentation: 'modal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: C.BG_SOLID } }}
+              />
+              <Root.Screen
+                name="CreateGroupChat"
+                component={CreateGroupChatScreen as any}
+                options={{ presentation: 'modal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: C.BG_SOLID } }}
               />
               <Root.Screen
                 name="RecordReaction"
@@ -307,6 +364,12 @@ export default function RootNavigator() {
               />
             </>
           )
+        ) : CREATOR_INTRO && !authForced ? (
+          // Closed-launch: serve the cinematic creator pitch instead of the login wall.
+          // Its "log in" link sets authForced → swaps to the Auth flow for this session.
+          <Root.Screen name="CreatorIntro">
+            {() => <CreatorOnboardingScreen onLogin={() => setAuthForced(true)} />}
+          </Root.Screen>
         ) : (
           <Root.Screen name="Auth" component={AuthStack} />
         )}
@@ -315,6 +378,14 @@ export default function RootNavigator() {
       {session && <ProfileDrawer />}
       {/* Full-screen player for reactions opened from a profile drawer. */}
       {session && <ProfileReactionPlayer />}
-    </NavigationContainer>
+      </NavigationContainer>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.BG_SOLID }}>
+      {content}
+      {!splashGone && <SplashScene ready={appReady} onHidden={() => setSplashGone(true)} />}
+    </View>
   );
 }

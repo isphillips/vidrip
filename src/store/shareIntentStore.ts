@@ -4,8 +4,8 @@ import { create } from 'zustand';
  * Pending deep-link work, stashed until the navigator is ready (a link can arrive
  * on a cold start before the NavigationContainer/session mount).
  * - pendingUrl: a link handed in via "Share to Vidrip" → ShareHomeScreen pastes it.
- * - pendingReactionId: a reaxn://reaction/:id link → open that reaction.
- * - pendingChannel: a reaxn://channel/:id link (e.g. post-subscribe) → open the room.
+ * - pendingReactionId: a vidrip://reaction/:id link → open that reaction.
+ * - pendingChannel: a vidrip://channel/:id link (e.g. post-subscribe) → open the room.
  */
 interface ShareIntentState {
   pendingUrl: string | null;

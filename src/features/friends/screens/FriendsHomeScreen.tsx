@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, Easing as ReEasing } from 'react-native-reanimated';
 import GradientButton from '../../studio/components/GradientButton';
+import ScreenGradient from '../../../components/ScreenGradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Handle from '../../../components/Handle';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
@@ -63,7 +64,7 @@ function groupFriends(friends: Friend[]): FriendSection[] {
 }
 
 // The vertical A–Z+# rail on the right; tap or drag to jump to a section (greyed where empty).
-function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l: string) => void }) {
+function AZIndex({ available, onSelect, onGrabChange }: { available: Set<string>; onSelect: (l: string) => void; onGrabChange?: (grabbing: boolean) => void }) {
   // Only fire when the finger crosses into a NEW letter. onResponderMove fires dozens of
   // times per second; calling scrollToLocation on each one floods the SectionList (it
   // re-sticks headers + re-windows rows mid-drag → the letters flash/double and gaps appear).
@@ -78,9 +79,10 @@ function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l
       onStartShouldSetResponder={() => true}
       onMoveShouldSetResponder={() => true}
       onResponderTerminationRequest={() => false}
-      onResponderGrant={(e) => { last.current = null; pick(e.nativeEvent.locationY); }}
+      onResponderGrant={(e) => { last.current = null; onGrabChange?.(true); pick(e.nativeEvent.locationY); }}
       onResponderMove={(e) => pick(e.nativeEvent.locationY)}
-      onResponderRelease={() => { last.current = null; }}>
+      onResponderRelease={() => { last.current = null; onGrabChange?.(false); }}
+      onResponderTerminate={() => { last.current = null; onGrabChange?.(false); }}>
       {LETTERS.map(l => (
         <Text key={l} style={[styles.azLetter, !available.has(l) && styles.azLetterDim]}>{l}</Text>
       ))}
@@ -90,6 +92,9 @@ function AZIndex({ available, onSelect }: { available: Set<string>; onSelect: (l
 
 export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProps<'FriendsHome'>) {
   const { top } = useSafeAreaInsets();
+  // Shown as the "Friend list" root modal (vs the Friends tab home) → offer a close-X that dismisses
+  // the whole modal. canGoBack on the PARENT (Root) is true only in the modal case, false as a tab root.
+  const inModal = !!navigation.getParent?.()?.canGoBack?.();
   const { user } = useAuthStore();
   const blocked = useBlockStore(s => s.blocked);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -99,7 +104,7 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
   // Spin the + to an × on tap, then push the AddFriend screen a beat later so the morph is seen.
   const openAddFriend = () => {
     setAddActive(true);
-    setTimeout(() => navigation.navigate('AddFriend'), 200);
+    setTimeout(() => (navigation as any).navigate('FindFriend'), 200);
   };
   // App-wide block: hide blocked users from the friends + requests lists.
   const visFriends = friends.filter(f => !blocked.has(f.userId));
@@ -153,18 +158,26 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={C.ACCENT} />
-      </View>
+      <ScreenGradient>
+        <View style={styles.center}>
+          <ActivityIndicator color={C.ACCENT} />
+        </View>
+      </ScreenGradient>
     );
   }
 
   return (
+    <ScreenGradient>
     <View style={styles.container}>
-      <View style={[styles.headerRow, { paddingTop: top }]}>
+      <View style={[styles.headerRow, { paddingTop: SPACE.XXL }]}>
         <Text style={styles.title}>Friends</Text>
         <View style={styles.headerActions}>
           <MorphPlus active={addActive} onPress={openAddFriend} />
+          {inModal && (
+            <TouchableOpacity style={styles.headerClose} hitSlop={10} activeOpacity={0.7} onPress={() => navigation.getParent()?.goBack()} accessibilityRole="button" accessibilityLabel="Close">
+              <Ionicons name="close" size={22} color={C.INK} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -237,36 +250,38 @@ export default function FriendsHomeScreen({ navigation }: FriendsStackScreenProp
             </View>
           )}
         />
-        {sections.length > 0 && <AZIndex available={available} onSelect={scrollToLetter} />}
+        {sections.length > 0 && (
+          <AZIndex
+            available={available}
+            onSelect={scrollToLetter}
+            // While dragging the rail, turn off the modal's swipe-to-dismiss so a downward drag
+            // jumps A→Z instead of closing the modal; restore it on release.
+            onGrabChange={inModal ? (g) => navigation.getParent()?.setOptions({ gestureEnabled: !g }) : undefined}
+          />
+        )}
       </View>
 
       <GradientButton
         label="Invite from Contacts"
         icon="people-outline"
         variant="outline"
-        onPress={() => navigation.navigate('InviteContacts')}
+        onPress={() => (navigation as any).navigate('ImportContacts')}
         style={styles.inviteCtaTop}
       />
-      <GradientButton
-        label="Manage Invite Codes"
-        icon="key-outline"
-        variant="outline"
-        onPress={() => navigation.navigate('InviteManagement')}
-        style={styles.inviteCta}
-      />
     </View>
+    </ScreenGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
+  headerClose: { width: 36, height: 36, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.BORDER },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.BG },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 0,
-    marginTop: SPACE.SM,
   },
   title: {
     fontSize: FONT.SIZES.XL,
@@ -275,7 +290,6 @@ const styles = StyleSheet.create({
     padding: SPACE.LG,
     marginTop: 0,
     fontWeight: FONT.WEIGHTS.BOLD,
-    textTransform: 'uppercase',
   },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.XS, paddingRight: SPACE.LG },
   plusBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },

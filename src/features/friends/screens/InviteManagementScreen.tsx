@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import ScreenGradient from '../../../components/ScreenGradient';
 import { useAuthStore } from '../../../store/authStore';
 import { fetchMyInviteCodes } from '../../../infrastructure/supabase/queries/friends';
+import ModalCloseButton from '../../../components/ModalCloseButton';
 
 type InviteCode = { code: string; used_by: string | null; used_at: string | null };
 
@@ -42,9 +44,12 @@ export default function InviteManagementScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={C.ACCENT} />
-      </View>
+      <ScreenGradient>
+        <View style={styles.center}>
+          <ModalCloseButton />
+          <ActivityIndicator color={C.ACCENT} />
+        </View>
+      </ScreenGradient>
     );
   }
 
@@ -52,9 +57,12 @@ export default function InviteManagementScreen() {
   const used = codes.filter((c) => c.used_by);
 
   return (
+    <ScreenGradient>
+    <View style={styles.container}>
+    <ModalCloseButton />
     <FlatList
-      style={styles.container}
-      contentContainerStyle={styles.content}
+      style={styles.flex}
+      contentContainerStyle={[styles.content, { paddingTop: SPACE.XXL }]}
       data={available}
       keyExtractor={(item) => item.code}
       ListHeaderComponent={
@@ -80,11 +88,14 @@ export default function InviteManagementScreen() {
         </View>
       )}
     />
+    </View>
+    </ScreenGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.BG },
+  flex: { flex: 1 },
   content: { padding: SPACE.LG },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.BG },
   title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD,

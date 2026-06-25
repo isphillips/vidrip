@@ -10,7 +10,7 @@ export type ConnectionType = 'creator' | 'feed';
 // Providers require an https redirect (custom schemes rejected) and block OAuth in embedded
 // WebViews, so auth runs in the system browser and redirects here. This is a real endpoint —
 // a Cloudflare Pages Function on vidrip.app (web/functions/api/oauth-callback.ts) that 302s
-// back into the app via reaxn://. Served natively on vidrip.app (NOT proxied to Supabase,
+// back into the app via vidrip://. Served natively on vidrip.app (NOT proxied to Supabase,
 // which is itself on Cloudflare and rejects the loop). Register this exact value in the
 // Google + TikTok (+ Meta) consoles, and keep it in sync with sync-oauth's REDIRECT_URI.
 export const REDIRECT_URI = 'https://vidrip.app/api/oauth-callback';
@@ -107,7 +107,7 @@ export function buildAuthUrl(
 }
 
 /**
- * Parse the bounced `reaxn://oauth?...` deep link the oauth-callback edge function
+ * Parse the bounced `vidrip://oauth?...` deep link the oauth-callback edge function
  * sends back into the app. Returns null for non-oauth deep links. For an oauth
  * link it returns `code` on success or a human-readable `error` when the provider
  * rejected the request (e.g. unauthorized scope) — AccountScreen surfaces either.
@@ -115,7 +115,7 @@ export function buildAuthUrl(
 export function parseOAuthDeepLink(
   url: string,
 ): { provider: SyncProvider; connectionType: ConnectionType; code: string | null; error: string | null } | null {
-  if (!url.startsWith('reaxn://oauth')) {
+  if (!url.startsWith('vidrip://oauth')) {
     return null;
   }
   const query = url.split('?')[1];

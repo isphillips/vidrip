@@ -168,10 +168,18 @@ export type StudioStackScreenProps<T extends keyof StudioStackParamList> =
 
 export type RootStackParamList = {
   Onboarding: undefined;
+  // Closed-launch creator pitch shown to signed-out visitors (gated by CREATOR_INTRO).
+  CreatorIntro: undefined;
   Auth: undefined;
   Main: undefined;
-  // Friend requests — a root modal (close button), since it's opened from every tab header.
+  // Friends experience — all root modals (close button, no back), opened from the FriendsMenu in
+  // every tab header. Distinct names from the per-tab routes so navigate() bubbles cleanly to root.
   FriendRequests: undefined;
+  FriendList: undefined;       // the A–Z friend list (a small modal stack: list → profile)
+  FindFriend: undefined;       // search/add a friend
+  ImportContacts: undefined;   // invite from device contacts
+  InviteCodes: undefined;      // manage invite codes
+  CreateGroupChat: undefined;  // start a new group chat
   RecordReaction: RecordStackParamList['RecordReaction'];
   RecordComment: {
     rootSourceId: string;

@@ -95,8 +95,8 @@ function MessagesNavigator() {
   return (
     <MessagesStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <MessagesStack.Screen name="MessagesHome" component={MessagesHomeScreen} options={{ headerShown: false }} />
-      <MessagesStack.Screen name="AddFriend" component={AddFriendScreen as any} options={{ title: 'Add Friend', headerBackTitle: 'Messages' }} />
-      <MessagesStack.Screen name="InviteContacts" component={InviteContactsScreen as any} options={{ title: '', headerBackTitle: 'Messages' }} />
+      <MessagesStack.Screen name="AddFriend" component={AddFriendScreen as any} options={{ headerShown: false }} />
+      <MessagesStack.Screen name="InviteContacts" component={InviteContactsScreen as any} options={{ headerShown: false }} />
       <MessagesStack.Screen name="FriendConversation" component={FriendConversationScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <MessagesStack.Screen name="CreateGroupChat" component={CreateGroupChatScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <MessagesStack.Screen name="Channel" component={ChannelScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -116,10 +116,10 @@ function FriendsNavigator() {
   return (
     <FriendsStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <FriendsStack.Screen name="FriendsHome" component={FriendsHomeScreen} options={{ headerShown: false }} />
-      <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
+      <FriendsStack.Screen name="AddFriend" component={AddFriendScreen} options={{ headerShown: false }} />
       <FriendsStack.Screen name="Profile" component={UserProfileScreen} options={{ title: 'Profile', headerBackTitle: 'Friends' }} />
-      <FriendsStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
-      <FriendsStack.Screen name="InviteContacts" component={InviteContactsScreen} options={{ title: '', headerBackTitle: 'Friends' }} />
+      <FriendsStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ headerShown: false }} />
+      <FriendsStack.Screen name="InviteContacts" component={InviteContactsScreen} options={{ headerShown: false }} />
     </FriendsStack.Navigator>
   );
 }
@@ -137,7 +137,7 @@ function AccountNavigator() {
     <AccountStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <AccountStack.Screen name="AccountHome" component={AccountScreen} options={{ headerShown: false }} />
       <AccountStack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile', headerBackTitle: 'Account' }} />
-      <AccountStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ title: '', headerBackTitle: 'Account' }} />
+      <AccountStack.Screen name="InviteManagement" component={InviteManagementScreen} options={{ headerShown: false }} />
       <AccountStack.Screen name="PasswordSetup" component={PasswordSetupScreen} options={{ title: 'Password Login', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="TwoFactor" component={TwoFactorScreen} options={{ title: 'Two-Factor Auth', headerBackTitle: 'Account' }} />
       <AccountStack.Screen name="AccountAdvanced" component={AccountAdvancedScreen} options={{ title: 'Advanced', headerBackTitle: 'Account' }} />

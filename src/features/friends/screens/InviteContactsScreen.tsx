@@ -4,8 +4,10 @@ import {
   Linking, Platform, RefreshControl,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import ScreenGradient from '../../../components/ScreenGradient';
+import ModalCloseButton from '../../../components/ModalCloseButton';
 import { useAuthStore } from '../../../store/authStore';
 import { ensureContactsPermission, loadDeviceContacts, type DeviceContact } from '../../../infrastructure/native/contacts';
 import { fetchMyInviteCodes } from '../../../infrastructure/supabase/queries/friends';
@@ -94,7 +96,10 @@ function smsUrl(phone: string, code: string): string {
 
 export default function InviteContactsScreen() {
   const { user } = useAuthStore();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
+  // Bottom clearance via safe-area (works whether shown as a root modal or pushed in a tab — the
+  // old useBottomTabBarHeight() threw when this screen is presented as a modal outside the tabs).
+  const tabBarHeight = insets.bottom + 64;
   // Memoized so incidental re-renders (matches/sent/codes resolving) don't hand the list
   // a fresh style object → re-layout → scroll jitter. Only changes if the nav height does.
   const listContentStyle = useMemo(
@@ -213,24 +218,29 @@ export default function InviteContactsScreen() {
   };
 
   if (perm === 'loading') {
-    return <View style={styles.center}><ActivityIndicator color={C.ACCENT} /></View>;
+    return <ScreenGradient><View style={styles.center}><ModalCloseButton /><ActivityIndicator color={C.ACCENT} /></View></ScreenGradient>;
   }
   if (perm === 'denied') {
     return (
-      <View style={[styles.center, { padding: SPACE.XL }]}>
-        <Ionicons name="people-outline" size={44} color={C.MUTED} />
-        <Text style={styles.deniedTitle}>Contacts access is off</Text>
-        <Text style={styles.deniedHint}>Allow contacts access to text friends an invite code. Numbers are never uploaded.</Text>
-        <TouchableOpacity style={styles.settingsBtn} onPress={() => Linking.openSettings()}>
-          <Text style={styles.settingsTxt}>Open Settings</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenGradient>
+        <View style={[styles.center, { padding: SPACE.XL }]}>
+          <ModalCloseButton />
+          <Ionicons name="people-outline" size={44} color={C.MUTED} />
+          <Text style={styles.deniedTitle}>Contacts access is off</Text>
+          <Text style={styles.deniedHint}>Allow contacts access to text friends an invite code. Numbers are never uploaded.</Text>
+          <TouchableOpacity style={styles.settingsBtn} onPress={() => Linking.openSettings()}>
+            <Text style={styles.settingsTxt}>Open Settings</Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenGradient>
     );
   }
 
   return (
+    <ScreenGradient>
     <View style={styles.container}>
-      <View style={styles.banner}>
+      <ModalCloseButton />
+      <View style={[styles.banner, { paddingTop: SPACE.XXL }]}>
         <Text style={styles.bannerTitle}>Invite from Contacts</Text>
         <Text style={styles.bannerSub}>
           {codes.length === 0
@@ -296,6 +306,7 @@ export default function InviteContactsScreen() {
         </TouchableOpacity>
       </Modal>
     </View>
+    </ScreenGradient>
   );
 }
 

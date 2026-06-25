@@ -29,6 +29,7 @@
         android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
         android:launchMode="singleTask"
         android:windowSoftInputMode="adjustResize"
+        android:theme="@style/Theme.App.SplashScreen"
         android:exported="true">
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />
@@ -38,11 +39,11 @@
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
-            <data android:scheme="reaxn" />
+            <data android:scheme="vidrip" />
         </intent-filter>
         <!-- "Share to Vidrip": appear in the OS share sheet for shared links/text
              (e.g. YouTube → Share). MainActivity rewrites the ACTION_SEND text into
-             a reaxn://share deep link handled in RootNavigator. -->
+             a vidrip://share deep link handled in RootNavigator. -->
         <intent-filter>
             <action android:name="android.intent.action.SEND" />
             <category android:name="android.intent.category.DEFAULT" />

@@ -15,10 +15,14 @@ export default function ScreenGradient({ children, dark = false }: { children?: 
   // layer on top. This decouples the screen's layout from the gradient view — if
   // LinearGradient ever measures late/zero during a transition, the content still
   // lays out normally (fixes "content sometimes doesn't show on load").
+  const colors = dark ? GRADIENT_DARK : GRADIENT_LIGHT;
+  // Solid backstop = the gradient's darkest tone. The decoupled LinearGradient can
+  // under-measure (especially the bottom strip inside an iOS modal sheet); without an
+  // opaque base, that gap falls through to the OS default white. The base keeps it dark.
   return (
-    <View style={styles.fill}>
+    <View style={[styles.fill, { backgroundColor: colors[colors.length - 1] }]}>
       <LinearGradient
-        colors={dark ? GRADIENT_DARK : GRADIENT_LIGHT}
+        colors={colors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}

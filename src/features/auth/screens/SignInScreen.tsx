@@ -40,7 +40,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
-        options: { shouldCreateUser: false, emailRedirectTo: 'reaxn://auth/callback' },
+        options: { shouldCreateUser: false, emailRedirectTo: 'vidrip://auth/callback' },
       });
       if (error) { Alert.alert('Error', error.message); return; }
       setSent(true);

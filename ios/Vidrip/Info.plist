@@ -27,7 +27,7 @@
 			<string>com.reaxn.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>reaxn</string>
+				<string>vidrip</string>
 			</array>
 		</dict>
 	</array>

@@ -2,4 +2,7 @@
 <resources>
     <!-- Tint applied to the white notification small icon (brand pink). -->
     <color name="notification_color">#E73D93</color>
+    <!-- Launch / splash backdrop — the deep dusk purple (C.BG_SOLID) the animated
+         RN SplashScene fades in over, so there's no white flash on cold start. -->
+    <color name="splash_background">#190A33</color>
 </resources>

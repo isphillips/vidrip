@@ -65,6 +65,8 @@ const s = StyleSheet.create({
   kicker: {
     fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_SEMIBOLD, color: C.GOLD,
     letterSpacing: 3, textTransform: 'uppercase', textAlign: 'center',
+    // Dark halo so the gold kicker stays legible over the busy slime-land scene.
+    textShadowColor: 'rgba(8,3,18,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 10,
   },
 
   pips: { flexDirection: 'row', gap: SPACE.SM, alignSelf: 'center' },

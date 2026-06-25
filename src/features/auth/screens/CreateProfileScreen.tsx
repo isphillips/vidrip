@@ -73,7 +73,7 @@ export default function CreateProfileScreen({
       const { error: authError } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
-          emailRedirectTo: 'reaxn://auth/callback',
+          emailRedirectTo: 'vidrip://auth/callback',
           data: {
             handle: trimmedHandle,
             display_name: displayName.trim(),

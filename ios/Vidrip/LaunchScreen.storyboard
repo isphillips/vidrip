@@ -12,6 +12,13 @@
         <scene sceneID="EHf-IW-A2E">
             <objects>
                 <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                    <!--
+                        Static first frame for the launch. It mirrors the composition of the animated
+                        SplashScene (src/components/splash/SplashScene.tsx) — dusk sky, wordmark + tagline
+                        up top, Drippy centred — so when the live, slime-filled scene fades in over this
+                        the elements line up and there's no jump. iOS launch storyboards can't animate, so
+                        all the motion (Drippy's crew, fireflies, the gooey loading bar) lives in the RN scene.
+                    -->
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -19,19 +26,19 @@
                             <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="launchbg" translatesAutoresizingMaskIntoConstraints="NO" id="BGV-00-001">
                                 <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                             </imageView>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="driplogo" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="127.5" y="234" width="120" height="199"/>
-                                <constraints>
-                                    <constraint firstAttribute="width" constant="120" id="w0g-lo-w01"/>
-                                    <constraint firstAttribute="height" constant="199" id="h0g-lo-h01"/>
-                                </constraints>
-                            </imageView>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Vidrip" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="LBL-vi-001">
-                                <rect key="frame" x="157" y="451" width="61" height="45"/>
-                                <fontDescription key="fontDescription" name="Syne-Bold" family="Syne" pointSize="34"/>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="VIDRIP" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="LBL-vi-001">
+                                <rect key="frame" x="138" y="93" width="99" height="56"/>
+                                <fontDescription key="fontDescription" name="Syne-Bold" family="Syne" pointSize="46"/>
                                 <color key="textColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="driplogo" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
+                                <rect key="frame" x="123.5" y="227" width="128" height="212"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="128" id="w0g-lo-w01"/>
+                                    <constraint firstAttribute="height" constant="212" id="h0g-lo-h01"/>
+                                </constraints>
+                            </imageView>
                         </subviews>
                         <color key="backgroundColor" red="0.098" green="0.039" blue="0.2" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
@@ -39,10 +46,12 @@
                             <constraint firstItem="BGV-00-001" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="bg-bot-001"/>
                             <constraint firstItem="BGV-00-001" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="bg-lead-001"/>
                             <constraint firstItem="BGV-00-001" firstAttribute="trailing" secondItem="Ze5-6b-2t3" secondAttribute="trailing" id="bg-trail-001"/>
+                            <constraint firstItem="LBL-vi-001" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="wm-cx-001"/>
+                            <constraint firstItem="LBL-vi-001" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" multiplier="0.36" id="wm-cy-001"/>
+                            <constraint firstItem="LBL-tg-001" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="tg-cx-001"/>
+                            <constraint firstItem="LBL-tg-001" firstAttribute="top" secondItem="LBL-vi-001" secondAttribute="bottom" constant="6" id="tg-top-001"/>
                             <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="Q3B-4B-g5h"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="-36" id="moa-c2-u7t"/>
-                            <constraint firstItem="LBL-vi-001" firstAttribute="top" secondItem="GJd-Yh-RWb" secondAttribute="bottom" constant="18" id="lbl-top-001"/>
-                            <constraint firstItem="LBL-vi-001" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="lbl-cx-001"/>
+                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="0.0" id="moa-c2-u7t"/>
                         </constraints>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                     </view>

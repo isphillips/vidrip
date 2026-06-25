@@ -23,7 +23,7 @@ _Updated as we go._
 | # | Area | File | Sev | Summary | Status |
 |---|------|------|-----|---------|--------|
 | 1 | Nav | RootNavigator.tsx | 🟠 | Push token not unregistered on sign-out (comment says it should) | Open — verify pushService (Area 12) |
-| 2 | Nav | RootNavigator.tsx | 🟡 | `handleDeepLink` awaits `exchangeCodeForSession` in an event handler with no try/catch → possible unhandled rejection on unmatched `reaxn://` links | Open |
+| 2 | Nav | RootNavigator.tsx | 🟡 | `handleDeepLink` awaits `exchangeCodeForSession` in an event handler with no try/catch → possible unhandled rejection on unmatched `vidrip://` links | Open |
 | 3 | Nav/Channels | ChannelScreen.tsx | 🟠 | `Channel` route's `isOwner` is omitted by notification + subscribe deep links → owner rendered as non-owner | ✅ Fixed (derive role via `fetchMyChannelRole`, OR with param) |
 | 4 | Auth | CreateProfileScreen.tsx | 🟠 | Handle validation checked raw length; submit stripped invalid chars → could send empty/<3-char handle | ✅ Fixed (normalize on input) |
 | 5 | Feed | FeedHomeScreen.tsx | 🟡 | Mount `useEffect` + `useFocusEffect` both fired the same 4 queries → 8 calls on first load | ✅ Fixed (focus effect only) |
@@ -75,7 +75,7 @@ with `UpdatingScreen` as the force-update progress fallback.
 
 ### `src/app/navigation/RootNavigator.tsx`
 **What/How:** Top-level gate. Subscribes to `supabase.auth.onAuthStateChange`, loads profile +
-registers push token on sign-in, wires deep links (`reaxn://share|reaction|channel|oauth` + magic-
+registers push token on sign-in, wires deep links (`vidrip://share|reaction|channel|oauth` + magic-
 link/code), runs the MFA (AAL1→AAL2) gate, the onboarding gate, and pending share-intent
 navigation. Renders Auth vs Main/Onboarding/MFA based on session.
 **Findings:**
@@ -83,7 +83,7 @@ navigation. Renders Auth vs Main/Onboarding/MFA based on session.
   isn't implemented; the push-token row stays mapped to the user/device. Verify `pushService` has an
   unregister path (Area 12). Front-end fixable (client delete call) once confirmed.
 - 🟡 **(#2)** `handleDeepLink` is async and `await`s `exchangeCodeForSession(url)` as the catch-all
-  for any `reaxn://` link that matched none of the explicit prefixes; it's called from a `Linking`
+  for any `vidrip://` link that matched none of the explicit prefixes; it's called from a `Linking`
   event handler with no surrounding try/catch → an unhandled promise rejection on a stray link.
 - 🟡 `fetchProfile` is referenced (line 89) above its `const` declaration (line 179); works only
   because the auth callback fires after the render body runs. Harmless but fragile ordering.

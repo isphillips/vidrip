@@ -4,9 +4,9 @@ import {
   ActivityIndicator, Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import ScreenGradient from '../../../components/ScreenGradient';
 import { useAuthStore } from '../../../store/authStore';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import { createGroupChat } from '../../../infrastructure/supabase/queries/channels';
@@ -18,7 +18,6 @@ import { DEMO_MODE } from '../../../demo/demoMode';
 export default function CreateGroupChatScreen({
   navigation,
 }: FeedStackScreenProps<'CreateGroupChat'>) {
-  const { top } = useSafeAreaInsets();
   const { user } = useAuthStore();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,11 +48,18 @@ export default function CreateGroupChatScreen({
     setCreating(true);
     try {
       const channelId = await createGroupChat([...selected]);
-      // Replace so backing out of the group lands on the Feed, not this picker.
-      navigation.replace('Channel', {
-        channelId, channelName: 'Group chat',
-        isPublic: false, isJoined: true, isOwner: true, isMembersOnly: false, isGroupChat: true,
-      } as any);
+      // This screen is a root modal — dismiss it and open the new group in the Messages tab (so
+      // backing out of the group lands on Messages, not this picker).
+      (navigation as any).navigate('Main', {
+        screen: 'Messages',
+        params: {
+          screen: 'Channel',
+          params: {
+            channelId, channelName: 'Group chat',
+            isPublic: false, isJoined: true, isOwner: true, isMembersOnly: false, isGroupChat: true,
+          },
+        },
+      });
     } catch (e: any) {
       Alert.alert('Could not create group', e?.message ?? 'Please try again.');
       setCreating(false);
@@ -61,21 +67,19 @@ export default function CreateGroupChatScreen({
   }, [selected, user, navigation]);
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: top + SPACE.SM }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} hitSlop={8}>
-          <Text style={styles.backIcon}>‹</Text>
-        </TouchableOpacity>
+    <ScreenGradient>
+      <View style={[styles.header, { paddingTop: SPACE.XXL }]}>
         <Text style={styles.headerTitle}>New Group Chat</Text>
-        <TouchableOpacity
-          style={[styles.createBtn, !canCreate && styles.createBtnDisabled]}
-          onPress={create}
-          disabled={!canCreate}
-          activeOpacity={0.85}>
-          {creating
-            ? <ActivityIndicator color={C.WHITE} size="small" />
-            : <Text style={styles.createText}>Create</Text>}
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.plusBtn} onPress={create} disabled={!canCreate} hitSlop={10} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Create group">
+            {creating
+              ? <ActivityIndicator color={C.WHITE} size="small" />
+              : <Ionicons name="add" size={30} color={canCreate ? C.WHITE : C.SUBTLE} />}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerClose} onPress={() => navigation.goBack()} hitSlop={10} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Close">
+            <Ionicons name="close" size={22} color={C.INK} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Text style={styles.hint}>
@@ -90,7 +94,8 @@ export default function CreateGroupChatScreen({
         <FlatList
           data={friends}
           keyExtractor={f => f.userId}
-          contentContainerStyle={friends.length === 0 ? styles.center : undefined}
+          style={styles.list}
+          contentContainerStyle={friends.length === 0 ? styles.center : styles.listContent}
           ListEmptyComponent={<Text style={styles.empty}>Add some friends first.</Text>}
           renderItem={({ item }) => {
             const on = selected.has(item.userId);
@@ -114,27 +119,27 @@ export default function CreateGroupChatScreen({
           }}
         />
       )}
-    </View>
+    </ScreenGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.BG },
+  list: { flex: 1 },
+  listContent: { paddingBottom: SPACE.XXL },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACE.XL },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SPACE.SM,
     paddingHorizontal: SPACE.MD, paddingBottom: SPACE.SM,
     borderBottomWidth: 1, borderBottomColor: C.BORDER,
   },
-  backBtn: { paddingHorizontal: SPACE.XS },
-  backIcon: { fontSize: 34, color: C.INK, marginTop: -4 },
   headerTitle: { flex: 1, fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_SEMIBOLD, color: C.INK },
-  createBtn: {
-    backgroundColor: C.ACCENT, borderRadius: RADIUS.FULL,
-    paddingHorizontal: SPACE.LG, paddingVertical: SPACE.SM, minWidth: 76, alignItems: 'center',
+  // Right-side actions mirror the Friends modal: a "+" (create) and an "×" close button.
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
+  plusBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  headerClose: {
+    width: 36, height: 36, borderRadius: RADIUS.FULL, backgroundColor: C.SURFACE,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.BORDER,
   },
-  createBtnDisabled: { backgroundColor: C.SURFACE_2 },
-  createText: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD, color: C.WHITE },
   hint: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED, padding: SPACE.LG, paddingBottom: SPACE.SM },
   empty: { fontSize: FONT.SIZES.MD, color: C.MUTED, textAlign: 'center' },
 

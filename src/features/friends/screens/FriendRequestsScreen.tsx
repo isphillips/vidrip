@@ -3,10 +3,10 @@ import {
   View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import ScreenGradient from '../../../components/ScreenGradient';
+import SlimeFriend from '../components/SlimeFriend';
 import { useAuthStore } from '../../../store/authStore';
 import { openProfile } from '../../../store/profileDrawerStore';
 import {
@@ -18,7 +18,6 @@ import type { RootStackScreenProps } from '../../../app/navigation/types';
 // Accept, decline, or tap through to the requester's profile (global drawer overlay).
 export default function FriendRequestsScreen({ navigation }: RootStackScreenProps<'FriendRequests'>) {
   const { user } = useAuthStore();
-  const { top } = useSafeAreaInsets();
   const [requests, setRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,7 +50,7 @@ export default function FriendRequestsScreen({ navigation }: RootStackScreenProp
 
   return (
     <ScreenGradient>
-      <View style={[styles.header, { paddingTop: top + SPACE.SM }]}>
+      <View style={[styles.header, { paddingTop: SPACE.XXL }]}>
         <Text style={styles.title}>Friend Requests</Text>
         <TouchableOpacity style={styles.close} hitSlop={10} activeOpacity={0.7} onPress={() => navigation.goBack()}>
           <Ionicons name="close" size={22} color={C.INK} />
@@ -68,7 +67,7 @@ export default function FriendRequestsScreen({ navigation }: RootStackScreenProp
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.ACCENT_HOT} />}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="people-outline" size={40} color={C.SUBTLE} />
+              <View style={styles.emptyArt}><SlimeFriend /></View>
               <Text style={styles.emptyTitle}>No friend requests</Text>
               <Text style={styles.emptySub}>When someone adds you, you'll see it here.</Text>
             </View>
@@ -122,6 +121,9 @@ const styles = StyleSheet.create({
   list: { padding: SPACE.LG, gap: SPACE.SM },
   emptyContainer: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: SPACE.XL },
   empty: { alignItems: 'center', gap: SPACE.SM },
+  // Drippy "make a friend" scene scaled up to fill the dead space; marginBottom clears the title
+  // from the scaled overflow (transform doesn't grow the layout box).
+  emptyArt: { transform: [{ scale: 1.25 }], marginBottom: SPACE.XL },
   emptyTitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK, marginTop: SPACE.SM },
   emptySub: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center' },
 

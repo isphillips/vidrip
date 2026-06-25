@@ -581,7 +581,7 @@ export default function WatchReactionScreen({
       {/* Share this reaction as a Vidrip deep link (opens it for thread members) */}
       <TouchableOpacity
         style={[styles.shareBtn, { top: topInset + SPACE.SM }]}
-        onPress={() => shareTextNative('Watch my reaction on Vidrip', `reaxn://reaction/${reactionId}`)}>
+        onPress={() => shareTextNative('Watch my reaction on Vidrip', `vidrip://reaction/${reactionId}`)}>
         <Ionicons name="share-outline" size={20} color={C.WHITE} />
       </TouchableOpacity>
 

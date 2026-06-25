@@ -151,6 +151,11 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // Branded launch screen — backports the Android 12 SplashScreen API to our minSdk (26),
+    // giving a dusk-purple window + drip logo before the JS bridge boots (see MainActivity +
+    // Theme.App.SplashScreen). The animated RN SplashScene then fades in over it.
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
     // Media3 Transformer — the Android side of the Studio exporter (trim + colour matrix +
     // mirror + overlay bake), mirroring iOS's AVFoundation StudioExporter.
     def media3Version = "1.5.1"

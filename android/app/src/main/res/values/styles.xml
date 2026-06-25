@@ -6,4 +6,16 @@
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     </style>
 
+    <!-- Branded launch screen (AndroidX core-splashscreen; backports the Android 12 splash to
+         API 23+). The Android equivalent of iOS's LaunchScreen.storyboard: a deep dusk-purple
+         window with the Vidrip drip logo centred, shown for the instant before the JS bridge
+         boots — then the animated RN SplashScene fades in over the same backdrop. The system
+         splash can only show an icon (no wordmark), so the "Vidrip" wordmark + tagline + the
+         whole slime crew + loading bar live in the RN scene. -->
+    <style name="Theme.App.SplashScreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="postSplashScreenTheme">@style/AppTheme</item>
+    </style>
+
 </resources>

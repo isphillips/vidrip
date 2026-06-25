@@ -13,6 +13,7 @@ import { refreshConnectedFeed } from '../../infrastructure/supabase/queries/conn
 import LinearGradient from 'react-native-linear-gradient';
 import { DecoDivider, Kicker, Pips, DecoButton } from './components';
 import PaintReveal from '../../components/PaintReveal';
+import { SceneBackdrop, TEXT_GLOW } from '../../components/scene/sceneKit';
 import GradientButton from '../studio/components/GradientButton';
 import OnboardingSlime from './OnboardingSlime';
 
@@ -34,6 +35,14 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
   const [step, setStep] = useState(0);
   const next = () => setStep(s => Math.min(s + 1, STEPS - 1));
   const back = () => setStep(s => Math.max(0, s - 1));
+
+  // The slime-land scene lives behind every step (one continuous fantasy world, shared with the
+  // launch splash + the creator intro). It eases in on mount and fades out with `cover` on the
+  // final step so the paint-reveal finale reads cleanly.
+  const sceneEnter = useSharedValue(0);
+  useEffect(() => {
+    sceneEnter.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) });
+  }, [sceneEnter]);
 
   // Plain black backdrop until the final step, where the curtain stage is unveiled
   // (black fades out) and the back curtain then raises to reveal the room.
@@ -92,14 +101,9 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
 
   return (
     <View style={[styles.stage, { paddingTop: top }]}>
-      {/* Dark brand gradient backdrop; fades out on the final step to reveal the paint stage. */}
+      {/* The shared slime-land backdrop; fades out on the final step to reveal the paint stage. */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, coverStyle]}>
-        <LinearGradient
-          colors={['#2A0E4E', '#190A33', '#0B0518']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
+        <SceneBackdrop enter={sceneEnter} />
       </Animated.View>
       {/* Paint splatter + dripping reveal, replacing the curtain on the last step. */}
       <PaintReveal active={reveal} />
@@ -462,9 +466,9 @@ const styles = StyleSheet.create({
   stepWrap: { flex: 1, justifyContent: 'center' },
   center: { alignItems: 'center', gap: SPACE.MD },
 
-  h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.MEDIUM, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
+  h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.MEDIUM, color: C.INK, textAlign: 'center', textTransform: 'uppercase', ...TEXT_GLOW },
   vidrip: { fontFamily: 'Syne-ExtraBold', fontWeight: FONT.WEIGHTS.BOLD, letterSpacing: 0.5 },
-  h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.BOLD, color: C.INK, textAlign: 'center', textTransform: 'uppercase' },
+  h2: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.BOLD, color: C.INK, textAlign: 'center', textTransform: 'uppercase', ...TEXT_GLOW },
   // Final-step payoff title — bigger, with a pink neon glow so it pops off the paint.
   h2Epic: {
     fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.BOLD,
@@ -474,9 +478,9 @@ const styles = StyleSheet.create({
   popWrap: { alignSelf: 'stretch', alignItems: 'center' },
   // Vertical gradient band behind the final-step copy — feathered top/bottom (no hard clip), heavy center.
   copyScrim: { position: 'absolute', left: 0, right: 0, top: '18%', height: '62%' },
-  body: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', lineHeight: 24, maxWidth: 320 },
+  body: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.INK, textAlign: 'center', lineHeight: 24, maxWidth: 320, ...TEXT_GLOW },
   em: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD },
-  whisper: { fontSize: FONT.SIZES.MD, fontFamily: FONT.DISPLAY_ITALIC, fontStyle: 'italic', color: C.GOLD, textAlign: 'center', marginTop: SPACE.SM },
+  whisper: { fontSize: FONT.SIZES.MD, fontFamily: FONT.DISPLAY_ITALIC, fontStyle: 'italic', color: C.GOLD, textAlign: 'center', marginTop: SPACE.SM, ...TEXT_GLOW },
 
   connectedRow: { marginTop: SPACE.SM, borderWidth: 1, borderColor: C.GOLD, borderRadius: RADIUS.FULL, paddingHorizontal: SPACE.LG, paddingVertical: SPACE.XS },
   connectedText: { color: C.GOLD, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },

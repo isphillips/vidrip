@@ -36,8 +36,6 @@ export default function FriendsMenu({ size = 30 }: { size?: number }) {
     Animated.timing(anim, { toValue: 0, duration: 140, useNativeDriver: true })
       .start(({ finished }) => { if (finished) { setOpen(false); } });
   };
-  // The tab navigator (parent of this screen's stack) — lets friend actions reach the Friends/Messages tabs.
-  const tab = () => navigation.getParent?.() ?? navigation;
   const go = (run: () => void) => { closeMenu(); run(); };
 
   return (
@@ -71,21 +69,33 @@ export default function FriendsMenu({ size = 30 }: { size?: number }) {
             </TouchableOpacity>
             <View style={styles.divider} />
             <TouchableOpacity style={styles.item} activeOpacity={0.7}
-              onPress={() => go(() => tab().navigate('Friends', { screen: 'AddFriend', initial: false }))}>
+              onPress={() => go(() => navigation.navigate('FriendList'))}>
+              <Ionicons name="people-outline" size={20} color={C.ACCENT_HOT} />
+              <Text style={styles.itemText}>Friend list</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.item} activeOpacity={0.7}
+              onPress={() => go(() => navigation.navigate('FindFriend'))}>
               <Ionicons name="search-outline" size={20} color={C.ACCENT_HOT} />
               <Text style={styles.itemText}>Add a friend</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
             <TouchableOpacity style={styles.item} activeOpacity={0.7}
-              onPress={() => go(() => tab().navigate('Friends', { screen: 'InviteContacts', initial: false }))}>
+              onPress={() => go(() => navigation.navigate('ImportContacts'))}>
               <Ionicons name="people-circle-outline" size={20} color={C.ACCENT_HOT} />
               <Text style={styles.itemText}>Import from contacts</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
             <TouchableOpacity style={styles.item} activeOpacity={0.7}
-              onPress={() => go(() => tab().navigate('Messages', { screen: 'CreateGroupChat', initial: false }))}>
+              onPress={() => go(() => navigation.navigate('CreateGroupChat'))}>
               <Ionicons name="chatbubbles-outline" size={20} color={C.ACCENT_HOT} />
               <Text style={styles.itemText}>New group chat</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.item} activeOpacity={0.7}
+              onPress={() => go(() => navigation.navigate('InviteCodes'))}>
+              <Ionicons name="ticket-outline" size={20} color={C.ACCENT_HOT} />
+              <Text style={styles.itemText}>Manage invite codes</Text>
             </TouchableOpacity>
           </Animated.View>
         </TouchableOpacity>
