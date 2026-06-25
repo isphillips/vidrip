@@ -4,6 +4,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { usePendingReactionsStore } from '../../../store/pendingReactionsStore';
 import { usePendingChannelReactionsStore } from '../../../store/pendingChannelReactionsStore';
+import { useReactedThreadsStore } from '../../../store/reactedThreadsStore';
 import { useIntroSeenStore } from '../../../store/introSeenStore';
 import { saveReaction } from '../../../infrastructure/storage/reactionStorage';
 import { localPathForReaction } from '../../../infrastructure/storage/localReactionStorage';
@@ -37,6 +38,7 @@ export default function RecordReactionScreen({
   const enqueue = useUploadStore(s => s.enqueue);
   const addPendingReaction = usePendingReactionsStore(s => s.add);
   const addPendingChannelReaction = usePendingChannelReactionsStore(s => s.add);
+  const markThreadReacted = useReactedThreadsStore(s => s.markReacted);
 
   // Sender intro shares the once-per-session gate with ThreadScreen — if the
   // recipient already saw it on opening the video, don't replay it here.
@@ -173,6 +175,9 @@ export default function RecordReactionScreen({
         // Surface the reaction in the thread immediately (plays from the local
         // copy), before the relay upload finishes. Reconciled once it's fetched.
         onCommitted: (reactionId) => {
+          // Drop this share's actionable row from the Feed immediately — don't wait on the
+          // backgrounded thread_members.status='reacted' write (which a focus-reload races).
+          markThreadReacted(threadId!);
           addPendingReaction({
             id: reactionId,
             thread_id: threadId!,
@@ -192,7 +197,7 @@ export default function RecordReactionScreen({
         },
       });
     });
-  }, [isChannel, postId, channelId, user, profile, threadId, videoId, sourceType, enqueue, addPendingReaction, addPendingChannelReaction]);
+  }, [isChannel, postId, channelId, user, profile, threadId, videoId, sourceType, enqueue, addPendingReaction, addPendingChannelReaction, markThreadReacted]);
 
   if (introUrl && threadId && !introSeen.has(threadId)) {
     return <IntroPreroll introUrl={introUrl} onDone={() => markIntroSeen(threadId)} />;

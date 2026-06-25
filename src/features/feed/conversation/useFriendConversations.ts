@@ -3,6 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../../store/authStore';
 import { useBlockStore } from '../../../store/blockStore';
+import { useReactedThreadsStore } from '../../../store/reactedThreadsStore';
 import { fetchFeedThreads, type FeedThread } from '../../../infrastructure/supabase/queries/threads';
 import {
   fetchPrivateChannels, fetchPrivateChannelPeers, fetchGroupChatMemberAvatars,
@@ -24,6 +25,9 @@ export const convKey = (it: FeedItem) => (it.kind === 'friend' ? `f:${it.conv.fr
 export function useFriendConversations() {
   const { user } = useAuthStore();
   const blocked = useBlockStore(s => s.blocked);
+  // Threads reacted to this session — overlaid as 'reacted' so the Feed row clears instantly
+  // (before the backgrounded status write lands). Reactive: marking re-renders + drops the row.
+  const reactedThreads = useReactedThreadsStore(s => s.reacted);
 
   const [friends, setFriends] = useState<Friend[]>([]);
   const [threads, setThreads] = useState<FeedThread[]>([]);
@@ -54,7 +58,14 @@ export function useFriendConversations() {
       if (gen !== loadGenRef.current) { return; }   // a newer load superseded this one
       // Apply only what succeeded — a transient failure keeps the prior slice instead of blanking it.
       if (fr) { setFriends(fr); }
-      if (th) { setThreads(th); }
+      if (th) {
+        setThreads(th);
+        // Server caught up on any locally-marked reactions → hand authority back to it
+        // (and keep the optimistic set bounded).
+        useReactedThreadsStore.getState().reconcile(
+          th.filter(t => t.my_status === 'reacted').map(t => t.id),
+        );
+      }
       if (!DEMO_MODE && dm) { setDmChannels(dm); }
       if (peers) { setPeerByChannel(peers); }
       setHidden(h ? new Set(JSON.parse(h) as string[]) : new Set());
@@ -89,13 +100,18 @@ export function useFriendConversations() {
 
   const items = useMemo<FeedItem[]>(() => {
     if (!user) { return []; }
+    // Overlay just-reacted threads as 'reacted' so their row drops immediately, without
+    // waiting on the fire-and-forget status write or a focus-reload.
+    const effectiveThreads = reactedThreads.size
+      ? threads.map(t => (reactedThreads.has(t.id) ? { ...t, my_status: 'reacted' as FeedThread['my_status'] } : t))
+      : threads;
     const friendConvos = buildFriendConversations({
-      friends, threads, dmChannels, peerByChannel,
+      friends, threads: effectiveThreads, dmChannels, peerByChannel,
       myId: user.id, blocked, hidden,
     });
     return mergeFeedItems(friendConvos, buildGroupConversations(dmChannels, groupMemberAvatars))
       .filter(it => !hiddenConvs.has(convKey(it)));
-  }, [friends, threads, dmChannels, peerByChannel, groupMemberAvatars, user, blocked, hidden, hiddenConvs]);
+  }, [friends, threads, reactedThreads, dmChannels, peerByChannel, groupMemberAvatars, user, blocked, hidden, hiddenConvs]);
 
   // Total items still needing my attention — drives the bottom-tab Feed badge.
   const toReactCount = useMemo(
