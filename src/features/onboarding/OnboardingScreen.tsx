@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   // edge while the copy keeps its normal side padding. `W` (full screen width) centered in
   // the already-centered content makes the band full-bleed; the scrim feathers top/bottom
   // so it darkens the description without touching Drippy or the glowing heading above.
-  desc: { width: W, alignItems: 'center', paddingHorizontal: SPACE.XL, paddingVertical: SPACE.SM, gap: SPACE.MD },
+  desc: { width: W, alignItems: 'center', paddingHorizontal: SPACE.XL, paddingVertical: SPACE.XXL, gap: SPACE.MD },
   descScrim: { top: -SPACE.SM, bottom: -SPACE.SM },
 
   h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.MEDIUM, color: C.INK, textAlign: 'center', textTransform: 'uppercase', ...TEXT_GLOW },

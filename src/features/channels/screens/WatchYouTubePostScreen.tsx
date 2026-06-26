@@ -8,8 +8,9 @@ import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/cr
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
 import { C } from '../../../theme';
-import { faceLensRecipe, type OverlayRecipe } from '../../studio/effectRecipe';
+import { reactionReplayRecipe, type OverlayRecipe } from '../../studio/effectRecipe';
 import type { FaceLensTrack } from '../../lens/faceLens';
+import type { EmojiHit } from '../../../components/EmojiFountain';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 export default function WatchYouTubePostScreen({
@@ -43,14 +44,15 @@ export default function WatchYouTubePostScreen({
   }, [postId]);
 
   const onBack = useCallback(() => navigation.goBack(), [navigation]);
-  const onSave = useCallback(async (filePath: string, duration: number, _ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null) => {
+  const onSave = useCallback(async (filePath: string, duration: number, _ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null, _afterthought?: { path: string; duration: number } | null, emojiTrack?: EmojiHit[]) => {
     // Moderate, then commit (row + local copy) and upload the cloud copy — all in
     // the background queue so a flagged clip is never inserted or published.
     enqueue('Posting reaction…', async () => {
       await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'channel_clip' });
       const newPostId = await commitChannelClip({
         channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones,
-        overlayRecipe: lensTrack ? faceLensRecipe(lensTrack) : null,
+        // Persist the reactor's face-lens + thrown-emoji tracks so the clip replays both on watch.
+        overlayRecipe: reactionReplayRecipe({ faceLens: lensTrack, emojiTrack }),
       });
       // Surface the reaction under the post immediately (plays from the local copy) —
       // before the slow relay upload — reconciled once ChannelPostScreen refetches.

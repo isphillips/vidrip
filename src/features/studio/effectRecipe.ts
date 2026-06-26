@@ -1,5 +1,6 @@
 import type { TextAnim } from './components/EffectText';
 import type { FaceLensTrack } from '../lens/faceLens';
+import type { EmojiHit } from '../../components/EmojiFountain';
 
 // ─── Overlay recipe ───────────────────────────────────────────────────────────
 // The serializable description of a video's overlay layer. Stored with the post and
@@ -41,6 +42,10 @@ export type OverlayRecipe = {
   // consistent with the rest of the replay model. Reused on channel_posts.overlay_recipe (which
   // is otherwise unused for reaction clips) so no extra column/migration is needed.
   faceLens?: FaceLensTrack | null;
+  // Thrown-emoji "fountain" track ({e,t}[]) captured while recording a reaction — re-emitted in
+  // sync over the selfie video on playback. Channel reactions reuse channel_posts.overlay_recipe
+  // for this (like faceLens above), so no extra column/migration is needed.
+  emojiTrack?: EmojiHit[] | null;
   // Music laid over the video (baked into the export). Null/absent = no music.
   audio?: StudioAudio | null;
 };
@@ -49,10 +54,27 @@ export type OverlayRecipe = {
 export function isEmptyRecipe(r?: OverlayRecipe | null): boolean {
   return !r || (!r.fullscreen && r.nodes.length === 0
     && (!r.faceLens || r.faceLens.frames.length === 0)
+    && (!r.emojiTrack || r.emojiTrack.length === 0)
     && (!r.audio || r.audio.tracks.length === 0));
 }
 
 /** Wrap a captured face-lens track as a standalone recipe (no creator overlay nodes). */
 export function faceLensRecipe(track: FaceLensTrack): OverlayRecipe {
   return { version: 1, canvasW: 9, canvasH: 16, nodes: [], fullscreen: null, faceLens: track };
+}
+
+/** Build a reaction clip's replay recipe from its captured tracks (face lens + thrown emojis).
+ *  Returns null when neither is present, so callers can store `recipe ?? null` with no empty rows. */
+export function reactionReplayRecipe(
+  { faceLens = null, emojiTrack = null }:
+  { faceLens?: FaceLensTrack | null; emojiTrack?: EmojiHit[] | null },
+): OverlayRecipe | null {
+  const hasLens = !!faceLens && faceLens.frames.length > 0;
+  const hasEmoji = !!emojiTrack && emojiTrack.length > 0;
+  if (!hasLens && !hasEmoji) { return null; }
+  return {
+    version: 1, canvasW: 9, canvasH: 16, nodes: [], fullscreen: null,
+    faceLens: hasLens ? faceLens : null,
+    emojiTrack: hasEmoji ? emojiTrack : null,
+  };
 }

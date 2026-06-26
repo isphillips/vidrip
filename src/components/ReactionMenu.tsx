@@ -15,15 +15,20 @@ export type ReactionMenuAction = { label: string; destructive?: boolean; onPress
 type Rect = { x: number; y: number; w: number; h: number };
 
 export default function ReactionMenu({
-  emojis, mine = [], onPick, onPress, actions, children, style, disabled = false,
+  emojis, mine = [], onPick, onPress, actions, children, style, liftedStyle, disabled = false,
 }: {
   emojis: string[];
   mine?: string[];                 // emojis I've already reacted with (highlighted in the bar)
   onPick: (emoji: string) => void;
   onPress?: () => void;            // normal tap action (e.g. open the post)
   actions?: ReactionMenuAction[];  // optional context actions (e.g. Delete) shown below the preview
-  children: React.ReactNode;       // the content; also re-rendered as the lifted preview
+  // The content (also re-rendered as the lifted preview). Pass a function to receive open() so an
+  // explicit icon trigger can pop the picker — the long-press still works either way.
+  children: React.ReactNode | ((open: () => void) => React.ReactNode);
   style?: StyleProp<ViewStyle>;
+  // Extra style applied ONLY to the lifted preview (not the inline content) — e.g. a solid/darkened
+  // background + radius so a transparent inline row reads as a card when it floats over the backdrop.
+  liftedStyle?: StyleProp<ViewStyle>;
   disabled?: boolean;
 }) {
   const ref = useRef<View>(null);
@@ -49,6 +54,9 @@ export default function ReactionMenu({
       Animated.spring(prog, { toValue: 1, useNativeDriver: true, damping: 15, stiffness: 220 }).start();
     });
   }, [disabled, prog]);
+
+  // Render children directly, or call them with open() so a consumer can wire an icon trigger.
+  const content = typeof children === 'function' ? children(openMenu) : children;
 
   // Place the bar above the content if there's room, else below.
   const BAR_H = 58;
@@ -81,7 +89,7 @@ export default function ReactionMenu({
         onPress={onPress}
         onLongPress={openMenu}
         delayLongPress={280}>
-        {children}
+        {content}
       </Pressable>
 
       <Modal visible={open} transparent animationType="none" statusBarTranslucent onRequestClose={close}>
@@ -95,8 +103,8 @@ export default function ReactionMenu({
                 inline card so the floating preview reads identically, just lifted. */}
             <Animated.View
               pointerEvents="none"
-              style={[style, { position: 'absolute', top: rect.y, left: rect.x, width: rect.w }, styles.preview, previewStyle]}>
-              {children}
+              style={[style, liftedStyle, { position: 'absolute', top: rect.y, left: rect.x, width: rect.w }, styles.preview, previewStyle]}>
+              {content}
             </Animated.View>
 
             {/* Single-line scrollable reaction bar. */}

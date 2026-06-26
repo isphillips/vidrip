@@ -32,7 +32,10 @@ import {
   downloadChannelClip,
 } from '../../../infrastructure/storage/localChannelClipStorage';
 import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import EmojiChips from '../../../components/EmojiChips';
+import ReactionMenu from '../../../components/ReactionMenu';
+import { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import Handle from '../../../components/Handle';
 import ContentActions from '../../../components/ContentActions';
 import { openProfile } from '../../../store/profileDrawerStore';
@@ -440,16 +443,19 @@ export default function ChannelPostScreen({
         const retryable = state === 'unavailable' && !expired;
 
         return (
-          <TouchableOpacity
+          <ReactionMenu
             key={r.id}
             style={styles.reactionCard}
-            activeOpacity={canWatch || retryable ? 0.8 : 1}
+            emojis={QUICK_EMOJIS}
+            mine={(r.emoji_reactions ?? []).filter(e => e.user_id === user?.id).map(e => e.emoji)}
+            onPick={emoji => handleEmojiToggle(r.id, emoji)}
             onPress={canWatch
               ? () => navigation.navigate('WatchChannelClip', { postId: r.id })
               : retryable
               ? () => retryClip(r)
-              : undefined}>
-
+              : undefined}
+            liftedStyle={styles.reactionLifted}>
+            {openPicker => (<>
             <View style={[styles.reactionThumb, !canWatch && styles.reactionThumbDim]}>
               {canWatch && <Text style={styles.thumbPlayIcon}>▶</Text>}
               {state === 'downloading' && (
@@ -478,12 +484,21 @@ export default function ChannelPostScreen({
               )}
             </View>
 
-            <EmojiChips
-              reactions={r.emoji_reactions}
-              userId={user?.id}
-              onToggle={emoji => handleEmojiToggle(r.id, emoji)}
-            />
-          </TouchableOpacity>
+            <View style={styles.reactionReacts}>
+              {r.emoji_reactions.length > 0 && (
+                <EmojiChips
+                  reactions={r.emoji_reactions}
+                  userId={user?.id}
+                  onToggle={emoji => handleEmojiToggle(r.id, emoji)}
+                  showAdd={false}
+                />
+              )}
+              <TouchableOpacity onPress={openPicker} hitSlop={8} activeOpacity={0.7} style={styles.reactTrigger}>
+                <Ionicons name="happy-outline" size={20} color={C.MUTED} />
+              </TouchableOpacity>
+            </View>
+            </>)}
+          </ReactionMenu>
         );
       })
       )}
@@ -580,8 +595,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FONT.SIZES.SM, color: C.MUTED,
     textTransform: 'uppercase', letterSpacing: 1,
-    paddingHorizontal: SPACE.LG, marginBottom: SPACE.SM,
-    paddingBottom: SPACE.SM,
+    paddingHorizontal: SPACE.LG, paddingTop: SPACE.MD,
+    paddingBottom: SPACE.XL
   },
   reactionCard: {
     flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
@@ -600,6 +615,11 @@ const styles = StyleSheet.create({
   dlWrap: { alignItems: 'center', gap: 2 },
   dlPct: { fontSize: 10, color: C.MUTED, fontFamily: FONT.BODY },
   reactionInfo: { flex: 1 },
+  reactionReacts: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
+  reactTrigger: { padding: 2 },
+  // Lifted-preview backing: a solid darkened card so the (transparent) inline row reads as an
+  // elevated entry when it floats over the dimmed reaction-menu backdrop.
+  reactionLifted: { backgroundColor: C.SURFACE_2, borderRadius: RADIUS.MD, borderTopWidth: 0 },
   reactionHandle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM, color: C.ACCENT_HOT },
   reactionDuration: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY },
   reactionStatus: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY, fontStyle: 'italic' },

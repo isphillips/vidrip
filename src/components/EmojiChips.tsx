@@ -21,8 +21,8 @@ export default function EmojiChips({ reactions, userId, onToggle, showAdd = true
     return acc;
   }, {});
   const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
-  const top3 = sorted.slice(0, 3);
-  const overflow = sorted.length - 3;
+  const top3 = sorted.slice(0, 2);
+  const overflow = sorted.length - 2;
 
   return (
     <View style={styles.wrap}>

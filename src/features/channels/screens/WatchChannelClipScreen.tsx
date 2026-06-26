@@ -41,6 +41,7 @@ import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/cr
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
 import { FaceLensReplay, type FaceLensTrack } from '../../lens/faceLens';
+import EmojiFountain, { type EmojiFountainHandle, type EmojiHit } from '../../../components/EmojiFountain';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import ContentActions from '../../../components/ContentActions';
@@ -127,6 +128,24 @@ function WatchChannelClipImpl({
   // Latest reaction playhead (seconds) — read by the source-sync loop without re-running it.
   const progressRef = useRef(0);
 
+  // Replay of the reactor's emoji throws ({e,t}[]), re-emitted as the clip's playhead crosses each t.
+  const fountainRef = useRef<EmojiFountainHandle>(null);
+  const emojiTrackRef = useRef<EmojiHit[]>([]);
+  const firedRef = useRef(0);          // index into the sorted track of the next throw to fire
+  const lastReplayTimeRef = useRef(0); // detect loop/seek-back to re-arm
+
+  // Re-emit throws whose timestamp playback has reached; re-arm when the clip loops/seeks back.
+  const replayEmojis = useCallback((t: number) => {
+    const track = emojiTrackRef.current;
+    if (track.length === 0) { return; }
+    if (t + 0.25 < lastReplayTimeRef.current) { firedRef.current = 0; }
+    lastReplayTimeRef.current = t;
+    while (firedRef.current < track.length && track[firedRef.current].t <= t) {
+      fountainRef.current?.emit(track[firedRef.current].e);
+      firedRef.current += 1;
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       const p = await fetchChannelPost(postId).catch(() => null);
@@ -135,7 +154,11 @@ function WatchChannelClipImpl({
 
       // This clip's own overlay recipe carries the reactor's AR face-lens track (if any),
       // replayed over the selfie video below in sync with its playhead.
-      fetchOverlayRecipe(postId).then(r => setLensTrack(r?.faceLens ?? null)).catch(() => {});
+      fetchOverlayRecipe(postId).then(r => {
+        setLensTrack(r?.faceLens ?? null);
+        emojiTrackRef.current = [...(r?.emojiTrack ?? [])].sort((a, b) => a.t - b.t);
+        firedRef.current = 0; lastReplayTimeRef.current = 0;
+      }).catch(() => {});
 
       // Fetch parent post's YouTube video ID for PIP + sibling reactions for auto-advance
       if (p.parent_post_id) {
@@ -399,7 +422,7 @@ function WatchChannelClipImpl({
         setDuration(d.duration);
         configureForMixedPlayback().then(() => setSessionReady(true)).catch(() => setSessionReady(true));
       }}
-      onProgress={(d: any) => { progressRef.current = d.currentTime; setProgress(d.currentTime); }}
+      onProgress={(d: any) => { progressRef.current = d.currentTime; setProgress(d.currentTime); replayEmojis(d.currentTime); }}
       onEnd={handleReactionEnd}
       repeat={false}
     />
@@ -433,6 +456,9 @@ function WatchChannelClipImpl({
           </View>
         );
       })()}
+
+      {/* Thrown-emoji fountain — re-emits the reactor's recorded throws in sync with the playhead. */}
+      <EmojiFountain ref={fountainRef} />
 
       {/* Pause indicator — standalone clips only */}
       {!hasParent && paused && (

@@ -51,7 +51,7 @@ export default function ProfileDrawer() {
           try { const st = await fetchFriendStatus(me.id, r.id); if (alive) { setFriendStatus(st); } } catch { /* ignore */ }
         }
         if (r?.id && r.show_reactions_in_profile) {
-          try { const rx = await fetchProfileReactions(r.id, 9); if (alive) { setReactions(rx); } } catch { /* ignore */ }
+          try { const rx = await fetchProfileReactions(r.id, 6); if (alive) { setReactions(rx); } } catch { /* ignore */ }
         }
       }).finally(() => { if (alive) { setLoading(false); } });
       Animated.parallel([
