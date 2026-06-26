@@ -1,4 +1,5 @@
 import { supabase } from '../client';
+import { log } from '../../logging/logger';
 
 // User-facing content/user reporting (UGC safety). Writes to `content_reports`
 // (see migration 20260622000000_content_reports.sql). Reviewed out-of-band by staff.
@@ -28,5 +29,10 @@ export async function reportContent(input: ReportInput): Promise<void> {
     reason: input.reason ?? null,
     details: input.details ?? null,
   });
-  if (error && error.code !== '23505') { throw error; }   // ignore duplicate report
+  if (error && error.code !== '23505') {
+    // Surface the real Postgres error so we can tell RLS (42501) from missing table (42P01),
+    // bad target_type CHECK (23514), missing column (42703), etc.
+    log.error('[reportContent] insert failed', { code: error.code, message: error.message, details: error.details, hint: error.hint });
+    throw error;
+  }
 }

@@ -1,0 +1,982 @@
+2026-06-26 02:00:00 +0000  Xcode couldn't find any iOS App Development provisioning profiles matching 'com.isphillips.vidrip.ShareExtension'.
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): Using account <DVTFoundation.DVTServicesSessionProxyProvider: 0x600003593240> for repair
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): -[IDEProvisioningRepairStepGenerator_Automatic _allCertificateTypesForProgram:purpose:profileType:context:]:certificate types for OID 1.2.840.113635.100.6.1.2: {(
+    <DVTPortalCertificateType: 0x600000290dc0; identifier='Xcode.Portal.CertificateType.Development'>,
+    <DVTPortalCertificateType: 0x600000291220; identifier='Xcode.Portal.CertificateType.iOS.Development'>
+)}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): -[IDEProvisioningRepairStepGenerator_Automatic _allCertificateTypesForProgram:purpose:profileType:context:]: profile allowed certificate types: {(
+    <DVTPortalCertificateType: 0x600000290dc0; identifier='Xcode.Portal.CertificateType.Development'>,
+    <DVTPortalCertificateType: 0x600000291220; identifier='Xcode.Portal.CertificateType.iOS.Development'>
+)}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): -[IDEProvisioningRepairStepGenerator_Automatic _getPrimaryCertificateType:team:context:]: creatable certificate types: {(
+    <DVTPortalCertificateType: 0x600000290dc0; identifier='Xcode.Portal.CertificateType.Development'>
+)}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): -[IDEProvisioningRepairStepGenerator_Automatic _getPrimaryCertificateType:team:context:]: certificate types eligible for primary type: {(
+    <DVTPortalCertificateType: 0x600000290dc0; identifier='Xcode.Portal.CertificateType.Development'>
+)}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): -[IDEProvisioningRepairStepGenerator_Automatic _getPrimaryCertificateType:team:context:]: found primary certificate type Apple Development
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): Sending request B1487016-1499-46AA-8CD1-C92538198118 to <http://172.16.50.135:8089/services/v1/certificates> for session DVTFoundation.DVTServicesSessionProxy.
+Method: POST
+
+Headers:
+{
+    Accept = "application/vnd.api+json";
+    "Accept-Encoding" = "gzip, deflate";
+    "Content-Length" = 103;
+    "Content-Type" = "application/vnd.api+json";
+    "User-Agent" = Xcode;
+    "X-HTTP-Method-Override" = GET;
+    "X-Xcode-Version" = "26.5 (17F42)";
+}
+
+Payload:
+{"urlEncodedQueryParams":"teamId=6F98QXGZHU&filter%5BcertificateType%5D=DEVELOPMENT_MANAGED&limit=200"}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): Received response for B1487016-1499-46AA-8CD1-C92538198118 @ <http://172.16.50.135:8089/services/v1/certificates>. Code = 0
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): Response payload: {
+  "data" : [ {
+    "type" : "certificates",
+    "id" : "3XF6UL569T",
+    "attributes" : {
+      "serialNumber" : "6B30E49292D2202AAD0C2883CEDB124B",
+      "certificateContent" : "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",
+      "displayName" : "Created via API",
+      "name" : "Apple Development: Created via API",
+      "platform" : null,
+      "responseId" : "df24e996-44d1-40b9-9416-731dd034d9f2",
+      "expirationDate" : "2027-06-05T23:45:20.000+00:00",
+      "certificateType" : "DEVELOPMENT_MANAGED"
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/certificates/3XF6UL569T"
+    }
+  } ],
+  "links" : {
+    "self" : "https://developer-ci.corp.apple.com:443/services/v1/certificates?filter%5BcertificateType%5D=DEVELOPMENT_MANAGED&limit=200"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 1,
+      "limit" : 200
+    }
+  }
+}
+
+
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): -[IDEProvisioningRepairStepGenerator_Automatic _evaluateCertificatesWithSession:context:repairable:steps:userAction:error:]: 1 certificates on portal for purpose <DVTPortalCertificatePurpose name: development, identifier: Xcode.Portal.CertificatePurpose.Development, automaticSelector: Apple Development>: (
+    "<DeveloperAPICertificate = name: Apple Development: Created via API; team: <DVTPortalTeam: 0x600002623b00; name='Immanuel Phillips', teamID='6F98QXGZHU', type='Individual', memberships='(\n    \"<DVTPortalMembership: 0x600003ecc8d0; programs='{(\\n    <DVTPortalProgram: 0x60000139d0e0; <DVTPortalProgram: 0x60000139d0e0; identifier='Xcode.Portal.Program.iOS'>>\\n)}'>\",\n    \"<DVTPortalMembership: 0x600003ecc510; programs='{(\\n    <DVTPortalProgram: 0x6000010ffa70; <DVTPortalProgram: 0x6000010ffa70; identifier='Xcode.Portal.Program.Mac'>>\\n)}'>\"\n)'>; machineName: unknown; machineID: unknown; type: certificates; signingCertificate: <DVTSigningCertificate: 0x6000006a36c0; name='Apple Development: Created via API (7F693G6VM8)', hash='DB52E314919B61EEE5C0D1F5CC016526B7363E83', serialNumber='6B30E49292D2202AAD0C2883CEDB124B', certificateKinds='(\n    \"1.2.840.113635.100.6.1.12\",\n    \"1.2.840.113635.100.6.1.2\"\n), issueDate='2026-06-05 23:45:21 +0000''>>"
+)
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): -[IDEProvisioningRepairStepGenerator_Automatic _evaluateCertificatesWithSession:context:repairable:steps:userAction:error:]: 0 member-specific certificates on portal for purpose development: (
+    "<DeveloperAPICertificate = name: Apple Development: Created via API; team: <DVTPortalTeam: 0x600002623b00; name='Immanuel Phillips', teamID='6F98QXGZHU', type='Individual', memberships='(\n    \"<DVTPortalMembership: 0x600003ecc8d0; programs='{(\\n    <DVTPortalProgram: 0x60000139d0e0; <DVTPortalProgram: 0x60000139d0e0; identifier='Xcode.Portal.Program.iOS'>>\\n)}'>\",\n    \"<DVTPortalMembership: 0x600003ecc510; programs='{(\\n    <DVTPortalProgram: 0x6000010ffa70; <DVTPortalProgram: 0x6000010ffa70; identifier='Xcode.Portal.Program.Mac'>>\\n)}'>\"\n)'>; machineName: unknown; machineID: unknown; type: certificates; signingCertificate: <DVTSigningCertificate: 0x6000006a36c0; name='Apple Development: Created via API (7F693G6VM8)', hash='DB52E314919B61EEE5C0D1F5CC016526B7363E83', serialNumber='6B30E49292D2202AAD0C2883CEDB124B', certificateKinds='(\n    \"1.2.840.113635.100.6.1.12\",\n    \"1.2.840.113635.100.6.1.2\"\n), issueDate='2026-06-05 23:45:21 +0000''>>"
+)
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): -[IDEProvisioningRepairStepGenerator_Automatic _evaluateCertificatesWithSession:context:repairable:steps:userAction:error:]: is managed and has a portal certificate
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(ShareExtension.appex): Using account <DVTFoundation.DVTServicesSessionProxyProvider: 0x600003593240> for repair
+
+2026-06-26 02:00:00 +0000  Xcode couldn't find any iOS App Development provisioning profiles matching 'com.isphillips.vidrip'.
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): Using account <DVTFoundation.DVTServicesSessionProxyProvider: 0x600003593240> for repair
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): -[IDEProvisioningRepairStepGenerator_Automatic _allCertificateTypesForProgram:purpose:profileType:context:]:certificate types for OID 1.2.840.113635.100.6.1.2: {(
+    <DVTPortalCertificateType: 0x600000290dc0; identifier='Xcode.Portal.CertificateType.Development'>,
+    <DVTPortalCertificateType: 0x600000291220; identifier='Xcode.Portal.CertificateType.iOS.Development'>
+)}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): -[IDEProvisioningRepairStepGenerator_Automatic _allCertificateTypesForProgram:purpose:profileType:context:]: profile allowed certificate types: {(
+    <DVTPortalCertificateType: 0x600000290dc0; identifier='Xcode.Portal.CertificateType.Development'>,
+    <DVTPortalCertificateType: 0x600000291220; identifier='Xcode.Portal.CertificateType.iOS.Development'>
+)}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): -[IDEProvisioningRepairStepGenerator_Automatic _getPrimaryCertificateType:team:context:]: creatable certificate types: {(
+    <DVTPortalCertificateType: 0x600000290dc0; identifier='Xcode.Portal.CertificateType.Development'>
+)}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): -[IDEProvisioningRepairStepGenerator_Automatic _getPrimaryCertificateType:team:context:]: certificate types eligible for primary type: {(
+    <DVTPortalCertificateType: 0x600000290dc0; identifier='Xcode.Portal.CertificateType.Development'>
+)}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): -[IDEProvisioningRepairStepGenerator_Automatic _getPrimaryCertificateType:team:context:]: found primary certificate type Apple Development
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): Sending request 8CC8D0BE-3479-4D09-8147-BAEC6EC8C15B to <http://172.16.50.135:8089/services/v1/certificates> for session DVTFoundation.DVTServicesSessionProxy.
+Method: POST
+
+Headers:
+{
+    Accept = "application/vnd.api+json";
+    "Accept-Encoding" = "gzip, deflate";
+    "Content-Length" = 103;
+    "Content-Type" = "application/vnd.api+json";
+    "User-Agent" = Xcode;
+    "X-HTTP-Method-Override" = GET;
+    "X-Xcode-Version" = "26.5 (17F42)";
+}
+
+Payload:
+{"urlEncodedQueryParams":"teamId=6F98QXGZHU&filter%5BcertificateType%5D=DEVELOPMENT_MANAGED&limit=200"}
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): Received response for 8CC8D0BE-3479-4D09-8147-BAEC6EC8C15B @ <http://172.16.50.135:8089/services/v1/certificates>. Code = 0
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): Response payload: {
+  "data" : [ {
+    "type" : "certificates",
+    "id" : "3XF6UL569T",
+    "attributes" : {
+      "serialNumber" : "6B30E49292D2202AAD0C2883CEDB124B",
+      "certificateContent" : "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",
+      "displayName" : "Created via API",
+      "name" : "Apple Development: Created via API",
+      "platform" : null,
+      "responseId" : "52278b73-8147-45ae-bf59-4eb7e9ec0a54",
+      "expirationDate" : "2027-06-05T23:45:20.000+00:00",
+      "certificateType" : "DEVELOPMENT_MANAGED"
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/certificates/3XF6UL569T"
+    }
+  } ],
+  "links" : {
+    "self" : "https://developer-ci.corp.apple.com:443/services/v1/certificates?filter%5BcertificateType%5D=DEVELOPMENT_MANAGED&limit=200"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 1,
+      "limit" : 200
+    }
+  }
+}
+
+
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): -[IDEProvisioningRepairStepGenerator_Automatic _evaluateCertificatesWithSession:context:repairable:steps:userAction:error:]: 1 certificates on portal for purpose <DVTPortalCertificatePurpose name: development, identifier: Xcode.Portal.CertificatePurpose.Development, automaticSelector: Apple Development>: (
+    "<DeveloperAPICertificate = name: Apple Development: Created via API; team: <DVTPortalTeam: 0x600002623b00; name='Immanuel Phillips', teamID='6F98QXGZHU', type='Individual', memberships='(\n    \"<DVTPortalMembership: 0x600003ecc8d0; programs='{(\\n    <DVTPortalProgram: 0x60000139d0e0; <DVTPortalProgram: 0x60000139d0e0; identifier='Xcode.Portal.Program.iOS'>>\\n)}'>\",\n    \"<DVTPortalMembership: 0x600003ecc510; programs='{(\\n    <DVTPortalProgram: 0x6000010ffa70; <DVTPortalProgram: 0x6000010ffa70; identifier='Xcode.Portal.Program.Mac'>>\\n)}'>\"\n)'>; machineName: unknown; machineID: unknown; type: certificates; signingCertificate: <DVTSigningCertificate: 0x6000006b9140; name='Apple Development: Created via API (7F693G6VM8)', hash='DB52E314919B61EEE5C0D1F5CC016526B7363E83', serialNumber='6B30E49292D2202AAD0C2883CEDB124B', certificateKinds='(\n    \"1.2.840.113635.100.6.1.12\",\n    \"1.2.840.113635.100.6.1.2\"\n), issueDate='2026-06-05 23:45:21 +0000''>>"
+)
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): -[IDEProvisioningRepairStepGenerator_Automatic _evaluateCertificatesWithSession:context:repairable:steps:userAction:error:]: 0 member-specific certificates on portal for purpose development: (
+    "<DeveloperAPICertificate = name: Apple Development: Created via API; team: <DVTPortalTeam: 0x600002623b00; name='Immanuel Phillips', teamID='6F98QXGZHU', type='Individual', memberships='(\n    \"<DVTPortalMembership: 0x600003ecc8d0; programs='{(\\n    <DVTPortalProgram: 0x60000139d0e0; <DVTPortalProgram: 0x60000139d0e0; identifier='Xcode.Portal.Program.iOS'>>\\n)}'>\",\n    \"<DVTPortalMembership: 0x600003ecc510; programs='{(\\n    <DVTPortalProgram: 0x6000010ffa70; <DVTPortalProgram: 0x6000010ffa70; identifier='Xcode.Portal.Program.Mac'>>\\n)}'>\"\n)'>; machineName: unknown; machineID: unknown; type: certificates; signingCertificate: <DVTSigningCertificate: 0x6000006b9140; name='Apple Development: Created via API (7F693G6VM8)', hash='DB52E314919B61EEE5C0D1F5CC016526B7363E83', serialNumber='6B30E49292D2202AAD0C2883CEDB124B', certificateKinds='(\n    \"1.2.840.113635.100.6.1.12\",\n    \"1.2.840.113635.100.6.1.2\"\n), issueDate='2026-06-05 23:45:21 +0000''>>"
+)
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): -[IDEProvisioningRepairStepGenerator_Automatic _evaluateCertificatesWithSession:context:repairable:steps:userAction:error:]: is managed and has a portal certificate
+
+2026-06-26 02:00:00 +0000  2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:00 +0000 IDEProvisioningRepair(Vidrip.app): Using account <DVTFoundation.DVTServicesSessionProxyProvider: 0x600003593240> for repair
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:01 +0000 IDEProvisioningRepair(Vidrip.app): Using account <DVTFoundation.DVTServicesSessionProxyProvider: 0x600003593240> for repair
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Sending request 37EAB858-481F-45E4-9475-4679EE0441E1 to <http://172.16.50.135:8089/services/v1/bundleIds> for session DVTFoundation.DVTServicesSessionProxy.
+Method: POST
+
+Headers:
+{
+    Accept = "application/vnd.api+json";
+    "Accept-Encoding" = "gzip, deflate";
+    "Content-Length" = 132;
+    "Content-Type" = "application/vnd.api+json";
+    "User-Agent" = Xcode;
+    "X-HTTP-Method-Override" = GET;
+    "X-Xcode-Version" = "26.5 (17F42)";
+}
+
+Payload:
+{"urlEncodedQueryParams":"teamId=6F98QXGZHU&filter%5BbundleType%5D=bundle&filter%5Bidentifier%5D=com.isphillips.vidrip,*&limit=200"}
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Received response for 37EAB858-481F-45E4-9475-4679EE0441E1 @ <http://172.16.50.135:8089/services/v1/bundleIds>. Code = 0
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Response payload: {
+  "data" : [ {
+    "type" : "bundleIds",
+    "id" : "A36Z73WNN5",
+    "attributes" : {
+      "identifier" : "*",
+      "seedId" : "6F98QXGZHU",
+      "hasExclusiveManagedCapabilities" : false,
+      "name" : "XC Wildcard",
+      "entitlementGroupName" : null,
+      "bundleType" : "bundle",
+      "entitlementType" : null,
+      "platform" : "UNIVERSAL",
+      "responseId" : "acb975d9-ca3d-4f09-9853-6553a2a8c23c"
+    },
+    "relationships" : {
+      "bundleIdCapabilities" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/A36Z73WNN5/relationships/bundleIdCapabilities",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/A36Z73WNN5/bundleIdCapabilities"
+        }
+      },
+      "profiles" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/A36Z73WNN5/relationships/profiles",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/A36Z73WNN5/profiles"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/A36Z73WNN5"
+    }
+  }, {
+    "type" : "bundleIds",
+    "id" : "XBM345J73L",
+    "attributes" : {
+      "identifier" : "com.isphillips.vidrip",
+      "seedId" : "6F98QXGZHU",
+      "hasExclusiveManagedCapabilities" : false,
+      "name" : "Vidrip",
+      "entitlementGroupName" : null,
+      "bundleType" : "bundle",
+      "entitlementType" : null,
+      "platform" : "UNIVERSAL",
+      "responseId" : "acb975d9-ca3d-4f09-9853-6553a2a8c23c"
+    },
+    "relationships" : {
+      "bundleIdCapabilities" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L/relationships/bundleIdCapabilities",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L/bundleIdCapabilities"
+        }
+      },
+      "profiles" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L/relationships/profiles",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L/profiles"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L"
+    }
+  } ],
+  "links" : {
+    "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds?filter%5BbundleType%5D=bundle&filter%5Bidentifier%5D=com.isphillips.vidrip%2C%2A&limit=200"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 2,
+      "limit" : 200
+    }
+  }
+}
+
+
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Sending request C5C95D8A-15C4-4260-8195-341D2C1A13B7 to <http://172.16.50.135:8089/services/v1/bundleIds/XBM345J73L> for session DVTFoundation.DVTServicesSessionProxy.
+Method: POST
+
+Headers:
+{
+    Accept = "application/vnd.api+json";
+    "Accept-Encoding" = "gzip, deflate";
+    "Content-Length" = 227;
+    "Content-Type" = "application/vnd.api+json";
+    "User-Agent" = Xcode;
+    "X-HTTP-Method-Override" = GET;
+    "X-Xcode-Version" = "26.5 (17F42)";
+}
+
+Payload:
+{"urlEncodedQueryParams":"teamId=6F98QXGZHU&include=bundleIdCapabilities.capability,bundleIdCapabilities.appGroups,bundleIdCapabilities.cloudContainers,bundleIdCapabilities.merchantIds,bundleIdCapabilities.associatedBundleIds"}
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Received response for C5C95D8A-15C4-4260-8195-341D2C1A13B7 @ <http://172.16.50.135:8089/services/v1/bundleIds/XBM345J73L>. Code = 0
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Response payload: {
+  "data" : {
+    "type" : "bundleIds",
+    "id" : "XBM345J73L",
+    "attributes" : {
+      "identifier" : "com.isphillips.vidrip",
+      "seedId" : "6F98QXGZHU",
+      "hasExclusiveManagedCapabilities" : false,
+      "name" : "Vidrip",
+      "entitlementGroupName" : null,
+      "bundleType" : "bundle",
+      "entitlementType" : null,
+      "platform" : "UNIVERSAL",
+      "responseId" : "708817f6-8e87-4d90-a6a4-57fed81106bf"
+    },
+    "relationships" : {
+      "bundleIdCapabilities" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ {
+          "type" : "bundleIdCapabilities",
+          "id" : "XBM345J73L_IN_APP_PURCHASE"
+        }, {
+          "type" : "bundleIdCapabilities",
+          "id" : "XBM345J73L_PUSH_NOTIFICATIONS"
+        } ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L/relationships/bundleIdCapabilities",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L/bundleIdCapabilities"
+        }
+      },
+      "profiles" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L/relationships/profiles",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L/profiles"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L"
+    }
+  },
+  "included" : [ {
+    "type" : "bundleIdCapabilities",
+    "id" : "XBM345J73L_IN_APP_PURCHASE",
+    "attributes" : {
+      "settings" : null,
+      "enabled" : true,
+      "responseId" : "708817f6-8e87-4d90-a6a4-57fed81106bf"
+    },
+    "relationships" : {
+      "appConsentBundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/appConsentBundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/appConsentBundleId"
+        }
+      },
+      "appGroups" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/appGroups",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/appGroups"
+        }
+      },
+      "associatedBundleIds" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/associatedBundleIds",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/associatedBundleIds"
+        }
+      },
+      "bundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/bundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/bundleId"
+        }
+      },
+      "capability" : {
+        "data" : {
+          "type" : "capabilities",
+          "id" : "IN_APP_PURCHASE"
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/capability",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/capability"
+        }
+      },
+      "certificates" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/certificates",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/certificates"
+        }
+      },
+      "cloudContainers" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/cloudContainers",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/cloudContainers"
+        }
+      },
+      "identityMerchantIds" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/identityMerchantIds",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/identityMerchantIds"
+        }
+      },
+      "macBundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/macBundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/macBundleId"
+        }
+      },
+      "mediaSharingProtocolIds" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/mediaSharingProtocolIds",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/mediaSharingProtocolIds"
+        }
+      },
+      "merchantIds" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/merchantIds",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/merchantIds"
+        }
+      },
+      "parentBundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/relationships/parentBundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE/parentBundleId"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_IN_APP_PURCHASE"
+    }
+  }, {
+    "type" : "bundleIdCapabilities",
+    "id" : "XBM345J73L_PUSH_NOTIFICATIONS",
+    "attributes" : {
+      "entitlements" : [ {
+        "key" : "PUSH_MAC_DIRECT_DISTRIBUTION",
+        "name" : "Push MAC Direct Distribution",
+        "description" : "Push MAC Direct Distribution Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "com.apple.developer.aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_MAC_RESTRICTED_DEVELOPMENT",
+        "name" : "Push MAC Restricted Development",
+        "description" : "Push MAC Restricted Development Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "com.apple.developer.aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "development",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_MAC_RESTRICTED_DISTRIBUTION",
+        "name" : "Push MAC Restricted Distribution",
+        "description" : "Push MAC Restricted Distribution Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "com.apple.developer.aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_RESTRICTED_AD_HOC_DISTRIBUTION",
+        "name" : "Push Restricted Ad-Hoc Distribution",
+        "description" : "Push Restricted Ad-Hoc Distribution Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_RESTRICTED_DEVELOPMENT",
+        "name" : "Push Restricted Development",
+        "description" : "Push Restricted Development Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "development",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_RESTRICTED_DISTRIBUTION",
+        "name" : "Push Restricted Distribution",
+        "description" : "Push Restricted Distribution Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_UNIVERSAL",
+        "name" : "Push Universal",
+        "description" : "Push Universal Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      } ],
+      "settings" : null,
+      "enabled" : true,
+      "responseId" : "708817f6-8e87-4d90-a6a4-57fed81106bf"
+    },
+    "relationships" : {
+      "appConsentBundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/appConsentBundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/appConsentBundleId"
+        }
+      },
+      "appGroups" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/appGroups",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/appGroups"
+        }
+      },
+      "associatedBundleIds" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/associatedBundleIds",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/associatedBundleIds"
+        }
+      },
+      "bundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/bundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/bundleId"
+        }
+      },
+      "capability" : {
+        "data" : {
+          "type" : "capabilities",
+          "id" : "PUSH_NOTIFICATIONS"
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/capability",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/capability"
+        }
+      },
+      "certificates" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/certificates",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/certificates"
+        }
+      },
+      "cloudContainers" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/cloudContainers",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/cloudContainers"
+        }
+      },
+      "identityMerchantIds" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/identityMerchantIds",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/identityMerchantIds"
+        }
+      },
+      "macBundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/macBundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/macBundleId"
+        }
+      },
+      "mediaSharingProtocolIds" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/mediaSharingProtocolIds",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/mediaSharingProtocolIds"
+        }
+      },
+      "merchantIds" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/merchantIds",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/merchantIds"
+        }
+      },
+      "parentBundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/relationships/parentBundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS/parentBundleId"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIdCapabilities/XBM345J73L_PUSH_NOTIFICATIONS"
+    }
+  }, {
+    "type" : "capabilities",
+    "id" : "IN_APP_PURCHASE",
+    "attributes" : {
+      "documentationURL" : "https://developer.apple.com/in-app-purchase",
+      "supportsWildcard" : false,
+      "editable" : true,
+      "requestedCustomCapabilities" : null,
+      "enabledByDefault" : true,
+      "referenceType" : null,
+      "description" : "In-App Purchase",
+      "optional" : false,
+      "developmentOnly" : false,
+      "displaySupportedSDKs" : false,
+      "imageUrl" : "/assets/elements/icons/cip/capabilities/portal-in-app-purchase.svg",
+      "name" : "In-App Purchase",
+      "isPublic" : true,
+      "optInRequired" : false,
+      "capabilityType" : "capability",
+      "distributionApprovalRequired" : false,
+      "responseId" : "708817f6-8e87-4d90-a6a4-57fed81106bf"
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/capabilities/IN_APP_PURCHASE"
+    }
+  }, {
+    "type" : "capabilities",
+    "id" : "PUSH_NOTIFICATIONS",
+    "attributes" : {
+      "entitlements" : [ {
+        "key" : "PUSH_MAC_DIRECT_DISTRIBUTION",
+        "name" : "Push MAC Direct Distribution",
+        "description" : "Push MAC Direct Distribution Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "com.apple.developer.aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_MAC_RESTRICTED_DEVELOPMENT",
+        "name" : "Push MAC Restricted Development",
+        "description" : "Push MAC Restricted Development Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "com.apple.developer.aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "development",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_MAC_RESTRICTED_DISTRIBUTION",
+        "name" : "Push MAC Restricted Distribution",
+        "description" : "Push MAC Restricted Distribution Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "com.apple.developer.aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_RESTRICTED_AD_HOC_DISTRIBUTION",
+        "name" : "Push Restricted Ad-Hoc Distribution",
+        "description" : "Push Restricted Ad-Hoc Distribution Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_RESTRICTED_DEVELOPMENT",
+        "name" : "Push Restricted Development",
+        "description" : "Push Restricted Development Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "development",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_RESTRICTED_DISTRIBUTION",
+        "name" : "Push Restricted Distribution",
+        "description" : "Push Restricted Distribution Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      }, {
+        "key" : "PUSH_UNIVERSAL",
+        "name" : "Push Universal",
+        "description" : "Push Universal Entitlement",
+        "valueType" : "DISTRIBUTION_ENV_SPECIFIC",
+        "relevance" : "profile-entitlement",
+        "profileKey" : "aps-environment",
+        "supportsWildcard" : false,
+        "isRequiredInPlist" : true,
+        "values" : [ {
+          "value" : "production",
+          "inference" : "constant"
+        } ]
+      } ],
+      "documentationURL" : "https://developer.apple.com/documentation/usernotifications/registering-your-app-with-apns",
+      "supportsWildcard" : false,
+      "editable" : true,
+      "requestedCustomCapabilities" : null,
+      "enabledByDefault" : false,
+      "referenceType" : null,
+      "description" : "Push notifications use the Apple Push Notifications service (APNs) to deliver notifications to devices.",
+      "optional" : true,
+      "developmentOnly" : false,
+      "displaySupportedSDKs" : false,
+      "imageUrl" : "/assets/elements/icons/cip/capabilities/portal-notifications.svg",
+      "name" : "Push Notifications",
+      "isPublic" : true,
+      "optInRequired" : false,
+      "capabilityType" : "capability",
+      "distributionApprovalRequired" : false,
+      "responseId" : "708817f6-8e87-4d90-a6a4-57fed81106bf"
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/capabilities/PUSH_NOTIFICATIONS"
+    }
+  } ],
+  "links" : {
+    "self" : "https://developer-ci.corp.apple.com:443/services/v1/bundleIds/XBM345J73L?include=bundleIdCapabilities.capability%2CbundleIdCapabilities.appGroups%2CbundleIdCapabilities.cloudContainers%2CbundleIdCapabilities.merchantIds%2CbundleIdCapabilities.associatedBundleIds"
+  }
+}
+
+
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Sending request D2230F38-63A8-4C13-A51F-1E5CC2F81338 to <http://172.16.50.135:8089/services/v1/profiles> for session DVTFoundation.DVTServicesSessionProxy.
+Method: POST
+
+Headers:
+{
+    Accept = "application/vnd.api+json";
+    "Accept-Encoding" = "gzip, deflate";
+    "Content-Length" = 178;
+    "Content-Type" = "application/vnd.api+json";
+    "User-Agent" = Xcode;
+    "X-Xcode-Version" = "26.5 (17F42)";
+}
+
+Payload:
+{"data":{"type":"profiles","attributes":{"profileType":"IOS_APP_DEVELOPMENT","teamId":"6F98QXGZHU"},"relationships":{"bundleId":{"data":{"type":"bundleIds","id":"XBM345J73L"}}}}}
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Received response for D2230F38-63A8-4C13-A51F-1E5CC2F81338 @ <http://172.16.50.135:8089/services/v1/profiles>. Code = 0
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: 2026-06-26 02:00:01 +0000 IDEProvisioningLedgerEntry: Response payload: {
+  "data" : {
+    "type" : "profiles",
+    "id" : "U5T3N35C39",
+    "attributes" : {
+      "profileState" : "ACTIVE",
+      "managingApp" : "skywagon_xcode",
+      "uuid" : "5a63583a-57aa-4916-8d97-1ce9a3162a90",
+      "platform" : "IOS",
+      "cloneEntitlements" : null,
+      "createdDate" : "2026-06-26T02:00:01.507+00:00",
+      "profileType" : "IOS_APP_DEVELOPMENT",
+      "name" : "iOS Team Provisioning Profile: com.isphillips.vidrip",
+      "profileContent" : "MIIwxQYJKoZIhvcNAQcCoIIwtjCCMLICAQExCzAJBgUrDgMCGgUAMIIg0gYJKoZIhvcNAQcBoIIgwwSCIL88P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJVVEYtOCI/Pgo8IURPQ1RZUEUgcGxpc3QgUFVCTElDICItLy9BcHBsZS8vRFREIFBMSVNUIDEuMC8vRU4iICJodHRwOi8vd3d3LmFwcGxlLmNvbS9EVERzL1Byb3BlcnR5TGlzdC0xLjAuZHRkIj4KPHBsaXN0IHZlcnNpb249IjEuMCI+CjxkaWN0PgoJPGtleT5BcHBJRE5hbWU8L2tleT4KCTxzdHJpbmc+VmlkcmlwPC9zdHJpbmc+Cgk8a2V5PkFwcGxpY2F0aW9uSWRlbnRpZmllclByZWZpeDwva2V5PgoJPGFycmF5PgoJPHN0cmluZz42Rjk4UVhHWkhVPC9zdHJpbmc+Cgk8L2FycmF5PgoJPGtleT5DcmVhdGlvbkRhdGU8L2tleT4KCTxkYXRlPjIwMjYtMDYtMjZUMDI6MDA6MDFaPC9kYXRlPgoJPGtleT5QbGF0Zm9ybTwva2V5PgoJPGFycmF5PgoJCTxzdHJpbmc+aU9TPC9zdHJpbmc+CgkJPHN0cmluZz54ck9TPC9zdHJpbmc+CgkJPHN0cmluZz52aXNpb25PUzwvc3RyaW5nPgoJPC9hcnJheT4KCTxrZXk+SXNYY29kZU1hbmFnZWQ8L2tleT4KCTx0cnVlLz4KCTxrZXk+RGV2ZWxvcGVyQ2VydGlmaWNhdGVzPC9rZXk+Cgk8YXJyYXk+CgkJPGRhdGE+TUlJRjREQ0NCTWlnQXdJQkFnSVFhekRra3BMU0lDcXREQ2lEenRzU1N6QU5CZ2txaGtpRzl3MEJBUXNGQURCMU1VUXdRZ1lEVlFRREREdEJjSEJzWlNCWGIzSnNaSGRwWkdVZ1JHVjJaV3h2Y0dWeUlGSmxiR0YwYVc5dWN5QkRaWEowYVdacFkyRjBhVzl1SUVGMWRHaHZjbWwwZVRFTE1Ba0dBMVVFQ3d3Q1J6TXhFekFSQmdOVkJBb01Da0Z3Y0d4bElFbHVZeTR4Q3pBSkJnTlZCQVlUQWxWVE1CNFhEVEkyTURZd05USXpORFV5TVZvWERUSTNNRFl3TlRJek5EVXlNRm93Z1pReEdqQVlCZ29Ka2lhSmsvSXNaQUVCREFvM1JqWTVNMGMyVmswNE1UZ3dOZ1lEVlFRRERDOUJjSEJzWlNCRVpYWmxiRzl3YldWdWREb2dRM0psWVhSbFpDQjJhV0VnUVZCSklDZzNSalk1TTBjMlZrMDRLVEVUTUJFR0ExVUVDd3dLTmtZNU9GRllSMXBJVlRFYU1CZ0dBMVVFQ2d3UlNXMXRZVzUxWld3Z1VHaHBiR3hwY0hNeEN6QUpCZ05WQkFZVEFsVlRNSUlCSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQXNxTisrR3c2Z3hGaG9SdFJmYmpXVU1VdTI2Z2JTVSs5Ykh2WlpESks5RHg3dWwwTlhCZnhHdUVmdGFvUFQ0Z042aFVsNnFXSThwcEgxbCtCSmRqYXoxMUI0RlFmTzQzSEtHb25qbEFyVWg2cmJhc0w2cjhqSlVVSkFtaDhPTVhTdllXYTFOYngxb2c1RjRCT0c0cEJ4bGEveUNadjRaQUZKaVY2SFljdFJ4TXV0M1dKTFY3K1hNbHNsWFRpTHpjMGFsYkdnVzlBeEtTdnRnR2NBVUpuczlDR1N3K1Z5ZnBDcExPOHZUcEFQd3ZKRjBHRnM3WEdhOHh3RjAyWWZJbXZwTEtWd2phUTJmSGRORUxHUEZJUHdaQ1VyVWQxS3lYOXViVmlpVkVnV1dwdlA0ZjFCNUVBT3RqeUNZZmxJKzlHZTM4Z1pldTUyMWJ5Q2dHOGgwajhEUUlEQVFBQm80SUNTakNDQWtZd0RBWURWUjBUQVFIL0JBSXdBREFmQmdOVkhTTUVHREFXZ0JRSi9zQVZrUG12WkFxU0Vya21LR01NbCt5bnNqQndCZ2dyQmdFRkJRY0JBUVJrTUdJd0xRWUlLd1lCQlFVSE1BS0dJV2gwZEhBNkx5OWpaWEowY3k1aGNIQnNaUzVqYjIwdmQzZGtjbWN6TG1SbGNqQXhCZ2dyQmdFRkJRY3dBWVlsYUhSMGNEb3ZMMjlqYzNBdVlYQndiR1V1WTI5dEwyOWpjM0F3TXkxM2QyUnlaek14TXpDQ0FSNEdBMVVkSUFTQ0FSVXdnZ0VSTUlJQkRRWUpLb1pJaHZkalpBVUJNSUgvTUlIREJnZ3JCZ0VGQlFjQ0FqQ0J0Z3lCczFKbGJHbGhibU5sSUc5dUlIUm9hWE1nWTJWeWRHbG1hV05oZEdVZ1lua2dZVzU1SUhCaGNuUjVJR0Z6YzNWdFpYTWdZV05qWlhCMFlXNWpaU0J2WmlCMGFHVWdkR2hsYmlCaGNIQnNhV05oWW14bElITjBZVzVrWVhKa0lIUmxjbTF6SUdGdVpDQmpiMjVrYVhScGIyNXpJRzltSUhWelpTd2dZMlZ5ZEdsbWFXTmhkR1VnY0c5c2FXTjVJR0Z1WkNCalpYSjBhV1pwWTJGMGFXOXVJSEJ5WVdOMGFXTmxJSE4wWVhSbGJXVnVkSE11TURjR0NDc0dBUVVGQndJQkZpdG9kSFJ3Y3pvdkwzZDNkeTVoY0hCc1pTNWpiMjB2WTJWeWRHbG1hV05oZEdWaGRYUm9iM0pwZEhrdk1CWUdBMVVkSlFFQi93UU1NQW9HQ0NzR0FRVUZCd01ETUIwR0ExVWREZ1FXQkJRTnhaTWlOcjlPYXk2NHNrclYxMHlqeDlnUUpUQU9CZ05WSFE4QkFmOEVCQU1DQjRBd0V3WUtLb1pJaHZkalpBWUJBZ0VCL3dRQ0JRQXdFd1lLS29aSWh2ZGpaQVlCREFFQi93UUNCUUF3RUFZS0tvWklodmRqWkFZQklBUUNCUUF3RFFZSktvWklodmNOQVFFTEJRQURnZ0VCQUZjSFNGTHU3b1NVd1lKcnduUGNRRmU5U01GRWxkMVdrYzNpeFcxc0ZyMWljN21ZZ2JGc0dEdy9LMGh0eE5pS1RnbFdFODJKUFppc05QM3ozc0tXRjVOTTZnVDI4dS9XY3pQdWJ0UGFDNmlnQ1c1RTRjSE1wQmVJZ1RZRzVQMlY5SG5GL2NaeC9tbERFOXF6YS8valVZSjUwcjhpVmV4OVlJdGFLYUU5SnZENS9TYUdJZUI0YSt4aXJyd0t1QVkza0loWVJ0V1BDM2tua1NGczJoSGhEN3FWWmxqNDNkeEMwbmE1QkhIdGFmenk5Q3kwNmNOY0ZiRVJzRU4weEZHN3ZEQ0s2cWo0UllpeWhIa01lMC9sQ1Z0VG9EbHRLS1NnRXNDN1RNTVFERVdTdkxYd0pOcFFCN0JHbzR5MExDY2d2ZmlPSzArbzQ5eHJRbmFZL1J4azIyaz08L2RhdGE+Cgk8L2FycmF5PgoKCTxrZXk+REVSLUVuY29kZWQtUHJvZmlsZTwva2V5PgoJPGRhdGE+TUlJTmxBWUpLb1pJaHZjTkFRY0NvSUlOaFRDQ0RZRUNBUUV4RFRBTEJnbGdoa2dCWlFNRUFnRXdnZ05UQmdrcWhraUc5dzBCQndHZ2dnTkVCSUlEUURHQ0F6d3dEQXdIVm1WeWMybHZiZ0lCQVRBUURBcFVhVzFsVkc5TWFYWmxBZ0lCYlRBVERBbEJjSEJKUkU1aGJXVU1CbFpwWkhKcGNEQVREQTVKYzFoamIyUmxUV0Z1WVdkbFpBRUIvekFkREFoVVpXRnRUbUZ0WlF3UlNXMXRZVzUxWld3Z1VHaHBiR3hwY0hNd0hRd01RM0psWVhScGIyNUVZWFJsRncweU5qQTJNall3TWpBd01ERmFNQjRNRGxSbFlXMUpaR1Z1ZEdsbWFXVnlNQXdNQ2paR09UaFJXRWRhU0ZVd0h3d09SWGh3YVhKaGRHbHZia1JoZEdVWERUSTNNRFl5TmpBeU1EQXdNVm93SVF3SVVHeGhkR1p2Y20wd0ZRd0RhVTlUREFSNGNrOVREQWgyYVhOcGIyNVBVekFpREJkUWNtOW1hV3hsUkdsemRISnBZblYwYVc5dVZIbHdaUXdIVEVsTlNWUkZSREFyREJ0QmNIQnNhV05oZEdsdmJrbGtaVzUwYVdacFpYSlFjbVZtYVhnd0RBd0tOa1k1T0ZGWVIxcElWVEFzREFSVlZVbEVEQ1ExWVRZek5UZ3pZUzAxTjJGaExUUTVNVFl0T0dRNU55MHhZMlU1WVRNeE5qSmhPVEF3T3d3VlJHVjJaV3h2Y0dWeVEyVnlkR2xtYVdOaGRHVnpNQ0lFSUtwcnRCcmxrRzg0dUZRN2VBbnpNNGFSWXExVlJ0S011M2REZTN4UlpqMGVNRHdNQkU1aGJXVU1OR2xQVXlCVVpXRnRJRkJ5YjNacGMybHZibWx1WnlCUWNtOW1hV3hsT2lCamIyMHVhWE53YUdsc2JHbHdjeTUyYVdSeWFYQXdXd3dTVUhKdmRtbHphVzl1WldSRVpYWnBZMlZ6TUVVTUdUQXdNREE0TVRFd0xUQXdNVEV5UTBRNE1FTkdNRFF3TVVVTUtHUm1aVFE1TlRBNE1XWXpaRFE0TXpFMk9USmpOalUyWVRRM1ptUmxNRGt5Tm1Rd04yUTNNelF3Z2ZZTURFVnVkR2wwYkdWdFpXNTBjM0NCNVFJQkFiQ0IzekE2REJaaGNIQnNhV05oZEdsdmJpMXBaR1Z1ZEdsbWFXVnlEQ0EyUmprNFVWaEhXa2hWTG1OdmJTNXBjM0JvYVd4c2FYQnpMblpwWkhKcGNEQWVEQTloY0hNdFpXNTJhWEp2Ym0xbGJuUU1DMlJsZG1Wc2IzQnRaVzUwTURFTUkyTnZiUzVoY0hCc1pTNWtaWFpsYkc5d1pYSXVkR1ZoYlMxcFpHVnVkR2xtYVdWeURBbzJSams0VVZoSFdraFZNQk1NRG1kbGRDMTBZWE5yTFdGc2JHOTNBUUgvTURrTUZtdGxlV05vWVdsdUxXRmpZMlZ6Y3kxbmNtOTFjSE13SHd3TU5rWTVPRkZZUjFwSVZTNHFEQTlqYjIwdVlYQndiR1V1ZEc5clpXNmdnZ2c5TUlJQ1F6Q0NBY21nQXdJQkFnSUlMY1g4aU5MRlM1VXdDZ1lJS29aSXpqMEVBd013WnpFYk1Ca0dBMVVFQXd3U1FYQndiR1VnVW05dmRDQkRRU0F0SUVjek1TWXdKQVlEVlFRTERCMUJjSEJzWlNCRFpYSjBhV1pwWTJGMGFXOXVJRUYxZEdodmNtbDBlVEVUTUJFR0ExVUVDZ3dLUVhCd2JHVWdTVzVqTGpFTE1Ba0dBMVVFQmhNQ1ZWTXdIaGNOTVRRd05ETXdNVGd4T1RBMldoY05Nemt3TkRNd01UZ3hPVEEyV2pCbk1Sc3dHUVlEVlFRRERCSkJjSEJzWlNCU2IyOTBJRU5CSUMwZ1J6TXhKakFrQmdOVkJBc01IVUZ3Y0d4bElFTmxjblJwWm1sallYUnBiMjRnUVhWMGFHOXlhWFI1TVJNd0VRWURWUVFLREFwQmNIQnNaU0JKYm1NdU1Rc3dDUVlEVlFRR0V3SlZVekIyTUJBR0J5cUdTTTQ5QWdFR0JTdUJCQUFpQTJJQUJKanBMejFBY3FUdGt5SnlnUk1jM1JDVjhjV2pUbkhjRkJiWkR1V21CU3AzWkh0ZlRqalR1eHhFdFgvMUg3WXlZbDNKNllSYlR6QlBFVm9BL1ZoWURLWDFEeXhOQjBjVGRkcVhsNWR2TVZ6dEs1MTdJRHZZdVZUWlhwbWtPbEVLTWFOQ01FQXdIUVlEVlIwT0JCWUVGTHV3M3FGWU00aWFwSXFaM3I2OTY2L2F5eVNyTUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3RGdZRFZSMFBBUUgvQkFRREFnRUdNQW9HQ0NxR1NNNDlCQU1EQTJnQU1HVUNNUUNENmNIRUZsNGFYVFFZMmUzdjlHd09BRVpMdU4reVJoSEZELzNtZW95aHBtdk93Z1BVblBXVHhuUzRhdCtxSXhVQ01HMW1paERLMUEzVVQ4Mk5RejYwaW1PbE0yN2piZG9YdDJRZnlGTW0rWWhpZERrTEYxdkxVYWdNNkJnRDU2S3lLRENDQXVZd2dnSnRvQU1DQVFJQ0NETU43dmkvVEdndU1Bb0dDQ3FHU000OUJBTURNR2N4R3pBWkJnTlZCQU1NRWtGd2NHeGxJRkp2YjNRZ1EwRWdMU0JITXpFbU1DUUdBMVVFQ3d3ZFFYQndiR1VnUTJWeWRHbG1hV05oZEdsdmJpQkJkWFJvYjNKcGRIa3hFekFSQmdOVkJBb01Da0Z3Y0d4bElFbHVZeTR4Q3pBSkJnTlZCQVlUQWxWVE1CNFhEVEUzTURJeU1qSXlNak15TWxvWERUTXlNREl4T0RBd01EQXdNRm93Y2pFbU1DUUdBMVVFQXd3ZFFYQndiR1VnVTNsemRHVnRJRWx1ZEdWbmNtRjBhVzl1SUVOQklEUXhKakFrQmdOVkJBc01IVUZ3Y0d4bElFTmxjblJwWm1sallYUnBiMjRnUVhWMGFHOXlhWFI1TVJNd0VRWURWUVFLREFwQmNIQnNaU0JKYm1NdU1Rc3dDUVlEVlFRR0V3SlZVekJaTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEEwSUFCQVpycEZadmZaOG4wYzQyanBJYlZzMVVObVJLeVpSb21mckpJSDdpOVZnUDNPSnE2eGxITHk3dk82UUJ0QUVUUkh4YUpxMmduQ2tsaXVYbUJtOVBmRnFqZ2Zjd2dmUXdEd1lEVlIwVEFRSC9CQVV3QXdFQi96QWZCZ05WSFNNRUdEQVdnQlM3c042aFdET0ltcVNLbWQ2K3ZldXYyc3NrcXpCR0JnZ3JCZ0VGQlFjQkFRUTZNRGd3TmdZSUt3WUJCUVVITUFHR0ttaDBkSEE2THk5dlkzTndMbUZ3Y0d4bExtTnZiUzl2WTNOd01ETXRZWEJ3YkdWeWIyOTBZMkZuTXpBM0JnTlZIUjhFTURBdU1DeWdLcUFvaGlab2RIUndPaTh2WTNKc0xtRndjR3hsTG1OdmJTOWhjSEJzWlhKdmIzUmpZV2N6TG1OeWJEQWRCZ05WSFE0RUZnUVVla2U2T0lvVkpFZ2lSczIranhva2V6UURLbWt3RGdZRFZSMFBBUUgvQkFRREFnRUdNQkFHQ2lxR1NJYjNZMlFHQWhFRUFnVUFNQW9HQ0NxR1NNNDlCQU1EQTJjQU1HUUNNQlVNcVk3R3I1WnBhNmVmM1Z6VUExbHNybExVWU1hTGR1QzN4YUx4Q1h6Z211TnJzZU44TWNRbmVxZU9pZjJyZHdJd1lUTWc4U24vK1ljeXJpbklaRDEyZTFHazBnSXZkcjVnSXBIeDFUcDEzTFRpeGlxVy9zWUozRXBQMVNUdy9NcXlNSUlEQ0RDQ0FxMmdBd0lCQWdJSWRBdytPZVdTcW1Bd0NnWUlLb1pJemowRUF3SXdjakVtTUNRR0ExVUVBd3dkUVhCd2JHVWdVM2x6ZEdWdElFbHVkR1ZuY21GMGFXOXVJRU5CSURReEpqQWtCZ05WQkFzTUhVRndjR3hsSUVObGNuUnBabWxqWVhScGIyNGdRWFYwYUc5eWFYUjVNUk13RVFZRFZRUUtEQXBCY0hCc1pTQkpibU11TVFzd0NRWURWUVFHRXdKVlV6QWVGdzB5TmpBeE1qRXhPVEkzTWpCYUZ3MHpNREF5TVRreE9USTNNVGxhTUU0eEtqQW9CZ05WQkFNTUlWZFhSRklnVUhKdmRtbHphVzl1YVc1bklGQnliMlpwYkdVZ1UybG5ibWx1WnpFVE1CRUdBMVVFQ2d3S1FYQndiR1VnU1c1akxqRUxNQWtHQTFVRUJoTUNWVk13V1RBVEJnY3Foa2pPUFFJQkJnZ3Foa2pPUFFNQkJ3TkNBQVNRQ20rSno5T0JnREJVdGJzNnB3dXByeW0yRWRGdmsrMis4MG5hZVhIdWFwMmJoOEZSL2lUeURYalFOYnRLSVdPT0JORy9wcnFPcjV2NDBJUU9mVkU0bzRJQlR6Q0NBVXN3REFZRFZSMFRBUUgvQkFJd0FEQWZCZ05WSFNNRUdEQVdnQlI2UjdvNGloVWtTQ0pHemI2UEdpUjdOQU1xYVRCQkJnZ3JCZ0VGQlFjQkFRUTFNRE13TVFZSUt3WUJCUVVITUFHR0pXaDBkSEE2THk5dlkzTndMbUZ3Y0d4bExtTnZiUzl2WTNOd01ETXRZWE5wWTJFME1ETXdnWllHQTFVZElBU0JqakNCaXpDQmlBWUpLb1pJaHZkalpBVUJNSHN3ZVFZSUt3WUJCUVVIQWdJd2JReHJWR2hwY3lCalpYSjBhV1pwWTJGMFpTQnBjeUIwYnlCaVpTQjFjMlZrSUdWNFkyeDFjMmwyWld4NUlHWnZjaUJtZFc1amRHbHZibk1nYVc1MFpYSnVZV3dnZEc4Z1FYQndiR1VnVUhKdlpIVmpkSE1nWVc1a0wyOXlJRUZ3Y0d4bElIQnliMk5sYzNObGN5NHdIUVlEVlIwT0JCWUVGT09SNFlsMEFXYWtoKzcvczFTTDNURkx4Vi9RTUE0R0ExVWREd0VCL3dRRUF3SUhnREFQQmdrcWhraUc5Mk5rREJNRUFnVUFNQW9HQ0NxR1NNNDlCQU1DQTBrQU1FWUNJUUNLTEFuNG5ra1JOQ2ZyZXVCQ0IrTmhNbi95aFJxUG5GQXEyRjJCM0Iwc1ZRSWhBT0ZWbmJ6NmYzYVRpYzdETTZERER5azY5Wnp3a0MvWlgwOTRRbmoxTWR6VU1ZSUIwekNDQWM4Q0FRRXdmakJ5TVNZd0pBWURWUVFEREIxQmNIQnNaU0JUZVhOMFpXMGdTVzUwWldkeVlYUnBiMjRnUTBFZ05ERW1NQ1FHQTFVRUN3d2RRWEJ3YkdVZ1EyVnlkR2xtYVdOaGRHbHZiaUJCZFhSb2IzSnBkSGt4RXpBUkJnTlZCQW9NQ2tGd2NHeGxJRWx1WXk0eEN6QUpCZ05WQkFZVEFsVlRBZ2gwREQ0NTVaS3FZREFMQmdsZ2hrZ0JaUU1FQWdHZ2dlY3dHQVlKS29aSWh2Y05BUWtETVFzR0NTcUdTSWIzRFFFSEFUQWNCZ2txaGtpRzl3MEJDUVV4RHhjTk1qWXdOakkyTURJd01EQXhXakFvQmdrcWhraUc5dzBCQ1RReEd6QVpNQXNHQ1dDR1NBRmxBd1FDQWFFS0JnZ3Foa2pPUFFRREFqQXZCZ2txaGtpRzl3MEJDUVF4SWdRZ3hwTGFOaG9wZGtmbkcrRzkwbzVqOVVZSUJGdmJuQ3BGQjh2MDBEZE9RRUl3VWdZSktvWklodmNOQVFrUE1VVXdRekFLQmdncWhraUc5dzBEQnpBT0JnZ3Foa2lHOXcwREFnSUNBSUF3RFFZSUtvWklodmNOQXdJQ0FVQXdCd1lGS3c0REFnY3dEUVlJS29aSWh2Y05Bd0lDQVNnd0NnWUlLb1pJemowRUF3SUVSekJGQWlBVGpkd1lockNuSjBjd2NJd0tvYjFpVEhraVZCUVovRXV2b0cxck0xWU9Kd0loQU82R3BwZW95empBRkpZWWFPMjJWS29STkNUcHlBbUxERk1sMTQraDVtRDA8L2RhdGE+CgkJCQkJCQkJCQkKCTxrZXk+RW50aXRsZW1lbnRzPC9rZXk+Cgk8ZGljdD4KCQkJCQoJCQkJPGtleT5hcHMtZW52aXJvbm1lbnQ8L2tleT4KCQk8c3RyaW5nPmRldmVsb3BtZW50PC9zdHJpbmc+CgkJCQkKCQkJCTxrZXk+YXBwbGljYXRpb24taWRlbnRpZmllcjwva2V5PgoJCTxzdHJpbmc+NkY5OFFYR1pIVS5jb20uaXNwaGlsbGlwcy52aWRyaXA8L3N0cmluZz4KCQkJCQoJCQkJPGtleT5rZXljaGFpbi1hY2Nlc3MtZ3JvdXBzPC9rZXk+CgkJPGFycmF5PgoJCQkJPHN0cmluZz42Rjk4UVhHWkhVLio8L3N0cmluZz4KCQkJCTxzdHJpbmc+Y29tLmFwcGxlLnRva2VuPC9zdHJpbmc+CgkJPC9hcnJheT4KCQkJCQoJCQkJPGtleT5nZXQtdGFzay1hbGxvdzwva2V5PgoJCTx0cnVlLz4KCQkJCQoJCQkJPGtleT5jb20uYXBwbGUuZGV2ZWxvcGVyLnRlYW0taWRlbnRpZmllcjwva2V5PgoJCTxzdHJpbmc+NkY5OFFYR1pIVTwvc3RyaW5nPgoKCTwvZGljdD4KCTxrZXk+RXhwaXJhdGlvbkRhdGU8L2tleT4KCTxkYXRlPjIwMjctMDYtMjZUMDI6MDA6MDFaPC9kYXRlPgoJPGtleT5OYW1lPC9rZXk+Cgk8c3RyaW5nPmlPUyBUZWFtIFByb3Zpc2lvbmluZyBQcm9maWxlOiBjb20uaXNwaGlsbGlwcy52aWRyaXA8L3N0cmluZz4KCTxrZXk+UHJvdmlzaW9uZWREZXZpY2VzPC9rZXk+Cgk8YXJyYXk+CgkJPHN0cmluZz4wMDAwODExMC0wMDExMkNEODBDRjA0MDFFPC9zdHJpbmc+CgkJPHN0cmluZz5kZmU0OTUwODFmM2Q0ODMxNjkyYzY1NmE0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",
+      "supportedPlatforms" : [ "WATCH_OS", "VISION_OS", "XR_OS", "IOS" ],
+      "responseId" : "5a6cb9b3-6192-45c8-9ad2-14ee1ad295ae",
+      "expirationDate" : "2027-06-26T02:00:01.507+00:00"
+    },
+    "relationships" : {
+      "bundleId" : {
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/profiles/U5T3N35C39/relationships/bundleId",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/profiles/U5T3N35C39/bundleId"
+        }
+      },
+      "certificates" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/profiles/U5T3N35C39/relationships/certificates",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/profiles/U5T3N35C39/certificates"
+        }
+      },
+      "devices" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "data" : [ ],
+        "links" : {
+          "self" : "https://developer-ci.corp.apple.com:443/services/v1/profiles/U5T3N35C39/relationships/devices",
+          "related" : "https://developer-ci.corp.apple.com:443/services/v1/profiles/U5T3N35C39/devices"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://developer-ci.corp.apple.com:443/services/v1/profiles/U5T3N35C39"
+    }
+  },
+  "links" : {
+    "self" : "https://developer-ci.corp.apple.com:443/services/v1/profiles"
+  }
+}
+
+
+
+2026-06-26 02:00:01 +0000  2026-06-26 02:00:01 +0000 IDEProvisioningRepair(Vidrip.app): 2026-06-26 02:00:01 +0000 IDEProvisioningRepair(Vidrip.app): Created provisioning profile: <DVTEmbeddedProvisioningProfile 0x6000006adc80: name: iOS Team Provisioning Profile: com.isphillips.vidrip, UUID: 5a63583a-57aa-4916-8d97-1ce9a3162a90, teamName: Immanuel Phillips, teamIdentifierPrefixes: (
+    6F98QXGZHU
+), entitlements: {
+    "application-identifier" = "6F98QXGZHU.com.isphillips.vidrip";
+    "aps-environment" = development;
+    "com.apple.developer.team-identifier" = 6F98QXGZHU;
+    "get-task-allow" = 1;
+    "keychain-access-groups" =     (
+        "6F98QXGZHU.*",
+        "com.apple.token"
+    );
+}, appIdentifierName: Vidrip, applicationIdentifierPrefixes: (
+    6F98QXGZHU
+), dateCreated: 2026-06-26 02:00:01 +0000, dateExpired: 2027-06-26 02:00:01 +0000, certificateKinds: {(
+    "1.2.840.113635.100.6.1.12",
+    "1.2.840.113635.100.6.1.2"
+)}, certificateSHA1Hashes: {(
+    DB52E314919B61EEE5C0D1F5CC016526B7363E83
+)}, supportedUDIDs: {(
+    dfe495081f3d4831692c656a47fde0926d07d734,
+    "00008110-00112cd80cf0401e"
+)}, isUniversal: 0, isXcodeManaged: 1, platforms: {(
+    <DVTPlatform:0x600001db5900:'com.apple.platform.xros':<DVTFilePath:0x600001788c60:'/Applications/Xcode.app/Contents/Developer/Platforms/XROS.platform'>>,
+    <DVTPlatform:0x600001db5880:'com.apple.platform.watchos':<DVTFilePath:0x6000018883f0:'/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform'>>,
+    <DVTPlatform:0x600001db5480:'com.apple.platform.iphoneos':<DVTFilePath:0x600001888310:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>
+)}, filePath: (null)>

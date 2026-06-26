@@ -1,0 +1,4 @@
+2026-06-26T01:52:40.453414259Z	Command line invocation:
+2026-06-26T01:52:40.454016945Z	    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -resolvePackageDependencies -workspace /Volumes/workspace/repository/ios/Vidrip.xcworkspace -scheme Vidrip -derivedDataPath /Volumes/workspace/DerivedData -hideShellScriptEnvironment
+2026-06-26T01:52:40.454151224Z	
+2026-06-26T01:52:54.035467107Z	resolved source packages: 

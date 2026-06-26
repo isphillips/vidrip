@@ -1,0 +1,242 @@
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodiOSAppStoreDistribution: 0x600003271780>
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAppStoreDistribution: 0x6000032717e0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAppStoreDistributionVisionOS: 0x600003271830> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAppStoreDistribution: 0x600003216310> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAdHocVisionOS: 0x600003271750> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSAdHoc: 0x600003271820> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAdHoc: 0x600003216290> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAdHoc: 0x6000032162b0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodiOSAdHoc: 0x6000032162f0>
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSEnterprise: 0x600003271790> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSEnterprise: 0x6000032717c0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodEnterpriseVisionOS: 0x6000032717d0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodiOSEnterprise: 0x600003216270>
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodDevelopmentSigned: 0x600003271760>
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSignedVisionOS: 0x6000032717a0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSDevelopmentSigned: 0x6000032717f0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSDevelopmentSigned: 0x600003216240> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDeveloperIDNotarizedApp: 0x600003271770> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDeveloperID: 0x600003216280> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodSaveBuiltProducts: 0x600003271800> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSignedMac: 0x6000032162a0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacApplication: 0x6000032162d0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAppStoreValidationVisionOS: 0x6000032717b0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAppStoreValidation: 0x6000032162c0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodiOSAppStoreValidation: 0x6000032162e0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAppStoreValidation: 0x600003216300> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodExportArchive: 0x600003271810> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodiOSAppStoreDistribution: 0x600003271780> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAppStoreDistribution: 0x6000032717e0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAppStoreDistributionVisionOS: 0x600003271830> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAppStoreDistribution: 0x600003216310> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAdHocVisionOS: 0x600003271750> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSAdHoc: 0x600003271820> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAdHoc: 0x600003216290> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAdHoc: 0x6000032162b0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodiOSAdHoc: 0x6000032162f0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSEnterprise: 0x600003271790> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSEnterprise: 0x6000032717c0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodEnterpriseVisionOS: 0x6000032717d0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodiOSEnterprise: 0x600003216270> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSigned: 0x600003271760> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSignedVisionOS: 0x6000032717a0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSDevelopmentSigned: 0x6000032717f0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSDevelopmentSigned: 0x600003216240> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDeveloperIDNotarizedApp: 0x600003271770> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDeveloperID: 0x600003216280> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodSaveBuiltProducts: 0x600003271800> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSignedMac: 0x6000032162a0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacApplication: 0x6000032162d0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAppStoreValidationVisionOS: 0x6000032717b0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAppStoreValidation: 0x6000032162c0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodiOSAppStoreValidation: 0x6000032162e0>
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAppStoreValidation: 0x600003216300> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodExportArchive: 0x600003271810> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Available distribution methods: {(
+    <IDEDistributionMethodiOSAppStoreDistribution: 0x600003271780>,
+    <IDEDistributionMethodiOSAdHoc: 0x6000032162f0>,
+    <IDEDistributionMethodiOSEnterprise: 0x600003216270>,
+    <IDEDistributionMethodDevelopmentSigned: 0x600003271760>,
+    <IDEDistributionMethodiOSAppStoreValidation: 0x6000032162e0>
+)}
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodiOSAppStoreDistribution: 0x600003271780>
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAppStoreDistribution: 0x6000032717e0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAppStoreDistributionVisionOS: 0x600003271830> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAppStoreDistribution: 0x600003216310> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAdHocVisionOS: 0x600003271750> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSAdHoc: 0x600003271820> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAdHoc: 0x600003216290> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAdHoc: 0x6000032162b0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodiOSAdHoc: 0x6000032162f0>
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSEnterprise: 0x600003271790> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSEnterprise: 0x6000032717c0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodEnterpriseVisionOS: 0x6000032717d0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodiOSEnterprise: 0x600003216270>
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodDevelopmentSigned: 0x600003271760>
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSignedVisionOS: 0x6000032717a0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSDevelopmentSigned: 0x6000032717f0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSDevelopmentSigned: 0x600003216240> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDeveloperIDNotarizedApp: 0x600003271770> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDeveloperID: 0x600003216280> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodSaveBuiltProducts: 0x600003271800> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSignedMac: 0x6000032162a0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacApplication: 0x6000032162d0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAppStoreValidationVisionOS: 0x6000032717b0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAppStoreValidation: 0x6000032162c0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodiOSAppStoreValidation: 0x6000032162e0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAppStoreValidation: 0x600003216300> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodExportArchive: 0x600003271810> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodiOSAppStoreDistribution: 0x600003271780> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAppStoreDistribution: 0x6000032717e0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAppStoreDistributionVisionOS: 0x600003271830> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAppStoreDistribution: 0x600003216310> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAdHocVisionOS: 0x600003271750> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSAdHoc: 0x600003271820> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAdHoc: 0x600003216290> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAdHoc: 0x6000032162b0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodiOSAdHoc: 0x6000032162f0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSEnterprise: 0x600003271790> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSEnterprise: 0x6000032717c0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodEnterpriseVisionOS: 0x6000032717d0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodiOSEnterprise: 0x600003216270> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSigned: 0x600003271760> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSignedVisionOS: 0x6000032717a0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodWatchOSDevelopmentSigned: 0x6000032717f0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSDevelopmentSigned: 0x600003216240> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDeveloperIDNotarizedApp: 0x600003271770> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDeveloperID: 0x600003216280> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodSaveBuiltProducts: 0x600003271800> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodDevelopmentSignedMac: 0x6000032162a0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacApplication: 0x6000032162d0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodAppStoreValidationVisionOS: 0x6000032717b0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodMacAppStoreValidation: 0x6000032162c0> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Accepted distribution method <IDEDistributionMethodiOSAppStoreValidation: 0x6000032162e0>
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodTVOSAppStoreValidation: 0x600003216300> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Rejected distribution method <IDEDistributionMethodExportArchive: 0x600003271810> because it doesn't support distributing archive
+2026-06-26 01:59:58 +0000 [MT] Available distribution methods: {(
+    <IDEDistributionMethodiOSAppStoreDistribution: 0x600003271780>,
+    <IDEDistributionMethodiOSAdHoc: 0x6000032162f0>,
+    <IDEDistributionMethodiOSEnterprise: 0x600003216270>,
+    <IDEDistributionMethodDevelopmentSigned: 0x600003271760>,
+    <IDEDistributionMethodiOSAppStoreValidation: 0x6000032162e0>
+)}
+2026-06-26 01:59:58 +0000 [MT] Skipping reformat archive step. No reformatter selected for archive <DVTFilePath:0x600001e1a800:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive'>
+2026-06-26 01:59:58 +0000 [MT] IDEDistributionItem init <DVTFilePath:0x600001b21960:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex'>
+2026-06-26 01:59:58 +0000 [MT] IDEDistributionItem init <DVTFilePath:0x600001b80310:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework'>
+2026-06-26 01:59:58 +0000 [MT] IDEDistributionItem init <DVTFilePath:0x600001443660:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app'>
+2026-06-26 01:59:58 +0000 [MT] Set distributionItems on context: (
+    "<IDEDistributionItem: 0x6000014b7840; bundleID='com.isphillips.vidrip', path='<DVTFilePath:0x600001443660:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a640; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='{\n    \"aps-environment\" = development;\n}', teamID='(null)', identifier='com.isphillips.vidrip', executablePath='<DVTFilePath:0x600001489980:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Vidrip'>', hardenedRuntime='0'>'>"
+)
+2026-06-26 01:59:58 +0000 [MT] Archs to thin for item /Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app are []
+2026-06-26 01:59:58 +0000 [MT] Archs to thin for item /Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework are []
+2026-06-26 01:59:58 +0000 [MT] Archs to thin for item /Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex are []
+2026-06-26 01:59:58 +0000 [MT] Distributable's provisioning style is Automatic
+2026-06-26 01:59:58 +0000 [MT] Starting evaluation for distribution items:
+(
+    "<IDEDistributionItem: 0x6000014b7840; bundleID='com.isphillips.vidrip', path='<DVTFilePath:0x600001443660:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a640; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='{\n    \"aps-environment\" = development;\n}', teamID='(null)', identifier='com.isphillips.vidrip', executablePath='<DVTFilePath:0x600001489980:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Vidrip'>', hardenedRuntime='0'>'>"
+)
+2026-06-26 01:59:58 +0000 [MT] Evaluating <IDEDistributionItemProvisionable: 0x600001c6c580; distributionItem='<IDEDistributionItem: 0x600001491e60; bundleID='com.isphillips.vidrip.ShareExtension', path='<DVTFilePath:0x600001b21960:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a100; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='com.isphillips.vidrip.ShareExtension', executablePath='<DVTFilePath:0x600001484cc0:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex/ShareExtension'>', hardenedRuntime='0'>'>', team='<IDEProvisioningBasicTeam: 0x600003163ce0; teamID='6F98QXGZHU', teamName='(null)'>', method='<IDEDistributionMethodiOSAdHoc: 0x6000032162f0>', provisioningStyle='0', entitlementsProcessors='(
+    "<IDEiCloudEntitlementsProcessor: 0x600003d3b4e0>",
+    "<IDEAppAttestEnvironmentEntitlementsProcessor: 0x600003d3b570>",
+    "<IDEClassKitEntitlementsProcessor: 0x600003d3b690>",
+    "<IDEAppIdentifierPrefixedEntitlementsProcessor: 0x600003d3b7b0>"
+)'> with overrides <IDEProvisionableOverrides 0x600000736f70: configuration: Default, profileSupport: <IDEProvisioningProfileSupport: 0x6000032719d0>, provisioningStyle: (null), certificateSigningStyle: (null), provisioningPurpose: ad-hoc, team: (null), platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), profileSpecifier: (null), certificateIdentifier: (null), bundleIdentifier: (null), entitlements: (null), entitlementsFile: (null), baseEntitlements: (null), entitlementsExpansion: (null), entitlementsDestination: (null), allowSigningWithoutTeamSelection: (null), signingRequiresTeam: (null), appIDFeatures: (null)>
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x600001491e60; bundleID='com.isphillips.vidrip.ShareExtension', path='<DVTFilePath:0x600001b21960:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a100; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='com.isphillips.vidrip.ShareExtension', executablePath='<DVTFilePath:0x600001484cc0:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex/ShareExtension'>', hardenedRuntime='0'>'> from <IDEiCloudEntitlementsProcessor: 0x600003d3b4e0>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x600001491e60; bundleID='com.isphillips.vidrip.ShareExtension', path='<DVTFilePath:0x600001b21960:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a100; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='com.isphillips.vidrip.ShareExtension', executablePath='<DVTFilePath:0x600001484cc0:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex/ShareExtension'>', hardenedRuntime='0'>'> from <IDEAppAttestEnvironmentEntitlementsProcessor: 0x600003d3b570>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x600001491e60; bundleID='com.isphillips.vidrip.ShareExtension', path='<DVTFilePath:0x600001b21960:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a100; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='com.isphillips.vidrip.ShareExtension', executablePath='<DVTFilePath:0x600001484cc0:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex/ShareExtension'>', hardenedRuntime='0'>'> from <IDEClassKitEntitlementsProcessor: 0x600003d3b690>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x600001491e60; bundleID='com.isphillips.vidrip.ShareExtension', path='<DVTFilePath:0x600001b21960:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a100; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='com.isphillips.vidrip.ShareExtension', executablePath='<DVTFilePath:0x600001484cc0:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/PlugIns/ShareExtension.appex/ShareExtension'>', hardenedRuntime='0'>'> from <IDEAppIdentifierPrefixedEntitlementsProcessor: 0x600003d3b7b0>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Evaluating <IDEDistributionItemProvisionable: 0x600001c6c300; distributionItem='<IDEDistributionItem: 0x6000014b7840; bundleID='com.isphillips.vidrip', path='<DVTFilePath:0x600001443660:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a640; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='{
+    "aps-environment" = development;
+}', teamID='(null)', identifier='com.isphillips.vidrip', executablePath='<DVTFilePath:0x600001489980:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Vidrip'>', hardenedRuntime='0'>'>', team='<IDEProvisioningBasicTeam: 0x600003163ce0; teamID='6F98QXGZHU', teamName='(null)'>', method='<IDEDistributionMethodiOSAdHoc: 0x6000032162f0>', provisioningStyle='0', entitlementsProcessors='(
+    "<IDEiCloudEntitlementsProcessor: 0x600003d3b450>",
+    "<IDEAppAttestEnvironmentEntitlementsProcessor: 0x600003d3b3f0>",
+    "<IDEClassKitEntitlementsProcessor: 0x600003d3b420>",
+    "<IDEAppIdentifierPrefixedEntitlementsProcessor: 0x600003d3b6c0>"
+)'> with overrides <IDEProvisionableOverrides 0x600000738580: configuration: Default, profileSupport: <IDEProvisioningProfileSupport: 0x60000320ec00>, provisioningStyle: (null), certificateSigningStyle: (null), provisioningPurpose: ad-hoc, team: (null), platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), profileSpecifier: (null), certificateIdentifier: (null), bundleIdentifier: (null), entitlements: (null), entitlementsFile: (null), baseEntitlements: (null), entitlementsExpansion: (null), entitlementsDestination: (null), allowSigningWithoutTeamSelection: (null), signingRequiresTeam: (null), appIDFeatures: (null)>
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x6000014b7840; bundleID='com.isphillips.vidrip', path='<DVTFilePath:0x600001443660:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a640; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='{
+    "aps-environment" = development;
+}', teamID='(null)', identifier='com.isphillips.vidrip', executablePath='<DVTFilePath:0x600001489980:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Vidrip'>', hardenedRuntime='0'>'> from <IDEiCloudEntitlementsProcessor: 0x600003d3b450>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x6000014b7840; bundleID='com.isphillips.vidrip', path='<DVTFilePath:0x600001443660:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a640; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='{
+    "aps-environment" = development;
+}', teamID='(null)', identifier='com.isphillips.vidrip', executablePath='<DVTFilePath:0x600001489980:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Vidrip'>', hardenedRuntime='0'>'> from <IDEAppAttestEnvironmentEntitlementsProcessor: 0x600003d3b3f0>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x6000014b7840; bundleID='com.isphillips.vidrip', path='<DVTFilePath:0x600001443660:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a640; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='{
+    "aps-environment" = development;
+}', teamID='(null)', identifier='com.isphillips.vidrip', executablePath='<DVTFilePath:0x600001489980:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Vidrip'>', hardenedRuntime='0'>'> from <IDEClassKitEntitlementsProcessor: 0x600003d3b420>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x6000014b7840; bundleID='com.isphillips.vidrip', path='<DVTFilePath:0x600001443660:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a640; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='{
+    "aps-environment" = development;
+}', teamID='(null)', identifier='com.isphillips.vidrip', executablePath='<DVTFilePath:0x600001489980:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Vidrip'>', hardenedRuntime='0'>'> from <IDEAppIdentifierPrefixedEntitlementsProcessor: 0x600003d3b6c0>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Evaluating <IDEDistributionItemProvisionable: 0x600001c6c600; distributionItem='<IDEDistributionItem: 0x60000148a3a0; bundleID='dev.hermesengine.iphoneos', path='<DVTFilePath:0x600001b80310:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a340; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='dev.hermesengine.iphoneos', executablePath='<DVTFilePath:0x600001485500:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework/hermes'>', hardenedRuntime='0'>'>', team='<IDEProvisioningBasicTeam: 0x600003163ce0; teamID='6F98QXGZHU', teamName='(null)'>', method='<IDEDistributionMethodiOSAdHoc: 0x6000032162f0>', provisioningStyle='0', entitlementsProcessors='(
+    "<IDEiCloudEntitlementsProcessor: 0x600003d3b480>",
+    "<IDEAppAttestEnvironmentEntitlementsProcessor: 0x600003d3b540>",
+    "<IDEClassKitEntitlementsProcessor: 0x600003d3b660>",
+    "<IDEAppIdentifierPrefixedEntitlementsProcessor: 0x600003d3b750>"
+)'> with overrides <IDEProvisionableOverrides 0x600000774000: configuration: Default, profileSupport: <IDEProvisioningProfileSupport: 0x6000032411e0>, provisioningStyle: (null), certificateSigningStyle: (null), provisioningPurpose: ad-hoc, team: (null), platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), profileSpecifier: (null), certificateIdentifier: (null), bundleIdentifier: (null), entitlements: (null), entitlementsFile: (null), baseEntitlements: (null), entitlementsExpansion: (null), entitlementsDestination: (null), allowSigningWithoutTeamSelection: (null), signingRequiresTeam: (null), appIDFeatures: (null)>
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x60000148a3a0; bundleID='dev.hermesengine.iphoneos', path='<DVTFilePath:0x600001b80310:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a340; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='dev.hermesengine.iphoneos', executablePath='<DVTFilePath:0x600001485500:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework/hermes'>', hardenedRuntime='0'>'> from <IDEiCloudEntitlementsProcessor: 0x600003d3b480>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x60000148a3a0; bundleID='dev.hermesengine.iphoneos', path='<DVTFilePath:0x600001b80310:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a340; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='dev.hermesengine.iphoneos', executablePath='<DVTFilePath:0x600001485500:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework/hermes'>', hardenedRuntime='0'>'> from <IDEAppAttestEnvironmentEntitlementsProcessor: 0x600003d3b540>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x60000148a3a0; bundleID='dev.hermesengine.iphoneos', path='<DVTFilePath:0x600001b80310:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a340; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='dev.hermesengine.iphoneos', executablePath='<DVTFilePath:0x600001485500:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework/hermes'>', hardenedRuntime='0'>'> from <IDEClassKitEntitlementsProcessor: 0x600003d3b660>: {
+}
+2026-06-26 01:59:58 +0000 [MT] Applying entitlements delta for <IDEDistributionItem: 0x60000148a3a0; bundleID='dev.hermesengine.iphoneos', path='<DVTFilePath:0x600001b80310:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x60000148a340; isSigned='1', isAdHocSigned='1', signingCertificate='(null)', entitlements='(null)', teamID='(null)', identifier='dev.hermesengine.iphoneos', executablePath='<DVTFilePath:0x600001485500:'/Volumes/workspace/tmp/a1b71353-abcc-40a4-97d9-7a877f751ce0.xcarchive/Products/Applications/Vidrip.app/Frameworks/hermes.framework/hermes'>', hardenedRuntime='0'>'> from <IDEAppIdentifierPrefixedEntitlementsProcessor: 0x600003d3b750>: {
+}
+2026-06-26 02:00:00 +0000 [MT] Evaluation for hermes.framework is <IDEProvisionableStatusEvaluation 0x600001bd9730: inputs: <IDEProvisionableStatusEvalutorInputs 0x6000010a83c0: provisionableSnapshot: <IDEProvisionableSnapshot 0x600003d275d0: name: hermes.framework, configurations: {
+    Default = "<_IDEProvisionableConfigurationSnapshot 0x60000010d860: name: Default, provisioningStyle: 0, certificateSigningStyle: 2, team: <IDEProvisioningBasicTeam: 0x600003163ce0; teamID='6F98QXGZHU', teamName='(null)'>, profileSupport: <IDEProvisioningProfileSupport: 0x60000320eef0>, platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), bundleIdentifier: dev.hermesengine.iphoneos, profileSpecifier: (null), certificateIdentifier: iPhone Distribution, entitlementsFilePath: (null), baseEntitlements: <IDEProvisionableEntitlements: 0x6000031c6ba0; signedEntitlements='{\n}', simulatedEntitlements='(null)'>, entitlementsExpansion: <IDEDistributionProvisioningEntitlementsExpansion: 0x60000320f430>, entitlementsDestination: 1, allowSigningWithoutTeamSelection: 0, signingRequiresTeam: 0, appIDFeatures: <DVTPortalAppIDFeatures 0x600003671da0: Features: {\n}, Containers: {\n}>, provisioningPurpose: ad-hoc, supportsIOSMac: 0, areFeaturesUpToDate: 0>";
+}, overrides: <IDEProvisionableOverrides 0x600000774000: configuration: Default, profileSupport: <IDEProvisioningProfileSupport: 0x6000032411e0>, provisioningStyle: (null), certificateSigningStyle: (null), provisioningPurpose: ad-hoc, team: (null), platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), profileSpecifier: (null), certificateIdentifier: (null), bundleIdentifier: (null), entitlements: (null), entitlementsFile: (null), baseEntitlements: (null), entitlementsExpansion: (null), entitlementsDestination: (null), allowSigningWithoutTeamSelection: (null), signingRequiresTeam: (null), appIDFeatures: (null)>>>, configuration: Default, codesignParameterSnapshot: <IDECodesignParameterSnapshot: 0x600003d40090>:
+Identity: 2AF399AFC790BFE5C62265AF0E4711EF8B191A55
+Certificate <DVTSigningCertificate: 0x6000005333c0; name='Apple Distribution: Immanuel Phillips (6F98QXGZHU)', hash='2AF399AFC790BFE5C62265AF0E4711EF8B191A55', serialNumber='64FDF8FC59346215F0766F1E5453D139', certificateKinds='(
+    "1.2.840.113635.100.6.1.7",
+    "1.2.840.113635.100.6.1.4"
+), issueDate='2026-06-05 23:45:23 +0000''>>, errors: (null)>
+2026-06-26 02:00:02 +0000 [MT] Evaluation for Vidrip.app is <IDEProvisionableStatusEvaluation 0x600001b99420: inputs: <IDEProvisionableStatusEvalutorInputs 0x60000106e490: provisionableSnapshot: <IDEProvisionableSnapshot 0x600003d22a60: name: Vidrip.app, configurations: {
+    Default = "<_IDEProvisionableConfigurationSnapshot 0x60000013abc0: name: Default, provisioningStyle: 0, certificateSigningStyle: 2, team: <IDEProvisioningBasicTeam: 0x600003163ce0; teamID='6F98QXGZHU', teamName='(null)'>, profileSupport: <IDEProvisioningProfileSupport: 0x600003241210>, platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), bundleIdentifier: com.isphillips.vidrip, profileSpecifier: (null), certificateIdentifier: iPhone Distribution, entitlementsFilePath: (null), baseEntitlements: <IDEProvisionableEntitlements: 0x6000031f2880; signedEntitlements='{\n    \"aps-environment\" = development;\n}', simulatedEntitlements='(null)'>, entitlementsExpansion: <IDEDistributionProvisioningEntitlementsExpansion: 0x600003240ff0>, entitlementsDestination: 1, allowSigningWithoutTeamSelection: 0, signingRequiresTeam: 0, appIDFeatures: <DVTPortalAppIDFeatures 0x600003660000: Features: {\n    \"<DVTPortalProfileFeature: 0x600001bf9960; id='PUSH_NOTIFICATIONS', userDescription='Push Notifications', platforms='.xros, .watchos, .macosx, .iphoneos, .appletvos'>\" = 1;\n}, Containers: {\n}>, provisioningPurpose: ad-hoc, supportsIOSMac: 0, areFeaturesUpToDate: 0>";
+}, overrides: <IDEProvisionableOverrides 0x600000738580: configuration: Default, profileSupport: <IDEProvisioningProfileSupport: 0x60000320ec00>, provisioningStyle: (null), certificateSigningStyle: (null), provisioningPurpose: ad-hoc, team: (null), platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), profileSpecifier: (null), certificateIdentifier: (null), bundleIdentifier: (null), entitlements: (null), entitlementsFile: (null), baseEntitlements: (null), entitlementsExpansion: (null), entitlementsDestination: (null), allowSigningWithoutTeamSelection: (null), signingRequiresTeam: (null), appIDFeatures: (null)>>>, configuration: Default, codesignParameterSnapshot: <IDECodesignParameterSnapshot: 0x600003ce3b40>:
+Profile:  <DVTEmbeddedProvisioningProfile 0x600000564a80: name: iOS Team Ad Hoc Provisioning Profile: com.isphillips.vidrip, UUID: 45f30a73-c7ab-4402-b2c1-734d5c4c14f1, teamName: Immanuel Phillips, teamIdentifierPrefixes: (
+    6F98QXGZHU
+), entitlements: {
+    "application-identifier" = "6F98QXGZHU.com.isphillips.vidrip";
+    "aps-environment" = production;
+    "com.apple.developer.team-identifier" = 6F98QXGZHU;
+    "get-task-allow" = 0;
+    "keychain-access-groups" =     (
+        "6F98QXGZHU.*",
+        "com.apple.token"
+    );
+}, appIdentifierName: Vidrip, applicationIdentifierPrefixes: (
+    6F98QXGZHU
+), dateCreated: 2026-06-26 02:00:01 +0000, dateExpired: 2027-06-05 23:45:22 +0000, certificateKinds: {(
+    "1.2.840.113635.100.6.1.7",
+    "1.2.840.113635.100.6.1.4"
+)}, certificateSHA1Hashes: {(
+    F832246CD5E854687F6CC982E1D6E04147A3213D,
+    2AF399AFC790BFE5C62265AF0E4711EF8B191A55
+)}, supportedUDIDs: {(
+    dfe495081f3d4831692c656a47fde0926d07d734,
+    "00008110-00112cd80cf0401e"
+)}, isUniversal: 0, isXcodeManaged: 1, platforms: {(
+    <DVTPlatform:0x600001e00200:'com.apple.platform.xros':<DVTFilePath:0x600001414540:'/Applications/Xcode.app/Contents/Developer/Platforms/XROS.platform'>>,
+    <DVTPlatform:0x600001e00180:'com.apple.platform.watchos':<DVTFilePath:0x600001b041c0:'/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform'>>,
+    <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>
+)}, filePath: <DVTFilePath:0x600000226ac0:'/Users/local/Library/Developer/Xcode/UserData/Provisioning Profiles/45f30a73-c7ab-4402-b2c1-734d5c4c14f1.mobileprovision'>>
+Identity: 2AF399AFC790BFE5C62265AF0E4711EF8B191A55
+Certificate <DVTSigningCertificate: 0x60000052e7c0; name='Apple Distribution: Immanuel Phillips (6F98QXGZHU)', hash='2AF399AFC790BFE5C62265AF0E4711EF8B191A55', serialNumber='64FDF8FC59346215F0766F1E5453D139', certificateKinds='(
+    "1.2.840.113635.100.6.1.7",
+    "1.2.840.113635.100.6.1.4"
+), issueDate='2026-06-05 23:45:23 +0000''>>, errors: (null)>
+2026-06-26 02:00:02 +0000 [MT] Evaluation for ShareExtension.appex is <IDEProvisionableStatusEvaluation 0x600001bea3e0: inputs: <IDEProvisionableStatusEvalutorInputs 0x600001048dc0: provisionableSnapshot: <IDEProvisionableSnapshot 0x600003d36730: name: ShareExtension.appex, configurations: {
+    Default = "<_IDEProvisionableConfigurationSnapshot 0x60000010d5e0: name: Default, provisioningStyle: 0, certificateSigningStyle: 2, team: <IDEProvisioningBasicTeam: 0x600003163ce0; teamID='6F98QXGZHU', teamName='(null)'>, profileSupport: <IDEProvisioningProfileSupport: 0x60000320ebc0>, platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), bundleIdentifier: com.isphillips.vidrip.ShareExtension, profileSpecifier: (null), certificateIdentifier: iPhone Distribution, entitlementsFilePath: (null), baseEntitlements: <IDEProvisionableEntitlements: 0x6000031f2740; signedEntitlements='{\n}', simulatedEntitlements='(null)'>, entitlementsExpansion: <IDEDistributionProvisioningEntitlementsExpansion: 0x60000320ebb0>, entitlementsDestination: 1, allowSigningWithoutTeamSelection: 0, signingRequiresTeam: 0, appIDFeatures: <DVTPortalAppIDFeatures 0x6000031fe460: Features: {\n}, Containers: {\n}>, provisioningPurpose: ad-hoc, supportsIOSMac: 0, areFeaturesUpToDate: 0>";
+}, overrides: <IDEProvisionableOverrides 0x600000736f70: configuration: Default, profileSupport: <IDEProvisioningProfileSupport: 0x6000032719d0>, provisioningStyle: (null), certificateSigningStyle: (null), provisioningPurpose: ad-hoc, team: (null), platform: <DVTPlatform:0x600001e00100:'com.apple.platform.iphoneos':<DVTFilePath:0x600001b040e0:'/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform'>>, sdk: (null), sdkVariant: (null), profileSpecifier: (null), certificateIdentifier: (null), bundleIdentifier: (null), entitlements: (null), entitlementsFile: (null), baseEntitlements: (null), entitlementsExpansion: (null), entitlementsDestination: (null), allowSigningWithoutTeamSelection: (null), signingRequiresTeam: (null), appIDFeatures: (null)>>>, configuration: Default, codesignParameterSnapshot: (null), errors: (
+    "Error Domain=DVTPortalAppIDErrorDomain Code=4 \"Automatic signing cannot register bundle identifier \"com.isphillips.vidrip.ShareExtension\".\" UserInfo={NSLocalizedDescription=Automatic signing cannot register bundle identifier \"com.isphillips.vidrip.ShareExtension\"., NSLocalizedRecoverySuggestion=Automatic signing cannot register bundle identifiers with Apple. Register your bundle identifier on https://developer.apple.com/account and then try again.}",
+    "Error Domain=IDEProfileLocatorErrorDomain Code=1 \"No profiles for 'com.isphillips.vidrip.ShareExtension' were found\" UserInfo={NSLocalizedDescription=No profiles for 'com.isphillips.vidrip.ShareExtension' were found, NSLocalizedRecoverySuggestion=Xcode couldn't find any iOS Ad Hoc provisioning profiles matching 'com.isphillips.vidrip.ShareExtension'.}"
+)>
+2026-06-26 02:00:02 +0000 [MT] Step failed: <IDEDistributionSigningAssetsStep: 0x6000031f8da0>: Error Domain=IDEDistributionSigningAssetStepErrorDomain Code=0 "Locating signing assets failed." UserInfo={NSLocalizedDescription=Locating signing assets failed., IDEDistributionUnderlyingErrors=(
+    "Error Domain=DVTPortalAppIDErrorDomain Code=4 \"Automatic signing cannot register bundle identifier \"com.isphillips.vidrip.ShareExtension\".\" UserInfo={IDEDistributionIssueSeverity=3, NSLocalizedDescription=Automatic signing cannot register bundle identifier \"com.isphillips.vidrip.ShareExtension\"., NSLocalizedRecoverySuggestion=Automatic signing cannot register bundle identifiers with Apple. Register your bundle identifier on https://developer.apple.com/account and then try again.}",
+    "Error Domain=IDEProfileLocatorErrorDomain Code=1 \"No profiles for 'com.isphillips.vidrip.ShareExtension' were found\" UserInfo={IDEDistributionIssueSeverity=3, NSLocalizedDescription=No profiles for 'com.isphillips.vidrip.ShareExtension' were found, NSLocalizedRecoverySuggestion=Xcode couldn't find any iOS Ad Hoc provisioning profiles matching 'com.isphillips.vidrip.ShareExtension'.}"
+)}

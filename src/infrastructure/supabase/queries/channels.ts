@@ -1,6 +1,7 @@
 import { log } from '../../logging/logger';
 import RNFS from 'react-native-fs';
 import { supabase, SUPABASE_ANON_KEY } from '../client';
+import { fetchBlockedIds } from './blocks';
 import type { OverlayRecipe } from '../../../features/studio/effectRecipe';
 import { DEMO_MODE } from '../../../demo/demoMode';
 import {
@@ -626,6 +627,26 @@ export async function fetchChannelPosts(
     if (userId && r.reviewer_id === userId) { myReviewed.add(r.post_id); }
   });
 
+  // App-wide block: a blocked user's reaction must not inflate a post's reaction tally. The grid badge
+  // uses a server count() that doesn't know about blocks (the list views already filter them out), so
+  // we subtract blocked posters' reactions per post. One small query (only blocked-user reactions), and
+  // it's skipped entirely when the viewer has blocked no one.
+  const blockedDecr = new Map<string, number>();
+  if (userId) {
+    const blockedIds = await fetchBlockedIds(userId);
+    const postIds = (data ?? []).map((p: any) => p.id);
+    if (blockedIds.length && postIds.length) {
+      const { data: blockedRx } = await (supabase as any)
+        .from('channel_posts')
+        .select('parent_post_id')
+        .in('parent_post_id', postIds)
+        .in('poster_id', blockedIds);
+      (blockedRx ?? []).forEach((r: any) => {
+        blockedDecr.set(r.parent_post_id, (blockedDecr.get(r.parent_post_id) ?? 0) + 1);
+      });
+    }
+  }
+
   return (data ?? []).map((p: any) => ({
     id: p.id,
     channel_id: p.channel_id,
@@ -642,7 +663,7 @@ export async function fetchChannelPosts(
     created_at: p.created_at,
     message: p.message ?? null,
     emoji_reactions: p.emoji_reactions ?? [],
-    reaction_count: Array.isArray(p.reactions) ? (p.reactions[0]?.count ?? 0) : 0,
+    reaction_count: Math.max(0, (Array.isArray(p.reactions) ? (p.reactions[0]?.count ?? 0) : 0) - (blockedDecr.get(p.id) ?? 0)),
     has_my_reaction: reactedIds.has(p.id),
     review_count: reviewCount.get(p.id) ?? 0,
     has_my_review: myReviewed.has(p.id),

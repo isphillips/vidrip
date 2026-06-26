@@ -278,7 +278,7 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
           style={styles.signInLink}
           activeOpacity={0.7}
           onPress={() => navigation.navigate('SignIn')}>
-          <Text style={styles.signInText}>Already have an account? Sign In</Text>
+          <Text style={styles.signInText}>Already have an account? <Text style={styles.loginEm}>Log in</Text></Text>
         </TouchableOpacity>
         {/* EULA / terms agreement, presented before registering or signing in (App Store 1.2). */}
         <Text style={styles.legal}>
@@ -357,4 +357,5 @@ const styles = StyleSheet.create({
     marginBottom: SPACE.XL,
   },
   legalLink: { color: C.WHITE, fontFamily: FONT.BODY_SEMIBOLD, textDecorationLine: 'underline' },
+  loginEm: { color: '#FFD24A', fontFamily: FONT.BODY_BOLD },
 });

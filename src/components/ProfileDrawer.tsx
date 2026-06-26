@@ -13,6 +13,7 @@ import {
 } from '../infrastructure/supabase/queries/profile';
 import { fetchFriendStatus, sendFriendRequest, type FriendStatus } from '../infrastructure/supabase/queries/friends';
 import { openReactionPlayer } from '../store/profileReactionPlayerStore';
+import ContentActions from './ContentActions';
 
 // Mounted once at the root. Any @handle tap calls openProfile({ userId | handle })
 // to slide this up over everything.
@@ -122,6 +123,20 @@ export default function ProfileDrawer() {
               </TouchableOpacity>
             )}
 
+            {/* Report / block this user (App Store 1.2 — UGC safety on every profile). */}
+            {profile.id !== me?.id && (
+              <View style={styles.actionsRow}>
+                <ContentActions
+                  variant="inline"
+                  targetType="user"
+                  targetId={profile.id}
+                  targetUserId={profile.id}
+                  handle={profile.handle}
+                  onBlocked={close}
+                />
+              </View>
+            )}
+
             {profile.show_reactions_in_profile && reactions.length > 0 && (
               <View style={styles.reactionsBlock}>
                 <Text style={styles.reactionsLabel}>Latest Reactions</Text>
@@ -188,6 +203,7 @@ const styles = StyleSheet.create({
   friendBtnDisabled: { backgroundColor: C.SURFACE_2, borderWidth: 1, borderColor: C.BORDER },
   friendBtnText: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_BOLD, fontWeight: '700' },
   friendBtnTextDisabled: { color: C.MUTED },
+  actionsRow: { marginTop: SPACE.MD, alignItems: 'center' },
   reactionsBlock: { width: '100%', marginTop: SPACE.XL },
   reactionsLabel: {
     fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_BOLD, color: C.SUBTLE,

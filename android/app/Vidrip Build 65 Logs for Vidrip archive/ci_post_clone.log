@@ -1,0 +1,654 @@
+2026-06-26T01:43:04.586021383Z	+ cd /Volumes/workspace/repository
+2026-06-26T01:43:04.586269128Z	+ brew install node@22
+2026-06-26T01:43:06.617612574Z	==> Auto-updating Homebrew...
+2026-06-26T01:43:06.617848400Z	Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+2026-06-26T01:43:06.618257547Z	`$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+2026-06-26T01:43:11.656564251Z	To restore the stashed changes to /Users/local/Homebrew, run:
+2026-06-26T01:43:11.656775572Z	  cd /Users/local/Homebrew && git stash pop
+2026-06-26T01:43:14.696238966Z	==> Downloading https://ghcr.io/v2/homebrew/core/portable-ruby/blobs/sha256:a731026301924336a5ee2051689788cd91ab09c2d42cb7b51c280e8fdcd85c7d
+2026-06-26T01:43:14.696484630Z	#=#=#                                                                          
+2026-06-26T01:43:14.696864714Z	##O#-#                                                                         
+2026-06-26T01:43:14.697030009Z	
+2026-06-26T01:43:14.697230181Z	################################                                          44.6%
+2026-06-26T01:43:14.697374428Z	######################################################################## 100.0%
+2026-06-26T01:43:14.723951733Z	==> Pouring portable-ruby-4.0.5_1.catalina.bottle.tar.gz
+2026-06-26T01:43:19.757439858Z	✔︎ JSON API packages.tahoe.jws.json
+2026-06-26T01:43:19.889870428Z	==> Homebrew's analytics have entirely moved to our InfluxDB instance in the EU.
+2026-06-26T01:43:19.890349004Z	We gather less data than before and have destroyed all Google Analytics data:
+2026-06-26T01:43:19.890765614Z	  https://docs.brew.sh/Analytics
+2026-06-26T01:43:19.890926541Z	Please reconsider re-enabling analytics to help our volunteer maintainers with:
+2026-06-26T01:43:19.891030236Z	  brew analytics on
+2026-06-26T01:43:19.956890255Z	==> Homebrew is run entirely by unpaid volunteers. Please consider donating:
+2026-06-26T01:43:19.957186879Z	  https://github.com/Homebrew/brew#donations
+2026-06-26T01:43:19.957530135Z	
+2026-06-26T01:43:20.988757736Z	==> Auto-updated Homebrew!
+2026-06-26T01:43:20.989031966Z	Updated 2 taps (homebrew/core and homebrew/cask).
+2026-06-26T01:43:20.989489350Z	==> New Formulae
+2026-06-26T01:43:21.508975225Z	actions-languageserver: Language server for GitHub Actions YAML files
+2026-06-26T01:43:21.509250997Z	ansible@13: Automate deployment, configuration, and upgrading
+2026-06-26T01:43:21.509619053Z	arf: Modern R console with syntax highlighting and fuzzy search
+2026-06-26T01:43:21.509703186Z	asccli: App Store Connect CLI to manage apps, versions, and screenshots
+2026-06-26T01:43:21.509870817Z	aube: Fast Node.js package manager
+2026-06-26T01:43:21.510091508Z	avisynthplus: Improved version of the AviSynth frameserver
+2026-06-26T01:43:21.510203608Z	backplane-cli: CLI for interacting with the OpenShift Backplane API
+2026-06-26T01:43:21.510336356Z	baguette: Headless iOS Simulator manager and host-side input injection for iOS 26
+2026-06-26T01:43:21.510448991Z	beets: Music library manager and tagger
+2026-06-26T01:43:21.510514383Z	btdu: Sampling disk usage profiler for btrfs
+2026-06-26T01:43:21.510779912Z	bttf: CLI tool for datetime arithmetic, parsing, formatting and more
+2026-06-26T01:43:21.510895735Z	buffa: Pure-Rust Protocol Buffers implementation with editions support
+2026-06-26T01:43:21.511067925Z	bumblebee: Read-only developer endpoint scanner for supply-chain exposure
+2026-06-26T01:43:21.511134771Z	bun: Incredibly fast JavaScript runtime, bundler, test runner, and package manager
+2026-06-26T01:43:21.511321131Z	cargo-insta: Snapshot testing CLI for Rust
+2026-06-26T01:43:21.511427962Z	cargo-show-asm: Show assembly, LLVM-IR, MIR, and WASM generated for Rust code
+2026-06-26T01:43:21.511587012Z	cc-switch-cli: All-in-one assistant tool for Claude Code, Codex, Gemini, OpenCode and OpenClaw
+2026-06-26T01:43:21.511683972Z	chunkah: OCI building tool for content-based layers
+2026-06-26T01:43:21.511827768Z	civetweb: C/C++ embeddable web server with optional CGI, SSL and Lua support
+2026-06-26T01:43:21.511923536Z	cloudmonkey: Apache CloudStack CloudMonkey CLI
+2026-06-26T01:43:21.512082461Z	coacd: Approximate convex decomposition for 3D meshes with collision-aware concavity
+2026-06-26T01:43:21.512185301Z	codeburn: See where your AI coding tokens go - by task, tool, model, and project
+2026-06-26T01:43:21.512524065Z	concord: Terminal user interface client for Discord
+2026-06-26T01:43:21.512625784Z	container-use: Dev envs for coding agents. Run multiple agents safely with your stack
+2026-06-26T01:43:21.512713595Z	container2wasm: Container to WASM converter
+2026-06-26T01:43:21.512825736Z	cozypkg: CLI for managing Cozystack packages
+2026-06-26T01:43:21.512888763Z	cyclonedx-cli: Tool for analysis and manipulation of CycloneDX SBOMs
+2026-06-26T01:43:21.512960987Z	dbx-cli: Command-line interface for DBX database connections, schema, and safe queries
+2026-06-26T01:43:21.513070087Z	dbxcli: Command-line tool for Dropbox users and team admins
+2026-06-26T01:43:21.513195933Z	depsguard: Harden package manager configs against supply chain attacks
+2026-06-26T01:43:21.513282147Z	draw-things-cli: Local inference and LoRA training CLI for Draw Things
+2026-06-26T01:43:21.513389848Z	dz6: Fast Vim-inspired TUI hex editor
+2026-06-26T01:43:21.513452513Z	eas-cli: Command-line tool for working with Expo Application Services
+2026-06-26T01:43:21.513506234Z	ec: TUI 3-way git mergetool
+2026-06-26T01:43:21.513825602Z	elio: Batteries-included terminal file manager with rich previews
+2026-06-26T01:43:21.513909200Z	erlang@28: Programming language for highly scalable real-time systems
+2026-06-26T01:43:21.514109157Z	fakecloud: Free, open-source local AWS cloud emulator for integration testing
+2026-06-26T01:43:21.514206001Z	fallow: Codebase intelligence for TypeScript and JavaScript
+2026-06-26T01:43:21.514365694Z	far2l-tty: Unix TTY port of FAR Manager v2 (with NetRocks support)
+2026-06-26T01:43:21.514430819Z	gascity: Orchestration-builder SDK for multi-agent coding workflows
+2026-06-26T01:43:21.514536857Z	gcc@15: GNU compiler collection
+2026-06-26T01:43:21.514588549Z	ghcid: Very low feature GHCi based IDE
+2026-06-26T01:43:21.514717520Z	ghcitty: Fast, friendly GHCi
+2026-06-26T01:43:21.514800712Z	gixy: NGINX configuration static analyzer focused on security
+2026-06-26T01:43:21.514960653Z	gmp-ecm: Elliptic Curve Method for integer factorization
+2026-06-26T01:43:21.515034447Z	gnhf: Autonomous agent orchestrator for long-running coding tasks
+2026-06-26T01:43:21.517257407Z	goenv@2: Go version management
+2026-06-26T01:43:21.517423505Z	herdr: Agent multiplexer that lives in your terminal
+2026-06-26T01:43:21.517512669Z	hexapoda: Colorful modal hex editor
+2026-06-26T01:43:21.517697618Z	hookdeck: Forward webhook events from Hookdeck to a local server
+2026-06-26T01:43:21.517791175Z	ip2location: C library and CLI to geolocate IP addresses
+2026-06-26T01:43:21.518335535Z	isponsorblocktv: SponsorBlock client for all YouTube TV clients
+2026-06-26T01:43:21.518473106Z	just-lsp: Language server for just
+2026-06-26T01:43:21.518572387Z	jwt-ui: TUI for decoding and encoding JWT tokens
+2026-06-26T01:43:21.518623186Z	k0sctl: Bootstrapping and management tool for k0s clusters
+2026-06-26T01:43:21.518818765Z	kdash: Simple and fast dashboard for Kubernetes
+2026-06-26T01:43:21.518936905Z	keyd: Key remapping daemon for Linux
+2026-06-26T01:43:21.519114973Z	kimi-code: AI coding agent for your terminal
+2026-06-26T01:43:21.519194838Z	kubectl-explore: Better kubectl explain with the fuzzy finder
+2026-06-26T01:43:21.519382804Z	ladder: Selfhosted alternative to 12ft.io and 1ft.io HTTP web proxies
+2026-06-26T01:43:21.519482900Z	leaf-md: Terminal Markdown previewer with a GUI-like experience
+2026-06-26T01:43:21.519642777Z	libbcg729: Encoder and decoder of the ITU G.729 Annex A/B speech codec
+2026-06-26T01:43:21.519885607Z	libcext: C utility library for Common Pipeline Library (CPL)
+2026-06-26T01:43:21.520026609Z	libredwg: DWG utilities
+2026-06-26T01:43:21.520197344Z	liquidsoap: Audio and video streaming language
+2026-06-26T01:43:21.520279690Z	lisette: Language inspired by Rust that compiles to Go
+2026-06-26T01:43:21.520425055Z	m4ri: Library for fast arithmetic with dense matrices over GF(2)
+2026-06-26T01:43:21.520566051Z	m4rie: Library for fast arithmetic with dense matrices over GF(2^e), 2<=e<=16
+2026-06-26T01:43:21.520636655Z	mado: Fast Markdown linter written in Rust
+2026-06-26T01:43:21.520783918Z	md-tui: Markdown renderer in the terminal written in rust
+2026-06-26T01:43:21.520879141Z	mercury-cli: CLI interface for Mercury banking
+2026-06-26T01:43:21.521014788Z	merman-cli: Mermaid.js, but headless, in Rust
+2026-06-26T01:43:21.521097930Z	miasma: Trap AI web scrapers in an endless poison pit
+2026-06-26T01:43:21.521186623Z	mimo-code: AI coding agent with cross-session memory
+2026-06-26T01:43:21.521266113Z	minibwa: Successor of BWA-MEM for short-read alignment
+2026-06-26T01:43:21.521416569Z	miniz: Lossless, high-performance data compression library (zlib/Deflate)
+2026-06-26T01:43:21.521571037Z	mips-linux-gnu-binutils: GNU Binutils for mips-linux-gnu cross development
+2026-06-26T01:43:21.521664842Z	msgvault: Archive a lifetime of email and chat with offline search and analytics
+2026-06-26T01:43:21.521778643Z	nettle@3: Low-level cryptographic library
+2026-06-26T01:43:21.521832258Z	netwatch: Cross-platform realtime network diagnostics TUI
+2026-06-26T01:43:21.521932878Z	nvi2: Multibyte fork of the nvi editor for BSD
+2026-06-26T01:43:21.521974890Z	officecli: Read, edit, and automate Office documents (.docx, .xlsx, .pptx)
+2026-06-26T01:43:21.522034704Z	openjdk@25: Development kit for the Java programming language
+2026-06-26T01:43:21.522071354Z	openturns: Probabilistic modelling and uncertainty quantification library
+2026-06-26T01:43:21.522121327Z	osdctl: CLI tool for managed OpenShift clusters
+2026-06-26T01:43:21.522180228Z	panache: Language server, formatter, and linter for Markdown, Quarto, and R Markdown
+2026-06-26T01:43:21.522301297Z	pdf.tocgen: CLI toolset to generate table of contents for PDF files automatically
+2026-06-26T01:43:21.522337153Z	phpantom-lsp: Fast PHP language server written in Rust
+2026-06-26T01:43:21.522402584Z	pitchfork: CLI for managing daemons with a focus on developer experience
+2026-06-26T01:43:21.522436509Z	pkgsite: Documentation server for Go packages
+2026-06-26T01:43:21.522490330Z	poppler-qt6: PDF rendering library (based on the xpdf-3.0 code base)
+2026-06-26T01:43:21.522522249Z	proton-pass-cli: Command-line interface for Proton Pass
+2026-06-26T01:43:21.522578285Z	pup: CLI companion with 200+ commands across 33+ Datadog products
+2026-06-26T01:43:21.522610385Z	pv-migrate: CLI tool to migrate or backup/restore Kubernetes persistent volumes
+2026-06-26T01:43:21.522669270Z	pypy3.11: Implementation of Python 3 in Python
+2026-06-26T01:43:21.522701351Z	quickjs-ng: QuickJS, the Next Generation: a mighty JavaScript engine
+2026-06-26T01:43:21.522743126Z	quien: Better WHOIS and domain intelligence toolkit
+2026-06-26T01:43:21.522795123Z	ratty: GPU-rendered terminal emulator with inline 3D graphics
+2026-06-26T01:43:21.522828188Z	redli: Humane alternative to redis-cli with TLS support
+2026-06-26T01:43:21.522883634Z	rmux: Terminal multiplexer with a tmux-style CLI and daemon runtime
+2026-06-26T01:43:21.522916186Z	rura: Interactive TUI scratchpad for building shell pipelines
+2026-06-26T01:43:21.522955989Z	rustnet: Cross-platform network monitoring terminal UI with deep packet inspection
+2026-06-26T01:43:21.523012156Z	safestringlib: Safe string operations and memory routines
+2026-06-26T01:43:21.523068004Z	sanity: Command-line interface for Sanity
+2026-06-26T01:43:21.523163611Z	satellite-tracker: Terminal-based real-time satellite tracking and orbit prediction application
+2026-06-26T01:43:21.523205555Z	sdl2-compat: SDL2 compatibility layer that uses SDL3 behind the scenes
+2026-06-26T01:43:21.523282439Z	sdl3_net: Simple cross-platform wrapper over TCP/IP sockets
+2026-06-26T01:43:21.523332271Z	skm: Simple and powerful SSH keys manager
+2026-06-26T01:43:21.523479645Z	slint-compiler: Compiler for the Slint UI markup language
+2026-06-26T01:43:21.523554524Z	socktainer: Docker-compatible REST API on top of Apple container
+2026-06-26T01:43:21.523595109Z	speech: On-device speech toolkit for Apple Silicon: ASR, TTS, VAD, diarization
+2026-06-26T01:43:21.523652699Z	splitrail: Real-time token usage tracker and cost monitor for CLI coding agents
+2026-06-26T01:43:21.523726158Z	swgp-go: Simple WireGuard proxy with minimal overhead for WireGuard traffic
+2026-06-26T01:43:21.523762615Z	syswatch: Cross-platform system diagnostics TUI
+2026-06-26T01:43:21.523837505Z	taproom: Interactive TUI for Homebrew
+2026-06-26T01:43:21.523873782Z	tdf: TUI-based PDF viewer
+2026-06-26T01:43:21.523949183Z	telegram-send: Command-line tool to send Telegram messages
+2026-06-26T01:43:21.524001553Z	threatdeck: TUI threat intelligence monitoring and alerting platform
+2026-06-26T01:43:21.524104375Z	tinyice: Modern, all-in-one Icecast-compatible audio/video streaming server
+2026-06-26T01:43:21.524143037Z	tirith: Detect terminal injection, homograph, and pipe-to-shell attacks
+2026-06-26T01:43:21.524217554Z	ttl: Modern traceroute/mtr-style TUI with hop stats and ASN/geo enrichment
+2026-06-26T01:43:21.524251175Z	tubeup: Use yt-dlp to download video/metadata and upload to the Internet Archive
+2026-06-26T01:43:21.524316870Z	tuxedo: Fast, keyboard-driven terminal UI for todo.txt
+2026-06-26T01:43:21.524349303Z	unuran: UNU.RAN - Universal Non-Uniform RANdom number generator
+2026-06-26T01:43:21.524403167Z	vcfanno: Annotate a VCF with other VCFs/BEDs/tabixed files
+2026-06-26T01:43:21.524437302Z	vdt: Math library of fast, approximate and vectorisable trascendental functions
+2026-06-26T01:43:21.524486468Z	vim-classic: Vim 8 long term support version with no LLM-generated code
+2026-06-26T01:43:21.524519448Z	vs-preview: Previewer for VapourSynth scripts
+2026-06-26T01:43:21.524564810Z	vulcain: Fast and idiomatic client-driven REST APIs
+2026-06-26T01:43:21.524617601Z	wl-clipboard: Command-line copy/paste utilities for Wayland
+2026-06-26T01:43:21.524654248Z	wtype: Xdotool type for wayland
+2026-06-26T01:43:21.524716826Z	wx-cli: WeChat 4.x local data CLI with daemon architecture
+2026-06-26T01:43:21.524750014Z	zerolang: Programming language for agents with explicit effects and predictable memory
+2026-06-26T01:43:21.524800523Z	zot: Lightweight coding agent harness written in Go
+2026-06-26T01:43:21.542879577Z	
+2026-06-26T01:43:21.543175204Z	You have 2 outdated formulae installed.
+2026-06-26T01:43:46.604263957Z	
+2026-06-26T01:43:49.638393047Z	==> Would install 1 formula:
+2026-06-26T01:43:49.638578934Z	node@22
+2026-06-26T01:43:49.638938301Z	==> Downloading https://ghcr.io/v2/homebrew/core/node/22/manifests/22.23.1
+2026-06-26T01:43:49.897695183Z	==> Would install 16 dependencies for node@22:
+2026-06-26T01:43:49.897864096Z	brotli
+2026-06-26T01:43:49.898149631Z	c-ares
+2026-06-26T01:43:49.898402687Z	icu4c@78
+2026-06-26T01:43:49.898504037Z	libnghttp2
+2026-06-26T01:43:49.898675924Z	libnghttp3
+2026-06-26T01:43:49.898732071Z	ca-certificates
+2026-06-26T01:43:49.898886282Z	libngtcp2
+2026-06-26T01:43:49.898962501Z	libuv
+2026-06-26T01:43:49.899186430Z	simdjson
+2026-06-26T01:43:49.899300237Z	simdutf
+2026-06-26T01:43:49.899406981Z	readline
+2026-06-26T01:43:49.899554981Z	sqlite
+2026-06-26T01:43:49.899638530Z	uvwasi
+2026-06-26T01:43:49.899763301Z	lz4
+2026-06-26T01:43:49.899815650Z	xz
+2026-06-26T01:43:49.899930304Z	zstd
+2026-06-26T01:43:49.900136431Z	==> Fetching downloads for: node@22
+2026-06-26T01:43:51.930717535Z	✔︎ Bottle Manifest brotli (1.2.0)
+2026-06-26T01:43:51.931138727Z	✔︎ Bottle brotli (1.2.0)
+2026-06-26T01:43:51.931738006Z	✔︎ Bottle Manifest c-ares (1.34.6)
+2026-06-26T01:43:51.931808999Z	✔︎ Bottle c-ares (1.34.6)
+2026-06-26T01:43:51.932105793Z	✔︎ Bottle Manifest icu4c@78 (78.3)
+2026-06-26T01:43:51.932220464Z	✔︎ Bottle Manifest libnghttp2 (1.69.0)
+2026-06-26T01:43:51.932723136Z	✔︎ Bottle libnghttp2 (1.69.0)
+2026-06-26T01:43:51.932871591Z	✔︎ Bottle Manifest libnghttp3 (1.16.0)
+2026-06-26T01:43:51.933165937Z	✔︎ Bottle libnghttp3 (1.16.0)
+2026-06-26T01:43:51.933277888Z	✔︎ Bottle Manifest ca-certificates (2026-05-14)
+2026-06-26T01:43:51.933461861Z	✔︎ Bottle ca-certificates (2026-05-14)
+2026-06-26T01:43:51.933561747Z	✔︎ Bottle Manifest libngtcp2 (1.23.0)
+2026-06-26T01:43:51.933753891Z	✔︎ Bottle libngtcp2 (1.23.0)
+2026-06-26T01:43:51.933836109Z	✔︎ Bottle Manifest libuv (1.52.1)
+2026-06-26T01:43:51.933966467Z	✔︎ Bottle Manifest simdjson (4.6.4)
+2026-06-26T01:43:51.934021391Z	✔︎ Bottle simdjson (4.6.4)
+2026-06-26T01:43:51.934105292Z	✔︎ Bottle Manifest simdutf (9.0.0)
+2026-06-26T01:43:51.934157377Z	✔︎ Bottle Manifest readline (8.3.3)
+2026-06-26T01:43:51.934341054Z	✔︎ Bottle Manifest sqlite (3.53.2)
+2026-06-26T01:43:51.934448680Z	✔︎ Bottle Manifest uvwasi (0.0.23)
+2026-06-26T01:43:51.934619959Z	✔︎ Bottle simdutf (9.0.0)
+2026-06-26T01:43:51.934672438Z	✔︎ Bottle readline (8.3.3)
+2026-06-26T01:43:51.996920791Z	✔︎ Bottle Manifest xz (5.8.3)
+2026-06-26T01:43:52.062068444Z	✔︎ Bottle sqlite (3.53.2)
+2026-06-26T01:43:52.062520669Z	✔︎ Bottle uvwasi (0.0.23)
+2026-06-26T01:43:52.062597073Z	✔︎ Bottle Manifest lz4 (1.10.0)
+2026-06-26T01:43:52.098621394Z	✔︎ Bottle lz4 (1.10.0)
+2026-06-26T01:43:52.168166300Z	✔︎ Bottle xz (5.8.3)
+2026-06-26T01:43:52.168349012Z	✔︎ Bottle Manifest zstd (1.5.7_1)
+2026-06-26T01:43:52.428862865Z	✔︎ Bottle icu4c@78 (78.3)
+2026-06-26T01:43:52.429150298Z	✔︎ Bottle zstd (1.5.7_1)
+2026-06-26T01:43:54.459811383Z	✔︎ Bottle node@22 (22.23.1)
+2026-06-26T01:46:01.692127378Z	✔︎ Bottle libuv (1.52.1)
+2026-06-26T01:46:01.692584044Z	==> Installing dependencies for node@22: brotli, c-ares, icu4c@78, libnghttp2, libnghttp3, ca-certificates, libngtcp2, libuv, simdjson, simdutf, readline, sqlite, uvwasi, lz4, xz and zstd
+2026-06-26T01:46:01.693050752Z	==> Installing node@22 dependency: brotli
+2026-06-26T01:46:01.693334603Z	==> Pouring brotli--1.2.0.sonoma.bottle.tar.gz
+2026-06-26T01:46:01.964691565Z	🍺  /usr/local/Cellar/brotli/1.2.0: 33 files, 1.8MB
+2026-06-26T01:46:01.965042943Z	==> Installing node@22 dependency: c-ares
+2026-06-26T01:46:01.996777766Z	==> Pouring c-ares--1.34.6.sonoma.bottle.tar.gz
+2026-06-26T01:46:02.519382422Z	🍺  /usr/local/Cellar/c-ares/1.34.6: 176 files, 968.9KB
+2026-06-26T01:46:02.519567992Z	==> Installing node@22 dependency: icu4c@78
+2026-06-26T01:46:02.519968441Z	==> Pouring icu4c@78--78.3.sonoma.bottle.tar.gz
+2026-06-26T01:46:04.554715616Z	🍺  /usr/local/Cellar/icu4c@78/78.3: 279 files, 86.7MB
+2026-06-26T01:46:04.554897983Z	==> Installing node@22 dependency: libnghttp2
+2026-06-26T01:46:04.555243036Z	==> Pouring libnghttp2--1.69.0.sonoma.bottle.tar.gz
+2026-06-26T01:46:04.623970530Z	🍺  /usr/local/Cellar/libnghttp2/1.69.0: 14 files, 814.2KB
+2026-06-26T01:46:04.624133688Z	==> Installing node@22 dependency: libnghttp3
+2026-06-26T01:46:04.693536221Z	==> Pouring libnghttp3--1.16.0.sonoma.bottle.tar.gz
+2026-06-26T01:46:04.829797687Z	🍺  /usr/local/Cellar/libnghttp3/1.16.0: 20 files, 588.6KB
+2026-06-26T01:46:04.829990978Z	==> Installing node@22 dependency: ca-certificates
+2026-06-26T01:46:04.830273096Z	==> Pouring ca-certificates--2026-05-14.all.bottle.tar.gz
+2026-06-26T01:46:06.864557983Z	[34m==>[0m [1mRegenerating CA certificate bundle from keychain, this may take a while...[0m
+2026-06-26T01:46:23.928535485Z	🍺  /usr/local/Cellar/ca-certificates/2026-05-14: 4 files, 199.2KB
+2026-06-26T01:46:23.928725499Z	==> Installing node@22 dependency: libngtcp2
+2026-06-26T01:46:23.929135081Z	==> Pouring libngtcp2--1.23.0.sonoma.bottle.tar.gz
+2026-06-26T01:46:23.929264036Z	🍺  /usr/local/Cellar/libngtcp2/1.23.0: 21 files, 1.4MB
+2026-06-26T01:46:23.929592614Z	==> Installing node@22 dependency: libuv
+2026-06-26T01:46:24.062135242Z	==> Pouring libuv--1.52.1.sonoma.bottle.tar.gz
+2026-06-26T01:46:24.195661154Z	🍺  /usr/local/Cellar/libuv/1.52.1: 35 files, 1.2MB
+2026-06-26T01:46:24.195857479Z	==> Installing node@22 dependency: simdjson
+2026-06-26T01:46:24.230097031Z	==> Pouring simdjson--4.6.4.sonoma.bottle.tar.gz
+2026-06-26T01:46:24.362068104Z	🍺  /usr/local/Cellar/simdjson/4.6.4: 19 files, 8.1MB
+2026-06-26T01:46:24.362282175Z	==> Installing node@22 dependency: simdutf
+2026-06-26T01:46:24.622881507Z	==> Pouring simdutf--9.0.0.sonoma.bottle.tar.gz
+2026-06-26T01:46:24.758008095Z	🍺  /usr/local/Cellar/simdutf/9.0.0: 65 files, 2.6MB
+2026-06-26T01:46:24.758235670Z	==> Installing node@22 dependency: readline
+2026-06-26T01:46:24.777836325Z	==> Pouring readline--8.3.3.tahoe.bottle.tar.gz
+2026-06-26T01:46:25.041449918Z	🍺  /usr/local/Cellar/readline/8.3.3: 56 files, 2.6MB
+2026-06-26T01:46:25.041734444Z	==> Installing node@22 dependency: sqlite
+2026-06-26T01:46:25.042162188Z	==> Pouring sqlite--3.53.2.tahoe.bottle.tar.gz
+2026-06-26T01:46:25.307092194Z	🍺  /usr/local/Cellar/sqlite/3.53.2: 13 files, 5.3MB
+2026-06-26T01:46:25.307546853Z	==> Installing node@22 dependency: uvwasi
+2026-06-26T01:46:25.375099988Z	==> Pouring uvwasi--0.0.23.sonoma.bottle.1.tar.gz
+2026-06-26T01:46:25.510815117Z	🍺  /usr/local/Cellar/uvwasi/0.0.23: 15 files, 262.8KB
+2026-06-26T01:46:25.510980506Z	==> Installing node@22 dependency: lz4
+2026-06-26T01:46:25.511282403Z	==> Pouring lz4--1.10.0.tahoe.bottle.1.tar.gz
+2026-06-26T01:46:25.696257394Z	🍺  /usr/local/Cellar/lz4/1.10.0: 24 files, 711.5KB
+2026-06-26T01:46:25.696649230Z	==> Installing node@22 dependency: xz
+2026-06-26T01:46:25.696731321Z	==> Pouring xz--5.8.3.tahoe.bottle.tar.gz
+2026-06-26T01:46:26.726991763Z	🍺  /usr/local/Cellar/xz/5.8.3: 96 files, 2.5MB
+2026-06-26T01:46:26.727230311Z	==> Installing node@22 dependency: zstd
+2026-06-26T01:46:26.727553486Z	==> Pouring zstd--1.5.7_1.tahoe.bottle.tar.gz
+2026-06-26T01:46:26.763102347Z	🍺  /usr/local/Cellar/zstd/1.5.7_1: 32 files, 2.5MB
+2026-06-26T01:46:26.799010922Z	==> Installing node@22
+2026-06-26T01:46:26.799209672Z	==> Pouring node@22--22.23.1.sonoma.bottle.tar.gz
+2026-06-26T01:46:31.840184992Z	🍺  /usr/local/Cellar/node@22/22.23.1: 2,140 files, 55.5MB
+2026-06-26T01:46:31.840374066Z	==> Running `brew cleanup node@22`...
+2026-06-26T01:46:31.840642714Z	Disable this behaviour by setting `HOMEBREW_NO_INSTALL_CLEANUP=1`.
+2026-06-26T01:46:31.840703165Z	Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+2026-06-26T01:46:31.840805599Z	==> `brew cleanup` has not been run in the last 30 days, running now...
+2026-06-26T01:46:31.840862986Z	Disable this behaviour by setting `HOMEBREW_NO_INSTALL_CLEANUP=1`.
+2026-06-26T01:46:31.840938115Z	Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+2026-06-26T01:46:31.841275873Z	Removing: /usr/local/Cellar/ca-certificates/2026-03-19... (4 files, 237.5KB)
+2026-06-26T01:46:31.841441501Z	Removing: /Users/local/Library/Caches/Homebrew/ca-certificates_bottle_manifest--2026-03-19... (2KB)
+2026-06-26T01:46:31.841504709Z	Removing: /Users/local/Library/Caches/Homebrew/ca-certificates--2026-03-19... (132.4KB)
+2026-06-26T01:46:32.101267796Z	Removing: /Users/local/Library/Caches/Homebrew/portable-ruby-4.0.3.catalina.bottle.tar.gz... (12.3MB)
+2026-06-26T01:46:32.137055160Z	Removing: /Users/local/Library/Caches/Homebrew/bootsnap/31537e02b93d790606c3627647f80559fe3014fc743cad7175ee7ce1eaff9181... (648 files, 6.0MB)
+2026-06-26T01:46:32.269121471Z	Removing: /Users/local/Library/Logs/Homebrew/libyaml... (64B)
+2026-06-26T01:46:32.269262096Z	Removing: /Users/local/Library/Logs/Homebrew/openssl@3... (64B)
+2026-06-26T01:46:32.269486521Z	Removing: /Users/local/Library/Logs/Homebrew/ca-certificates... (64B)
+2026-06-26T01:46:32.269542146Z	Removing: /Users/local/Library/Logs/Homebrew/cocoapods... (64B)
+2026-06-26T01:46:32.269626575Z	Removing: /Users/local/Library/Logs/Homebrew/ruby... (64B)
+2026-06-26T01:46:35.310063320Z	++ brew --prefix node@22
+2026-06-26T01:46:35.310380869Z	+ export PATH=/usr/local/opt/node@22/bin::/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pkg/env/active/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/usr/local/bin:/Users/local/Homebrew:/Users/local/Homebrew/bin:/usr/local/bin:/Users/local/Homebrew:/Users/local/Homebrew/bin
+2026-06-26T01:46:35.310671428Z	+ PATH=/usr/local/opt/node@22/bin::/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/pkg/env/active/bin:/opt/pmk/env/global/bin:/Library/Apple/usr/bin:/usr/local/bin:/Users/local/Homebrew:/Users/local/Homebrew/bin:/usr/local/bin:/Users/local/Homebrew:/Users/local/Homebrew/bin
+2026-06-26T01:46:35.310730490Z	+ node -v
+2026-06-26T01:46:43.355176491Z	v22.23.1
+2026-06-26T01:46:43.355604495Z	+ corepack enable
+2026-06-26T01:46:43.881375776Z	+ corepack prepare yarn@3.6.4 --activate
+2026-06-26T01:46:44.018627428Z	Preparing yarn@3.6.4 for immediate activation...
+2026-06-26T01:46:45.055073034Z	+ yarn install --immutable
+2026-06-26T01:46:46.297170950Z	➤ YN0000: ┌ Resolution step
+2026-06-26T01:46:46.298665605Z	➤ YN0002: │ @firebase/analytics-compat@npm:0.2.28 [4ab86] doesn't provide @firebase/app (pbf4d9), requested by @firebase/analytics
+2026-06-26T01:46:46.299509062Z	➤ YN0002: │ @firebase/app-check-compat@npm:0.4.4 [4ab86] doesn't provide @firebase/app (p8cdfa), requested by @firebase/app-check
+2026-06-26T01:46:46.299609349Z	➤ YN0002: │ @firebase/auth-compat@npm:0.6.7 [4ab86] doesn't provide @firebase/app (p6b473), requested by @firebase/auth
+2026-06-26T01:46:46.299811256Z	➤ YN0002: │ @firebase/auth-compat@npm:0.6.7 [4ab86] doesn't provide @firebase/app-types (pd5420), requested by @firebase/auth-types
+2026-06-26T01:46:46.299931053Z	➤ YN0002: │ @firebase/firestore-compat@npm:0.4.10 [4ab86] doesn't provide @firebase/app (pa3ae7), requested by @firebase/firestore
+2026-06-26T01:46:46.300103883Z	➤ YN0002: │ @firebase/firestore-compat@npm:0.4.10 [4ab86] doesn't provide @firebase/app-types (p02e71), requested by @firebase/firestore-types
+2026-06-26T01:46:46.300170223Z	➤ YN0002: │ @firebase/functions-compat@npm:0.4.5 [4ab86] doesn't provide @firebase/app (p973fa), requested by @firebase/functions
+2026-06-26T01:46:46.300268942Z	➤ YN0002: │ @firebase/installations-compat@npm:0.2.22 [4ab86] doesn't provide @firebase/app-types (p07aa6), requested by @firebase/installations-types
+2026-06-26T01:46:46.300319018Z	➤ YN0002: │ @firebase/messaging-compat@npm:0.2.27 [4ab86] doesn't provide @firebase/app (p9cf45), requested by @firebase/messaging
+2026-06-26T01:46:46.300470872Z	➤ YN0002: │ @firebase/performance-compat@npm:0.2.25 [4ab86] doesn't provide @firebase/app (pc649d), requested by @firebase/performance
+2026-06-26T01:46:46.300511126Z	➤ YN0002: │ @firebase/remote-config-compat@npm:0.2.25 [4ab86] doesn't provide @firebase/app (pe3c88), requested by @firebase/remote-config
+2026-06-26T01:46:46.300586446Z	➤ YN0002: │ @firebase/storage-compat@npm:0.4.3 [4ab86] doesn't provide @firebase/app (p5c920), requested by @firebase/storage
+2026-06-26T01:46:46.300625545Z	➤ YN0002: │ @firebase/storage-compat@npm:0.4.3 [4ab86] doesn't provide @firebase/app-types (pae450), requested by @firebase/storage-types
+2026-06-26T01:46:46.300973084Z	➤ YN0002: │ @oxc-transform/binding-wasm32-wasi@npm:0.121.0 doesn't provide @emnapi/core (pc4da5), requested by @napi-rs/wasm-runtime
+2026-06-26T01:46:46.301822218Z	➤ YN0002: │ @oxc-transform/binding-wasm32-wasi@npm:0.121.0 doesn't provide @emnapi/runtime (p1d7cb), requested by @napi-rs/wasm-runtime
+2026-06-26T01:46:46.302524379Z	➤ YN0002: │ @react-native/babel-plugin-codegen@npm:0.76.5 doesn't provide @babel/preset-env (pcb924), requested by @react-native/codegen
+2026-06-26T01:46:46.302735131Z	➤ YN0002: │ babel-plugin-transform-flow-enums@npm:0.0.2 doesn't provide @babel/core (p919d6), requested by @babel/plugin-syntax-flow
+2026-06-26T01:46:46.302886763Z	➤ YN0002: │ react-native@npm:0.76.5 [c58af] doesn't provide @babel/core (p1b228), requested by babel-jest
+2026-06-26T01:46:46.302996690Z	➤ YN0002: │ react-native@npm:0.76.5 [c58af] doesn't provide @babel/preset-env (pffbe1), requested by @react-native/codegen
+2026-06-26T01:46:46.303138431Z	➤ YN0000: │ Some peer dependencies are incorrectly met; run yarn explain peer-requirements <hash> for details, where <hash> is the six-letter p-prefixed code
+2026-06-26T01:46:46.303194537Z	➤ YN0000: └ Completed in 0s 296ms
+2026-06-26T01:46:46.303280487Z	➤ YN0000: ┌ Fetch step
+2026-06-26T01:47:03.177652680Z	➤ YN0066: │ typescript@patch:typescript@npm%3A6.0.2#~builtin<compat/typescript>::version=6.0.2&hash=29ae49: Cannot apply hunk #1
+2026-06-26T01:49:18.745050660Z	➤ YN0013: │ 67 packages were already cached, 1160 had to be fetched
+2026-06-26T01:49:18.745359645Z	➤ YN0000: └ Completed in 2m 33s
+2026-06-26T01:49:18.745786854Z	➤ YN0000: ┌ Link step
+2026-06-26T01:49:37.795605439Z	➤ YN0007: │ @firebase/util@npm:1.15.1 must be built because it never has been before or the last one failed
+2026-06-26T01:49:37.796527345Z	➤ YN0007: │ protobufjs@npm:7.6.4 must be built because it never has been before or the last one failed
+2026-06-26T01:49:38.318237Z	➤ YN0007: │ vidrip@workspace:. must be built because it never has been before or the last one failed
+2026-06-26T01:49:39.352525949Z	➤ YN0000: │ vidrip@workspace:. STDOUT patch-package 8.0.1
+2026-06-26T01:49:39.353003708Z	➤ YN0000: │ vidrip@workspace:. STDOUT Applying patches...
+2026-06-26T01:49:39.353674485Z	➤ YN0000: │ vidrip@workspace:. STDOUT react-native-create-thumbnail@2.2.0 ✔
+2026-06-26T01:49:39.353760891Z	➤ YN0000: │ vidrip@workspace:. STDOUT react-native-gesture-handler@2.31.1 ✔
+2026-06-26T01:49:39.353876525Z	➤ YN0000: │ vidrip@workspace:. STDOUT react-native-vision-camera@4.7.3 ✔
+2026-06-26T01:49:39.353940504Z	➤ YN0000: │ vidrip@workspace:. STDOUT react-native-webview@13.16.1 ✔
+2026-06-26T01:49:39.354064156Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.354123527Z	➤ YN0000: │ vidrip@workspace:. STDOUT Warning: patch-package detected a patch file version mismatch
+2026-06-26T01:49:39.354391340Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.354464548Z	➤ YN0000: │ vidrip@workspace:. STDOUT   Don't worry! This is probably fine. The patch was still applied
+2026-06-26T01:49:39.354676813Z	➤ YN0000: │ vidrip@workspace:. STDOUT   successfully. Here's the deets:
+2026-06-26T01:49:39.354763687Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.354915558Z	➤ YN0000: │ vidrip@workspace:. STDOUT   Patch file created for
+2026-06-26T01:49:39.354991219Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.355166695Z	➤ YN0000: │ vidrip@workspace:. STDOUT     react-native-webview@13.16.1
+2026-06-26T01:49:39.355228022Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.355364121Z	➤ YN0000: │ vidrip@workspace:. STDOUT   applied to
+2026-06-26T01:49:39.356125125Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.356334698Z	➤ YN0000: │ vidrip@workspace:. STDOUT     react-native-webview@13.17.0
+2026-06-26T01:49:39.356402332Z	➤ YN0000: │ vidrip@workspace:. STDOUT   
+2026-06-26T01:49:39.358930385Z	➤ YN0000: │ vidrip@workspace:. STDOUT   At path
+2026-06-26T01:49:39.359009615Z	➤ YN0000: │ vidrip@workspace:. STDOUT   
+2026-06-26T01:49:39.359309337Z	➤ YN0000: │ vidrip@workspace:. STDOUT     node_modules/react-native-webview
+2026-06-26T01:49:39.359395728Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.359660659Z	➤ YN0000: │ vidrip@workspace:. STDOUT   This warning is just to give you a heads-up. There is a small chance of
+2026-06-26T01:49:39.359708888Z	➤ YN0000: │ vidrip@workspace:. STDOUT   breakage even though the patch was applied successfully. Make sure the package
+2026-06-26T01:49:39.359776611Z	➤ YN0000: │ vidrip@workspace:. STDOUT   still behaves like you expect (you wrote tests, right?) and then run
+2026-06-26T01:49:39.359883100Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.359932588Z	➤ YN0000: │ vidrip@workspace:. STDOUT     patch-package react-native-webview
+2026-06-26T01:49:39.360043174Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.360086917Z	➤ YN0000: │ vidrip@workspace:. STDOUT   to update the version in the patch file name and make this warning go away.
+2026-06-26T01:49:39.360456370Z	➤ YN0000: │ vidrip@workspace:. STDOUT 
+2026-06-26T01:49:39.360525933Z	➤ YN0000: │ vidrip@workspace:. STDOUT ---
+2026-06-26T01:49:39.360686100Z	➤ YN0000: │ vidrip@workspace:. STDOUT patch-package finished with 1 warning(s).
+2026-06-26T01:49:39.360877831Z	➤ YN0000: └ Completed in 20s 315ms
+2026-06-26T01:49:39.360922980Z	➤ YN0000: Done with warnings in 2m 54s
+2026-06-26T01:49:39.618132917Z	++ command -v node
+2026-06-26T01:49:39.618472872Z	+ echo 'export NODE_BINARY=/usr/local/opt/node@22/bin/node'
+2026-06-26T01:49:39.618825321Z	+ export HOMEBREW_NO_INSTALL_CLEANUP=TRUE
+2026-06-26T01:49:39.619012147Z	+ HOMEBREW_NO_INSTALL_CLEANUP=TRUE
+2026-06-26T01:49:39.619094416Z	+ brew install cocoapods
+2026-06-26T01:49:41.660200670Z	Warning: cocoapods 1.16.2_2 is already installed and up-to-date.
+2026-06-26T01:49:41.660395182Z	To reinstall 1.16.2_2, run:
+2026-06-26T01:49:41.660675998Z	  brew reinstall cocoapods
+2026-06-26T01:49:41.697610455Z	+ cd ios
+2026-06-26T01:49:41.697699300Z	+ pod install
+2026-06-26T01:49:45.745174844Z	[VisionCamera] Thank you for using VisionCamera ❤️
+2026-06-26T01:49:45.745367584Z	[VisionCamera] If you enjoy using VisionCamera, please consider sponsoring this project: https://github.com/sponsors/mrousavy
+2026-06-26T01:49:45.745611197Z	[VisionCamera] $VCEnableLocation is set to false!
+2026-06-26T01:49:45.745702100Z	[VisionCamera] $VCEnableFrameProcessors is not set, enabling Frame Processors if Worklets is installed...
+2026-06-26T01:49:45.745871696Z	[VisionCamera] react-native-worklets-core found at /Volumes/workspace/repository/node_modules/react-native-worklets-core, Frame Processors are enabled!
+2026-06-26T01:49:45.745923575Z	Found 27 modules for target `Vidrip`
+2026-06-26T01:49:45.746151499Z	link_native_modules! {ios_packages: [{configurations: [], name: "@hot-updater/react-native", root: "/Volumes/workspace/repository/node_modules/@hot-updater/react-native", path: "../node_modules/@hot-updater/react-native", podspec_path: "/Volumes/workspace/repository/node_modules/@hot-updater/react-native/HotUpdater.podspec", script_phases: []}, {configurations: [], name: "@react-native-async-storage/async-storage", root: "/Volumes/workspace/repository/node_modules/@react-native-async-storage/async-storage", path: "../node_modules/@react-native-async-storage/async-storage", podspec_path: "/Volumes/workspace/repository/node_modules/@react-native-async-storage/async-storage/RNCAsyncStorage.podspec", script_phases: []}, {configurations: [], name: "@react-native-clipboard/clipboard", root: "/Volumes/workspace/repository/node_modules/@react-native-clipboard/clipboard", path: "../node_modules/@react-native-clipboard/clipboard", podspec_path: "/Volumes/workspace/repository/node_modules/@react-native-clipboard/clipboard/RNCClipboard.podspec", script_phases: []}, {configurations: [], name: "@react-native-community/datetimepicker", root: "/Volumes/workspace/repository/node_modules/@react-native-community/datetimepicker", path: "../node_modules/@react-native-community/datetimepicker", podspec_path: "/Volumes/workspace/repository/node_modules/@react-native-community/datetimepicker/RNDateTimePicker.podspec", script_phases: []}, {configurations: [], name: "@react-native-community/image-editor", root: "/Volumes/workspace/repository/node_modules/@react-native-community/image-editor", path: "../node_modules/@react-native-community/image-editor", podspec_path: "/Volumes/workspace/repository/node_modules/@react-native-community/image-editor/react-native-image-editor.podspec", script_phases: []}, {configurations: [], name: "@react-native-community/push-notification-ios", root: "/Volumes/workspace/repository/node_modules/@react-native-community/push-notification-ios", path: "../node_modules/@react-native-community/push-notification-ios", podspec_path: "/Volumes/workspace/repository/node_modules/@react-native-community/push-notification-ios/RNCPushNotificationIOS.podspec", script_phases: []}, {configurations: [], name: "@react-native-firebase/app", root: "/Volumes/workspace/repository/node_modules/@react-native-firebase/app", path: "../node_modules/@react-native-firebase/app", podspec_path: "/Volumes/workspace/repository/node_modules/@react-native-firebase/app/RNFBApp.podspec", script_phases: [{"name" => "[RNFB] Core Configuration", "path" => "./ios_config.sh", "execution_position" => "after_compile", "input_files" => ["$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)"]}]}, {configurations: [], name: "@react-native-firebase/messaging", root: "/Volumes/workspace/repository/node_modules/@react-native-firebase/messaging", path: "../node_modules/@react-native-firebase/messaging", podspec_path: "/Volumes/workspace/repository/node_modules/@react-native-firebase/messaging/RNFBMessaging.podspec", script_phases: []}, {configurations: [], name: "@react-native-masked-view/masked-view", root: "/Volumes/workspace/repository/node_modules/@react-native-masked-view/masked-view", path: "../node_modules/@react-native-masked-view/masked-view", podspec_path: "/Volumes/workspace/repository/node_modules/@react-native-masked-view/masked-view/RNCMaskedView.podspec", script_phases: []}, {configurations: [], name: "@shopify/react-native-skia", root: "/Volumes/workspace/repository/node_modules/@shopify/react-native-skia", path: "../node_modules/@shopify/react-native-skia", podspec_path: "/Volumes/workspace/repository/node_modules/@shopify/react-native-skia/react-native-skia.podspec", script_phases: []}, {configurations: [], name: "react-native-contacts", root: "/Volumes/workspace/repository/node_modules/react-native-contacts", path: "../node_modules/react-native-contacts", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-contacts/react-native-contacts.podspec", script_phases: []}, {configurations: [], name: "react-native-create-thumbnail", root: "/Volumes/workspace/repository/node_modules/react-native-create-thumbnail", path: "../node_modules/react-native-create-thumbnail", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-create-thumbnail/react-native-create-thumbnail.podspec", script_phases: []}, {configurations: [], name: "react-native-fs", root: "/Volumes/workspace/repository/node_modules/react-native-fs", path: "../node_modules/react-native-fs", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-fs/RNFS.podspec", script_phases: []}, {configurations: [], name: "react-native-gesture-handler", root: "/Volumes/workspace/repository/node_modules/react-native-gesture-handler", path: "../node_modules/react-native-gesture-handler", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-gesture-handler/RNGestureHandler.podspec", script_phases: []}, {configurations: [], name: "react-native-image-picker", root: "/Volumes/workspace/repository/node_modules/react-native-image-picker", path: "../node_modules/react-native-image-picker", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-image-picker/react-native-image-picker.podspec", script_phases: []}, {configurations: [], name: "react-native-linear-gradient", root: "/Volumes/workspace/repository/node_modules/react-native-linear-gradient", path: "../node_modules/react-native-linear-gradient", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-linear-gradient/BVLinearGradient.podspec", script_phases: []}, {configurations: [], name: "react-native-orientation-locker", root: "/Volumes/workspace/repository/node_modules/react-native-orientation-locker", path: "../node_modules/react-native-orientation-locker", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-orientation-locker/react-native-orientation-locker.podspec", script_phases: []}, {configurations: [], name: "react-native-reanimated", root: "/Volumes/workspace/repository/node_modules/react-native-reanimated", path: "../node_modules/react-native-reanimated", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-reanimated/RNReanimated.podspec", script_phases: []}, {configurations: [], name: "react-native-safe-area-context", root: "/Volumes/workspace/repository/node_modules/react-native-safe-area-context", path: "../node_modules/react-native-safe-area-context", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-safe-area-context/react-native-safe-area-context.podspec", script_phases: []}, {configurations: [], name: "react-native-screens", root: "/Volumes/workspace/repository/node_modules/react-native-screens", path: "../node_modules/react-native-screens", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-screens/RNScreens.podspec", script_phases: []}, {configurations: [], name: "react-native-share", root: "/Volumes/workspace/repository/node_modules/react-native-share", path: "../node_modules/react-native-share", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-share/RNShare.podspec", script_phases: []}, {configurations: [], name: "react-native-vector-icons", root: "/Volumes/workspace/repository/node_modules/react-native-vector-icons", path: "../node_modules/react-native-vector-icons", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-vector-icons/RNVectorIcons.podspec", script_phases: []}, {configurations: [], name: "react-native-video", root: "/Volumes/workspace/repository/node_modules/react-native-video", path: "../node_modules/react-native-video", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-video/react-native-video.podspec", script_phases: []}, {configurations: [], name: "react-native-view-shot", root: "/Volumes/workspace/repository/node_modules/react-native-view-shot", path: "../node_modules/react-native-view-shot", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-view-shot/react-native-view-shot.podspec", script_phases: []}, {configurations: [], name: "react-native-vision-camera", root: "/Volumes/workspace/repository/node_modules/react-native-vision-camera", path: "../node_modules/react-native-vision-camera", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-vision-camera/VisionCamera.podspec", script_phases: []}, {configurations: [], name: "react-native-webview", root: "/Volumes/workspace/repository/node_modules/react-native-webview", path: "../node_modules/react-native-webview", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-webview/react-native-webview.podspec", script_phases: []}, {configurations: [], name: "react-native-worklets-core", root: "/Volumes/workspace/repository/node_modules/react-native-worklets-core", path: "../node_modules/react-native-worklets-core", podspec_path: "/Volumes/workspace/repository/node_modules/react-native-worklets-core/react-native-worklets-core.podspec", script_phases: []}], ios_project_root_path: "/Volumes/workspace/repository/ios", react_native_path: "../node_modules/react-native"}
+2026-06-26T01:49:45.746249624Z	Adding a custom script phase for Pod RNFBApp: [RNFB] Core Configuration
+2026-06-26T01:49:45.746484143Z	[VisionCamera] Thank you for using VisionCamera ❤️
+2026-06-26T01:49:45.747078157Z	[VisionCamera] If you enjoy using VisionCamera, please consider sponsoring this project: https://github.com/sponsors/mrousavy
+2026-06-26T01:49:45.747146721Z	[VisionCamera] $VCEnableLocation is set to false!
+2026-06-26T01:49:45.747307622Z	[VisionCamera] $VCEnableFrameProcessors is not set, enabling Frame Processors if Worklets is installed...
+2026-06-26T01:49:45.747367144Z	[VisionCamera] react-native-worklets-core found at /Volumes/workspace/repository/node_modules/react-native-worklets-core, Frame Processors are enabled!
+2026-06-26T01:49:45.747538461Z	Auto-linking React Native modules for target `Vidrip`: BVLinearGradient, HotUpdater, RNCAsyncStorage, RNCClipboard, RNCMaskedView, RNCPushNotificationIOS, RNDateTimePicker, RNFBApp, RNFBMessaging, RNFS, RNGestureHandler, RNReanimated, RNScreens, RNShare, RNVectorIcons, VisionCamera, react-native-contacts, react-native-create-thumbnail, react-native-image-editor, react-native-image-picker, react-native-orientation-locker, react-native-safe-area-context, react-native-skia, react-native-video, react-native-view-shot, react-native-webview, and react-native-worklets-core
+2026-06-26T01:49:46.008610819Z	Framework build type is static library
+2026-06-26T01:49:46.008808142Z	[Codegen] Adding script_phases to ReactCodegen.
+2026-06-26T01:49:46.009142423Z	[Codegen] Generating ./build/generated/ios/ReactCodegen.podspec.json
+2026-06-26T01:49:49.050637718Z	[Codegen] Analyzing /Volumes/workspace/repository/package.json
+2026-06-26T01:49:49.051046514Z	[Codegen] Searching for codegen-enabled libraries in the app.
+2026-06-26T01:49:49.051141117Z	[Codegen] The "codegenConfig" field is not defined in package.json. Assuming there is nothing to generate at the app level.
+2026-06-26T01:49:49.051282272Z	[Codegen] Searching for codegen-enabled libraries in the project dependencies.
+2026-06-26T01:49:49.051386031Z	[Codegen] Found @hot-updater/react-native
+2026-06-26T01:49:49.051527401Z	[Codegen] Found @react-native-async-storage/async-storage
+2026-06-26T01:49:49.051596188Z	[Codegen] Found @react-native-clipboard/clipboard
+2026-06-26T01:49:49.051793783Z	[Codegen] Found @react-native-community/datetimepicker
+2026-06-26T01:49:49.051868475Z	[Codegen] Found @react-native-community/image-editor
+2026-06-26T01:49:49.052040774Z	[Codegen] Found @shopify/react-native-skia
+2026-06-26T01:49:49.052130917Z	[Codegen] Found react-native
+2026-06-26T01:49:49.052308261Z	[Codegen] Found react-native-contacts
+2026-06-26T01:49:49.052385863Z	[Codegen] Found react-native-gesture-handler
+2026-06-26T01:49:49.052514954Z	[Codegen] Found react-native-image-picker
+2026-06-26T01:49:49.052608148Z	[Codegen] Found react-native-reanimated
+2026-06-26T01:49:49.052765823Z	[Codegen] Found react-native-safe-area-context
+2026-06-26T01:49:49.052815945Z	[Codegen] Found react-native-screens
+2026-06-26T01:49:49.052912895Z	[Codegen] Found react-native-share
+2026-06-26T01:49:49.052960197Z	[Codegen] Found react-native-vector-icons
+2026-06-26T01:49:49.053078685Z	[Codegen] Found react-native-view-shot
+2026-06-26T01:49:49.053164346Z	[Codegen] Found react-native-webview
+2026-06-26T01:49:49.053450011Z	[Codegen] Found react-native-worklets-core
+2026-06-26T01:49:49.053529813Z	
+2026-06-26T01:49:49.053704778Z	
+2026-06-26T01:49:49.053773290Z	[Codegen] >>>>> Searching for codegen-enabled libraries in react-native.config.js
+2026-06-26T01:49:49.053960138Z	[Codegen] Processing HotUpdaterSpec
+2026-06-26T01:49:49.054055875Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.054225629Z	[Codegen] Supported Apple platforms: ios, tvos for HotUpdaterSpec
+2026-06-26T01:49:49.054311062Z	[Codegen] Processing rnasyncstorage
+2026-06-26T01:49:49.054384206Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.054419990Z	[Codegen] Supported Apple platforms: ios, macos, tvos, visionos for rnasyncstorage
+2026-06-26T01:49:49.054517438Z	[Codegen] Processing rnclipboard
+2026-06-26T01:49:49.054555847Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.054615304Z	[Codegen] Supported Apple platforms: ios, macos, tvos, visionos for rnclipboard
+2026-06-26T01:49:49.054647769Z	[Codegen] Processing RNDateTimePickerCGen
+2026-06-26T01:49:49.054731644Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.054766959Z	[Codegen] Supported Apple platforms: ios, visionos for RNDateTimePickerCGen
+2026-06-26T01:49:49.054820024Z	[Codegen] Processing RNCImageEditorSpec
+2026-06-26T01:49:49.054852638Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.054916362Z	[Codegen] Supported Apple platforms: ios for RNCImageEditorSpec
+2026-06-26T01:49:49.054970548Z	[Codegen] Processing rnskia
+2026-06-26T01:49:49.055022921Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.055116111Z	[Codegen] Supported Apple platforms: ios, macos, tvos for rnskia
+2026-06-26T01:49:49.055152928Z	[Codegen] Processing FBReactNativeSpec
+2026-06-26T01:49:49.055228335Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.055262932Z	[Codegen] Processing rncore
+2026-06-26T01:49:49.055559222Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.055666443Z	[Codegen] Processing RNContactsSpec
+2026-06-26T01:49:49.055767059Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.055862800Z	[Codegen] Supported Apple platforms: ios for RNContactsSpec
+2026-06-26T01:49:49.055910983Z	[Codegen] Processing rngesturehandler_codegen
+2026-06-26T01:49:49.058664966Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.058733003Z	[Codegen] Supported Apple platforms: ios, macos, tvos, visionos for rngesturehandler_codegen
+2026-06-26T01:49:49.058841607Z	[Codegen] Processing RNImagePickerSpec
+2026-06-26T01:49:49.058901290Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.059140293Z	[Codegen] Supported Apple platforms: ios for RNImagePickerSpec
+2026-06-26T01:49:49.059199951Z	[Codegen] Processing rnreanimated
+2026-06-26T01:49:49.059351695Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.059414320Z	[Codegen] Supported Apple platforms: ios, macos, tvos, visionos for rnreanimated
+2026-06-26T01:49:49.059560856Z	[Codegen] Processing safeareacontext
+2026-06-26T01:49:49.059615229Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.059709717Z	[Codegen] Supported Apple platforms: ios, macos, tvos, visionos for safeareacontext
+2026-06-26T01:49:49.059776070Z	[Codegen] Processing rnscreens
+2026-06-26T01:49:49.059936868Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.060023949Z	[Codegen] Supported Apple platforms: ios, tvos, visionos for rnscreens
+2026-06-26T01:49:49.060174978Z	[Codegen] Processing RNShareSpec
+2026-06-26T01:49:49.060236511Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.060424937Z	[Codegen] Supported Apple platforms: ios for RNShareSpec
+2026-06-26T01:49:49.060598099Z	[Codegen] Processing RNVectorIconsSpec
+2026-06-26T01:49:49.060680554Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.060841644Z	[Codegen] Supported Apple platforms: ios, tvos, visionos for RNVectorIconsSpec
+2026-06-26T01:49:49.060920545Z	[Codegen] Processing rnviewshot
+2026-06-26T01:49:49.061078440Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.061133822Z	[Codegen] Supported Apple platforms: ios for rnviewshot
+2026-06-26T01:49:49.061379147Z	[Codegen] Processing RNCWebViewSpec
+2026-06-26T01:49:49.061445932Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.061546368Z	[Codegen] Supported Apple platforms: ios, macos, visionos for RNCWebViewSpec
+2026-06-26T01:49:49.061605270Z	[Codegen] Processing RNWorkletsSpec
+2026-06-26T01:49:49.061769577Z	[Codegen] Searching for podspec in the project dependencies.
+2026-06-26T01:49:49.061828840Z	[Codegen] Supported Apple platforms: ios for RNWorkletsSpec
+2026-06-26T01:49:49.061922518Z	[Codegen] Generating Native Code for HotUpdaterSpec - ios
+2026-06-26T01:49:49.061977692Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.062149013Z	[Codegen] Generating Native Code for rnasyncstorage - ios
+2026-06-26T01:49:49.062280717Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.062377087Z	[Codegen] Generating Native Code for rnclipboard - ios
+2026-06-26T01:49:49.062484232Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.062531738Z	[Codegen] Generating Native Code for RNDateTimePickerCGen - ios
+2026-06-26T01:49:49.062667420Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.062735294Z	[Codegen] Generating Native Code for RNCImageEditorSpec - ios
+2026-06-26T01:49:49.062852451Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.062919140Z	[Codegen] Generating Native Code for rnskia - ios
+2026-06-26T01:49:49.063057779Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.063137121Z	[Codegen] Generating Native Code for FBReactNativeSpec - ios
+2026-06-26T01:49:49.063356773Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.063434182Z	[Codegen - rncore] Skipping iOS code generation for rncore as it has been generated already.
+2026-06-26T01:49:49.063541783Z	[Codegen] Generating Native Code for RNContactsSpec - ios
+2026-06-26T01:49:49.063620647Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.063746352Z	[Codegen] Generating Native Code for rngesturehandler_codegen - ios
+2026-06-26T01:49:49.063797320Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.063876249Z	[Codegen] Generating Native Code for RNImagePickerSpec - ios
+2026-06-26T01:49:49.063923230Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.064125857Z	[Codegen] Generating Native Code for rnreanimated - ios
+2026-06-26T01:49:49.064187844Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.064308934Z	[Codegen] Generating Native Code for safeareacontext - ios
+2026-06-26T01:49:49.064384662Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.064478270Z	[Codegen] Generating Native Code for rnscreens - ios
+2026-06-26T01:49:49.064532694Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.064637447Z	[Codegen] Generating Native Code for RNShareSpec - ios
+2026-06-26T01:49:49.064713001Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.064879714Z	[Codegen] Generating Native Code for RNVectorIconsSpec - ios
+2026-06-26T01:49:49.064937323Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.065034334Z	[Codegen] Generating Native Code for rnviewshot - ios
+2026-06-26T01:49:49.065089744Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.065196087Z	[Codegen] Generating Native Code for RNCWebViewSpec - ios
+2026-06-26T01:49:49.065246064Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.065416099Z	[Codegen] Generating Native Code for RNWorkletsSpec - ios
+2026-06-26T01:49:49.065461963Z	[Codegen] Generated artifacts: /Volumes/workspace/repository/ios/build/generated/ios
+2026-06-26T01:49:49.065534658Z	[Codegen] Creating component provider.
+2026-06-26T01:49:49.065576474Z	[Codegen] Generated provider in: /Volumes/workspace/repository/node_modules/react-native/React/Fabric
+2026-06-26T01:49:49.065703435Z	[Codegen] Done.
+2026-06-26T01:49:49.065745343Z	Analyzing dependencies
+2026-06-26T01:49:49.065886719Z	Fetching podspec for `DoubleConversion` from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`
+2026-06-26T01:49:49.065937842Z	Fetching podspec for `RCT-Folly` from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`
+2026-06-26T01:49:49.066106492Z	[VisionCamera] Thank you for using VisionCamera ❤️
+2026-06-26T01:49:49.066175435Z	[VisionCamera] If you enjoy using VisionCamera, please consider sponsoring this project: https://github.com/sponsors/mrousavy
+2026-06-26T01:49:49.066348386Z	[VisionCamera] $VCEnableLocation is set to false!
+2026-06-26T01:49:49.066408965Z	[VisionCamera] $VCEnableFrameProcessors is not set, enabling Frame Processors if Worklets is installed...
+2026-06-26T01:49:49.066495117Z	[VisionCamera] react-native-worklets-core found at /Volumes/workspace/repository/node_modules/react-native-worklets-core, Frame Processors are enabled!
+2026-06-26T01:49:49.066559300Z	Fetching podspec for `boost` from `../node_modules/react-native/third-party-podspecs/boost.podspec`
+2026-06-26T01:49:49.066622190Z	Fetching podspec for `fmt` from `../node_modules/react-native/third-party-podspecs/fmt.podspec`
+2026-06-26T01:49:49.066659732Z	Fetching podspec for `glog` from `../node_modules/react-native/third-party-podspecs/glog.podspec`
+2026-06-26T01:49:49.066735121Z	Fetching podspec for `hermes-engine` from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`
+2026-06-26T01:49:49.315786773Z	[Hermes] Using release tarball from URL: https://repo1.maven.org/maven2/com/facebook/react/react-native-artifacts/0.76.5/react-native-artifacts-0.76.5-hermes-ios-debug.tar.gz
+2026-06-26T01:49:49.323049470Z	  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-06-26T01:49:49.323516469Z	                                 Dload  Upload   Total   Spent    Left  Speed
+2026-06-26T01:49:49.323603520Z	
+2026-06-26T01:49:50.361852563Z	  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-06-26T01:49:50.432173208Z	 93 23.3M   93 21.8M    0     0  28.8M      0 --:--:-- --:--:-- --:--:-- 28.8M
+2026-06-26T01:49:50.432362312Z	100 23.3M  100 23.3M    0     0  21.2M      0  0:00:01  0:00:01 --:--:-- 21.2M
+2026-06-26T01:49:50.470017092Z	  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-06-26T01:49:50.470184460Z	                                 Dload  Upload   Total   Spent    Left  Speed
+2026-06-26T01:49:50.470267591Z	
+2026-06-26T01:49:50.994756383Z	  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-06-26T01:49:50.994919294Z	100 16.3M  100 16.3M    0     0  57.6M      0 --:--:-- --:--:-- --:--:-- 57.6M
+2026-06-26T01:50:03.050585904Z	Adding spec repo `trunk` with CDN `https://cdn.cocoapods.org/`
+2026-06-26T01:50:03.050753874Z	Downloading dependencies
+2026-06-26T01:50:03.050958517Z	Installing BVLinearGradient (2.8.3)
+2026-06-26T01:50:03.051060573Z	Installing DoubleConversion (1.1.6)
+2026-06-26T01:50:05.087365970Z	Installing FBLazyVector (0.76.5)
+2026-06-26T01:50:05.087518401Z	Installing Firebase (12.11.0)
+2026-06-26T01:50:16.145095254Z	Installing FirebaseCore (12.11.0)
+2026-06-26T01:50:26.193790545Z	Installing FirebaseCoreExtension (12.11.0)
+2026-06-26T01:50:36.231386655Z	Installing FirebaseCoreInternal (12.11.0)
+2026-06-26T01:50:46.273692365Z	Installing FirebaseInstallations (12.11.0)
+2026-06-26T01:50:55.318904167Z	Installing FirebaseMessaging (12.11.0)
+2026-06-26T01:51:05.369062880Z	Installing GoogleDataTransport (10.1.0)
+2026-06-26T01:51:07.408816252Z	Installing GoogleUtilities (8.1.0)
+2026-06-26T01:51:10.445177477Z	Installing HotUpdater (0.32.0)
+2026-06-26T01:51:10.445397831Z	Installing MediaPipeTasksCommon (0.10.35)
+2026-06-26T01:51:14.483751917Z	Installing MediaPipeTasksVision (0.10.35)
+2026-06-26T01:51:14.749556903Z	Installing PromisesObjC (2.4.0)
+2026-06-26T01:51:16.789128178Z	Installing RCT-Folly (2024.01.01.00)
+2026-06-26T01:51:23.836630059Z	Installing RCTDeprecation (0.76.5)
+2026-06-26T01:51:23.836846234Z	Installing RCTRequired (0.76.5)
+2026-06-26T01:51:23.837131614Z	Installing RCTTypeSafety (0.76.5)
+2026-06-26T01:51:23.837240588Z	Installing RNCAsyncStorage (2.2.0)
+2026-06-26T01:51:23.837378634Z	Installing RNCClipboard (1.16.3)
+2026-06-26T01:51:23.837479286Z	Installing RNCMaskedView (0.3.2)
+2026-06-26T01:51:23.837606471Z	Installing RNCPushNotificationIOS (1.12.0)
+2026-06-26T01:51:23.837767197Z	Installing RNDateTimePicker (9.1.0)
+2026-06-26T01:51:23.837829400Z	Installing RNFBApp (24.1.0)
+2026-06-26T01:51:23.837941721Z	Installing RNFBMessaging (24.1.0)
+2026-06-26T01:51:23.838012884Z	Installing RNFS (2.20.0)
+2026-06-26T01:51:23.838111469Z	Installing RNGestureHandler (2.31.1)
+2026-06-26T01:51:23.838160591Z	Installing RNReanimated (3.16.7)
+2026-06-26T01:51:23.838274539Z	Installing RNScreens (4.4.0)
+2026-06-26T01:51:23.838327821Z	Installing RNShare (12.3.1)
+2026-06-26T01:51:23.838464294Z	Installing RNVectorIcons (10.3.0)
+2026-06-26T01:51:23.838526877Z	Installing React (0.76.5)
+2026-06-26T01:51:23.838606997Z	Installing React-Core (0.76.5)
+2026-06-26T01:51:23.838662126Z	Installing React-CoreModules (0.76.5)
+2026-06-26T01:51:23.838759360Z	Installing React-Fabric (0.76.5)
+2026-06-26T01:51:23.838825800Z	Installing React-FabricComponents (0.76.5)
+2026-06-26T01:51:23.838904248Z	Installing React-FabricImage (0.76.5)
+2026-06-26T01:51:23.838964331Z	Installing React-ImageManager (0.76.5)
+2026-06-26T01:51:23.839050828Z	Installing React-Mapbuffer (0.76.5)
+2026-06-26T01:51:23.839104932Z	Installing React-NativeModulesApple (0.76.5)
+2026-06-26T01:51:23.839181837Z	Installing React-RCTActionSheet (0.76.5)
+2026-06-26T01:51:23.839269196Z	Installing React-RCTAnimation (0.76.5)
+2026-06-26T01:51:23.839325289Z	Installing React-RCTAppDelegate (0.76.5)
+2026-06-26T01:51:23.839422216Z	Installing React-RCTBlob (0.76.5)
+2026-06-26T01:51:23.839506940Z	Installing React-RCTFabric (0.76.5)
+2026-06-26T01:51:23.839599853Z	Installing React-RCTImage (0.76.5)
+2026-06-26T01:51:23.839677282Z	Installing React-RCTLinking (0.76.5)
+2026-06-26T01:51:23.839775357Z	Installing React-RCTNetwork (0.76.5)
+2026-06-26T01:51:23.840231543Z	Installing React-RCTSettings (0.76.5)
+2026-06-26T01:51:23.840312253Z	Installing React-RCTText (0.76.5)
+2026-06-26T01:51:23.840406279Z	Installing React-RCTVibration (0.76.5)
+2026-06-26T01:51:23.840464804Z	Installing React-RuntimeApple (0.76.5)
+2026-06-26T01:51:23.840526869Z	Installing React-RuntimeCore (0.76.5)
+2026-06-26T01:51:23.840568960Z	Installing React-RuntimeHermes (0.76.5)
+2026-06-26T01:51:23.840669204Z	Installing React-callinvoker (0.76.5)
+2026-06-26T01:51:23.840734165Z	Installing React-cxxreact (0.76.5)
+2026-06-26T01:51:23.840817200Z	Installing React-debug (0.76.5)
+2026-06-26T01:51:23.840864843Z	Installing React-defaultsnativemodule (0.76.5)
+2026-06-26T01:51:23.840939604Z	Installing React-domnativemodule (0.76.5)
+2026-06-26T01:51:23.841005179Z	Installing React-featureflags (0.76.5)
+2026-06-26T01:51:23.841073087Z	Installing React-featureflagsnativemodule (0.76.5)
+2026-06-26T01:51:23.841115828Z	Installing React-graphics (0.76.5)
+2026-06-26T01:51:23.841205077Z	Installing React-hermes (0.76.5)
+2026-06-26T01:51:23.841245950Z	Installing React-idlecallbacksnativemodule (0.76.5)
+2026-06-26T01:51:23.841332159Z	Installing React-jserrorhandler (0.76.5)
+2026-06-26T01:51:23.841400852Z	Installing React-jsi (0.76.5)
+2026-06-26T01:51:23.841536874Z	Installing React-jsiexecutor (0.76.5)
+2026-06-26T01:51:23.841589729Z	Installing React-jsinspector (0.76.5)
+2026-06-26T01:51:23.841675948Z	Installing React-jsitracing (0.76.5)
+2026-06-26T01:51:23.841728609Z	Installing React-logger (0.76.5)
+2026-06-26T01:51:23.841792791Z	Installing React-microtasksnativemodule (0.76.5)
+2026-06-26T01:51:23.841838154Z	Installing React-nativeconfig (0.76.5)
+2026-06-26T01:51:23.841908016Z	Installing React-perflogger (0.76.5)
+2026-06-26T01:51:23.841965580Z	Installing React-performancetimeline (0.76.5)
+2026-06-26T01:51:23.842027605Z	Installing React-rendererconsistency (0.76.5)
+2026-06-26T01:51:23.842072684Z	Installing React-rendererdebug (0.76.5)
+2026-06-26T01:51:23.844277204Z	Installing React-rncore (0.76.5)
+2026-06-26T01:51:23.844439317Z	Installing React-runtimeexecutor (0.76.5)
+2026-06-26T01:51:23.844497529Z	Installing React-runtimescheduler (0.76.5)
+2026-06-26T01:51:23.844564968Z	Installing React-timing (0.76.5)
+2026-06-26T01:51:23.844611529Z	Installing React-utils (0.76.5)
+2026-06-26T01:51:23.845359167Z	Installing ReactCodegen (0.76.5)
+2026-06-26T01:51:23.845453938Z	Installing ReactCommon (0.76.5)
+2026-06-26T01:51:23.845530063Z	Installing SocketRocket (0.7.1)
+2026-06-26T01:51:25.865828861Z	Installing VisionCamera (4.7.3)
+2026-06-26T01:51:25.866026328Z	Installing Yoga (0.0.0)
+2026-06-26T01:51:25.866198619Z	Installing boost (1.84.0)
+2026-06-26T01:51:29.904080526Z	Installing fmt (9.1.0)
+2026-06-26T01:51:32.945577184Z	Installing glog (0.3.5)
+2026-06-26T01:52:14.074037317Z	Installing hermes-engine (0.76.5)
+2026-06-26T01:52:16.105952288Z	Installing nanopb (3.30910.0)
+2026-06-26T01:52:33.184208822Z	Installing react-native-contacts (8.0.10)
+2026-06-26T01:52:33.184356823Z	Installing react-native-create-thumbnail (2.2.0)
+2026-06-26T01:52:33.184573419Z	Installing react-native-image-editor (4.3.0)
+2026-06-26T01:52:33.184627247Z	Installing react-native-image-picker (8.2.1)
+2026-06-26T01:52:33.184892671Z	Installing react-native-orientation-locker (1.7.0)
+2026-06-26T01:52:33.185029935Z	Installing react-native-safe-area-context (5.8.0)
+2026-06-26T01:52:33.185104785Z	Installing react-native-skia (1.12.4)
+2026-06-26T01:52:33.185382566Z	Installing react-native-video (6.19.2)
+2026-06-26T01:52:33.185473593Z	Installing react-native-view-shot (4.0.3)
+2026-06-26T01:52:33.185575333Z	Installing react-native-webview (13.17.0)
+2026-06-26T01:52:33.185622159Z	Installing react-native-worklets-core (1.6.3)
+2026-06-26T01:52:33.186470465Z	Generating Pods project
+2026-06-26T01:52:33.186548454Z	Setting USE_HERMES build settings
+2026-06-26T01:52:33.186625106Z	Setting REACT_NATIVE_PATH build settings
+2026-06-26T01:52:33.186738237Z	Setting SWIFT_ACTIVE_COMPILATION_CONDITIONS build settings
+2026-06-26T01:52:34.225110202Z	[Ccache]: Removing Ccache from CC, LD, CXX & LDPLUSPLUS build settings
+2026-06-26T01:52:37.929146793Z	[SPM] Cleaning old SPM dependencies from Pods project
+2026-06-26T01:52:37.929315483Z	[SPM] Adding SPM dependencies to Pods project
+2026-06-26T01:52:37.929551377Z	[Privacy Manifest Aggregation] Appending aggregated reasons to existing PrivacyInfo.xcprivacy file.
+2026-06-26T01:52:37.929617436Z	[Privacy Manifest Aggregation] Reading .xcprivacy files to aggregate all used Required Reason APIs.
+2026-06-26T01:52:37.929691077Z	Setting CLANG_CXX_LANGUAGE_STANDARD to c++20 on /Volumes/workspace/repository/ios/Vidrip.xcodeproj
+2026-06-26T01:52:37.929780223Z	Pod install took 173 [s] to run
+2026-06-26T01:52:37.929955130Z	Integrating client project
+2026-06-26T01:52:37.930014928Z	Pod installation complete! There are 101 dependencies from the Podfile and 103 total pods installed.
+2026-06-26T01:52:37.930209754Z	
+2026-06-26T01:52:37.930366513Z	[!] [Codegen] warn: using experimental new codegen integration
+2026-06-26T01:52:37.930561931Z	
+2026-06-26T01:52:37.930628253Z	[!] hermes-engine has added 1 script phase. Please inspect before executing a build. See `https://guides.cocoapods.org/syntax/podspec.html#script_phases` for more information.

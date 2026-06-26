@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Face &amp; Gesture Data — current state, collection plan, and App Review risk</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; font-size: 11pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 20pt; margin: 0 0 2pt; color: #111; }
+  .sub { color: #666; font-size: 10pt; margin: 0 0 18pt; }
+  h2 { font-size: 13pt; margin: 22pt 0 6pt; padding-bottom: 3pt; border-bottom: 2px solid #4A6CF7; color: #2742a8; }
+  h3 { font-size: 11.5pt; margin: 14pt 0 4pt; color: #222; }
+  p { margin: 6pt 0; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9.5pt; background: #eef1fb; padding: 1px 4px; border-radius: 3px; color: #2742a8; }
+  strong { color: #111; }
+  table { width: 100%; border-collapse: collapse; margin: 10pt 0; font-size: 9pt; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #eef1fb; color: #2742a8; font-weight: 600; }
+  td.ok { color: #1a7f37; font-weight: 600; } td.bad { color: #b3261e; font-weight: 600; } td.warn { color: #9a6700; font-weight: 600; }
+  ul, ol { margin: 6pt 0; padding-left: 20pt; }
+  li { margin: 3pt 0; }
+  .callout { background: #f6f8ff; border-left: 4px solid #4A6CF7; padding: 8pt 12pt; margin: 10pt 0; border-radius: 0 4px 4px 0; }
+  .danger { background: #fff5f5; border-left-color: #e5484d; }
+  .rec { background: #f3fbf5; border-left-color: #2da44e; }
+  hr { border: none; border-top: 1px solid #eee; margin: 16pt 0; }
+  h2, h3 { page-break-after: avoid; }
+  table { page-break-inside: auto; }
+  footer { margin-top: 24pt; padding-top: 8pt; border-top: 1px solid #eee; color: #999; font-size: 8.5pt; }
+</style>
+</head>
+<body>
+  <h1>Face &amp; Gesture Data</h1>
+  <p class="sub">Current state, collection plan, and App Review risk · Vidrip — internal planning &amp; App Store 2.1</p>
+
+  <h2>TL;DR recommendation</h2>
+  <ol>
+    <li><strong>For the current (rejected) submission: collect nothing new.</strong> Answer Apple's 2.1 question truthfully about what exists today (on-device detection, minimal <em>functional</em> landmark storage) and pass review. Adding new face-data collection in the same cycle Apple is already scrutinizing face data is the fastest way to get rejected again.</li>
+    <li><strong>Next release: add gesture analytics as opt-in, on-device-derived, non-identifying <em>events</em></strong> (e.g. "smiled at 0:03", "laughed at 0:11") — not raw biometrics, not a faceprint. This gives almost all the product value at the lowest legal/review risk.</li>
+    <li><strong>Never store a face template / embedding / faceprint</strong> (anything that can <em>identify</em> a person from their face). That single line is the difference between "sensitive usage data" and "biometric identifier" — the latter triggers BIPA-class laws with per-violation statutory damages and much harsher review.</li>
+  </ol>
+
+  <h2>1. What we store TODAY (so we're precise with Apple)</h2>
+  <p>Face detection runs <strong>100% on-device</strong> (MediaPipe Face Landmarker via a VisionCamera frame processor). No cloud face processing, no third party.</p>
+  <p>We <strong>do</strong> persist a small amount of face geometry, but only:</p>
+  <ul>
+    <li><strong>when the user actively wears an AR lens while recording</strong>, and</li>
+    <li><strong>only for studio/channel clips</strong> (friend-share reactions store <em>no</em> landmarks), and</li>
+    <li>as part of the video's <code>overlay_recipe</code> JSON.</li>
+  </ul>
+  <p>What's stored = a <strong>FaceLensTrack</strong>: per-frame anchor points (eye/nose/mouth, face width, head roll) + optionally a <em>sparse</em> mesh contour (~150 of 478 points), quantized to integers. Its purpose is <strong>functional</strong> — to re-render the lens on playback. We do <strong>not</strong> store: face images/frames, RGB pixels, blendshapes, gaze/iris, or any face template/embedding.</p>
+  <div class="callout rec">So the honest answer to Apple is: <em>"on-device only; we store sparse facial-landmark geometry solely to re-render an optional cosmetic AR effect; it's not a biometric identifier and isn't used to identify anyone."</em> That answer passes.</div>
+
+  <h2>2. The taxonomy of what we <em>could</em> collect (value vs. risk)</h2>
+  <table>
+    <thead>
+      <tr><th>Signal</th><th>Product value</th><th>Identifies a person?</th><th>Risk tier</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Derived gesture events</strong> (smile, laugh, surprise, frown, nod, head-shake, brow-raise, "looked away") with timestamp + intensity</td>
+        <td>High — reaction analytics, auto-emoji, highlight detection, engagement scoring</td>
+        <td>No (derived, non-identifying)</td>
+        <td class="ok">Low</td>
+        <td class="ok">✅ Collect (opt-in, next release)</td>
+      </tr>
+      <tr>
+        <td><strong>Aggregate reaction scores</strong> (positivity, intensity, # of laughs, attention %) per reaction</td>
+        <td>High — creator analytics, ranking, "best reactions"</td>
+        <td>No</td>
+        <td class="ok">Low</td>
+        <td class="ok">✅ Collect (opt-in)</td>
+      </tr>
+      <tr>
+        <td><strong>Blendshape coefficient timeline</strong> (52 ARKit-style: jawOpen, mouthSmile, eyeBlink, browInnerUp…)</td>
+        <td>Medium — richer expression modeling, better classifiers</td>
+        <td>Not on its own (but granular)</td>
+        <td class="warn">Medium</td>
+        <td class="warn">⚠️ Only if needed; keep on-device, upload sparingly</td>
+      </tr>
+      <tr>
+        <td><strong>Head pose</strong> (pitch/yaw/roll) + <strong>gaze direction</strong></td>
+        <td>Medium — attention/engagement</td>
+        <td>No (pose), gaze is more sensitive</td>
+        <td class="warn">Medium</td>
+        <td class="warn">⚠️ Pose ok; treat gaze cautiously</td>
+      </tr>
+      <tr>
+        <td><strong>Full 478-pt mesh timeline</strong></td>
+        <td>Low (beyond rendering)</td>
+        <td>Approaches face geometry</td>
+        <td class="bad">High</td>
+        <td class="bad">🚫 Don't store for analytics (keep only the functional sparse track)</td>
+      </tr>
+      <tr>
+        <td><strong>Face embedding / template / "faceprint"</strong></td>
+        <td>Low here</td>
+        <td><strong>Yes — uniquely identifies</strong></td>
+        <td class="bad">Severe</td>
+        <td class="bad">🚫 Never</td>
+      </tr>
+      <tr>
+        <td><strong>Raw camera frames / face crops as data</strong></td>
+        <td>Low</td>
+        <td>Yes</td>
+        <td class="bad">Severe</td>
+        <td class="bad">🚫 Never</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>The line that matters: <strong>derived, non-identifying signals</strong> ("this person smiled") sit in normal sensitive-usage-data territory. The moment you store something that can <strong>recognize/identify</strong> a person from their face (a template/embedding), you're handling a <strong>biometric identifier</strong>.</p>
+
+  <h2>3. Review &amp; legal risk</h2>
+  <h3>Apple App Review</h3>
+  <ul>
+    <li><strong>2.1 (the current rejection):</strong> must fully disclose what face data is collected, every use, sharing, storage, retention — and have a privacy policy that says so. Answerable today; gets harder the more you collect.</li>
+    <li><strong>5.1.1 / 5.1.2 (privacy &amp; data use):</strong> collection must be tied to a disclosed purpose, require <strong>consent</strong>, and you can't use the data beyond what you told the user. Gather consent before collecting.</li>
+    <li><strong>App Privacy "nutrition label"</strong> (App Store Connect): you must declare the data types. Derived expression/usage signals → declare under usage data / "Other"; a faceprint would be "Sensitive Info / biometric" and draws scrutiny.</li>
+    <li>Apple is fine with on-device face detection for effects (Snapchat/TikTok do it). The risk spikes when face-derived data is <strong>uploaded/stored</strong> and especially if it could <strong>identify</strong> someone.</li>
+  </ul>
+  <h3>Privacy law (this is the real exposure)</h3>
+  <ul>
+    <li><strong>Illinois BIPA:</strong> if you collect a <strong>biometric identifier</strong> (a faceprint/scan of face geometry used to identify), you must get <strong>written consent</strong>, publish a <strong>retention + destruction schedule</strong>, can't <strong>sell/profit</strong> from it, and face <strong>statutory damages ($1,000–$5,000 per violation)</strong> — class actions have cost companies hundreds of millions. Texas (CUBI) and Washington have similar regimes.
+      <ul><li><strong>Mitigation: don't create identifiers.</strong> Derived events ("smiled") are generally <em>not</em> biometric identifiers. Keeping signals non-identifying is the single most important risk control.</li></ul>
+    </li>
+    <li><strong>GDPR / CCPA-CPRA:</strong> face/biometric data is <em>special category / sensitive personal information</em> → explicit opt-in consent, purpose limitation, data-subject access/delete, possibly a DPIA. Even non-identifying expression data tied to a user is "sensitive" and should be opt-in + deletable.</li>
+  </ul>
+
+  <h2>4. Recommended phased plan</h2>
+  <h3>Phase A — THIS submission (no new collection)</h3>
+  <ul>
+    <li>Ship the 2.1 answer describing today's on-device, functional, non-identifying landmark storage.</li>
+    <li>Publish/point to a Privacy Policy that includes the face-data section (draft below / to host at vidrip.app/privacy).</li>
+    <li>(Optional hardening) Confirm the stored mesh is sparse + functional; keep "anonymous mode" (silhouette) available. Nothing else changes. → <strong>Goal: pass.</strong></li>
+  </ul>
+  <h3>Phase B — next release (opt-in gesture analytics)</h3>
+  <ol>
+    <li><strong>On-device classification.</strong> The existing frame processor already yields landmarks (and can yield blendshapes). Add an on-device classifier that maps expression → discrete <strong>events</strong>: <code>{ t: ms, type: 'smile'|'laugh'|'surprise'|'frown'|'nod'|'shake'|'browRaise'|'lookAway', intensity: 0..1 }</code>. No raw landmarks leave the device for analytics.</li>
+    <li><strong>Store derived signals only.</strong> New record <code>reaction_signals</code> (or a <code>signals</code> JSON on the reaction/post): the event array + aggregate scores (positivity, intensity, peaks, attention%). Tied to the reaction + the source-video timestamp.</li>
+    <li><strong>Consent gate (opt-in, default OFF).</strong> A clear toggle — e.g. <em>"Help improve reactions with on-device expression signals (smiles, laughs). Processed on your device; we store only the gesture events, never your face or anything that identifies you."</em> Surface it at first lens/record use; respect it everywhere; easy to turn off.</li>
+    <li><strong>Privacy posture:</strong> declare in the App Privacy label; document use/retention in the policy; delete signals on video deletion and on account deletion; set a retention limit.</li>
+    <li><strong>Hard "never" list:</strong> no face templates/embeddings, no face crops as data, no selling, no third-party sharing, no using it to identify/authenticate users.</li>
+  </ol>
+  <h3>Product payoffs unlocked by Phase B</h3>
+  <p>Auto-suggested emoji reactions; "reaction highlights" (jump to the laugh); engagement/positivity scores for creators; better feed ranking; A/B which content lands — all from non-identifying derived events.</p>
+
+  <h2>5. Privacy-policy face-data section (draft — host at vidrip.app/privacy)</h2>
+  <div class="callout">
+    <p><strong>Camera &amp; face effects.</strong> When you record a reaction, Vidrip uses your camera. If you choose an AR "lens," your device detects facial landmarks <strong>on your device</strong> to position the effect. This detection is performed locally using on-device machine learning; <strong>raw camera frames and facial geometry are not sent to our servers</strong> for this purpose. When a lens is used, a compact set of facial <em>landmark coordinates</em> (not images, not a faceprint) is saved with your video so the effect can be re-rendered on playback. We do <strong>not</strong> create a face template, do <strong>not</strong> use face data to identify you, and do <strong>not</strong> share it with third parties. You can delete your videos at any time, which removes this data.</p>
+    <p><strong>Optional expression signals (if enabled).</strong> If you opt in, Vidrip derives non-identifying gesture <em>events</em> (e.g. smiled, laughed) on your device to improve reaction features. We store only these events and summary scores — never your face, images, or any data that identifies you from your appearance. You can disable this anytime; the data is deleted with your videos and on account deletion.</p>
+  </div>
+  <p><em>(Use only the first paragraph until Phase B ships.)</em></p>
+
+  <h2>6. App Store Connect 2.1 reply (current submission — use as-is)</h2>
+  <ul>
+    <li><strong>What face data does the app collect?</strong> Only when a user enables an optional AR lens while recording: sparse facial-landmark coordinates (eye/nose/mouth anchor points + head roll, plus an optional sparse face-outline mesh). No face images, no biometric template, no blendshapes, no gaze/iris.</li>
+    <li><strong>All planned uses?</strong> Solely to position and render the cosmetic AR effect, and to re-render it on playback. Not used for identification, authentication, advertising, or analytics.</li>
+    <li><strong>Shared with third parties? Where stored?</strong> Not shared with any third party. Detection runs on-device (MediaPipe, no cloud). The landmark coordinates are stored with the user's own video in our backend (Supabase).</li>
+    <li><strong>Retention?</strong> Kept as part of the video's render recipe; deleted when the user deletes the video or their account.</li>
+    <li><strong>Where in the privacy policy?</strong> Section "Camera, Microphone &amp; Face Data" at vidrip.app/privacy.</li>
+  </ul>
+
+  <footer>Vidrip — internal planning document. Face &amp; gesture data strategy and App Store Guideline 2.1 response.</footer>
+</body>
+</html>

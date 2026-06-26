@@ -1,0 +1,2 @@
+2026-06-26 02:00:06 +0000 [MT] Command line name "app-store" is deprecated. Use "app-store-connect" instead.
+2026-06-26 02:00:06 +0000  App Store Connect request for store configuration failed for account Session Proxy Provider (Account "Session Proxy Provider": Unable to authenticate with App Store Connect (Error Domain=DVTITunesSoftwareServiceFoundation.DVTServicesSessionProviderCredentialITunesAuthenticationContextError Code=1 "(null)"))
