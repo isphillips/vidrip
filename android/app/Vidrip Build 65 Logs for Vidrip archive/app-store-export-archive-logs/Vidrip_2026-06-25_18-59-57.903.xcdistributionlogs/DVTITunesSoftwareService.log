@@ -1,2 +1,0 @@
-2026-06-26 01:59:58 +0000  App Store Connect response failed with unknown failure for credential <DVTFoundation.DVTServicesSessionProviderCredential: 0x60000318a8c0>; response (null); error (null).
-2026-06-26 01:59:58 +0000  App Store Connect request for store configuration for credential <DVTFoundation.DVTServicesSessionProviderCredential: 0x60000318a8c0>; configuration: (null); error DVTITunesSoftwareServiceFoundation.DVTServicesSessionProviderCredentialITunesAuthenticationContextError.proxy
