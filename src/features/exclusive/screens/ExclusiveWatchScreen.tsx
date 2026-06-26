@@ -16,6 +16,8 @@ import {
 } from '../../../infrastructure/supabase/queries/channels';
 import EmojiChips from '../../../components/EmojiChips';
 import BunnyEmbedPlayer from '../../studio/components/BunnyEmbedPlayer';
+import ContentActions from '../../../components/ContentActions';
+import type { ReportTargetType } from '../../../infrastructure/supabase/queries/reports';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScreenProps<'ExclusiveWatch'>) {
@@ -29,7 +31,11 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'reactions' | 'reviews'>('reactions');
   const [playMain, setPlayMain] = useState(false);
-  const [clip, setClip] = useState<{ url: string; label: string } | null>(null);
+  // Carries the author alongside the URL so the player can offer Report/Block on this UGC clip.
+  const [clip, setClip] = useState<{
+    url: string; label: string;
+    targetType: ReportTargetType; targetId: string; targetUserId: string | null; handle: string | null;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -111,7 +117,7 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
               ? <Text style={styles.empty}>No reactions yet. Be the first.</Text>
               : visReactions.map(r => (
                 <TouchableOpacity key={r.id} style={styles.row} activeOpacity={r.video_url ? 0.8 : 1}
-                  onPress={() => r.video_url && setClip({ url: r.video_url, label: `@${r.poster?.handle ?? 'reaction'}` })}>
+                  onPress={() => r.video_url && setClip({ url: r.video_url, label: `@${r.poster?.handle ?? 'reaction'}`, targetType: 'reaction', targetId: r.id, targetUserId: r.poster_id, handle: r.poster?.handle ?? null })}>
                   <View style={styles.rowPlay}><Ionicons name="play" size={14} color="#fff" /></View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowName} numberOfLines={1}>@{r.poster?.handle ?? 'someone'}</Text>
@@ -124,7 +130,7 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
               ? <Text style={styles.empty}>No reviews yet.</Text>
               : visReviews.map(rv => (
                 <TouchableOpacity key={rv.id} style={styles.row} activeOpacity={rv.video_url ? 0.8 : 1}
-                  onPress={() => rv.video_url && setClip({ url: rv.video_url, label: `★ @${rv.reviewer?.handle ?? 'review'}` })}>
+                  onPress={() => rv.video_url && setClip({ url: rv.video_url, label: `★ @${rv.reviewer?.handle ?? 'review'}`, targetType: 'clip', targetId: rv.id, targetUserId: rv.reviewer_id, handle: rv.reviewer?.handle ?? null })}>
                   <View style={[styles.rowPlay, { backgroundColor: C.GOLD }]}><Ionicons name="star" size={13} color="#fff" /></View>
                   <Text style={styles.rowName} numberOfLines={1}>@{rv.reviewer?.handle ?? 'someone'}</Text>
                 </TouchableOpacity>
@@ -139,6 +145,22 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
       <Modal visible={!!clip} animationType="fade" onRequestClose={() => setClip(null)}>
         <View style={styles.clipContainer}>
           {clip && <Video source={{ uri: clip.url }} style={StyleSheet.absoluteFill} resizeMode="contain" controls repeat paused={false} />}
+          {/* Report this clip / block its author — UGC safety (App Store 1.2). */}
+          {clip && clip.targetUserId && clip.targetUserId !== user?.id && (
+            <View style={styles.clipActions}>
+              <View style={styles.clipCloseBg}>
+                <ContentActions
+                  targetType={clip.targetType}
+                  targetId={clip.targetId}
+                  targetUserId={clip.targetUserId}
+                  handle={clip.handle}
+                  color={C.WHITE}
+                  size={22}
+                  onBlocked={() => { setClip(null); load(); }}
+                />
+              </View>
+            </View>
+          )}
           <TouchableOpacity style={styles.clipClose} onPress={() => setClip(null)} hitSlop={12}>
             <View style={styles.clipCloseBg}><Ionicons name="close" size={22} color="#fff" /></View>
           </TouchableOpacity>
@@ -179,5 +201,6 @@ const styles = StyleSheet.create({
 
   clipContainer: { flex: 1, backgroundColor: '#000' },
   clipClose: { position: 'absolute', top: 52, right: 20 },
+  clipActions: { position: 'absolute', top: 52, right: 64 },
   clipCloseBg: { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, padding: 8 },
 });

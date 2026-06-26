@@ -1,42 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  ScrollView,
-  Alert,
+  View, Text, TextInput, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, interpolate } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
-import type { AuthStackScreenProps } from '../../../app/navigation/types';
-import SlimeWizard from '../components/SlimeWizard';
+import { CopyScrim, TEXT_GLOW } from '../../../components/scene/sceneKit';
+import { AuthScene } from '../components/AuthScene';
 import GradientButton from '../../studio/components/GradientButton';
+import type { AuthStackScreenProps } from '../../../app/navigation/types';
 
 export default function EnterInviteCodeScreen({
   navigation, route,
 }: AuthStackScreenProps<'EnterInviteCode'>) {
+  const { top, bottom } = useSafeAreaInsets();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const enter = useSharedValue(0);
+  useEffect(() => { enter.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) }); }, [enter]);
+  const formStyle = useAnimatedStyle(() => ({
+    opacity: enter.value,
+    transform: [{ scale: interpolate(enter.value, [0, 1], [0.92, 1]) }],
+  }));
+
   const handleChangeText = (text: string) => {
-    // Strip everything except letters/digits, uppercase
     const clean = text.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    // Auto-insert dash after first 5 chars (REAXN-)
-    if (clean.length <= 5) {
-      setCode(clean);
-    } else {
-      setCode(`${clean.slice(0, 5)}-${clean.slice(5, 9)}`);
-    }
+    if (clean.length <= 5) { setCode(clean); }
+    else { setCode(`${clean.slice(0, 5)}-${clean.slice(5, 9)}`); }
   };
 
-  // Pre-fill from an invite deep link / universal link (e.g. vidrip.app/i/<CODE>).
   const prefill = route.params?.code;
   useEffect(() => { if (prefill) { handleChangeText(prefill); } }, [prefill]);
 
   const handleSubmit = async () => {
     const trimmed = code.trim().toUpperCase();
-    if (!trimmed) return;
+    if (!trimmed) { return; }
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -45,7 +46,6 @@ export default function EnterInviteCodeScreen({
         .eq('code', trimmed)
         .is('used_by', null)
         .single();
-
       if (error || !data) {
         Alert.alert('Invalid Code', 'This invite code is invalid or has already been used.');
         return;
@@ -57,75 +57,64 @@ export default function EnterInviteCodeScreen({
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
-        <SlimeWizard />
-        <Text style={styles.title}>Enter your invite code</Text>
-        <Text style={styles.subtitle}>Vidrip is invite only. Enter your code for exclusive access.</Text>
-        <TextInput
-          style={styles.input}
-          value={code}
-          onChangeText={handleChangeText}
-          placeholder="XXXXX-XXXX"
-          placeholderTextColor={C.SUBTLE}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={10}
-          spellCheck={false}
-        />
-        <GradientButton
-          label="Continue"
-          icon="sparkles"
-          onPress={handleSubmit}
-          disabled={!code.trim()}
-          loading={loading}
-          style={styles.cta}
-        />
-      </ScrollView>
+    <View style={styles.root}>
+      <AuthScene gated enter={enter} />
+
+      <TouchableOpacity style={[styles.back, { top: top + SPACE.SM }]} onPress={() => navigation.goBack()} hitSlop={12} activeOpacity={0.75}>
+        <Ionicons name="chevron-back" size={22} color={C.INK} />
+      </TouchableOpacity>
+
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottom + SPACE.XL }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <Animated.View style={[styles.card, formStyle]}>
+            <CopyScrim style={styles.cardScrim} />
+            <Text style={styles.title}>Enter your invite code</Text>
+            <Text style={styles.subtitle}>Vidrip is invite-only. Drippy's guarding the gate. Enter your code for exclusive access.</Text>
+            <TextInput
+              style={styles.input}
+              value={code}
+              onChangeText={handleChangeText}
+              placeholder="XXXXX-XXXX"
+              placeholderTextColor={C.SUBTLE}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={10}
+              spellCheck={false}
+            />
+            <GradientButton
+              label="Continue"
+              icon="sparkles"
+              onPress={handleSubmit}
+              disabled={!code.trim()}
+              loading={loading}
+              style={styles.cta}
+            />
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: C.BG,
+  root: { flex: 1, backgroundColor: '#160826', overflow: 'hidden' },
+  flex: { flex: 1 },
+  back: {
+    position: 'absolute', left: SPACE.LG, zIndex: 10,
+    width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(10,4,20,0.5)',
+    borderWidth: 1, borderColor: C.BORDER, alignItems: 'center', justifyContent: 'center',
   },
-  scroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: SPACE.XL,
-  },
-  title: {
-    fontSize: FONT.SIZES.XXL,
-    fontFamily: FONT.DISPLAY_BOLD,
-    fontWeight: '700',
-    color: C.INK,
-    textAlign: 'center',
-    marginTop: SPACE.SM,
-    marginBottom: SPACE.SM,
-  },
-  subtitle: {
-    fontSize: FONT.SIZES.MD,
-    color: C.MUTED,
-    textAlign: 'center',
-    marginBottom: SPACE.XXL,
-  },
+  scroll: { flexGrow: 1, justifyContent: 'flex-end', paddingHorizontal: SPACE.XL },
+  card: { alignItems: 'center', alignSelf: 'stretch', gap: SPACE.MD, paddingVertical: SPACE.LG },
+  cardScrim: { left: -SPACE.XL, right: -SPACE.XL, top: -SPACE.MD, bottom: -SPACE.XXL },
+  title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: '700', color: C.WHITE, textAlign: 'center', ...TEXT_GLOW },
+  subtitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.INK, textAlign: 'center', lineHeight: 22, maxWidth: 320, ...TEXT_GLOW },
   input: {
-    backgroundColor: C.SURFACE,
-    borderRadius: RADIUS.MD,
-    borderWidth: 1,
-    borderColor: C.BORDER,
-    padding: SPACE.LG,
-    fontSize: FONT.SIZES.XL,
-    fontWeight: '700',
-    color: C.INK,
-    // No letterSpacing: on iOS it leaks into other TextInputs across the app (RN bug).
-    textAlign: 'center',
-    marginBottom: SPACE.LG,
+    alignSelf: 'stretch', backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER,
+    padding: SPACE.LG, fontSize: FONT.SIZES.XL, fontWeight: '700', color: C.INK, textAlign: 'center', marginTop: SPACE.SM,
   },
-  cta: { marginTop: SPACE.SM },
+  cta: { alignSelf: 'stretch', marginTop: SPACE.XS },
 });

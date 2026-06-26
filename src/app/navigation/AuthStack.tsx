@@ -24,10 +24,14 @@ export default function AuthStack() {
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
         contentStyle: { backgroundColor: GRADIENT_DARK[1] },
+        // Cross-fade between auth screens; each screen's content also scales up on mount, so the
+        // net effect is a "zoom fade" deeper into Dripville (the shared scene stays continuous).
+        animation: 'fade',
       }}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: '' }} />
-      <Stack.Screen name="EnterInviteCode" component={EnterInviteCodeScreen} options={{ title: '' }} />
+      {/* Gated scene screens render their own immersive Dripville backdrop + a custom back button. */}
+      <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="EnterInviteCode" component={EnterInviteCodeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="CreateProfile" component={CreateProfileScreen} options={{ title: '' }} />
     </Stack.Navigator>
   );

@@ -1,15 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
+  View, Text, Image, StyleSheet, TouchableOpacity,
   ActivityIndicator, useWindowDimensions, Platform,
 } from 'react-native';
 import Video from 'react-native-video';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { fetchChannelReview, type ChannelReview } from '../../../infrastructure/supabase/queries/channels';
 import {
   hasLocalClip, localPathForClip, downloadChannelClip,
 } from '../../../infrastructure/storage/localChannelClipStorage';
+import { useAuthStore } from '../../../store/authStore';
+import ContentActions from '../../../components/ContentActions';
 
 type LoadState = 'loading' | 'downloading' | 'ready' | 'unavailable';
 
@@ -25,7 +28,8 @@ type Props = {
 export default function WatchReviewScreen({ route, navigation }: Props) {
   const { reviewId } = route.params;
   const { width, height } = useWindowDimensions();
-  const { top: topInset } = useSafeAreaInsets();
+  const { top: topInset, bottom: bottomInset } = useSafeAreaInsets();
+  const { user } = useAuthStore();
 
   const [review, setReview] = useState<ChannelReview | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('loading');
@@ -116,8 +120,14 @@ export default function WatchReviewScreen({ route, navigation }: Props) {
         </View>
       )}
 
-      <View style={[styles.infoBar, { top: topInset + SPACE.SM }]} pointerEvents="none">
-        <Text style={styles.handle}>Review by @{review?.reviewer?.handle ?? '?'}</Text>
+      {/* Reviewer identity (bottom-left) + timer (bottom-right), sitting just above the scrubber. */}
+      <View style={[styles.infoBar, { bottom: bottomInset + SPACE.MD }]} pointerEvents="none">
+        <View style={styles.who}>
+          {review?.reviewer?.avatar_url
+            ? <Image source={{ uri: review.reviewer.avatar_url }} style={styles.avatar} />
+            : <View style={[styles.avatar, styles.avatarFallback]}><Ionicons name="person" size={15} color={C.WHITE} /></View>}
+          <Text style={styles.handle} numberOfLines={1}>Review by @{review?.reviewer?.handle ?? '?'}</Text>
+        </View>
         <Text style={styles.timer}>{fmt(progress)} / {fmt(totalDuration)}</Text>
       </View>
 
@@ -125,8 +135,24 @@ export default function WatchReviewScreen({ route, navigation }: Props) {
         <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
 
+      {/* Report the clip / block the reviewer — UGC safety affordance (App Store 1.2). */}
+      {review?.reviewer_id && review.reviewer_id !== user?.id && (
+        <View style={[styles.moreBtn, { top: topInset + SPACE.LG }]}>
+          <ContentActions
+            // Reviews share the clip storage model and the live `target_type` set; 'clip' is the
+            // established, constraint-valid target for talk-to-camera video content here.
+            targetType="clip"
+            targetId={reviewId}
+            targetUserId={review.reviewer_id}
+            handle={review.reviewer?.handle}
+            color={C.WHITE}
+            size={20}
+          />
+        </View>
+      )}
+
       <TouchableOpacity
-        style={[styles.closeBtn, { top: topInset + SPACE.SM }]}
+        style={[styles.closeBtn, { top: topInset + SPACE.LG }]}
         onPress={() => navigation.goBack()}>
         <Text style={styles.closeTxt}>✕</Text>
       </TouchableOpacity>
@@ -157,10 +183,16 @@ const styles = StyleSheet.create({
   playIcon: { color: C.WHITE, fontSize: 26, marginLeft: 5 },
   infoBar: {
     position: 'absolute', left: SPACE.LG, right: SPACE.LG,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+  },
+  who: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, flexShrink: 1, marginRight: SPACE.MD },
+  avatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: C.SURFACE },
+  avatarFallback: {
+    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.35)',
   },
   handle: {
-    color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD,
+    flexShrink: 1, color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD,
     textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   timer: {
@@ -174,6 +206,12 @@ const styles = StyleSheet.create({
   progressFill: { height: 3, backgroundColor: C.ACCENT_HOT },
   closeBtn: {
     position: 'absolute', right: SPACE.LG,
+    width: 36, height: 36, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  moreBtn: {
+    position: 'absolute', right: SPACE.LG + 44,
     width: 36, height: 36, borderRadius: RADIUS.FULL,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center', justifyContent: 'center',

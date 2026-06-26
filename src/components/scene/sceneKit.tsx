@@ -50,7 +50,7 @@ export function CopyScrim({ style }: { style?: any }) {
   return (
     <LinearGradient
       pointerEvents="none"
-      colors={['rgba(9,4,20,0)', 'rgba(9,4,20,0.72)', 'rgba(9,4,20,0.74)', 'rgba(9,4,20,0.72)', 'rgba(9,4,20,0)']}
+      colors={['rgba(9,4,20,0)', 'rgba(9,4,20,0.52)', 'rgba(9,4,20,0.54)', 'rgba(9,4,20,0.52)', 'rgba(9,4,20,0)']}
       locations={[0, 0.16, 0.5, 0.84, 1]}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
@@ -242,7 +242,7 @@ function renderAccessory(kind: Accessory, w: number) {
       );
     case 'party':
       return (
-        <View style={[styles.abs, { top: -w * 0.6, left: w * 0.18, alignItems: 'center' }]} pointerEvents="none">
+        <View style={[styles.abs, { top: -w * 0.6, left: w * 0.25, alignItems: 'center' }]} pointerEvents="none">
           <View style={[styles.pompom, { backgroundColor: TEAL }]} />
           <View style={[styles.cone, { borderLeftWidth: w * 0.26, borderRightWidth: w * 0.26, borderBottomWidth: w * 0.56, borderBottomColor: PINK }]} />
           <View style={[styles.partyDot, { left: 2, backgroundColor: GOLD }]} />
@@ -251,7 +251,7 @@ function renderAccessory(kind: Accessory, w: number) {
       );
     case 'shades':
       return (
-        <View style={[styles.abs, { top: w * 0.3, left: w * 0.25, flexDirection: 'row', alignItems: 'center' }]} pointerEvents="none">
+        <View style={[styles.abs, { top: w * 0.3, left: w * 0.22, flexDirection: 'row', alignItems: 'center' }]} pointerEvents="none">
           <View style={styles.lens} />
           <View style={styles.bridge} />
           <View style={styles.lens} />
@@ -259,14 +259,14 @@ function renderAccessory(kind: Accessory, w: number) {
       );
     case 'detective':
       return (
-        <View style={[styles.abs, { top: -w * 0.34, left: w * 0.06, alignItems: 'center' }]} pointerEvents="none">
+        <View style={[styles.abs, { top: -w * 0.30, left: w * 0.02, alignItems: 'center' }]} pointerEvents="none">
           <View style={[styles.capDome, { width: w * 0.78, height: w * 0.34, backgroundColor: '#7a5c3e' }]} />
           <View style={[styles.capBrim, { width: w * 1.0, backgroundColor: '#6a4f35' }]} />
         </View>
       );
     case 'bow':
       return (
-        <View style={[styles.abs, { top: -w * 0.16, left: w * 0.5 - w * 0.18, flexDirection: 'row' }]} pointerEvents="none">
+        <View style={[styles.abs, { top: -w * 0.16, left: w * 0.4 - w * 0.18, flexDirection: 'row' }]} pointerEvents="none">
           <View style={[styles.bowSide, { backgroundColor: MAGENTA }]} />
           <View style={[styles.bowKnot, { backgroundColor: '#fff' }]} />
           <View style={[styles.bowSide, { backgroundColor: MAGENTA }]} />
@@ -443,8 +443,8 @@ export function HeroDrippy({ enter, width = HERO_W_DEFAULT, waving = true }: { e
 //  and an optional `scrollX` (px) shared value to make the depth layers drift as the user swipes.
 // ════════════════════════════════════════════════════════════════════════════════════════════
 
-export function SceneBackdrop({ enter, scrollX, showCrew = true }: {
-  enter: SharedValue<number>; scrollX?: SharedValue<number>; showCrew?: boolean;
+export function SceneBackdrop({ enter, scrollX, showCrew = true, showBalloons = true }: {
+  enter: SharedValue<number>; scrollX?: SharedValue<number>; showCrew?: boolean; showBalloons?: boolean;
 }) {
   const zero = useSharedValue(0);
   const sx = scrollX ?? zero;
@@ -488,9 +488,13 @@ export function SceneBackdrop({ enter, scrollX, showCrew = true }: {
         <Firefly startLeft={W * 0.6} color={TEAL} delay={1800} duration={7200} />
         <Firefly startLeft={W * 0.46} color={MAGENTA} delay={3600} duration={6600} />
         <Firefly startLeft={W * 0.82} color={GOLD} delay={900} duration={8000} />
-        <Balloon startLeft={W * 0.16} size={44} colors={[PINK, MAGENTA]} face="heart" delay={300} duration={9000} />
-        <Balloon startLeft={W * 0.78} size={38} colors={[TEAL, '#2563EB']} face="smile" delay={2600} duration={11000} />
-        <Balloon startLeft={W * 0.52} size={34} colors={[GOLD, '#FF8A3D']} face="wow" delay={5200} duration={10000} />
+        {showBalloons && (
+          <>
+            <Balloon startLeft={W * 0.16} size={44} colors={[PINK, MAGENTA]} face="heart" delay={300} duration={9000} />
+            <Balloon startLeft={W * 0.78} size={38} colors={[TEAL, '#2563EB']} face="smile" delay={2600} duration={11000} />
+            <Balloon startLeft={W * 0.52} size={34} colors={[GOLD, '#FF8A3D']} face="wow" delay={5200} duration={10000} />
+          </>
+        )}
       </Animated.View>
 
       {/* the crew, loafing on the hills */}

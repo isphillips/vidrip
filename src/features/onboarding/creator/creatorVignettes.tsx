@@ -165,63 +165,7 @@ export function TwoViewVignette() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════════
-//  3 · Tiers & the web dashboard — creators set up membership tiers on the web
-//  (No prices shown in-app — App Store 3.1.1: the app carries no pricing/purchase surface.)
-// ════════════════════════════════════════════════════════════════════════════════════════════
-const TIERS = [
-  { name: 'Fan', icon: 'heart', color: TEAL },
-  { name: 'Super', icon: 'star', color: GOLD, hot: true },
-  { name: 'Inner', icon: 'diamond', color: PINK },
-];
-export function TiersVignette() {
-  const cursor = useSharedValue(0);
-  useEffect(() => {
-    cursor.value = withRepeat(withSequence(
-      withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) }),
-      withDelay(500, withTiming(0, { duration: 1200, easing: Easing.inOut(Easing.quad) })),
-    ), -1, false);
-  }, [cursor]);
-  const curStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: interpolate(cursor.value, [0, 1], [STAGE * 0.2, STAGE * 0.5]) },
-      { translateY: interpolate(cursor.value, [0, 1], [70, 44]) },
-    ],
-  }));
-  const hotStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + cursor.value * 0.06 }] }));
-
-  return (
-    <View style={styles.stage}>
-      {/* browser window */}
-      <View style={styles.browser}>
-        <View style={styles.browserBar}>
-          <View style={[styles.dot, { backgroundColor: '#FF5F57' }]} />
-          <View style={[styles.dot, { backgroundColor: '#FEBC2E' }]} />
-          <View style={[styles.dot, { backgroundColor: '#28C840' }]} />
-          <View style={styles.url}><Ionicons name="lock-closed" size={9} color={C.MUTED} /><Text style={styles.urlTxt}>vidrip.app/dashboard</Text></View>
-        </View>
-        <View style={styles.tierRow}>
-          {TIERS.map((t, i) => (
-            <Animated.View key={t.name} style={[styles.tierCard, t.hot && styles.tierHot, t.hot && hotStyle]}>
-              {t.hot && <View style={styles.tierBadge}><Text style={styles.tierBadgeTxt}>POPULAR</Text></View>}
-              <Ionicons name={t.icon} size={18} color={t.color} />
-              <Text style={styles.tierName}>{t.name}</Text>
-              <Text style={styles.tierMo}>members</Text>
-            </Animated.View>
-          ))}
-        </View>
-      </View>
-      {/* the creator's cursor, setting it up */}
-      <Animated.View style={[styles.cursor, curStyle]} pointerEvents="none">
-        <Ionicons name="navigate" size={18} color="#fff" style={{ transform: [{ rotate: '-12deg' }] }} />
-      </Animated.View>
-      {/* a slime running the dashboard */}
-      <MiniSlime left={STAGE - 56} top={4} size={44} colors={[GOLD, '#E08A1E']} accessory="director" delay={200} mouth="grin" />
-    </View>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════════════════════════════
-//  4 · The members club — exclusivity & loyalty
+//  3 · The members club — exclusivity & loyalty
 // ════════════════════════════════════════════════════════════════════════════════════════════
 export function LoyaltyVignette() {
   const glow = useSharedValue(0);

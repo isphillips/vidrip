@@ -14,17 +14,17 @@ import { W, H, GOLD, SceneBackdrop, HeroDrippy, CopyScrim, TEXT_GLOW } from '../
 import { Kicker, DecoDivider, Pips } from '../components';
 import GradientButton from '../../studio/components/GradientButton';
 import { joinEarlyAccess, isLikelyEmail } from '../../../infrastructure/supabase/queries/earlyAccess';
-import { StudioVignette, TwoViewVignette, TiersVignette, LoyaltyVignette } from './creatorVignettes';
+import { StudioVignette, TwoViewVignette, LoyaltyVignette } from './creatorVignettes';
 
 // ════════════════════════════════════════════════════════════════════════════════════════════
 //  Creator onboarding — the cinematic, pre-auth pitch shown to influencers during the closed
 //  launch (gated by CREATOR_INTRO, mounted from RootNavigator's signed-out branch).
 //
 //  A swipeable, parallaxing tour through the slime-land — welcome → the Studio → the two-view
-//  concept → tiers & the web dashboard → the members club — riding on the shared <SceneBackdrop>
-//  so it feels like one continuous world. Skippable at any time (jumps to the email capture); the
-//  capture markets exclusivity, takes an email for a spot, and has a subtle "log in" link that
-//  drops devs/returning creators into the auth flow.
+//  concept → the members club — riding on the shared <SceneBackdrop> so it feels like one 
+//  continuous world. Skippable at any time (jumps to the email capture); the capture markets 
+//  exclusivity, takes an email for a spot, and has a subtle "log in" link that drops devs/returning
+//  creators into the auth flow.
 // ════════════════════════════════════════════════════════════════════════════════════════════
 
 type Vignette = React.ComponentType | null;
@@ -46,12 +46,6 @@ const SCENES: { kicker: string; title: string; body: string; Vignette: Vignette 
     title: 'Two screens,\none you',
     body: 'Link the socials you already post to. Your views keep racking up where they live. Meanwhile your real fanbase gathers here, on Vidrip. Reach and loyalty, at once.',
     Vignette: TwoViewVignette,
-  },
-  {
-    kicker: 'Earn',
-    title: 'Set your\ntiers',
-    body: 'Set up membership tiers and perks from your web dashboard. Turn your biggest fans into a members club they join on the web — exclusive drip, straight from you.',
-    Vignette: TiersVignette,
   },
   {
     kicker: 'Belong',
@@ -280,7 +274,7 @@ const styles = StyleSheet.create({
   pageInner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACE.XL, gap: SPACE.MD },
   stageSlot: { height: 212, alignItems: 'center', justifyContent: 'center', marginBottom: SPACE.SM },
   // copy block + its feathered scrim (extends past the page padding to the screen edges)
-  copyBlock: { alignSelf: 'stretch', alignItems: 'center', gap: SPACE.MD, paddingVertical: SPACE.LG },
+  copyBlock: { alignSelf: 'stretch', alignItems: 'center', gap: SPACE.MD, paddingVertical: SPACE.XXXL },
   copyScrim: { left: -SPACE.XL, right: -SPACE.XL, top: -SPACE.SM, bottom: -SPACE.SM },
   title: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: '700', color: C.WHITE, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 36, ...TEXT_GLOW },
   body: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.INK, textAlign: 'center', lineHeight: 24, maxWidth: 330, ...TEXT_GLOW },

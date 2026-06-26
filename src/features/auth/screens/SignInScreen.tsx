@@ -1,25 +1,21 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
+  View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, KeyboardAvoidingView, ScrollView, Platform,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, interpolate } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
-import type { AuthStackScreenProps } from '../../../app/navigation/types';
-import SlimeWelcome from '../components/SlimeWelcome';
-import SlimeMail from '../components/SlimeMail';
+import { CopyScrim, TEXT_GLOW } from '../../../components/scene/sceneKit';
+import { AuthScene } from '../components/AuthScene';
 import GradientButton from '../../studio/components/GradientButton';
+import type { AuthStackScreenProps } from '../../../app/navigation/types';
 
 type Mode = 'magic' | 'password';
 
 export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignIn'>) {
+  const { top, bottom } = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('magic');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,8 +23,13 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  // Scroll the form into view when a field is focused so the keyboard never covers it (the slime
-  // artwork above pushes the inputs down). Delay lets the keyboard + KeyboardAvoidingView settle first.
+  const enter = useSharedValue(0);
+  useEffect(() => { enter.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) }); }, [enter]);
+  const formStyle = useAnimatedStyle(() => ({
+    opacity: enter.value,
+    transform: [{ scale: interpolate(enter.value, [0, 1], [0.92, 1]) }],
+  }));
+
   const scrollRef = useRef<ScrollView>(null);
   const focusScroll = () => { setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 180); };
 
@@ -53,10 +54,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
     if (!validEmail || password.length < 1) { return; }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       if (error) { Alert.alert('Sign In Failed', error.message); return; }
       // onAuthStateChange in RootNavigator handles the rest
     } finally {
@@ -64,221 +62,145 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
     }
   };
 
+  const BackButton = (
+    <TouchableOpacity style={[styles.back, { top: top + SPACE.SM }]} onPress={() => navigation.goBack()} hitSlop={12} activeOpacity={0.75}>
+      <Ionicons name="chevron-back" size={22} color={C.INK} />
+    </TouchableOpacity>
+  );
+
   if (sent) {
     return (
-      <View style={[styles.container, styles.sentContainer]}>
-        <SlimeMail />
-        <Text style={styles.sentTitle}>Check your email</Text>
-        <Text style={styles.sentSubtitle}>
-          We sent a magic link to{'\n'}
-          <Text style={styles.sentEmail}>{email.trim().toLowerCase()}</Text>
-        </Text>
-        <Text style={styles.sentHint}>
-          Tap the link in the email to sign in. You can close this screen.
-        </Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink} activeOpacity={0.7}>
-          <Text style={styles.backLinkText}>← Back</Text>
-        </TouchableOpacity>
+      <View style={styles.root}>
+        <AuthScene gated enter={enter} />
+        {BackButton}
+        <View style={styles.sentWrap}>
+          <Animated.View style={[styles.card, formStyle]}>
+            <CopyScrim style={styles.cardScrim} />
+            <View style={styles.mailBadge}><Ionicons name="mail-outline" size={34} color={C.WHITE} /></View>
+            <Text style={styles.title}>Check your email</Text>
+            <Text style={styles.subtitle}>We sent a magic link to{'\n'}<Text style={styles.email}>{email.trim().toLowerCase()}</Text></Text>
+            <Text style={styles.hint}>Tap the link in the email to sign in. You can close this screen.</Text>
+          </Animated.View>
+        </View>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <SlimeWelcome />
+    <View style={styles.root}>
+      <AuthScene gated enter={enter} />
+      {BackButton}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottom + SPACE.XL }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <Animated.View style={[styles.card, formStyle]}>
+            <CopyScrim style={styles.cardScrim} />
+            <Text style={styles.title}>Welcome back</Text>
 
-        {/* Mode toggle */}
-        <View style={styles.toggle}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'magic' && styles.toggleBtnActive]}
-            onPress={() => setMode('magic')}>
-            <Text style={[styles.toggleTxt, mode === 'magic' && styles.toggleTxtActive]}>
-              Magic Link
+            <View style={styles.toggle}>
+              <TouchableOpacity style={[styles.toggleBtn, mode === 'magic' && styles.toggleBtnActive]} onPress={() => setMode('magic')}>
+                <Text style={[styles.toggleTxt, mode === 'magic' && styles.toggleTxtActive]}>Magic Link</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.toggleBtn, mode === 'password' && styles.toggleBtnActive]} onPress={() => setMode('password')}>
+                <Text style={[styles.toggleTxt, mode === 'password' && styles.toggleTxtActive]}>Password</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.subtitle}>
+              {mode === 'magic' ? "We'll email you a one-tap link" : 'Sign in with your email and password'}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'password' && styles.toggleBtnActive]}
-            onPress={() => setMode('password')}>
-            <Text style={[styles.toggleTxt, mode === 'password' && styles.toggleTxtActive]}>
-              Password
-            </Text>
-          </TouchableOpacity>
-        </View>
 
-        <Text style={styles.subtitle}>
-          {mode === 'magic' ? "We'll email you a one-tap link" : 'Sign in with your email and password'}
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          placeholderTextColor={C.SUBTLE}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          onFocus={focusScroll}
-        />
-
-        {mode === 'password' && (
-          <View style={styles.passwordRow}>
             <TextInput
-              style={styles.passwordInput}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@vidrip.app"
               placeholderTextColor={C.SUBTLE}
-              secureTextEntry={!showPassword}
+              keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              returnKeyType="go"
-              onSubmitEditing={handlePasswordSignIn}
               onFocus={focusScroll}
             />
-            <TouchableOpacity
-              style={styles.eyeBtn}
-              onPress={() => setShowPassword((v) => !v)}>
-              <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
-        {mode === 'magic' ? (
-          <GradientButton
-            label="Send Magic Link"
-            icon="sparkles"
-            onPress={handleMagicLink}
-            disabled={!validEmail}
-            loading={loading}
-            style={styles.cta}
-          />
-        ) : (
-          <GradientButton
-            label="Sign In"
-            onPress={handlePasswordSignIn}
-            disabled={!validEmail || !password}
-            loading={loading}
-            style={styles.cta}
-          />
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+            {mode === 'password' && (
+              <View style={styles.passwordRow}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Password"
+                  placeholderTextColor={C.SUBTLE}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="go"
+                  onSubmitEditing={handlePasswordSignIn}
+                  onFocus={focusScroll}
+                />
+                <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword((v) => !v)}>
+                  <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {mode === 'magic' ? (
+              <GradientButton label="Send Magic Link" icon="sparkles" onPress={handleMagicLink} disabled={!validEmail} loading={loading} style={styles.cta} />
+            ) : (
+              <GradientButton label="Sign In" onPress={handlePasswordSignIn} disabled={!validEmail || !password} loading={loading} style={styles.cta} />
+            )}
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: C.BG,
+  root: { flex: 1, backgroundColor: '#160826', overflow: 'hidden' },
+  flex: { flex: 1 },
+  back: {
+    position: 'absolute', left: SPACE.LG, zIndex: 10,
+    width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(10,4,20,0.5)',
+    borderWidth: 1, borderColor: C.BORDER, alignItems: 'center', justifyContent: 'center',
   },
-  scroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: SPACE.XL,
-  },
+  scroll: { flexGrow: 1, justifyContent: 'flex-end', paddingHorizontal: SPACE.XL },
+  sentWrap: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: SPACE.XL, paddingBottom: SPACE.XXXL },
+
+  card: { alignItems: 'center', alignSelf: 'stretch', gap: SPACE.SM, paddingVertical: SPACE.LG },
+  cardScrim: { left: -SPACE.XL, right: -SPACE.XL, top: -SPACE.MD, bottom: -SPACE.XXL },
+  title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: '700', color: C.WHITE, textAlign: 'center', marginBottom: SPACE.XS, ...TEXT_GLOW },
+
   toggle: {
-    flexDirection: 'row',
-    backgroundColor: C.SURFACE,
-    borderRadius: RADIUS.MD,
-    padding: 3,
-    gap: 3,
-    marginTop: SPACE.XXL,
-    marginBottom: SPACE.LG,
-    borderWidth: 1,
-    borderColor: C.BORDER,
+    flexDirection: 'row', alignSelf: 'stretch', backgroundColor: C.SURFACE, borderRadius: RADIUS.MD,
+    padding: 3, gap: 3, borderWidth: 1, borderColor: C.BORDER,
   },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: SPACE.SM,
-    alignItems: 'center',
-    borderRadius: RADIUS.SM,
-  },
+  toggleBtn: { flex: 1, paddingVertical: SPACE.SM, alignItems: 'center', borderRadius: RADIUS.SM },
   toggleBtnActive: { backgroundColor: C.ACCENT },
   toggleTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED },
   toggleTxtActive: { color: C.WHITE },
-  subtitle: {
-    fontSize: FONT.SIZES.MD,
-    color: C.MUTED,
-    fontFamily: FONT.BODY,
-    marginBottom: SPACE.LG,
-    textAlign: 'center'
-  },
+  subtitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.INK, textAlign: 'center', ...TEXT_GLOW },
+
   input: {
-    backgroundColor: C.SURFACE,
-    borderRadius: RADIUS.MD,
-    borderWidth: 1,
-    borderColor: C.BORDER,
-    padding: SPACE.LG,
-    fontSize: FONT.SIZES.MD,
-    color: C.INK,
-    fontFamily: FONT.BODY,
-    marginBottom: SPACE.MD,
+    alignSelf: 'stretch', backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER,
+    padding: SPACE.LG, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY, marginTop: SPACE.XS,
   },
   passwordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.SURFACE,
-    borderRadius: RADIUS.MD,
-    borderWidth: 1,
-    borderColor: C.BORDER,
-    marginBottom: SPACE.MD,
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', backgroundColor: C.SURFACE,
+    borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER,
   },
-  passwordInput: {
-    flex: 1,
-    padding: SPACE.LG,
-    fontSize: FONT.SIZES.MD,
-    color: C.INK,
-    fontFamily: FONT.BODY,
-  },
+  passwordInput: { flex: 1, padding: SPACE.LG, fontSize: FONT.SIZES.MD, color: C.INK, fontFamily: FONT.BODY },
   eyeBtn: { paddingHorizontal: SPACE.MD },
   eyeIcon: { fontSize: 18 },
-  cta: { marginTop: SPACE.SM },
-  sentContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: SPACE.XL,
+  cta: { alignSelf: 'stretch', marginTop: SPACE.XS },
+
+  // sent confirmation
+  mailBadge: {
+    width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: SPACE.SM,
+    backgroundColor: C.ACCENT,
   },
-  sentTitle: {
-    fontSize: FONT.SIZES.XXXL,
-    fontFamily: FONT.DISPLAY_BOLD,
-    fontWeight: '700',
-    color: C.INK,
-    textAlign: 'center',
-    marginBottom: SPACE.MD,
-  },
-  sentSubtitle: {
-    fontSize: FONT.SIZES.MD,
-    fontFamily: FONT.BODY,
-    color: C.MUTED,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: SPACE.XL,
-  },
-  sentEmail: { color: C.ACCENT_HOT, fontFamily: FONT.DISPLAY_SEMIBOLD },
-  sentHint: {
-    fontSize: FONT.SIZES.SM,
-    fontFamily: FONT.BODY,
-    color: C.SUBTLE,
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 280,
-  },
-  backLink: {
-    marginTop: SPACE.XXL,
-    paddingVertical: SPACE.SM,
-    paddingHorizontal: SPACE.XL,
-    borderRadius: RADIUS.FULL,
-    borderWidth: 1,
-    borderColor: C.BORDER_STRONG,
-  },
-  backLinkText: { color: C.ACCENT_HOT, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
+  email: { color: C.ACCENT_HOT, fontFamily: FONT.DISPLAY_SEMIBOLD },
+  hint: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED, textAlign: 'center', lineHeight: 20, maxWidth: 280, ...TEXT_GLOW },
 });

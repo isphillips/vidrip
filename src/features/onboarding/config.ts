@@ -9,4 +9,4 @@
 // At public launch we'll flip this OFF for the general public (they get the normal login flow) and
 // surface the creator intro through a separate, targeted means (not built yet). It's a plain boolean
 // today by design — easy to flip per build, matching the existing DEMO_MODE pattern.
-export const CREATOR_INTRO = true;
+export const CREATOR_INTRO = false;

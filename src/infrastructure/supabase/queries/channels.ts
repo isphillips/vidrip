@@ -80,7 +80,7 @@ export type ChannelReview = {
   channel_id: string;
   post_id: string;
   reviewer_id: string;
-  reviewer: { handle: string } | null;
+  reviewer: { handle: string; avatar_url?: string | null } | null;
   video_url: string | null;
   duration: number | null;
   created_at: string;
@@ -574,6 +574,23 @@ export async function renameGroupChat(channelId: string, name: string): Promise<
   if (error) { throw new Error(error.message ?? 'Could not rename group chat'); }
 }
 
+// ── App-wide block filtering ─────────────────────────────────────────────────────────────────
+// A blocked user (someone I blocked, OR who blocked me) must disappear from every channel surface
+// — posts, reactions, reviews, members (App Store 1.2). Resolved per query from `fetchBlockedIds`
+// so all consumer screens are covered centrally; returns the shared empty set (no work) when the
+// viewer has blocked no one. Falls back to the session user when no id is passed.
+const NO_BLOCKS: ReadonlySet<string> = new Set<string>();
+async function viewerBlockedIds(userId?: string): Promise<ReadonlySet<string>> {
+  let id = userId;
+  if (!id) {
+    const { data } = await supabase.auth.getSession();
+    id = data.session?.user?.id;
+  }
+  if (!id) { return NO_BLOCKS; }
+  const ids = await fetchBlockedIds(id);
+  return ids.length ? new Set(ids) : NO_BLOCKS;
+}
+
 export async function fetchChannelPosts(
   channelId: string, userId?: string, opts?: { limit?: number },
 ): Promise<ChannelPost[]> {
@@ -627,27 +644,29 @@ export async function fetchChannelPosts(
     if (userId && r.reviewer_id === userId) { myReviewed.add(r.post_id); }
   });
 
-  // App-wide block: a blocked user's reaction must not inflate a post's reaction tally. The grid badge
-  // uses a server count() that doesn't know about blocks (the list views already filter them out), so
-  // we subtract blocked posters' reactions per post. One small query (only blocked-user reactions), and
-  // it's skipped entirely when the viewer has blocked no one.
+  // App-wide block: hide posts authored by a blocked user outright, and don't let a blocked user's
+  // reaction inflate a post's tally. The grid badge uses a server count() that doesn't know about
+  // blocks, so we also subtract blocked posters' reactions per post. One small query (only blocked-user
+  // reactions), skipped entirely when the viewer has blocked no one.
+  const blocked = await viewerBlockedIds(userId);
   const blockedDecr = new Map<string, number>();
-  if (userId) {
-    const blockedIds = await fetchBlockedIds(userId);
+  if (blocked.size) {
     const postIds = (data ?? []).map((p: any) => p.id);
-    if (blockedIds.length && postIds.length) {
+    if (postIds.length) {
       const { data: blockedRx } = await (supabase as any)
         .from('channel_posts')
         .select('parent_post_id')
         .in('parent_post_id', postIds)
-        .in('poster_id', blockedIds);
+        .in('poster_id', [...blocked]);
       (blockedRx ?? []).forEach((r: any) => {
         blockedDecr.set(r.parent_post_id, (blockedDecr.get(r.parent_post_id) ?? 0) + 1);
       });
     }
   }
 
-  return (data ?? []).map((p: any) => ({
+  return (data ?? [])
+    .filter((p: any) => !blocked.has(p.poster_id))
+    .map((p: any) => ({
     id: p.id,
     channel_id: p.channel_id,
     poster_id: p.poster_id,
@@ -677,7 +696,10 @@ export async function fetchChannelMembers(channelId: string): Promise<{ userId: 
   const { data, error } = await (supabase as any)
     .rpc('get_channel_members', { p_channel_id: channelId });
   if (error) { throw error; }
-  return (data ?? []).map((m: any) => ({ userId: m.user_id as string, handle: m.handle as string }));
+  const blocked = await viewerBlockedIds();
+  return (data ?? [])
+    .filter((m: any) => !blocked.has(m.user_id))
+    .map((m: any) => ({ userId: m.user_id as string, handle: m.handle as string }));
 }
 
 export async function fetchChannelName(channelId: string): Promise<string | null> {
@@ -782,7 +804,10 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
     .order('created_at', { ascending: true });
 
   if (error) { throw error; }
-  return (data ?? []).map((p: any) => ({
+  const blocked = await viewerBlockedIds();
+  return (data ?? [])
+    .filter((p: any) => !blocked.has(p.poster_id))
+    .map((p: any) => ({
     id: p.id,
     channel_id: p.channel_id,
     poster_id: p.poster_id,
@@ -860,6 +885,7 @@ export async function fetchChannelsToReact(userId: string): Promise<ChannelToRea
       .in('id', channelIds),
   ]);
 
+  const blocked = await viewerBlockedIds(userId);
   const reacted = new Set<string>((mineRes.data ?? []).map((r: any) => r.parent_post_id));
   const nameById = new Map<string, string>();
   (groupsRes.data ?? []).forEach((g: any) => {
@@ -868,7 +894,7 @@ export async function fetchChannelsToReact(userId: string): Promise<ChannelToRea
   });
 
   return (postsRes.data ?? [])
-    .filter((p: any) => !reacted.has(p.id) && p.poster_id !== userId)
+    .filter((p: any) => !reacted.has(p.id) && p.poster_id !== userId && !blocked.has(p.poster_id))
     .map((p: any) => ({
       postId: p.id,
       channelId: p.channel_id,
@@ -888,12 +914,13 @@ export async function fetchChannelReactions(channelId: string): Promise<ChannelC
   // doesn't reliably return the parent — fetch parents explicitly and stitch.
   const { data, error } = await (supabase as any)
     .from('channel_posts')
-    .select('id, duration, created_at, parent_post_id, poster:users!poster_id(handle)')
+    .select('id, poster_id, duration, created_at, parent_post_id, poster:users!poster_id(handle)')
     .eq('channel_id', channelId)
     .not('parent_post_id', 'is', null)
     .order('created_at', { ascending: false });
   if (error) { throw error; }
-  const rows = data ?? [];
+  const blocked = await viewerBlockedIds();
+  const rows = (data ?? []).filter((r: any) => !blocked.has(r.poster_id));
 
   const parentIds = [...new Set(rows.map((r: any) => r.parent_post_id).filter(Boolean))];
   const parents = new Map<string, any>();
@@ -1452,7 +1479,8 @@ export async function fetchPostReviews(postId: string): Promise<ChannelReview[]>
     .eq('post_id', postId)
     .order('created_at', { ascending: false });
   if (error) { throw error; }
-  return (data ?? []).map(mapReview);
+  const blocked = await viewerBlockedIds();
+  return (data ?? []).filter((r: any) => !blocked.has(r.reviewer_id)).map(mapReview);
 }
 
 /** Every review across a channel, newest first — the creator's inbox. RLS limits
@@ -1468,7 +1496,8 @@ export async function fetchChannelReviews(channelId: string): Promise<ChannelRev
     .eq('channel_id', channelId)
     .order('created_at', { ascending: false });
   if (error) { throw error; }
-  return (data ?? []).map(mapReview);
+  const blocked = await viewerBlockedIds();
+  return (data ?? []).filter((r: any) => !blocked.has(r.reviewer_id)).map(mapReview);
 }
 
 /** Every channel-clip reaction the user has recorded, across all channels, newest
@@ -1519,7 +1548,7 @@ export async function fetchChannelReview(reviewId: string): Promise<ChannelRevie
     .from('channel_reviews')
     .select(`
       id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
-      reviewer:users!reviewer_id(handle),
+      reviewer:users!reviewer_id(handle, avatar_url),
       post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type)
     `)
     .eq('id', reviewId)

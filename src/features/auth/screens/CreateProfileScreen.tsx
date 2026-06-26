@@ -185,7 +185,7 @@ export default function CreateProfileScreen({
               style={styles.input}
               value={email}
               onChangeText={setEmail}
-              placeholder="you@example.com"
+              placeholder="you@vidrip.app"
               placeholderTextColor={C.SUBTLE}
               keyboardType="email-address"
               autoCapitalize="none"
