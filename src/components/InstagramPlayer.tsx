@@ -37,6 +37,11 @@ const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function Instag
   const videoRef = useRef<any>(null);
   const [paused, setPaused] = useState(true);
   const [muted, setMuted] = useState(startMuted);
+  // Android ExoPlayer drops a play() (paused→false) that arrives before the player has prepared its
+  // surface — so the first tap-to-play does nothing and the user taps again. Gate `paused` on this
+  // flag (set once the first frame is ready) so the play intent only reaches a ready player. iOS is
+  // already reliable; the gate is a no-op there.
+  const [canPlay, setCanPlay] = useState(false);
 
   const emit = useCallback((s: PlayerState) => onChangeState?.(s), [onChangeState]);
 
@@ -57,7 +62,7 @@ const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function Instag
       ref={videoRef}
       source={{ uri }}
       style={style}
-      paused={paused}
+      paused={paused || !canPlay}
       muted={muted}
       // Render into a TextureView (not the default SurfaceView) on Android so this
       // native-video source composites in the normal view hierarchy — exactly like
@@ -67,7 +72,9 @@ const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function Instag
       resizeMode="cover"
       mixWithOthers="mix"
       playInBackground={false}
-      onLoad={() => onReady?.()}
+      onLoad={() => { setCanPlay(true); onReady?.(); }}
+      // Android: surface/first frame ready — a play command will now actually take.
+      onReadyForDisplay={() => setCanPlay(true)}
       onProgress={(d: any) =>
         onCurrentTime?.(d.currentTime, d.seekableDuration ?? d.playableDuration ?? 0)}
       onEnd={() => { setPaused(true); emit('ended'); }}

@@ -167,7 +167,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
             <Ionicons
               name={item.visibility === 'subscribers' ? 'lock-closed' : 'globe-outline'}
               size={12} color={C.SUBTLE} style={{ marginLeft: SPACE.SM }} />
-            <Text style={styles.visText}>{item.visibility === 'subscribers' ? 'Subscribers' : 'Public'}</Text>
+            <Text style={styles.visText}>{item.visibility === 'subscribers' ? 'Members' : 'Public'}</Text>
           </View>
         </View>
         {item.status !== 'ready' && (

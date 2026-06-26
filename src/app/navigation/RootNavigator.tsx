@@ -193,13 +193,11 @@ export default function RootNavigator() {
     if (!sessionRef.current || !navRef.current?.isReady()) { return; }
     const store = useShareIntentStore.getState();
     if (store.pendingChannel) {
-      const { id, justSubscribed } = store.pendingChannel;
+      const { id } = store.pendingChannel;
       store.setPendingChannel(null);
-      // Coming back from the channel should land on My Subscriptions.
-      if (justSubscribed) { store.setSubscribedTabPending(true); }
       navRef.current.navigate('Main', {
         screen: 'Channels',
-        params: { screen: 'Channel', params: { channelId: id, channelName: '', isPublic: true, isJoined: true, isMembersOnly: true, justSubscribed } },
+        params: { screen: 'Channel', params: { channelId: id, channelName: '', isPublic: true, isJoined: true, isMembersOnly: true } },
       });
     } else if (store.pendingReactionId) {
       const reactionId = store.pendingReactionId;
@@ -248,13 +246,11 @@ export default function RootNavigator() {
       return;
     }
 
-    // vidrip://channel/<id>?subscribed=1 — returning from the web subscribe flow.
-    // Stash it; runPendingNavigation opens it once the navigator + session are
-    // ready (handles cold start, where the link arrives before they mount).
+    // vidrip://channel/<id> — open the room. Stash it; runPendingNavigation opens it once the
+    // navigator + session are ready (handles cold start, where the link arrives before they mount).
     if (url.startsWith('vidrip://channel/')) {
       const id = url.slice('vidrip://channel/'.length).split(/[?#/]/)[0];
-      const justSubscribed = /[?&]subscribed=1/.test(url);
-      if (id) { useShareIntentStore.getState().setPendingChannel({ id, justSubscribed }); }
+      if (id) { useShareIntentStore.getState().setPendingChannel({ id }); }
       return;
     }
 

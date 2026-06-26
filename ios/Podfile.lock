@@ -2051,6 +2051,12 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - RNIap (12.16.4):
+    - RCT-Folly
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - ReactCommon/turbomodule/core
   - RNReanimated (3.16.7):
     - DoubleConversion
     - glog
@@ -2177,6 +2183,27 @@ PODS:
     - React-NativeModulesApple
     - React-RCTFabric
     - React-RCTImage
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
+  - RNShare (12.3.1):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - RCT-Folly (= 2024.01.01.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-NativeModulesApple
+    - React-RCTFabric
     - React-rendererdebug
     - React-utils
     - ReactCodegen
@@ -2315,8 +2342,10 @@ DEPENDENCIES:
   - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
   - RNFS (from `../node_modules/react-native-fs`)
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNIap (from `../node_modules/react-native-iap`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
+  - RNShare (from `../node_modules/react-native-share`)
   - RNVectorIcons (from `../node_modules/react-native-vector-icons`)
   - VisionCamera (from `../node_modules/react-native-vision-camera`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
@@ -2507,10 +2536,14 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-fs"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNIap:
+    :path: "../node_modules/react-native-iap"
   RNReanimated:
     :path: "../node_modules/react-native-reanimated"
   RNScreens:
     :path: "../node_modules/react-native-screens"
+  RNShare:
+    :path: "../node_modules/react-native-share"
   RNVectorIcons:
     :path: "../node_modules/react-native-vector-icons"
   VisionCamera:
@@ -2615,13 +2648,15 @@ SPEC CHECKSUMS:
   RNFBMessaging: a12bd45d4c1572e7a6f7b4c65377ec2ce600bf92
   RNFS: 89de7d7f4c0f6bafa05343c578f61118c8282ed8
   RNGestureHandler: 1f80320a8835ca148d7a1c48707128e6aa4fc086
+  RNIap: f14cb76671570a0144bbf0cb23541f0f3364f393
   RNReanimated: a2692304a6568bc656c04c8ffea812887d37436e
   RNScreens: 351f431ef2a042a1887d4d90e1c1024b8ae9d123
+  RNShare: 6f06e3a21fa8417450e4bbfce5bcad4835423602
   RNVectorIcons: d023ce4b93302120c93666cb0194f48cf4b6ecc5
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   VisionCamera: 2140384716600ebf9e8f5b2b604a1fb38fb8fe87
   Yoga: fcc198acd4a55599b3468cfb6ebc526baff5f06e
 
-PODFILE CHECKSUM: 55ef558c86e2fb62dc403614bd0e1acc5657c484
+PODFILE CHECKSUM: f48d07fe44c15f0063248340e8fd45b027ec16fd
 
 COCOAPODS: 1.16.2

@@ -41,8 +41,6 @@ import ChannelSettingsSheet from '../../channels/components/ChannelSettingsSheet
 import {
   fetchMyCreatorChannel,
   fetchMySubscriptions,
-  cancelChannelSubscription,
-  resumeChannelSubscription,
   type MyCreatorChannel,
   type MySubscription,
 } from '../../../infrastructure/supabase/queries/channels';
@@ -74,7 +72,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   const [savingCreator, setSavingCreator] = useState(false);
   const [creatorChannel, setCreatorChannel] = useState<MyCreatorChannel | null>(null);
   const [subs, setSubs] = useState<MySubscription[]>([]);
-  const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const handleToggleCreator = (next: boolean) => {
     if (!user?.id || savingCreator) { return; }
@@ -125,31 +122,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     try { setCreatorChannel(await fetchMyCreatorChannel(user.id)); } catch { /* ignore */ }
     try { setSubs(await fetchMySubscriptions(user.id)); } catch { /* ignore */ }
   }, [user?.id]);
-
-  const handleUnsubscribe = (sub: MySubscription) => {
-    Alert.alert(
-      `Unsubscribe from ${sub.name}?`,
-      'Your subscription will end at the close of the current billing period — you keep access until then.',
-      [
-        { text: 'Keep subscription', style: 'cancel' },
-        {
-          text: 'Unsubscribe', style: 'destructive', onPress: async () => {
-            setCancelingId(sub.channelId);
-            try { await cancelChannelSubscription(sub.channelId); await loadSynced(); }
-            catch (e: any) { Alert.alert('Error', e?.message ?? 'Could not cancel.'); }
-            finally { setCancelingId(null); }
-          },
-        },
-      ],
-    );
-  };
-
-  const handleResume = async (sub: MySubscription) => {
-    setCancelingId(sub.channelId);
-    try { await resumeChannelSubscription(sub.channelId); await loadSynced(); }
-    catch (e: any) { Alert.alert('Error', e?.message ?? 'Could not resume.'); }
-    finally { setCancelingId(null); }
-  };
 
   useFocusEffect(useCallback(() => { loadSynced(); }, [loadSynced]));
 
@@ -504,10 +476,10 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         </View>
       </View>
 
-      {/* Subscriptions — channels this user pays to access */}
+      {/* Memberships — channels this user has access to (read-only; managed on the web) */}
       {subs.length > 0 && (
         <>
-          <Text style={styles.sectionLabel}>Subscriptions</Text>
+          <Text style={styles.sectionLabel}>Memberships</Text>
           <View style={styles.section}>
             {subs.map((s, i) => (
               <View key={s.channelId}>
@@ -517,21 +489,8 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
                     <Text style={styles.rowLabel} numberOfLines={1}>
                       {s.name}{s.tierTitle ? <Text style={styles.syncHandle}>  ·  {s.tierTitle}</Text> : null}
                     </Text>
-                    <Text style={styles.syncHandle} numberOfLines={1}>
-                      {s.cancelAtPeriodEnd
-                        ? `Ends ${s.currentPeriodEnd ? new Date(s.currentPeriodEnd).toLocaleDateString() : 'soon'}`
-                        : s.currentPeriodEnd ? `Renews ${new Date(s.currentPeriodEnd).toLocaleDateString()}` : 'Active'}
-                    </Text>
+                    <Text style={styles.syncHandle} numberOfLines={1}>Managed on the web</Text>
                   </View>
-                  {s.cancelAtPeriodEnd ? (
-                    <TouchableOpacity onPress={() => handleResume(s)} hitSlop={8} disabled={cancelingId === s.channelId}>
-                      <Text style={styles.connectBtnText}>{cancelingId === s.channelId ? '…' : 'Resume'}</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity onPress={() => handleUnsubscribe(s)} hitSlop={8} disabled={cancelingId === s.channelId}>
-                      <Text style={styles.syncDisconnect}>{cancelingId === s.channelId ? '…' : 'Unsubscribe'}</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               </View>
             ))}

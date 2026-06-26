@@ -9,12 +9,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
+import { TERMS_URL, PRIVACY_URL } from '../../../constants/legal';
+import { assertCleanText, TextRejected, OBJECTIONABLE_MESSAGE } from '../../../infrastructure/moderation/textFilter';
 import type { AuthStackScreenProps } from '../../../app/navigation/types';
 import SlimeScribe from '../components/SlimeScribe';
 import GradientButton from '../../studio/components/GradientButton';
@@ -60,13 +63,22 @@ export default function CreateProfileScreen({
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const handleCreate = async () => {
     // `handle` is already normalized on input (lowercase, [a-z0-9_] only), so this
     // matches exactly what the validation below gated on — no risk of sending an
     // empty/too-short handle that passed a raw-length check.
     const trimmedHandle = handle;
-    if (!email.trim() || trimmedHandle.length < 3 || !displayName.trim()) return;
+    if (!email.trim() || trimmedHandle.length < 3 || !displayName.trim() || !agreed) return;
+
+    // Filter objectionable handles / display names before creating the account (App Store 1.2).
+    try {
+      assertCleanText(displayName);
+      assertCleanText(trimmedHandle);
+    } catch (e) {
+      if (e instanceof TextRejected) { Alert.alert('Choose another name', OBJECTIONABLE_MESSAGE); return; }
+    }
 
     setLoading(true);
     try {
@@ -94,7 +106,7 @@ export default function CreateProfileScreen({
   };
 
   const isValid =
-    email.includes('@') && handle.length >= 3 && displayName.trim().length >= 1;
+    email.includes('@') && handle.length >= 3 && displayName.trim().length >= 1 && agreed;
 
   // After the magic link is sent, swap to a dedicated confirmation — otherwise the user is
   // dropped back on the form (which reads as "my text vanished"). Mirrors SignInScreen.
@@ -181,6 +193,19 @@ export default function CreateProfileScreen({
             />
           </View>
         </View>
+
+        {/* Required EULA / terms agreement before account creation (App Store 1.2). */}
+        <TouchableOpacity style={styles.agreeRow} activeOpacity={0.8} onPress={() => setAgreed(a => !a)}>
+          <View style={[styles.checkbox, agreed && styles.checkboxOn]}>
+            {agreed && <Ionicons name="checkmark" size={14} color={C.WHITE} />}
+          </View>
+          <Text style={styles.agreeTxt}>
+            I agree to the{' '}
+            <Text style={styles.agreeLink} onPress={() => Linking.openURL(TERMS_URL)}>Terms of Use</Text>
+            {' '}and{' '}
+            <Text style={styles.agreeLink} onPress={() => Linking.openURL(PRIVACY_URL)}>Privacy Policy</Text>.
+          </Text>
+        </TouchableOpacity>
 
         <GradientButton
           label="Send Magic Link"
@@ -293,6 +318,16 @@ const styles = StyleSheet.create({
     color: C.INK,
   },
   cta: { marginTop: SPACE.LG },
+
+  // EULA / terms agreement
+  agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.SM, marginTop: SPACE.LG },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: C.BORDER_STRONG,
+    alignItems: 'center', justifyContent: 'center', marginTop: 1,
+  },
+  checkboxOn: { backgroundColor: C.ACCENT, borderColor: C.ACCENT },
+  agreeTxt: { flex: 1, color: C.MUTED, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, lineHeight: 19 },
+  agreeLink: { color: C.ACCENT_HOT, fontFamily: FONT.BODY_SEMIBOLD, textDecorationLine: 'underline' },
 
   // sent confirmation (mirrors SignInScreen)
   sentContainer: {

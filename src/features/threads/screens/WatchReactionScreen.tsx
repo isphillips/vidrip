@@ -124,6 +124,11 @@ export default function WatchReactionScreen({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  // Android ExoPlayer drops a play command (paused→false) if it arrives before the player has
+  // prepared/attached its surface — so an early tap does nothing and the user taps again. Gate the
+  // reaction video's `paused` on this flag (set once the first frame is ready) so the play intent is
+  // only delivered to a ready player. iOS already starts reliably; the gate is a harmless no-op there.
+  const [canPlay, setCanPlay] = useState(false);
   const videoRef = useRef<any>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
   const ttRef = useRef<TikTokPlayerHandle>(null);
@@ -413,7 +418,7 @@ export default function WatchReactionScreen({
           source={{ uri: (playingAfterthought && reaction?.afterthoughtUri) ? reaction.afterthoughtUri : localUri }}
           style={{ width, height }}
           resizeMode="cover"
-          paused={paused}
+          paused={paused || !canPlay}
           mixWithOthers="mix"
           disableFocus={Platform.OS === 'android'}
           // TextureView renders in the normal view hierarchy so it can't be
@@ -423,10 +428,13 @@ export default function WatchReactionScreen({
           viewType={Platform.OS === 'android' ? ViewType.TEXTURE : undefined}
           onLoad={(d: any) => {
             setDuration(d.duration);
+            setCanPlay(true); // fallback in case onReadyForDisplay doesn't fire
             configureForMixedPlayback()
               .then(() => setSessionReady(true))
               .catch(() => setSessionReady(true));
           }}
+          // Android: the surface/first frame is ready — now a play command will actually take.
+          onReadyForDisplay={() => setCanPlay(true)}
           onProgress={(d: any) => { progressRef.current = d.currentTime; setProgress(d.currentTime); replayEmojis(d.currentTime); }}
           onEnd={handleEnd}
           onError={(e: any) => {

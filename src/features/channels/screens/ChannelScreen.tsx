@@ -36,7 +36,6 @@ import {
   type ChannelPost,
   type ChannelClipTile,
   type ChannelReview,
-  type ChannelTier,
 } from '../../../infrastructure/supabase/queries/channels';
 import {
   startAudioRecording,
@@ -60,7 +59,7 @@ export default function ChannelhamburderScreen({
   route,
   navigation,
 }: ChannelsStackScreenProps<'Channel'>) {
-  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner: isOwnerParam, isMembersOnly, inviteOnly: inviteOnlyParam, ownerHandle, justSubscribed } = route.params;
+  const { channelId, channelName, isPublic, isJoined: isJoinedParam, isOwner: isOwnerParam, isMembersOnly, inviteOnly: inviteOnlyParam, ownerHandle } = route.params;
   const { user } = useAuthStore();
   // Some entry points (notification tap, post-subscribe deep link) navigate here WITHOUT the
   // `isOwner` route param, so trusting it alone makes an owner render as a non-owner. Derive the
@@ -95,14 +94,9 @@ export default function ChannelhamburderScreen({
   const [inviteOnly, setInviteOnly] = useState(!!inviteOnlyParam);
   const [isListed, setIsListed] = useState(false); // groups.is_public — public visibility
   const [filter, setFilter] = useState<GridFilter>('all');
-  // Subscriber-mode paywall: gated=true → show the paywall instead of content.
+  // Members-mode lock: gated=true → show the neutral members lock instead of content.
+  // Membership is handled entirely on the web — no price/subscribe/payment UI in the app.
   const [gated, setGated] = useState(false);
-  const [tiers, setTiers] = useState<ChannelTier[]>([]);
-  const [myTier, setMyTier] = useState<string | null>(null);   // subscribed tier name (header pill)
-  // Just returned from web checkout: poll entitlement (webhook lags ~1-2s) and
-  // show "Unlocking…" instead of the paywall until the subscription lands.
-  const [finalizing, setFinalizing] = useState(!!justSubscribed);
-  const unlockTriesRef = useRef(0);
   const [reactionTiles, setReactionTiles] = useState<ChannelClipTile[]>([]);
   const [reviewTiles, setReviewTiles] = useState<ChannelReview[]>([]);
   // Fresh TikTok thumbnails resolved by video id (stored ones expire — see api.ts).
@@ -143,25 +137,11 @@ export default function ChannelhamburderScreen({
       fetchChannelAccess(channelId, user?.id)
         .then(a => {
           if (!mountedRef.current) { return; }
-          // Paywall → unlocked transition = subscription just went through.
-          if (wasGatedRef.current && !a.gated) {
-            Alert.alert('You’re subscribed! 🎉', 'Welcome in — enjoy the channel.');
-          }
           wasGatedRef.current = a.gated;
           setGated(a.gated);
-          setTiers(a.tiers);
-          setMyTier(a.myTier ?? null);
-          // An entitled subscriber has access — treat as joined so the grid isn't
-          // invite-locked (their nav param `joined` can be stale on re-entry).
+          // A member has access — treat as joined so the grid isn't invite-locked
+          // (their nav param `joined` can be stale on re-entry).
           if (a.subscriberMode && !a.gated) { setJoined(true); }
-          // Returning from checkout: the webhook lags a beat, so poll entitlement
-          // and keep showing "Unlocking…" rather than the paywall until it lands.
-          if (!a.gated) { setFinalizing(false); }
-          else if (justSubscribed && unlockTriesRef.current < 8) {
-            unlockTriesRef.current += 1;
-            setFinalizing(true);
-            setTimeout(() => { if (mountedRef.current) { load(true); } }, 1500);
-          } else { setFinalizing(false); }
         })
         .catch(() => {});
       fetchChannelReviewSettings(channelId)
@@ -186,8 +166,8 @@ export default function ChannelhamburderScreen({
   // Keep postsRef in sync
   useEffect(() => { postsRef.current = posts; }, [posts]);
 
-  // Fans subscribe in the browser (link-out). When they return to the app with the
-  // paywall still up, re-check entitlement so the room unlocks + confirms.
+  // Membership is completed on the web. When the user returns to the app with the
+  // members lock still up, re-check access so the room unlocks if they've joined.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active' && wasGatedRef.current) { load(true); }
@@ -540,8 +520,8 @@ export default function ChannelhamburderScreen({
             <SlimeGearhead size={30} active={menuVisible} />
           </TouchableOpacity>
         ) : gated ? (
-          // Subscriber-mode channel, viewer isn't a subscriber — no Join/Leave here;
-          // subscribing happens through the paywall below.
+          // Members channel, viewer isn't a member — no Join/Leave here; the neutral
+          // members lock is shown below (membership is handled on the web).
           null
         ) : isPublic && inviteOnly && !joined ? (
           // Invite-only room, not a member — can't self-join.
@@ -549,12 +529,8 @@ export default function ChannelhamburderScreen({
             <Text style={styles.lockedHeaderText}>🔒 Invite only</Text>
           </View>
         ) : isMembersOnly ? (
-          // Subscriber room you're in — show your tier (no Join/Leave; manage from Account).
-          myTier ? (
-            <View style={styles.tierPill}>
-              <Text style={styles.tierPillText} numberOfLines={1}>{myTier}</Text>
-            </View>
-          ) : null
+          // Members room you're in — no Join/Leave header control.
+          null
         ) : isPublic ? (
           // Public / curated channels only.
           <TouchableOpacity
@@ -592,13 +568,8 @@ export default function ChannelhamburderScreen({
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
-      ) : gated && finalizing ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={C.ACCENT_HOT} />
-          <Text style={[styles.emptyText, { marginTop: SPACE.MD }]}>Unlocking your subscription…</Text>
-        </View>
       ) : gated ? (
-        <SubscriberPaywall channelId={channelId} label={title} tiers={tiers} />
+        <SubscriberPaywall channelId={channelId} label={title} />
       ) : isPublic ? (
         <>
           {/* Reviews filter pills — public grid only, when the creator enabled reviews */}

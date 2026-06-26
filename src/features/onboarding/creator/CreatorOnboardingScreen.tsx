@@ -50,7 +50,7 @@ const SCENES: { kicker: string; title: string; body: string; Vignette: Vignette 
   {
     kicker: 'Earn',
     title: 'Set your\ntiers',
-    body: 'From your web dashboard, name your price and your perks. Fans subscribe for exclusive drip. Earn recurring support, straight from the people who love what you make.',
+    body: 'Set up membership tiers and perks from your web dashboard. Turn your biggest fans into a members club they join on the web — exclusive drip, straight from you.',
     Vignette: TiersVignette,
   },
   {

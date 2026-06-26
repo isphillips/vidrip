@@ -16,6 +16,7 @@ import {
   type PostableChannel, type Visibility, type UploadHandle,
 } from '../../../infrastructure/creatorStudio/api';
 import { publishStudioClipToFriends } from '../../../infrastructure/creatorStudio/studioShare';
+import { findObjectionable, OBJECTIONABLE_MESSAGE } from '../../../infrastructure/moderation/textFilter';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
@@ -137,8 +138,15 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
     });
   };
 
+  // Block objectionable captions before publishing (App Store 1.2 text filtering).
+  const captionOk = () => {
+    if (findObjectionable(title)) { Alert.alert('Edit your caption', OBJECTIONABLE_MESSAGE); return false; }
+    return true;
+  };
+
   const post = async () => {
     if (!channelId || uploading) { return; }
+    if (!captionOk()) { return; }
     const scheduling = publishMode === 'schedule';
     if (scheduling && releaseAt.getTime() <= Date.now()) {
       Alert.alert('Pick a future time', 'The scheduled time must be in the future.');
@@ -183,6 +191,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   // BAKED into the file here (recipients play a plain MP4 in the reaction viewer, no live recipe replay).
   const sendToFriends = async () => {
     if (selectedFriends.size === 0 || uploading || !user?.id) { return; }
+    if (!captionOk()) { return; }
     setUploading(true);
     try {
       const baked = isEmptyRecipe(recipe)
@@ -377,7 +386,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
 
         <Text style={styles.label}>Who can watch</Text>
         {subscribersOnly && (
-          <Text style={styles.hint}>This channel is subscribers-only. All posts are locked.</Text>
+          <Text style={styles.hint}>This channel is members-only. All posts are locked.</Text>
         )}
         <View style={styles.toggle}>
           {(['public', 'subscribers'] as Visibility[]).map(v => {
@@ -391,7 +400,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
                 <Ionicons name={v === 'public' ? 'globe-outline' : 'lock-closed'} size={16}
                   color={active ? C.WHITE : disabled ? C.SUBTLE : C.MUTED} />
                 <Text style={[styles.toggleText, active && styles.toggleTextActive, disabled && styles.toggleTextDisabled]}>
-                  {v === 'public' ? 'Public' : 'Subscribers'}
+                  {v === 'public' ? 'Public' : 'Members'}
                 </Text>
               </TouchableOpacity>
             );

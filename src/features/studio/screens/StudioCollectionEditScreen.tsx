@@ -189,15 +189,15 @@ export default function StudioCollectionEditScreen({ route, navigation }: Studio
 
         {/* Tiers */}
         <Text style={styles.section}>Award to tiers</Text>
-        <Text style={styles.hint}>Subscribers to a selected tier get this collection automatically.</Text>
+        <Text style={styles.hint}>Members of a selected tier get this collection automatically.</Text>
         {tiers.length === 0
-          ? <Text style={styles.empty}>This channel has no subscription tiers.</Text>
+          ? <Text style={styles.empty}>This channel has no membership tiers yet.</Text>
           : tiers.map(t => {
               const on = selectedTiers.has(t.id);
               return (
                 <TouchableOpacity key={t.id} style={[styles.choice, on && styles.choiceOn]} onPress={() => setSelectedTiers(s => toggle(s, t.id))} activeOpacity={0.8}>
                   <Ionicons name={on ? 'checkbox' : 'square-outline'} size={18} color={on ? C.ACCENT_HOT : C.SUBTLE} />
-                  <Text style={styles.choiceTxt}>{t.title} · ${(t.priceCents / 100).toFixed(0)}/mo</Text>
+                  <Text style={styles.choiceTxt}>{t.title}</Text>
                 </TouchableOpacity>
               );
             })}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, useWindowDimensions, Animated, Easing } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, useWindowDimensions, Animated, Easing, Linking } from 'react-native';
 import {
   Canvas, Fill, Group, Circle, vec, Blur, ColorMatrix, Paint,
   LinearGradient as SkiaGradient, useClock, useImage, Image as SkImage,
@@ -9,6 +9,7 @@ import { useDerivedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, SPACE, RADIUS, C } from '../../../theme';
 import GradientButton from '../../studio/components/GradientButton';
+import { TERMS_URL, PRIVACY_URL } from '../../../constants/legal';
 import type { AuthStackScreenProps } from '../../../app/navigation/types';
 
 const logo = require('../../../assets/driplogo.png');
@@ -279,6 +280,13 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
           onPress={() => navigation.navigate('SignIn')}>
           <Text style={styles.signInText}>Already have an account? Sign In</Text>
         </TouchableOpacity>
+        {/* EULA / terms agreement, presented before registering or signing in (App Store 1.2). */}
+        <Text style={styles.legal}>
+          By continuing, you agree to our{'\n '}
+          <Text style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)}>Terms of Use</Text>
+          {' '}and{' '}
+          <Text style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_URL)}>Privacy Policy</Text>.
+        </Text>
       </View>
     </View>
   );
@@ -337,6 +345,16 @@ const styles = StyleSheet.create({
     color: C.WHITE,
     fontSize: FONT.SIZES.MD,
     fontFamily: FONT.BODY,
-    marginBottom: SPACE.XXL,
+    marginBottom: SPACE.MD,
   },
+  legal: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: FONT.SIZES.XS,
+    fontFamily: FONT.BODY,
+    textAlign: 'center',
+    lineHeight: 17,
+    paddingHorizontal: SPACE.LG,
+    marginBottom: SPACE.XL,
+  },
+  legalLink: { color: C.WHITE, fontFamily: FONT.BODY_SEMIBOLD, textDecorationLine: 'underline' },
 });

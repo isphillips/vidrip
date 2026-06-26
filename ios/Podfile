@@ -1,3 +1,19 @@
+# --- Xcode 16 objectVersion 70 compatibility shim ------------------------------------
+# Xcode 16 stamps `objectVersion = 70` in the project, but the bundled CocoaPods `xcodeproj`
+# gem's compatibility table jumps 63 -> 77 (it has no 70). When CocoaPods creates the Pods
+# project it copies the app project's object version (Integer 70) and Xcodeproj::Project#new
+# looks it up, aborting `pod install` with:
+#   "Unable to find compatibility version string for object version `70`".
+# Teach xcodeproj that 70 == Xcode 16.0 (the table is frozen, so swap the constant). Runs
+# before the Pods project is generated, locally and in Xcode Cloud; a no-op once the gem
+# ships the mapping. Tracking: github.com/CocoaPods/CocoaPods/issues/12840
+require 'xcodeproj'
+unless Xcodeproj::Constants::COMPATIBILITY_VERSION_BY_OBJECT_VERSION.key?(70)
+  _patched = Xcodeproj::Constants::COMPATIBILITY_VERSION_BY_OBJECT_VERSION.merge(70 => 'Xcode 16.0').freeze
+  Xcodeproj::Constants.send(:remove_const, :COMPATIBILITY_VERSION_BY_OBJECT_VERSION)
+  Xcodeproj::Constants.const_set(:COMPATIBILITY_VERSION_BY_OBJECT_VERSION, _patched)
+end
+
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(

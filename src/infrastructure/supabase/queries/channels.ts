@@ -1138,41 +1138,9 @@ export async function fetchMySubscriptions(userId: string): Promise<MySubscripti
   }));
 }
 
-// Subscription management calls the web API (Stripe lives server-side).
-const WEB_API_BASE = 'https://www.vidrip.app/api';
-
-// A valid (non-expired) access token for the cross-service call. getSession() can
-// hand back a stale token; refresh if it's missing or about to expire, else the
-// web function rejects it as "unauthorized".
-async function freshAccessToken(): Promise<string> {
-  let session = (await supabase.auth.getSession()).data.session;
-  // Only refresh an EXISTING, near-expiry session — refreshSession() throws
-  // ("Auth session missing") when there's no session to refresh.
-  if (session?.expires_at && session.expires_at * 1000 < Date.now() + 60_000) {
-    try { const r = await supabase.auth.refreshSession(); if (r.data.session) { session = r.data.session; } }
-    catch { /* keep the current token */ }
-  }
-  const token = session?.access_token;
-  if (!token) { throw new Error('Please sign in again to manage your subscription.'); }
-  return token;
-}
-
-async function billingPost(path: string, channelId: string): Promise<void> {
-  const token = await freshAccessToken();
-  const res = await fetch(`${WEB_API_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-    body: JSON.stringify({ channelId }),
-  });
-  if (!res.ok) {
-    const j = await res.json().catch(() => ({} as any));
-    throw new Error(j.error ?? `Request failed (${res.status})`);
-  }
-}
-
-// Cancel at period end (user keeps access until then) / un-cancel.
-export const cancelChannelSubscription = (channelId: string) => billingPost('/subscribe/cancel', channelId);
-export const resumeChannelSubscription = (channelId: string) => billingPost('/subscribe/resume', channelId);
+// NOTE: in-app subscription management (cancel/resume via the web billing API) was removed for App
+// Store 3.1.1 compliance — the app carries no payment or subscription-management surface. Memberships
+// are managed entirely on the web. `fetchMySubscriptions` above remains for a READ-ONLY memberships list.
 
 export async function joinChannel(channelId: string, userId: string): Promise<void> {
   const { error } = await (supabase as any)

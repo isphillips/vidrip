@@ -91,7 +91,7 @@ export default function ChannelCard({
               ) : channel.invite_only ? (
                 <View style={styles.lockPill}>
                   <Text style={styles.lockText}>
-                    {channel.subscriber_mode ? '⭐ Subscription Only' : '🔒 Invite only'}
+                    {channel.subscriber_mode ? '⭐ Members Only' : '🔒 Invite only'}
                   </Text>
                 </View>
               ) : null

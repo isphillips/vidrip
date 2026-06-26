@@ -45,7 +45,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Vidrip records your reaction to videos shared by friends.</string>
+	<string>Vidrip uses the camera to record your video reactions and to power optional AR face effects (lenses). Face detection for lenses runs entirely on your device.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Vidrip uses your contacts so you can invite friends with your invite codes. Phone numbers are never uploaded or stored.</string>
 	<key>NSMicrophoneUsageDescription</key>

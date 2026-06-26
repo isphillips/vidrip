@@ -66,7 +66,7 @@ export default function StudioCollectionsScreen({ navigation }: StudioStackScree
             <View style={styles.emptyInner}>
               <Ionicons name="diamond-outline" size={36} color={C.SUBTLE} />
               <Text style={styles.emptyTitle}>No collections yet</Text>
-              <Text style={styles.emptyHint}>Group videos into exclusive collections and award them to subscribers or individual fans.</Text>
+              <Text style={styles.emptyHint}>Group videos into exclusive collections and award them to members or individual fans.</Text>
             </View>
           )}
       />

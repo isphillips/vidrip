@@ -165,12 +165,13 @@ export function TwoViewVignette() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════════
-//  3 · Tiers & the web dashboard — set your price, your fans subscribe
+//  3 · Tiers & the web dashboard — creators set up membership tiers on the web
+//  (No prices shown in-app — App Store 3.1.1: the app carries no pricing/purchase surface.)
 // ════════════════════════════════════════════════════════════════════════════════════════════
 const TIERS = [
-  { name: 'Fan', price: '$3', icon: 'heart', color: TEAL },
-  { name: 'Super', price: '$9', icon: 'star', color: GOLD, hot: true },
-  { name: 'Inner', price: '$25', icon: 'diamond', color: PINK },
+  { name: 'Fan', icon: 'heart', color: TEAL },
+  { name: 'Super', icon: 'star', color: GOLD, hot: true },
+  { name: 'Inner', icon: 'diamond', color: PINK },
 ];
 export function TiersVignette() {
   const cursor = useSharedValue(0);
@@ -204,7 +205,7 @@ export function TiersVignette() {
               {t.hot && <View style={styles.tierBadge}><Text style={styles.tierBadgeTxt}>POPULAR</Text></View>}
               <Ionicons name={t.icon} size={18} color={t.color} />
               <Text style={styles.tierName}>{t.name}</Text>
-              <Text style={[styles.tierPrice, { color: t.color }]}>{t.price}<Text style={styles.tierMo}>/mo</Text></Text>
+              <Text style={styles.tierMo}>members</Text>
             </Animated.View>
           ))}
         </View>

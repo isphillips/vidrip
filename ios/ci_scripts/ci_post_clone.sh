@@ -32,4 +32,6 @@ echo "export NODE_BINARY=$(command -v node)" > "$CI_PRIMARY_REPOSITORY_PATH/ios/
 export HOMEBREW_NO_INSTALL_CLEANUP=TRUE
 brew install cocoapods
 cd ios
+# The Podfile teaches xcodeproj the Xcode 16 objectVersion-70 mapping before the Pods
+# project is generated, so `pod install` works here the same as locally.
 pod install

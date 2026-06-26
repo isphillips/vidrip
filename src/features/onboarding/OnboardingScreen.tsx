@@ -13,7 +13,7 @@ import { refreshConnectedFeed } from '../../infrastructure/supabase/queries/conn
 import LinearGradient from 'react-native-linear-gradient';
 import { DecoDivider, Kicker, Pips, DecoButton } from './components';
 import PaintReveal from '../../components/PaintReveal';
-import { SceneBackdrop, TEXT_GLOW } from '../../components/scene/sceneKit';
+import { SceneBackdrop, CopyScrim, TEXT_GLOW, W } from '../../components/scene/sceneKit';
 import GradientButton from '../studio/components/GradientButton';
 import OnboardingSlime from './OnboardingSlime';
 
@@ -136,10 +136,13 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
                 ))}
               </Text>
               <DecoDivider />
-              <Text style={styles.body}>
-                You're in the drip. This is where you and your friends trade clips and react to each other. Nobody else, just your circle. Drippy will show you the ropes.
-              </Text>
-              <Text style={styles.whisper}>Tell your crew {handle} sent 'em.</Text>
+              <View style={styles.desc}>
+                <CopyScrim style={styles.descScrim} />
+                <Text style={styles.body}>
+                  You're in the drip. This is where you and your friends trade clips and react to each other. Nobody else, just your circle. Drippy will show you the ropes.
+                </Text>
+                <Text style={styles.whisper}>Tell your crew {handle} sent 'em.</Text>
+              </View>
             </View>
           )}
 
@@ -150,17 +153,20 @@ export default function OnboardingScreen({ onDone }: { mode: 'firstRun' | 'repla
               <Text style={styles.h2}>Your “Liked”</Text>
               <DecoDivider />
               <ForYouMock />
-              <Text style={styles.body}>
-                Pull in your YouTube <Text style={styles.em}>Liked videos</Text>. They pool into your private{' '}
-                <Text style={styles.em}>Liked</Text> stash, so there's always something good to drip to a friend.
-              </Text>
-              {connected ? (
-                <View style={styles.connectedRow}>
-                  <Text style={styles.connectedText}>YouTube connected ✓</Text>
-                </View>
-              ) : (
-                <Text style={styles.whisper}>You can do this later in your account.</Text>
-              )}
+              <View style={styles.desc}>
+                <CopyScrim style={styles.descScrim} />
+                <Text style={styles.body}>
+                  Pull in your YouTube <Text style={styles.em}>Liked videos</Text>. They pool into your private{' '}
+                  <Text style={styles.em}>Liked</Text> stash, so there's always something good to drip to a friend.
+                </Text>
+                {connected ? (
+                  <View style={styles.connectedRow}>
+                    <Text style={styles.connectedText}>YouTube connected ✓</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.whisper}>You can do this later in your account.</Text>
+                )}
+              </View>
             </View>
           )}
 
@@ -350,10 +356,13 @@ function ShareMock() {
           <Animated.Text style={[styles.demoSent, sent]}>Sent ✓</Animated.Text>
         </View>
       </View>
-      <View style={styles.dSteps}>
-        <DemoStep p={p} index={1} range={[0, 0.34]} label="Browse or paste a clip" />
-        <DemoStep p={p} index={2} range={[0.34, 0.6]} label="Pick a friend" />
-        <DemoStep p={p} index={3} range={[0.6, 0.97]} label="Drip it over" />
+      <View style={styles.desc}>
+        <CopyScrim style={styles.descScrim} />
+        <View style={styles.dSteps}>
+          <DemoStep p={p} index={1} range={[0, 0.34]} label="Browse or paste a clip" />
+          <DemoStep p={p} index={2} range={[0.34, 0.6]} label="Pick a friend" />
+          <DemoStep p={p} index={3} range={[0.6, 0.97]} label="Drip it over" />
+        </View>
       </View>
     </View>
   );
@@ -420,10 +429,13 @@ function ReactMock() {
           <Animated.Text style={[styles.demoEmojis, emojis]}>😂 🔥</Animated.Text>
         </View>
       </View>
-      <View style={styles.dSteps}>
-        <DemoStep p={p} index={1} range={[0, 0.2]} label="Open a clip a friend sent" />
-        <DemoStep p={p} index={2} range={[0.2, 0.5]} label="Tap “Record Your Reaction”" />
-        <DemoStep p={p} index={3} range={[0.5, 0.98]} label="They watch you watch it" />
+      <View style={styles.desc}>
+        <CopyScrim style={styles.descScrim} />
+        <View style={styles.dSteps}>
+          <DemoStep p={p} index={1} range={[0, 0.2]} label="Open a clip a friend sent" />
+          <DemoStep p={p} index={2} range={[0.2, 0.5]} label="Tap “Record Your Reaction”" />
+          <DemoStep p={p} index={3} range={[0.5, 0.98]} label="They watch you watch it" />
+        </View>
       </View>
     </View>
   );
@@ -465,6 +477,12 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: 'center', padding: SPACE.XL },
   stepWrap: { flex: 1, justifyContent: 'center' },
   center: { alignItems: 'center', gap: SPACE.MD },
+  // Each step's description sits in a screen-wide carrier so its dark scrim spans edge to
+  // edge while the copy keeps its normal side padding. `W` (full screen width) centered in
+  // the already-centered content makes the band full-bleed; the scrim feathers top/bottom
+  // so it darkens the description without touching Drippy or the glowing heading above.
+  desc: { width: W, alignItems: 'center', paddingHorizontal: SPACE.XL, paddingVertical: SPACE.SM, gap: SPACE.MD },
+  descScrim: { top: -SPACE.SM, bottom: -SPACE.SM },
 
   h1: { fontSize: FONT.SIZES.XXXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: FONT.WEIGHTS.MEDIUM, color: C.INK, textAlign: 'center', textTransform: 'uppercase', ...TEXT_GLOW },
   vidrip: { fontFamily: 'Syne-ExtraBold', fontWeight: FONT.WEIGHTS.BOLD, letterSpacing: 0.5 },
