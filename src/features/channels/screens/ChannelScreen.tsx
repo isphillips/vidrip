@@ -574,7 +574,7 @@ export default function ChannelhamburderScreen({
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
       ) : gated ? (
-        <SubscriberPaywall channelId={channelId} label={title} />
+        <SubscriberPaywall label={title} />
       ) : isPublic ? (
         <>
           {/* Reviews filter pills — public grid only, when the creator enabled reviews */}

@@ -1169,32 +1169,11 @@ export async function fetchSubscribedChannels(userId: string): Promise<ChannelSu
   })) as ChannelSummary[];
 }
 
-// The user's own channel subscriptions (for the Account screen). RLS lets a user
-// read their own rows.
-export type MySubscription = {
-  channelId: string; name: string; tierTitle: string | null; status: string;
-  currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean;
-};
-export async function fetchMySubscriptions(userId: string): Promise<MySubscription[]> {
-  const { data } = await (supabase as any)
-    .from('channel_subscriptions')
-    .select('channel_id, status, current_period_end, cancel_at_period_end, channel:groups!channel_id(name), tier:channel_subscription_tiers!tier_id(title)')
-    .eq('user_id', userId)
-    .in('status', ['active', 'trialing', 'past_due'])
-    .order('updated_at', { ascending: false });
-  return ((data ?? []) as any[]).map((s) => ({
-    channelId: s.channel_id,
-    name: s.channel?.name ?? 'Channel',
-    tierTitle: s.tier?.title ?? null,
-    status: s.status,
-    currentPeriodEnd: s.current_period_end ?? null,
-    cancelAtPeriodEnd: !!s.cancel_at_period_end,
-  }));
-}
-
-// NOTE: in-app subscription management (cancel/resume via the web billing API) was removed for App
-// Store 3.1.1 compliance — the app carries no payment or subscription-management surface. Memberships
-// are managed entirely on the web. `fetchMySubscriptions` above remains for a READ-ONLY memberships list.
+// NOTE: the app carries NO subscription surface at all for App Store 3.1.1 / reader-app compliance —
+// no payment, no subscription management, and no read-only "memberships" list that would reference
+// purchasing or the web. Members who have access simply see channel content directly; non-members see
+// a neutral "Members only" lock (SubscriberPaywall) that points nowhere. Subscriptions are created and
+// managed entirely on the web, with no in-app reference to that.
 
 export async function joinChannel(channelId: string, userId: string): Promise<void> {
   const { error } = await (supabase as any)

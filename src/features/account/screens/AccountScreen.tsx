@@ -40,9 +40,7 @@ import type { AccountStackScreenProps } from '../../../app/navigation/types';
 import ChannelSettingsSheet from '../../channels/components/ChannelSettingsSheet';
 import {
   fetchMyCreatorChannel,
-  fetchMySubscriptions,
   type MyCreatorChannel,
-  type MySubscription,
 } from '../../../infrastructure/supabase/queries/channels';
 
 const PROVIDERS: { key: SyncProvider; label: string }[] = [
@@ -71,7 +69,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
   const isCreator = !!(profile as any)?.is_creator;
   const [savingCreator, setSavingCreator] = useState(false);
   const [creatorChannel, setCreatorChannel] = useState<MyCreatorChannel | null>(null);
-  const [subs, setSubs] = useState<MySubscription[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const handleToggleCreator = (next: boolean) => {
     if (!user?.id || savingCreator) { return; }
@@ -120,7 +117,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     try { setSynced(await fetchSyncedAccounts(user.id, 'creator')); } catch { /* ignore */ }
     try { setFeedAccounts(await fetchSyncedAccounts(user.id, 'feed')); } catch { /* ignore */ }
     try { setCreatorChannel(await fetchMyCreatorChannel(user.id)); } catch { /* ignore */ }
-    try { setSubs(await fetchMySubscriptions(user.id)); } catch { /* ignore */ }
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { loadSynced(); }, [loadSynced]));
@@ -475,28 +471,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
           )}
         </View>
       </View>
-
-      {/* Memberships — channels this user has access to (read-only; managed on the web) */}
-      {subs.length > 0 && (
-        <>
-          <Text style={styles.sectionLabel}>Memberships</Text>
-          <View style={styles.section}>
-            {subs.map((s, i) => (
-              <View key={s.channelId}>
-                {i > 0 && <View style={styles.divider} />}
-                <View style={styles.row}>
-                  <View style={{ flex: 1, paddingRight: SPACE.MD }}>
-                    <Text style={styles.rowLabel} numberOfLines={1}>
-                      {s.name}{s.tierTitle ? <Text style={styles.syncHandle}>  ·  {s.tierTitle}</Text> : null}
-                    </Text>
-                    <Text style={styles.syncHandle} numberOfLines={1}>Managed on the web</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
 
       {/* Actions */}
       <View style={styles.section}>
