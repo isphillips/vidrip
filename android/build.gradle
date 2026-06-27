@@ -4,8 +4,8 @@ buildscript {
         minSdkVersion = 26
         compileSdkVersion = 35
         targetSdkVersion = 35
-        ndkVersion = "26.1.10909125"
-        kotlinVersion = "1.9.24"
+        ndkVersion = "27.1.12297006"
+        kotlinVersion = "2.0.21"
     }
     repositories {
         google()
@@ -20,3 +20,26 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// ── 16 KB page-size support (Google Play requirement for Android 15+) ────────────────
+// NDK r27 does NOT 16 KB-align native libs by default — each module's CMake build must opt
+// in via ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON. React Native's own libs and some modules
+// (worklets-core, gesture-handler) already pass it, but standalone-CMake modules (reanimated,
+// screens, skia) don't, so their .so ship 4 KB-aligned and Play rejects the upload. Inject the
+// flag into every Android subproject so all native libs relink 16 KB-aligned.
+// (Can be removed once the project moves to NDK r28+, where 16 KB is the default.)
+subprojects { subproject ->
+    ["com.android.library", "com.android.application"].each { pluginId ->
+        subproject.plugins.withId(pluginId) {
+            subproject.android {
+                defaultConfig {
+                    externalNativeBuild {
+                        cmake {
+                            arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

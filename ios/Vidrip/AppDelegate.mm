@@ -2,6 +2,7 @@
 
 #import <React/RCTBundleURLProvider.h>
 #import <React/RCTLinkingManager.h>
+#import <ReactAppDependencyProvider/RCTAppDependencyProvider.h>
 #import <HotUpdater/HotUpdater.h>
 #import <AVFoundation/AVFoundation.h>
 #import <UserNotifications/UserNotifications.h>
@@ -16,6 +17,10 @@
 {
   self.moduleName = @"Vidrip";
   self.initialProps = @{};
+
+  // RN 0.77+ (New Architecture): supplies third-party component/TurboModule info to the
+  // runtime. Required when keeping the Objective-C++ AppDelegate instead of the Swift template.
+  self.dependencyProvider = [RCTAppDependencyProvider new];
 
   // PlayAndRecord + MixWithOthers + DefaultToSpeaker:
   // PlayAndRecord is required so ReplayKit can access the microphone without
