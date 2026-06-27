@@ -13,6 +13,8 @@ import {
 } from '../../../infrastructure/storage/localChannelClipStorage';
 import { useAuthStore } from '../../../store/authStore';
 import ContentActions from '../../../components/ContentActions';
+import { recordView } from '../../../infrastructure/supabase/queries/views';
+import ViewBadge from '../../../components/ViewBadge';
 
 type LoadState = 'loading' | 'downloading' | 'ready' | 'unavailable';
 
@@ -64,6 +66,9 @@ export default function WatchReviewScreen({ route, navigation }: Props) {
       }
     })();
   }, [reviewId]);
+
+  // Count a view once this review clip is ready (deduped per viewer per day).
+  useEffect(() => { if (loadState === 'ready') { recordView('review', reviewId); } }, [loadState, reviewId]);
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -135,6 +140,10 @@ export default function WatchReviewScreen({ route, navigation }: Props) {
         <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
 
+      {review && review.view_count > 0 && (
+        <ViewBadge count={review.view_count} style={[styles.reviewViews, { top: topInset + SPACE.LG }]} />
+      )}
+
       {/* Report the clip / block the reviewer — UGC safety affordance (App Store 1.2). */}
       {review?.reviewer_id && review.reviewer_id !== user?.id && (
         <View style={[styles.moreBtn, { top: topInset + SPACE.LG }]}>
@@ -181,6 +190,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   playIcon: { color: C.WHITE, fontSize: 26, marginLeft: 5 },
+  reviewViews: { position: 'absolute', left: SPACE.LG },
   infoBar: {
     position: 'absolute', left: SPACE.LG, right: SPACE.LG,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',

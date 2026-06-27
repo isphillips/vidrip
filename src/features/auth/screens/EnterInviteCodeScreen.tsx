@@ -10,6 +10,7 @@ import { supabase } from '../../../infrastructure/supabase/client';
 import { CopyScrim, TEXT_GLOW } from '../../../components/scene/sceneKit';
 import { AuthScene } from '../components/AuthScene';
 import GradientButton from '../../studio/components/GradientButton';
+import { useShareIntentStore } from '../../../store/shareIntentStore';
 import type { AuthStackScreenProps } from '../../../app/navigation/types';
 
 export default function EnterInviteCodeScreen({
@@ -32,8 +33,16 @@ export default function EnterInviteCodeScreen({
     else { setCode(`${clean.slice(0, 5)}-${clean.slice(5, 9)}`); }
   };
 
-  const prefill = route.params?.code;
-  useEffect(() => { if (prefill) { handleChangeText(prefill); } }, [prefill]);
+  // Prefill from the nav param, or from a vidrip://invite?code= deep link (web registration).
+  const pendingInvite = useShareIntentStore(s => s.pendingInviteCode);
+  const prefill = route.params?.code ?? pendingInvite ?? undefined;
+  useEffect(() => {
+    if (prefill) {
+      handleChangeText(prefill);
+      if (pendingInvite) { useShareIntentStore.getState().setPendingInviteCode(null); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
 
   const handleSubmit = async () => {
     const trimmed = code.trim().toUpperCase();

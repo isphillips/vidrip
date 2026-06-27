@@ -13,6 +13,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import Video from 'react-native-video';
 import GradientIcon from '../../../components/GradientIcon';
 import SlimeGearhead from '../../../components/SlimeGearhead';
+import ViewBadge from '../../../components/ViewBadge';
 import { supabase } from '../../../infrastructure/supabase/client';
 import {
   fetchChannelPosts,
@@ -375,6 +376,7 @@ export default function ChannelhamburderScreen({
     handle: string | null;   // shown as a chip over reaction/review clips
     title: string | null;
     meta: string;
+    views: number;           // eye-count badge on the thumbnail
     obscured: boolean;
     isPinned: boolean;
     locked: boolean;         // invite-only room, viewer not invited → 🔒, no entry
@@ -399,6 +401,7 @@ export default function ChannelhamburderScreen({
         handle: c.handle,
         title: c.parent_yt_video_title,
         meta: c.duration ? `${c.duration}s reaction` : 'Reaction',
+        views: c.view_count,
         obscured: false,
         isPinned: false,
         locked: false,
@@ -413,6 +416,7 @@ export default function ChannelhamburderScreen({
         handle: r.reviewer?.handle ?? null,
         title: r.post_yt_video_title,
         meta: r.duration ? `${r.duration}s review` : 'Review',
+        views: r.view_count,
         obscured: false,
         isPinned: false,
         locked: false,
@@ -433,6 +437,7 @@ export default function ChannelhamburderScreen({
           : item.reaction_count > 0
             ? `${item.reaction_count} reaction${item.reaction_count !== 1 ? 's' : ''}`
             : 'No reactions yet',
+        views: item.view_count ?? 0,
         obscured,
         isPinned: item.is_pinned,
         locked: inviteLocked,
@@ -638,6 +643,9 @@ export default function ChannelhamburderScreen({
                     <View style={styles.tileHandle}>
                       <Text style={styles.tileHandleTxt} numberOfLines={1}>@{item.handle}</Text>
                     </View>
+                  )}
+                  {!item.obscured && !item.locked && item.views > 0 && (
+                    <ViewBadge count={item.views} style={styles.tileViews} />
                   )}
                 </View>
                 {item.obscured ? (
@@ -973,10 +981,11 @@ const styles = StyleSheet.create({
   },
   tilePlayIcon: { color: C.WHITE, fontSize: 18 },
   tileHandle: {
-    position: 'absolute', bottom: SPACE.XS, left: SPACE.XS, right: SPACE.XS,
+    position: 'absolute', bottom: SPACE.XS, left: SPACE.XS, maxWidth: '62%',
     backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.SM,
     paddingHorizontal: 6, paddingVertical: 3,
   },
+  tileViews: { position: 'absolute', right: SPACE.XS, bottom: SPACE.XS },
   tileHandleTxt: { color: C.WHITE, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_SEMIBOLD },
   pinBadgeText: { fontSize: 11 },
   gridTitle: { padding: SPACE.SM, fontSize: FONT.SIZES.SM, color: C.INK, fontFamily: FONT.BODY_MEDIUM },

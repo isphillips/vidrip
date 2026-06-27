@@ -436,3 +436,8 @@ verify_jwt = false
 # authenticates the request itself via the app-secret HMAC, so disable the gateway check.
 [functions.meta-data-deletion]
 verify_jwt = false
+
+# Cron: prunes superseded hot-updater OTA bundles + orphan storage + unreferenced assets.
+# Protected by x-internal-secret (no Supabase JWT), like the other internal cron functions.
+[functions.purge-bundles]
+verify_jwt = false

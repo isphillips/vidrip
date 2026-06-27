@@ -17,6 +17,7 @@ import {
 import EmojiChips from '../../../components/EmojiChips';
 import BunnyEmbedPlayer from '../../studio/components/BunnyEmbedPlayer';
 import ContentActions from '../../../components/ContentActions';
+import { recordView } from '../../../infrastructure/supabase/queries/views';
 import type { ReportTargetType } from '../../../infrastructure/supabase/queries/reports';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
@@ -79,7 +80,7 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
 
       <ScrollView contentContainerStyle={{ paddingBottom: SPACE.XXXL }}>
         {/* Main video play card */}
-        <TouchableOpacity style={styles.playCard} activeOpacity={0.9} onPress={() => setPlayMain(true)}>
+        <TouchableOpacity style={styles.playCard} activeOpacity={0.9} onPress={() => { setPlayMain(true); recordView('post', postId); }}>
           {thumbnail
             ? <Image source={{ uri: thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             : <View style={[StyleSheet.absoluteFill, styles.center, { backgroundColor: '#000' }]} />}
@@ -117,7 +118,7 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
               ? <Text style={styles.empty}>No reactions yet. Be the first.</Text>
               : visReactions.map(r => (
                 <TouchableOpacity key={r.id} style={styles.row} activeOpacity={r.video_url ? 0.8 : 1}
-                  onPress={() => r.video_url && setClip({ url: r.video_url, label: `@${r.poster?.handle ?? 'reaction'}`, targetType: 'reaction', targetId: r.id, targetUserId: r.poster_id, handle: r.poster?.handle ?? null })}>
+                  onPress={() => r.video_url && (recordView('post', r.id), setClip({ url: r.video_url, label: `@${r.poster?.handle ?? 'reaction'}`, targetType: 'reaction', targetId: r.id, targetUserId: r.poster_id, handle: r.poster?.handle ?? null }))}>
                   <View style={styles.rowPlay}><Ionicons name="play" size={14} color="#fff" /></View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowName} numberOfLines={1}>@{r.poster?.handle ?? 'someone'}</Text>
@@ -130,7 +131,7 @@ export default function ExclusiveWatchScreen({ route, navigation }: FeedStackScr
               ? <Text style={styles.empty}>No reviews yet.</Text>
               : visReviews.map(rv => (
                 <TouchableOpacity key={rv.id} style={styles.row} activeOpacity={rv.video_url ? 0.8 : 1}
-                  onPress={() => rv.video_url && setClip({ url: rv.video_url, label: `★ @${rv.reviewer?.handle ?? 'review'}`, targetType: 'clip', targetId: rv.id, targetUserId: rv.reviewer_id, handle: rv.reviewer?.handle ?? null })}>
+                  onPress={() => rv.video_url && (recordView('review', rv.id), setClip({ url: rv.video_url, label: `★ @${rv.reviewer?.handle ?? 'review'}`, targetType: 'clip', targetId: rv.id, targetUserId: rv.reviewer_id, handle: rv.reviewer?.handle ?? null }))}>
                   <View style={[styles.rowPlay, { backgroundColor: C.GOLD }]}><Ionicons name="star" size={13} color="#fff" /></View>
                   <Text style={styles.rowName} numberOfLines={1}>@{rv.reviewer?.handle ?? 'someone'}</Text>
                 </TouchableOpacity>

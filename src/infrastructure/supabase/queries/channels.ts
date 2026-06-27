@@ -64,6 +64,7 @@ export type ChannelPost = {
   message: string | null;
   emoji_reactions: { emoji: string; user_id: string }[];
   reaction_count: number;
+  view_count?: number;
   has_my_reaction: boolean;
   review_count: number;
   has_my_review: boolean;
@@ -83,6 +84,7 @@ export type ChannelReview = {
   reviewer: { handle: string; avatar_url?: string | null } | null;
   video_url: string | null;
   duration: number | null;
+  view_count: number;
   created_at: string;
   // Parent source-post context (populated by the inbox / my-reviews queries).
   post_yt_video_id: string | null;
@@ -600,7 +602,7 @@ export async function fetchChannelPosts(
     .select(`
       id, channel_id, poster_id, post_type, source_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
-      video_url, duration, is_pinned, created_at,
+      video_url, duration, is_pinned, view_count, created_at,
       poster:users!poster_id(handle),
       emoji_reactions:channel_post_emoji_reactions(emoji, user_id),
       reactions:channel_posts!parent_post_id(count)
@@ -683,6 +685,7 @@ export async function fetchChannelPosts(
     message: p.message ?? null,
     emoji_reactions: p.emoji_reactions ?? [],
     reaction_count: Math.max(0, (Array.isArray(p.reactions) ? (p.reactions[0]?.count ?? 0) : 0) - (blockedDecr.get(p.id) ?? 0)),
+    view_count: p.view_count ?? 0,
     has_my_reaction: reactedIds.has(p.id),
     review_count: reviewCount.get(p.id) ?? 0,
     has_my_review: myReviewed.has(p.id),
@@ -796,7 +799,7 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
     .select(`
       id, channel_id, poster_id, post_type, source_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
-      video_url, duration, is_pinned, created_at,
+      video_url, duration, is_pinned, view_count, created_at,
       poster:users!poster_id(handle),
       emoji_reactions:channel_post_emoji_reactions(emoji, user_id)
     `)
@@ -824,6 +827,7 @@ export async function fetchChannelPostReactions(parentPostId: string): Promise<C
     message: p.message ?? null,
     emoji_reactions: p.emoji_reactions ?? [],
     reaction_count: 0,
+    view_count: p.view_count ?? 0,
     has_my_reaction: false,
     review_count: 0,
     has_my_review: false,
@@ -839,6 +843,7 @@ export type ChannelClipTile = {
   id: string;
   handle: string | null;
   duration: number | null;
+  view_count: number;
   created_at: string;
   parent_yt_video_id: string | null;
   parent_yt_video_title: string | null;
@@ -914,7 +919,7 @@ export async function fetchChannelReactions(channelId: string): Promise<ChannelC
   // doesn't reliably return the parent — fetch parents explicitly and stitch.
   const { data, error } = await (supabase as any)
     .from('channel_posts')
-    .select('id, poster_id, duration, created_at, parent_post_id, poster:users!poster_id(handle)')
+    .select('id, poster_id, duration, view_count, created_at, parent_post_id, poster:users!poster_id(handle)')
     .eq('channel_id', channelId)
     .not('parent_post_id', 'is', null)
     .order('created_at', { ascending: false });
@@ -938,6 +943,7 @@ export async function fetchChannelReactions(channelId: string): Promise<ChannelC
     id: p.id,
     handle: p.poster?.handle ?? null,
     duration: p.duration ?? null,
+    view_count: p.view_count ?? 0,
     created_at: p.created_at,
     parent_yt_video_id: par?.yt_video_id ?? null,
     parent_yt_video_title: par?.yt_video_title ?? null,
@@ -954,7 +960,7 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
     .select(`
       id, channel_id, poster_id, post_type, source_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
-      video_url, duration, is_pinned, created_at, recorded_with_headphones,
+      video_url, duration, is_pinned, view_count, created_at, recorded_with_headphones,
       parent_post_id,
       parent:channel_posts!parent_post_id(yt_video_id, source_type),
       poster:users!poster_id(handle),
@@ -1458,6 +1464,7 @@ function mapReview(r: any): ChannelReview {
     reviewer: r.reviewer ?? null,
     video_url: r.video_url ?? null,
     duration: r.duration ?? null,
+    view_count: r.view_count ?? 0,
     created_at: r.created_at,
     post_yt_video_id: r.post?.yt_video_id ?? null,
     post_yt_video_title: r.post?.yt_video_title ?? null,
@@ -1473,7 +1480,7 @@ export async function fetchPostReviews(postId: string): Promise<ChannelReview[]>
   const { data, error } = await (supabase as any)
     .from('channel_reviews')
     .select(`
-      id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
+      id, channel_id, post_id, reviewer_id, video_url, duration, view_count, created_at,
       reviewer:users!reviewer_id(handle)
     `)
     .eq('post_id', postId)
@@ -1489,7 +1496,7 @@ export async function fetchChannelReviews(channelId: string): Promise<ChannelRev
   const { data, error } = await (supabase as any)
     .from('channel_reviews')
     .select(`
-      id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
+      id, channel_id, post_id, reviewer_id, video_url, duration, view_count, created_at,
       reviewer:users!reviewer_id(handle),
       post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type)
     `)
@@ -1532,7 +1539,7 @@ export async function fetchMyReviews(userId: string): Promise<ChannelReview[]> {
   const { data, error } = await (supabase as any)
     .from('channel_reviews')
     .select(`
-      id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
+      id, channel_id, post_id, reviewer_id, video_url, duration, view_count, created_at,
       reviewer:users!reviewer_id(handle),
       post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type),
       channel:groups!channel_id(name)
@@ -1547,7 +1554,7 @@ export async function fetchChannelReview(reviewId: string): Promise<ChannelRevie
   const { data, error } = await (supabase as any)
     .from('channel_reviews')
     .select(`
-      id, channel_id, post_id, reviewer_id, video_url, duration, created_at,
+      id, channel_id, post_id, reviewer_id, video_url, duration, view_count, created_at,
       reviewer:users!reviewer_id(handle, avatar_url),
       post:channel_posts!post_id(yt_video_id, yt_video_title, yt_video_thumbnail, source_type)
     `)

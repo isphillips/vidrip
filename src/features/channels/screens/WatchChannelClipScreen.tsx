@@ -45,6 +45,8 @@ import EmojiFountain, { type EmojiFountainHandle, type EmojiHit } from '../../..
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import ContentActions from '../../../components/ContentActions';
+import { recordView } from '../../../infrastructure/supabase/queries/views';
+import ViewBadge from '../../../components/ViewBadge';
 
 function EmojiBtn({
   emoji, count, isMine, isDisabled, onPress,
@@ -217,6 +219,9 @@ function WatchChannelClipImpl({
       }
     })();
   }, [postId]);
+
+  // Count a view once this reaction clip is ready to watch (deduped per viewer per day).
+  useEffect(() => { if (loadState === 'ready') { recordView('post', postId); } }, [loadState, postId]);
 
   // Realtime emoji updates
   useEffect(() => {
@@ -574,6 +579,10 @@ function WatchChannelClipImpl({
         <Text style={styles.timer}>{fmt(progress)} / {fmt(totalDuration)}</Text>
       </View>
 
+      {(post.view_count ?? 0) > 0 && (
+        <ViewBadge count={post.view_count ?? 0} style={[styles.clipViews, { bottom: bottomInset + SPACE.LG }]} />
+      )}
+
       {/* Emoji drawer — 😊 toggle hidden for own posts, reactions always visible */}
       <View style={[styles.emojiDrawer, { right: SPACE.MD, bottom: bottomInset + SPACE.LG }]}>
         {emojiOpen && (
@@ -672,6 +681,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   playIcon: { color: C.WHITE, fontSize: 26, marginLeft: 5 },
+  clipViews: { position: 'absolute', left: SPACE.MD },
   infoBar: {
     position: 'absolute', left: SPACE.LG, right: SPACE.LG,
     flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center',

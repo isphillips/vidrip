@@ -159,6 +159,7 @@ export default function RootNavigator() {
   const pendingShareUrl = useShareIntentStore(s => s.pendingUrl);
   const pendingReactionId = useShareIntentStore(s => s.pendingReactionId);
   const pendingChannel = useShareIntentStore(s => s.pendingChannel);
+  const pendingChannelReact = useShareIntentStore(s => s.pendingChannelReact);
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
@@ -192,7 +193,15 @@ export default function RootNavigator() {
   const runPendingNavigation = useCallback(() => {
     if (!sessionRef.current || !navRef.current?.isReady()) { return; }
     const store = useShareIntentStore.getState();
-    if (store.pendingChannel) {
+    if (store.pendingChannelReact) {
+      // From the web channel page's "Record Your Reaction in App" CTA → open the recorder.
+      const { channelId, postId } = store.pendingChannelReact;
+      store.setPendingChannelReact(null);
+      navRef.current.navigate('Main', {
+        screen: 'Channels',
+        params: { screen: 'WatchYouTubePost', params: { postId, channelId } },
+      });
+    } else if (store.pendingChannel) {
       const { id } = store.pendingChannel;
       store.setPendingChannel(null);
       navRef.current.navigate('Main', {
@@ -210,7 +219,7 @@ export default function RootNavigator() {
       navRef.current.navigate('Main', { screen: 'Share', params: { screen: 'ShareHome' } });
     }
   }, []);
-  useEffect(() => { runPendingNavigation(); }, [pendingShareUrl, pendingReactionId, pendingChannel, session, runPendingNavigation]);
+  useEffect(() => { runPendingNavigation(); }, [pendingShareUrl, pendingReactionId, pendingChannel, pendingChannelReact, session, runPendingNavigation]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -243,6 +252,21 @@ export default function RootNavigator() {
     if (url.startsWith('vidrip://reaction/')) {
       const id = url.slice('vidrip://reaction/'.length).split(/[?#/]/)[0];
       if (id) { useShareIntentStore.getState().setPendingReactionId(id); }
+      return;
+    }
+
+    // vidrip://channels/<channelId>/react/<postId> — the web channel page's "Record Your
+    // Reaction in App" CTA → open the in-app reaction recorder for that post.
+    if (url.startsWith('vidrip://channels/')) {
+      const m = url.slice('vidrip://channels/'.length).match(/^([^/]+)\/react\/([^/?#]+)/);
+      if (m) { useShareIntentStore.getState().setPendingChannelReact({ channelId: m[1], postId: m[2] }); }
+      return;
+    }
+
+    // vidrip://invite?code=<CODE> — web registration hand-off → prefill the invite-code entry.
+    if (url.startsWith('vidrip://invite')) {
+      const code = new URLSearchParams(url.split('?')[1] ?? '').get('code');
+      if (code) { useShareIntentStore.getState().setPendingInviteCode(code); }
       return;
     }
 

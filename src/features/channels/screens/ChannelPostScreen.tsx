@@ -38,6 +38,7 @@ import ReactionMenu from '../../../components/ReactionMenu';
 import { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import Handle from '../../../components/Handle';
 import ContentActions from '../../../components/ContentActions';
+import { formatViews } from '../../../components/ViewBadge';
 import { openProfile } from '../../../store/profileDrawerStore';
 import { formatSourceType } from '../../../utils/sourceType';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
@@ -475,7 +476,17 @@ export default function ChannelPostScreen({
                 hitSlop={8} activeOpacity={0.7}>
                 <Text style={styles.reactionHandle}>@{(r as any).user?.handle ?? r.poster?.handle ?? '?'}</Text>
               </TouchableOpacity>
-              {canWatch && <Text style={styles.reactionDuration}>{r.duration}s reaction</Text>}
+              {canWatch && (
+                <View style={styles.reactionMeta}>
+                  <Text style={styles.reactionDuration}>{r.duration}s reaction</Text>
+                  {(r.view_count ?? 0) > 0 && (
+                    <View style={styles.reactionViews}>
+                      <Ionicons name="eye-outline" size={12} color={C.SUBTLE} />
+                      <Text style={styles.reactionViewsTxt}>{formatViews(r.view_count ?? 0)}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
               {state === 'downloading' && <Text style={styles.reactionStatus}>Downloading…</Text>}
               {state === 'unavailable' && (
                 <Text style={[styles.reactionStatus, retryable && styles.reactionRetry]}>
@@ -622,6 +633,9 @@ const styles = StyleSheet.create({
   reactionLifted: { backgroundColor: C.SURFACE_2, borderRadius: RADIUS.MD, borderTopWidth: 0 },
   reactionHandle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_MEDIUM, color: C.ACCENT_HOT },
   reactionDuration: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY },
+  reactionMeta: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM, flexWrap: 'wrap' },
+  reactionViews: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  reactionViewsTxt: { fontSize: FONT.SIZES.XS, color: C.SUBTLE, fontFamily: FONT.BODY },
   reactionStatus: { fontSize: FONT.SIZES.SM, color: C.MUTED, fontFamily: FONT.BODY, fontStyle: 'italic' },
   reactionRetry: { color: C.ACCENT_HOT, fontStyle: 'normal' },
   backBtn: {
