@@ -43,6 +43,10 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   // (canCreate) gates whether the Channel segment is selectable.
   const isCreator = !!(profile as any)?.is_creator;
   const [canCreate, setCanCreate]   = useState(false);
+  // Creator Studio = is_creator AND the server-side creator_studio entitlement (canCreate). Only
+  // these users get the Channel destination and its exclusive (members-only) + scheduling options;
+  // everyone else can only send to friends or save a draft — no mention of channels/exclusive/schedule.
+  const isCreatorStudio = isCreator && canCreate;
   const [path, setPath]             = useState<'friends' | 'channel'>('friends');
   const [friends, setFriends]       = useState<Friend[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
@@ -310,8 +314,9 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           placeholder="Give it a title…" placeholderTextColor={C.SUBTLE} maxLength={120} editable={!uploading}
         />
 
-        {/* Destination fork, baked in: creators choose friends vs channel; Channel locks without creator_studio. */}
-        {isCreator && (
+        {/* Destination fork — Creator Studio only. Non-creator-studio users never see it, so the flow
+            stays friends-only with no mention of channels, exclusive content, or scheduling. */}
+        {isCreatorStudio && (
           <>
             <Text style={styles.label}>Post to</Text>
             <View style={styles.toggle}>

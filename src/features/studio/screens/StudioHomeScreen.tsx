@@ -1,5 +1,5 @@
 import { log } from '../../../infrastructure/logging/logger';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import CameraWarmup from '../../lens/CameraWarmup';
 import EffectWarmup from '../components/EffectWarmup';
 import {
@@ -11,7 +11,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
-import { fetchMyCreatorVideos, refreshCreatorVideoStatus, type MyCreatorVideo } from '../../../infrastructure/creatorStudio/api';
+import { fetchMyCreatorVideos, refreshCreatorVideoStatus, fetchCanCreate, type MyCreatorVideo } from '../../../infrastructure/creatorStudio/api';
 import { deleteChannelPost } from '../../../infrastructure/supabase/queries/channels';
 import { listDrafts, deleteDraft, type StudioDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import BunnyEmbedPlayer from '../components/BunnyEmbedPlayer';
@@ -41,7 +41,13 @@ const fmtRelease = (iso: string) => new Date(iso).toLocaleString(undefined, { mo
 
 export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<'StudioHome'>) {
   const { top } = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
+  // Studio recording is open to everyone, but the Collections (exclusive content) + Calendar
+  // (post scheduling) tools require BOTH is_creator and the server-side creator_studio entitlement
+  // (fetchCanCreate) — hide their header entrypoints otherwise.
+  const isCreator = !!(profile as any)?.is_creator;
+  const [canCreate, setCanCreate] = useState(false);
+  const isCreatorStudio = isCreator && canCreate;
   const [tab, setTab] = useState<'published' | 'scheduled' | 'drafts'>('published');
   const [videos, setVideos] = useState<MyCreatorVideo[]>([]);
   const [drafts, setDrafts] = useState<StudioDraft[]>([]);
@@ -52,6 +58,11 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   // nested under react-native-screens inside this modal renders black; an in-place
   // overlay composites like the reaction recorder's WebView does.
   const [playing, setPlaying] = useState<{ postId: string; title: string } | null>(null);
+
+  // Resolve the server-side creator_studio entitlement (only meaningful for is_creator accounts).
+  useEffect(() => {
+    if (user?.id && isCreator) { fetchCanCreate(user.id).then(setCanCreate).catch(() => {}); }
+  }, [user?.id, isCreator]);
 
   const load = useCallback(async () => {
     try { setDrafts(await listDrafts()); } catch { /* local — ignore */ }
@@ -209,10 +220,13 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
   const publishedVideos = videos.filter(v => !isScheduled(v));
   const listData = tab === 'drafts' ? drafts : tab === 'scheduled' ? scheduledVideos : publishedVideos;
   const TABS = [
-    { key: 'published', label: 'Published' },
-    { key: 'scheduled', label: `Scheduled${scheduledVideos.length ? ` (${scheduledVideos.length})` : ''}` },
-    { key: 'drafts', label: `Drafts${drafts.length ? ` (${drafts.length})` : ''}` },
-  ] as const;
+    { key: 'published' as const, label: 'Published' },
+    // Scheduling is a Creator Studio feature — hide the Scheduled tab for everyone else.
+    ...(isCreatorStudio
+      ? [{ key: 'scheduled' as const, label: `Scheduled${scheduledVideos.length ? ` (${scheduledVideos.length})` : ''}` }]
+      : []),
+    { key: 'drafts' as const, label: `Drafts${drafts.length ? ` (${drafts.length})` : ''}` },
+  ];
 
   return (
     <View style={styles.screen}>
@@ -222,12 +236,16 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
       <View style={styles.header}>
         <Text style={styles.title}>Studio</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={() => navigation.navigate('StudioCollections')} hitSlop={10}>
-            <Ionicons name="diamond-outline" size={22} color={C.INK} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('StudioCalendar')} hitSlop={10}>
-            <Ionicons name="calendar-outline" size={23} color={C.INK} />
-          </TouchableOpacity>
+          {isCreatorStudio && (
+            <>
+              <TouchableOpacity onPress={() => navigation.navigate('StudioCollections')} hitSlop={10}>
+                <Ionicons name="diamond-outline" size={22} color={C.INK} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('StudioCalendar')} hitSlop={10}>
+                <Ionicons name="calendar-outline" size={23} color={C.INK} />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 
