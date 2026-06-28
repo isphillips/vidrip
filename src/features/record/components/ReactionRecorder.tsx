@@ -42,6 +42,7 @@ import { MOCK_FACE } from '../../lens/useFaceLandmarks';
 import { useFaceTracking, faceTrackingAvailable } from '../../lens/faceTracking';
 import { useAnonymousMode, ANON_LENS_KEY, ANON_VOICE_MOD } from '../../lens/useAnonymousMode';
 import { useUploadStore } from '../../../store/uploadStore';
+import { log } from '../../../infrastructure/logging/logger';
 import { useBakeQueueStore } from '../../../store/bakeQueueStore';
 import { DEMO_MODE } from '../../../demo/demoMode';
 
@@ -113,6 +114,20 @@ export interface ReactionRecorderProps {
 
 const AFTERTHOUGHT_MAX = 30;       // seconds
 const AFTERTHOUGHT_COUNTDOWN = 5;  // decision window after the reaction finishes
+
+// Flatten a VisionCamera/AVFoundation recording error into greppable fields so logs identify the exact
+// failure — e.g. AVFoundationErrorDomain -11800 with an underlying OSStatus -12780 (the opaque
+// "operation could not be completed" that VisionCamera surfaces when the capture session is
+// interrupted/torn down) — instead of an unattributed native "[unknown/unknown]" line.
+function describeRecordingError(error: any): Record<string, unknown> {
+  const cause = error?.cause ?? error?.userInfo ?? null;
+  return {
+    code: error?.code ?? error?.name ?? 'unknown',
+    message: error?.message ?? String(error),
+    // VisionCamera nests the native error here; keep it raw so the AVFoundation domain/code print.
+    cause,
+  };
+}
 
 const YT_PARAMS = { rel: false as const, controls: true as const };
 const YT_WV_STYLE = { backgroundColor: '#000000' };
@@ -370,6 +385,7 @@ export default function ReactionRecorder({
       onRecordingFinished: (video) => { recordingCallbackRef.current?.(video); recordingCallbackRef.current = null; recordingRejectRef.current = null; },
       onRecordingError: (error: any) => {
         const msg = `${error?.code ?? 'error'}: ${error?.message ?? String(error)}`;
+        log.error('[ReactionRecorder] MAIN recording failed', describeRecordingError(error));
         // Reject the pending stop-promise (if any) so handleStop surfaces the real error
         // immediately instead of waiting out the 15s timeout.
         recordingRejectRef.current?.(error instanceof Error ? error : new Error(msg));
@@ -436,6 +452,7 @@ export default function ReactionRecorder({
           dismissUpload(prepId);                                   // hand off cleanly to the save toast
           await onSave(bakedMain, dur, ytOff, hp, null, after);    // shows the real "Saving…" toast
         } catch (e) {
+          log.error('[ReactionRecorder] ANON bake failed (silhouette/voice-mod export)', describeRecordingError(e));
           dismissUpload(prepId);
           enqueueUpload(uploadingText || 'Saving reaction…', async () => { throw e instanceof Error ? e : new Error('Could not anonymize the reaction'); });
         }
@@ -477,7 +494,10 @@ export default function ReactionRecorder({
         new Promise<VideoFile>((resolve, reject) => {
           recordingCallbackRef.current = resolve;
           recordingRejectRef.current = reject;
-          cameraRef.current?.stopRecording().catch(reject);
+          cameraRef.current?.stopRecording().catch((e) => {
+            log.error('[ReactionRecorder] MAIN stopRecording() threw', describeRecordingError(e));
+            reject(e);
+          });
         }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Recording timed out — please try again.')), 15000)
@@ -499,6 +519,7 @@ export default function ReactionRecorder({
         await finalize(null);
       }
     } catch (e: any) {
+      log.error('[ReactionRecorder] MAIN stop/finalize failed', describeRecordingError(e));
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
       setUploading(false);
     }
@@ -532,7 +553,10 @@ export default function ReactionRecorder({
     cameraRef.current?.startRecording({
       fileType: 'mp4',
       onRecordingFinished: (v) => { afterCallbackRef.current?.(v); afterCallbackRef.current = null; },
-      onRecordingError: () => { afterCallbackRef.current = null; finalizeRef.current(null); },
+      onRecordingError: (error: any) => {
+        log.error('[ReactionRecorder] AFTERTHOUGHT recording failed — saving reaction without it', describeRecordingError(error));
+        afterCallbackRef.current = null; finalizeRef.current(null);
+      },
     });
     // Anonymous mode: track the afterthought too so its silhouette can be baked in.
     if (anon) { startTrack(ANON_LENS_KEY, frameAspect); }
@@ -553,7 +577,10 @@ export default function ReactionRecorder({
       const v = await Promise.race([
         new Promise<VideoFile>((resolve, reject) => {
           afterCallbackRef.current = resolve;
-          cameraRef.current?.stopRecording().catch(reject);
+          cameraRef.current?.stopRecording().catch((e) => {
+            log.error('[ReactionRecorder] AFTERTHOUGHT stopRecording() threw', describeRecordingError(e));
+            reject(e);
+          });
         }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
       ]);

@@ -58,7 +58,13 @@ async function frameAt(url: string, timeStamp: number): Promise<string | null> {
     });
     if (cropped.uri) { RNFS.unlink(cropped.uri.replace('file://', '')).catch(() => {}); }
     return cropped.base64 ?? null;
-  } catch {
+  } catch (e: any) {
+    // createThumbnail uses AVAssetImageGenerator; on a just-recorded clip it can throw
+    // AVFoundationErrorDomain -11800 / OSStatus -12780 ("operation could not be completed") when the
+    // frame at this timestamp isn't readable. We fail-open (skip the frame) — log WHY so the noisy raw
+    // native "[unknown/unknown] -11800" lines are attributable to moderation frame-sampling, not a lost
+    // recording. Run-of-the-mill on the last/near-EOF timestamps.
+    log.warn(`[moderation] frame extract failed at t=${timeStamp.toFixed(1)}s (skipping):`, e?.code ?? e?.message ?? String(e));
     return null;
   } finally {
     if (thumbPath) { RNFS.unlink(thumbPath.replace('file://', '')).catch(() => {}); }

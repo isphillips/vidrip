@@ -363,6 +363,12 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
       <View style={styles.previewWrap} onLayout={e => setAvail({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
         {box.w > 0 && (
           <View style={[styles.preview, { width: box.w, height: box.h }]}>
+            {/* During the export bake, fully UNMOUNT the live preview (Skia video decode +
+                colour-matrix filter + effect clock + overlays). It's hidden behind the processing
+                overlay anyway, and on iOS the bake's CoreImage pass and the Skia preview both hit the
+                GPU — running them together makes even a short clip crawl and risks an OOM/GPU crash.
+                Releasing the preview hands the encoder the full GPU. */}
+            {!exporting && (<>
             <SkiaVideoPreview key={replayKey} uri={fileUri} width={box.w} height={box.h} matrix={matrix} mirror={mirror ?? false} onAspect={setAspect} />
             <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setSelectedId(null)} />
             {/* One shared, play-gated clock for the whole effect layer (instead of a per-component
@@ -387,6 +393,7 @@ export default function StudioOverlayScreen({ route, navigation }: StudioStackSc
                 ))}
               </View>
             </EffectClockProvider>
+            </>)}
           </View>
         )}
       </View>
