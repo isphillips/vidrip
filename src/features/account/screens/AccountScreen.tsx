@@ -259,7 +259,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
       <View style={[styles.navbar, { paddingTop: top + SPACE.MD }]}>
         <Text style={styles.navTitle}>Account</Text>
         <View style={styles.navActions}>
-          <FriendsMenu size={30} />
+          <FriendsMenu size={30} left={4} />
           <AccountBlob size={34} active />
         </View>
       </View>

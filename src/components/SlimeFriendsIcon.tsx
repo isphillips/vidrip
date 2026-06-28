@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Reanimated, {
   useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, Easing, interpolate,
@@ -23,7 +23,7 @@ function Bubble({ burst, x, size, delay }: { burst: SharedValue<number>; x: numb
   return <Reanimated.View style={[styles.bubble, { width: size, height: size, borderRadius: size / 2 }, st]} pointerEvents="none" />;
 }
 
-export default function SlimeFriendsIcon({ size = 30, active = false }: { size?: number; active?: boolean }) {
+export default function SlimeFriendsIcon({ size = 30, active = false, style }: { size?: number; active?: boolean; style?: StyleProp<ViewStyle> }) {
   const bob = useSharedValue(0);
   const blink = useSharedValue(1);
   const burst = useSharedValue(0);
@@ -51,7 +51,7 @@ export default function SlimeFriendsIcon({ size = 30, active = false }: { size?:
   const pupStyle = { width: pup, height: pup, borderRadius: pup / 2, backgroundColor: '#16091f' };
 
   return (
-    <View style={[styles.wrap, { width: size, height: size }]}>
+    <View style={[styles.wrap, { width: size, height: size }, style]}>
       {active && (
         <View style={styles.bubbleLayer} pointerEvents="none">
           {BUBBLES.map((b, i) => <Bubble key={i} burst={burst} x={b.x} size={b.size} delay={b.delay} />)}

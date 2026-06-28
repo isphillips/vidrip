@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image, Pressable, ScrollView,
-  ActivityIndicator, Alert, StatusBar, useWindowDimensions, Animated, InteractionManager,
+  ActivityIndicator, Alert, StatusBar, useWindowDimensions, Animated, InteractionManager, Platform,
 } from 'react-native';
 import Orientation from 'react-native-orientation-locker';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
@@ -780,7 +780,10 @@ export default function ReactionRecorder({
               onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:') || req.url.startsWith('data:')}
               // Signal readiness when the FB iframe finishes loading (a timer is the fallback if its
               // load event already fired / never does), so the tap-to-record only arms once it's playable.
-              injectedJavaScript={`(function(){var f=document.querySelector('iframe');var sent=false;function r(){if(sent)return;sent=true;window.ReactNativeWebView&&window.ReactNativeWebView.postMessage('fb-ready');}if(f){f.addEventListener('load',r);}setTimeout(r,2200);})(); true;`}
+              // fb-ready arms tap-to-record. On Android the iframe 'load' fires BEFORE FB's player is
+              // interactive, so wait a settle delay AFTER load there (iOS stays instant). Until ready the
+              // veil shows "Loading…" and absorbs taps, so a too-early tap can't start a videoless take.
+              injectedJavaScript={`(function(){var f=document.querySelector('iframe');var sent=false;function fire(){if(sent)return;sent=true;window.ReactNativeWebView&&window.ReactNativeWebView.postMessage('fb-ready');}var d=${Platform.OS === 'android' ? 1800 : 0};if(f){f.addEventListener('load',function(){setTimeout(fire,d);});}setTimeout(fire,6000);})(); true;`}
               onMessage={e => { if (e.nativeEvent.data === 'fb-ready') { setFbReady(true); } }}
             />
             {/* Blurred branded veil. While the iframe loads it shows a spinner and ABSORBS taps (no

@@ -58,7 +58,7 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
           </View>
           <View style={styles.headerActions}>
             {/* Friends — shared menu (requests / add / contacts / group chat) with a pending-request badge. */}
-            <FriendsMenu size={30} />
+            <FriendsMenu size={30} left={4} top={-1} />
             <TouchableOpacity hitSlop={8} activeOpacity={0.7} onPress={() => (navigation as any).getParent()?.navigate('Account')}>
               <AccountBlob size={34} />
             </TouchableOpacity>

@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
 
   card: { alignItems: 'center', alignSelf: 'stretch', gap: SPACE.SM, paddingVertical: SPACE.LG },
   cardScrim: { left: -SPACE.XL, right: -SPACE.XL, top: -SPACE.MD, bottom: -SPACE.XXL },
-  title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: '700', color: C.WHITE, textAlign: 'center', marginBottom: SPACE.XS, ...TEXT_GLOW },
+  title: { fontSize: FONT.SIZES.XXL, fontFamily: FONT.DISPLAY_BOLD, fontWeight: '700', color: C.WHITE, textAlign: 'center', marginBottom: SPACE.LG, ...TEXT_GLOW },
 
   toggle: {
     flexDirection: 'row', alignSelf: 'stretch', backgroundColor: C.SURFACE, borderRadius: RADIUS.MD,
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   toggleBtnActive: { backgroundColor: C.ACCENT },
   toggleTxt: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY_SEMIBOLD, color: C.MUTED },
   toggleTxtActive: { color: C.WHITE },
-  subtitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.INK, textAlign: 'center', ...TEXT_GLOW },
+  subtitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY, color: C.INK, textAlign: 'center', ...TEXT_GLOW, paddingVertical: SPACE.LG },
 
   input: {
     alignSelf: 'stretch', backgroundColor: C.SURFACE, borderRadius: RADIUS.MD, borderWidth: 1, borderColor: C.BORDER,

@@ -200,7 +200,7 @@ export default function ChannelsHomeScreen({
           </TouchableOpacity>
         </Reanimated.View>
         <View style={styles.headerRight}>
-          <FriendsMenu size={30} />
+          <FriendsMenu size={30} left={4} top={-1} />
           <TouchableOpacity hitSlop={10} activeOpacity={0.7}
             onPress={() => (navigation as any).getParent()?.navigate('Account')}>
             <AccountBlob size={34} />

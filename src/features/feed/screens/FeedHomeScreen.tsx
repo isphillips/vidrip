@@ -180,7 +180,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
             </MaskedView>
           </View>
           <View style={styles.headerActions}>
-            <FriendsMenu size={30} />
+            <FriendsMenu size={30} left={4} top={2} />
             <TouchableOpacity
               style={styles.acctBtn}
               hitSlop={10}

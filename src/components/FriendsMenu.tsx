@@ -11,7 +11,7 @@ import SlimeFriendsIcon from './SlimeFriendsIcon';
 // requests). Tapping opens the shared FriendsMenuOverlay, which is mounted once at the app root (see
 // RootNavigator) and renders the menu WITHOUT an RN <Modal>. Drop this next to the AccountBlob in any
 // tab header; the overlay navigates via the shared navigationRef so it works from every tab.
-export default function FriendsMenu({ size = 30 }: { size?: number }) {
+export default function FriendsMenu({ size = 30, left = 0, top = 0 }: { size?: number, left?: number, top?: number }) {
   const { user } = useAuthStore();
   const open = useFriendsMenu(s => s.open);
   const openMenu = useFriendsMenu(s => s.openMenu);
@@ -28,7 +28,7 @@ export default function FriendsMenu({ size = 30 }: { size?: number }) {
 
   return (
     <TouchableOpacity hitSlop={8} activeOpacity={0.7} onPress={openMenu}>
-      <SlimeFriendsIcon size={size} active={open} />
+      <SlimeFriendsIcon style={[ styles.friendsIcon, { left, top } ]} size={size} active={open} />
       {count > 0 && (
         <View style={styles.badge} pointerEvents="none">
           <Text style={styles.badgeTxt}>{count > 9 ? '9+' : count}</Text>
@@ -45,4 +45,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: C.BG === 'transparent' ? '#0E0716' : C.BG,
   },
   badgeTxt: { color: C.WHITE, fontSize: 9, fontFamily: FONT.BODY_BOLD },
+  friendsIcon: { position: 'relative' }
 });
