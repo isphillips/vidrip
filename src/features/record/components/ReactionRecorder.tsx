@@ -509,12 +509,20 @@ export default function ReactionRecorder({
     if (afterPhase !== 'countdown') { return; }
     const iv = setInterval(() => {
       setCountdown(c => {
-        if (c <= 1) { clearInterval(iv); finalizeRef.current(null); return 0; }
+        if (c <= 1) { clearInterval(iv); return 0; }
         return c - 1;
       });
     }, 1000);
     return () => clearInterval(iv);
   }, [afterPhase]);
+
+  // Fire the auto-send from an EFFECT (not inside the setCountdown updater): finalize() updates other
+  // stores (the upload toast), and React runs updaters during render — calling it there triggers the
+  // "Cannot update UploadToast while rendering ReactionRecorder" warning. finalize() flips afterPhase
+  // off, so this runs exactly once.
+  useEffect(() => {
+    if (afterPhase === 'countdown' && countdown === 0) { finalizeRef.current(null); }
+  }, [afterPhase, countdown]);
 
   const startAfterthought = useCallback(() => {
     afterElapsedRef.current = 0;

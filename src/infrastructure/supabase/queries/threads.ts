@@ -46,15 +46,19 @@ export type ReactionItem = {
   storage_mode: 'local' | 'cloud' | 'deleted';
   duration: number;
   created_at: string;
-  user: { handle: string; display_name: string } | null;
+  user: { id?: string; handle: string; display_name: string } | null;
   emoji_reactions: { emoji: string; user_id: string }[];
   yt_video_id: string | null;
   yt_start_offset: number;
-  source_type: 'youtube' | 'tiktok' | 'instagram' | 'facebook';
+  source_type: 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'studio';
   recorded_with_headphones?: boolean;
   // Sender intro on the parent thread (plays once before this reaction is watched).
   intro_url?: string | null;
   intro_duration?: number | null;
+  // Parent thread sender + kind (set by fetchReactionById). For a studio_share, the source clip is the
+  // SENDER's own reaction row, so playback resolves it from the siblings by matching user.id === senderId.
+  senderId?: string | null;
+  threadKind?: 'reaction' | 'studio_share' | null;
   // Afterthought "outro" clip — plays after this reaction finishes.
   afterthought_url?: string | null;
   afterthought_duration?: number | null;
@@ -378,7 +382,7 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
       afterthought_url, afterthought_duration,
       user:users!user_id(id, handle, display_name),
       emoji_reactions(emoji, user_id),
-      thread:threads!thread_id(intro_url, intro_duration)
+      thread:threads!thread_id(intro_url, intro_duration, sender_id, thread_kind)
     `)
     .eq('id', reactionId)
     .single();
@@ -389,6 +393,10 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
     ...item,
     intro_url: (data as any).thread?.intro_url ?? null,
     intro_duration: (data as any).thread?.intro_duration ?? null,
+    // Thread sender + kind — for a studio_share, the source clip is the SENDER's own reaction row, so
+    // playback finds it among the siblings (see WatchReactionScreen's studio PIP).
+    senderId: (data as any).thread?.sender_id ?? null,
+    threadKind: ((data as any).thread?.thread_kind as 'reaction' | 'studio_share') ?? null,
   };
 }
 

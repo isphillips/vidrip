@@ -2,6 +2,7 @@ import { log } from '../../../infrastructure/logging/logger';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import YoutubePlayer, { type YoutubeIframeRef } from 'react-native-youtube-iframe';
 import TikTokPlayer, { type TikTokPlayerHandle } from '../../../components/TikTokPlayer';
+import InstagramPlayer, { type InstagramPlayerHandle } from '../../../components/InstagramPlayer';
 import { WebView } from 'react-native-webview';
 import {
   View,
@@ -116,6 +117,8 @@ export default function WatchReactionScreen({
   // before auto-advancing.
   const [playingAfterthought, setPlayingAfterthought] = useState(false);
   const [srcDismissed, setSrcDismissed] = useState(false);
+  // Studio-share source: the sender's clip (a sibling reaction). Resolved playable URI for its PIP.
+  const [studioSourceUri, setStudioSourceUri] = useState<string | null>(null);
   const [paused, setPaused] = useState(true);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -132,6 +135,8 @@ export default function WatchReactionScreen({
   const videoRef = useRef<any>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
   const ttRef = useRef<TikTokPlayerHandle>(null);
+  const igRef = useRef<InstagramPlayerHandle>(null);   // studio file-source PIP
+  const igTimeRef = useRef(0);                          // latest studio-source playhead (onCurrentTime)
   // True while force-stopping at the end — ignore the source's auto "playing"
   // (seekTo resumes YouTube, which would otherwise loop the source).
   const stoppingRef = useRef(false);
@@ -171,7 +176,15 @@ export default function WatchReactionScreen({
           .catch(() => {});
         if (r.thread_id) {
           fetchReactions(r.thread_id)
-            .then(list => { siblingIdsRef.current = list.map(x => x.id); })
+            .then(list => {
+              siblingIdsRef.current = list.map(x => x.id);
+              // Studio share: the source clip has no embed id — it's the SENDER's own reaction row.
+              // Find it among the siblings and use its resolved URI as the source PIP.
+              if ((r.threadKind === 'studio_share' || r.source_type === 'studio') && r.senderId) {
+                const clip = list.find(x => x.id !== r.id && x.user?.id === r.senderId);
+                if (clip?.resolvedUri) { setStudioSourceUri(clip.resolvedUri); }
+              }
+            })
             .catch(() => {});
         }
 
@@ -254,6 +267,23 @@ export default function WatchReactionScreen({
     if (reaction?.source_type !== 'tiktok') { return; }
     if (paused) { ttRef.current?.pause(); } else { ttRef.current?.play(); }
   }, [paused, reaction?.source_type]);
+
+  // Studio source: a re-hosted file PIP driven imperatively (no `play` prop). Mirror TikTok: push
+  // the paused state in, and nudge it back onto the reaction clock on drift (it starts at offset 0).
+  // `studioSourceUri` is set only for a studio_share (resolved from the sender's sibling clip), and the
+  // reaction's own `source_type` is the coerced 'youtube' placeholder — so gate on the URI, not the type.
+  useEffect(() => {
+    if (!studioSourceUri) { return; }
+    if (paused) { igRef.current?.pause(); } else { igRef.current?.play(); }
+  }, [paused, studioSourceUri]);
+  useEffect(() => {
+    if (paused || !studioSourceUri) { return; }
+    const id = setInterval(() => {
+      const target = progressRef.current;
+      if (Math.abs(igTimeRef.current - target) > 0.5) { igRef.current?.seekTo?.(target); }
+    }, 1200);
+    return () => clearInterval(id);
+  }, [paused, studioSourceUri]);
 
   // Keep the YouTube source locked to the reaction clock. The recording is a fixed
   // clip where reaction time t ↔ source time (offset + t); without correction the two
@@ -477,9 +507,21 @@ export default function WatchReactionScreen({
       {/* Source player — full-screen, then animates into the corner on play. Hidden once the
           afterthought outro takes over (the reaction is finished). Facebook videos have no
           controllable embed, so reactions recorded from Facebook show no source PIP. */}
-      {sessionReady && reaction?.yt_video_id && reaction.source_type !== 'facebook' && !srcDismissed && (
+      {sessionReady && !srcDismissed && !!reaction && reaction.source_type !== 'facebook'
+        && (!!studioSourceUri || !!reaction.yt_video_id) && (
         <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
-          {reaction.source_type === 'instagram' ? (
+          {studioSourceUri ? (
+            <View style={{ width, height }}>
+              {/* Studio clip = the sender's own reaction row; play it as a file PIP, synced to the reaction. */}
+              <InstagramPlayer
+                ref={igRef}
+                uri={studioSourceUri}
+                startMuted={false}
+                style={{ width, height }}
+                onCurrentTime={(t) => { igTimeRef.current = t; }}
+              />
+            </View>
+          ) : reaction.source_type === 'instagram' ? (
             <WebView
               style={{ width, height, backgroundColor: '#000' }}
               source={{ uri: `https://www.instagram.com/reel/${reaction.yt_video_id}/?l=1` }}
@@ -511,7 +553,7 @@ export default function WatchReactionScreen({
               // (sync-locked to the clip) rather than muting it and leaving only the muffled bleed.
               startMuted={false}
               style={{ width, height, backgroundColor: '#000' }}
-              videoId={reaction.yt_video_id}
+              videoId={reaction.yt_video_id as string}
               onChangeState={handleYtStateChange}
               onReady={() => {
                 const offset = reaction.yt_start_offset ?? 0;
@@ -525,7 +567,7 @@ export default function WatchReactionScreen({
                   ref={ytRef}
                   height={height}
                   width={ytCoverW}
-                  videoId={reaction.yt_video_id}
+                  videoId={reaction.yt_video_id as string}
                   // Source always carries the audio now (the clip is muted for no-headphones). mute:1
                   // loads it muted, then this unmutes once it's playing.
                   mute={false}

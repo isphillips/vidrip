@@ -220,7 +220,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     : null;
   const listReactions = studioClip ? displayReactions.filter(r => r.id !== studioClip.id) : displayReactions;
 
-  const obscured = canReact && !isStudioShare;
+  const obscured = canReact;
   const thumbnail = thread.video_thumbnail ??
     (thread.source_type === 'youtube' ? `https://img.youtube.com/vi/${thread.video_id}/hqdefault.jpg` : null);
 
@@ -247,8 +247,7 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
         {/* Overlay — same position for both states */}
         <View style={styles.blindOverlay}>
           <Text style={styles.posterHandle}>
-            Shared by {isSender ? <Text style={styles.handle}>you</Text> : <Handle userId={thread.sender_id} handle={thread.sender?.handle ?? '?'} style={styles.handle} />}
-            {thread.source_type ? ` · ${formatSourceType(thread.source_type)}` : ''}
+            Shared by {isSender ? <Text style={styles.handle}>you</Text> : <Handle userId={thread.sender_id} handle={thread.sender?.handle ?? '?'} style={styles.handle} />} · via {thread.source_type ? `${formatSourceType(thread.source_type)}` : `${formatSourceType('Vidrip')}`}
           </Text>
           {obscured ? (
             <Text style={styles.videoTitleObscured}>React to reveal this video</Text>
