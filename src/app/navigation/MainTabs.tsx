@@ -24,7 +24,6 @@ import WatchReviewScreen from '../../features/channels/screens/WatchReviewScreen
 import ChannelVideoRecordScreen from '../../features/channels/screens/ChannelVideoRecordScreen';
 import WatchChannelClipScreen from '../../features/channels/screens/WatchChannelClipScreen';
 import ChannelScreen from '../../features/channels/screens/ChannelScreen';
-import CreateGroupChatScreen from '../../features/channels/screens/CreateGroupChatScreen';
 import GiftRevealScreen from '../../features/exclusive/screens/GiftRevealScreen';
 import ExclusiveCollectionScreen from '../../features/exclusive/screens/ExclusiveCollectionScreen';
 import ExclusiveWatchScreen from '../../features/exclusive/screens/ExclusiveWatchScreen';
@@ -77,7 +76,6 @@ function FeedNavigator() {
     <FeedStack.Navigator screenOptions={NAV_OPTS} screenLayout={screenLayout}>
       <FeedStack.Screen name="FeedHome" component={FeedHomeScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="FriendConversation" component={FriendConversationScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
-      <FeedStack.Screen name="CreateGroupChat" component={CreateGroupChatScreen as any} options={{ headerShown: false, presentation: 'modal' }} />
       <FeedStack.Screen name="Channel" component={ChannelScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
@@ -98,7 +96,6 @@ function MessagesNavigator() {
       <MessagesStack.Screen name="AddFriend" component={AddFriendScreen as any} options={{ headerShown: false }} />
       <MessagesStack.Screen name="InviteContacts" component={InviteContactsScreen as any} options={{ headerShown: false }} />
       <MessagesStack.Screen name="FriendConversation" component={FriendConversationScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
-      <MessagesStack.Screen name="CreateGroupChat" component={CreateGroupChatScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <MessagesStack.Screen name="Channel" component={ChannelScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <MessagesStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
       <MessagesStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />

@@ -1,6 +1,8 @@
 import { log } from '../../logging/logger';
 import RNFS from 'react-native-fs';
 import { supabase } from '../client';
+import { R2_ENABLED } from '../../storage/r2Config';
+import { uploadToR2 } from '../../storage/uploadToR2';
 
 export type EmojiReaction = { id: string; emoji: string; user_id: string };
 
@@ -62,35 +64,39 @@ export async function uploadReaction({
   // Strip file:// prefix — RNFS works with bare filesystem paths
   const localPath = filePath.replace(/^file:\/\//, '');
 
-  // Read the recorded video file as base64 then convert to a Uint8Array.
-  // XHR with responseType='arraybuffer' returns 0 bytes for file:// on iOS;
-  // RNFS is the reliable way to read local files on device.
-  const base64 = await RNFS.readFile(localPath, 'base64');
-  const binaryStr = atob(base64);
-  const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) {
-    bytes[i] = binaryStr.charCodeAt(i);
+  let videoUrl: string;
+  if (R2_ENABLED) {
+    // Upload via the Pages Function → r2://reactions/<key> marker (signed at read time).
+    videoUrl = await uploadToR2('reactions', uploadPath, localPath);
+  } else {
+    // Read the recorded video file as base64 then convert to a Uint8Array.
+    // XHR with responseType='arraybuffer' returns 0 bytes for file:// on iOS;
+    // RNFS is the reliable way to read local files on device.
+    const base64 = await RNFS.readFile(localPath, 'base64');
+    const binaryStr = atob(base64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from('reactions')
+      .upload(uploadPath, bytes, { contentType: 'video/mp4', upsert: false });
+
+    if (uploadError) {
+      log.error('[uploadReaction] storage error:', JSON.stringify(uploadError));
+      throw uploadError;
+    }
+
+    videoUrl = supabase.storage.from('reactions').getPublicUrl(uploadPath).data.publicUrl;
   }
-
-  const { error: uploadError } = await supabase.storage
-    .from('reactions')
-    .upload(uploadPath, bytes, { contentType: 'video/mp4', upsert: false });
-
-  if (uploadError) {
-    log.error('[uploadReaction] storage error:', JSON.stringify(uploadError));
-    throw uploadError;
-  }
-
-  const { data: { publicUrl } } = supabase.storage
-    .from('reactions')
-    .getPublicUrl(uploadPath);
 
   const { error: insertError } = await (supabase as any)
     .from('reactions')
     .insert({
       thread_id: threadId,
       user_id: userId,
-      video_url: publicUrl,
+      video_url: videoUrl,
       duration: Math.round(duration),
     });
 

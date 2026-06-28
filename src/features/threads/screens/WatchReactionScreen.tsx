@@ -419,6 +419,10 @@ export default function WatchReactionScreen({
           style={{ width, height }}
           resizeMode="cover"
           paused={paused || !canPlay}
+          // No-headphones recordings captured speaker bleed → mute the clip and let the clean
+          // sync-locked source carry audio. NEVER mute the afterthought outro (voice-only, no
+          // source behind it), or it'd be silent.
+          muted={!reaction?.recorded_with_headphones && !playingAfterthought}
           mixWithOthers="mix"
           disableFocus={Platform.OS === 'android'}
           // TextureView renders in the normal view hierarchy so it can't be
@@ -489,10 +493,9 @@ export default function WatchReactionScreen({
               setSupportMultipleWindows={false}
               onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
               injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
-              // Mute the reel unless the reaction was recorded with headphones — matches the
-              // muted YouTube/TikTok source so the reactor's mic is heard (an unmuted reel
-              // steals audio focus on Android and drowns out the mic).
-              injectedJavaScript={igReelJs(!reaction.recorded_with_headphones)}
+              // Source always carries audio now (the clip is muted for no-headphones), so play
+              // the reel rather than muting it.
+              injectedJavaScript={igReelJs(false)}
               onMessage={(e) => {
                 try {
                   const msg = JSON.parse(e.nativeEvent.data);
@@ -504,7 +507,9 @@ export default function WatchReactionScreen({
           ) : reaction.source_type === 'tiktok' ? (
             <TikTokPlayer
               ref={ttRef}
-              startMuted={!reaction.recorded_with_headphones}
+              // TikTok's mic-captured bleed is muffled/low-fi, so always play the CLEAN live source
+              // (sync-locked to the clip) rather than muting it and leaving only the muffled bleed.
+              startMuted={false}
               style={{ width, height, backgroundColor: '#000' }}
               videoId={reaction.yt_video_id}
               onChangeState={handleYtStateChange}
@@ -521,10 +526,12 @@ export default function WatchReactionScreen({
                   height={height}
                   width={ytCoverW}
                   videoId={reaction.yt_video_id}
-                  mute={!reaction.recorded_with_headphones}
+                  // Source always carries the audio now (the clip is muted for no-headphones). mute:1
+                  // loads it muted, then this unmutes once it's playing.
+                  mute={false}
                   play={Platform.OS === 'ios' ? !paused : undefined}
                   onChangeState={handleYtStateChange}
-                  initialPlayerParams={{ controls: true, rel: false } as any}
+                  initialPlayerParams={{ controls: true, rel: false, mute: 1 } as any}
                   webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
                   onReady={() => {
                     const offset = reaction.yt_start_offset ?? 0;

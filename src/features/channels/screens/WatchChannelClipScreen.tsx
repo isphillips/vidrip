@@ -130,6 +130,12 @@ function WatchChannelClipImpl({
   // Latest reaction playhead (seconds) — read by the source-sync loop without re-running it.
   const progressRef = useRef(0);
 
+  // Audio model: a no-headphones recording captured the speaker bleed, so its clip audio is the
+  // echoey/contaminated one. Mute the CLIP in that case and let the clean, sync-locked live source
+  // carry the audio (you see the reaction, hear the source). With headphones the clip is clean
+  // voice, so it plays alongside the source.
+  const muteClip = !post?.recorded_with_headphones;
+
   // Replay of the reactor's emoji throws ({e,t}[]), re-emitted as the clip's playhead crosses each t.
   const fountainRef = useRef<EmojiFountainHandle>(null);
   const emojiTrackRef = useRef<EmojiHit[]>([]);
@@ -421,6 +427,7 @@ function WatchChannelClipImpl({
       style={{ width, height }}
       resizeMode="contain"
       paused={paused}
+      muted={muteClip}
       mixWithOthers="mix"
       disableFocus={Platform.OS === 'android'}
       onLoad={(d: any) => {
@@ -505,7 +512,10 @@ function WatchChannelClipImpl({
           ) : parentSourceType === 'tiktok' ? (
             <TikTokPlayer
               ref={ttRef}
-              startMuted={!post?.recorded_with_headphones}
+              // TikTok's mic-captured bleed is muffled/low-fi, so always play the CLEAN live source
+              // (it's sync-locked to the clip) rather than muting it and leaving only the muffled
+              // bleed — mirrors the Instagram source. The faint bleed just sits under the live audio.
+              startMuted={false}
               style={{ width, height, backgroundColor: '#000' }}
               videoId={parentYtVideoId as string}
               onChangeState={(state) => {
@@ -521,11 +531,11 @@ function WatchChannelClipImpl({
           ) : parentSourceType === 'bunny' && parentEmbedUrl ? (
             <View style={{ width, height }}>
               {/* Creator parent: signed embed + live overlay, sync-locked to the reaction.
-                  Muted unless recorded with headphones (else the captured bleed doubles up). */}
+                  Always plays — the clip is muted for no-headphones, so the source carries audio. */}
               <BunnyVideoLayer
                 embedUrl={parentEmbedUrl}
                 recipe={parentRecipe}
-                muted={!post?.recorded_with_headphones}
+                muted={false}
                 onStateChange={(state) => {
                   if (state === 'playing') {
                     if (stoppingRef.current) { return; }
@@ -543,7 +553,9 @@ function WatchChannelClipImpl({
                   height={height}
                   width={ytCoverW}
                   videoId={parentYtVideoId as string}
-                  mute={!post?.recorded_with_headphones}
+                  // Source always carries the audio now (the clip is muted for no-headphones). mute:1
+                  // in initialPlayerParams still lets it load muted, then this unmutes once playing.
+                  mute={false}
                   play={Platform.OS === 'ios' ? !paused : undefined}
                   onChangeState={(state) => {
                     // Video has mixWithOthers="mix" so it never interrupts the WebView —

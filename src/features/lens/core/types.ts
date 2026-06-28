@@ -66,7 +66,7 @@ export type ReactiveLensProps = { f: SharedValue<MeshFrame | null>; clock: Share
 // Shader programs routed through the camera-pixel pipeline (warpLens.ts). `eyes`…`kaleido` are the
 // fun-house warps; `smooth`/`glow` are beauty skin-retouch passes (no face needed). The pipeline only
 // cares that each names a compiled effect — the `beauty` flag decides which picker tab it shows in.
-export type WarpKey = 'eyes' | 'bighead' | 'tinyface' | 'swirl' | 'glitch' | 'kaleido' | 'smooth' | 'glow';
+export type WarpKey = 'eyes' | 'bighead' | 'tinyface' | 'swirl' | 'glitch' | 'kaleido' | 'smooth' | 'glow' | 'shockwave';
 // `mesh: true` lenses render from the full 478-pt face mesh (FaceFrame.mesh) — the capture screen
 // requests the heavier mesh payload only while one of these (or Debug) is active. `gesture: true`
 // marks lenses driven by a facial action (open mouth, etc.). `beauty: true` marks face-flattering
@@ -75,7 +75,9 @@ export type WarpKey = 'eyes' | 'bighead' | 'tinyface' | 'swirl' | 'glitch' | 'ka
 // `Comp` is the legacy plain-FaceFrame renderer. It's OPTIONAL because lenses migrated to the reactive
 // UI-thread path (registered in faceLens' REACTIVE_RENDERERS) render via their `*Rx` for BOTH live and
 // bake and need no legacy renderer at all.
-export type Lens = { key: string; label: string; icon: string; Comp?: React.FC<LensProps>; warp?: WarpKey; mesh?: boolean; gesture?: boolean; beauty?: boolean };
+// `featured: true` flags a signature/new lens — the picker floats it to the front of its tab and
+// stamps a brand "NEW" badge on the tile.
+export type Lens = { key: string; label: string; icon: string; Comp?: React.FC<LensProps>; warp?: WarpKey; mesh?: boolean; gesture?: boolean; beauty?: boolean; featured?: boolean };
 
 // Picker grouping. Derived from the flags above (see lensCategory): beauty retouch/makeup, warp
 // pixels, mesh-driven, gesture-driven, or a plain overlay.

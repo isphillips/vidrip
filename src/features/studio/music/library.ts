@@ -1,6 +1,7 @@
 import RNFS from 'react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../../infrastructure/supabase/client';
+import { R2_ENABLED, R2_PUBLIC_BASE, publicR2Url } from '../../../infrastructure/storage/r2Config';
 import { parseMp3Meta, type Mp3Meta } from './mp3meta';
 
 // ─── Curated music library ──────────────────────────────────────────────────────
@@ -31,6 +32,31 @@ let _cache: MusicTrack[] | null = null;
  */
 export async function listMusicTracks(force = false): Promise<MusicTrack[]> {
   if (_cache && !force) { return _cache; }
+
+  // R2 can't be listed from the client (no Supabase storage API), so the curated set is
+  // published as music/manifest.json — an array of filenames, or {name,title?,artist?,durationSec?}
+  // objects (precomputed meta avoids the per-track ID3 fetch). Falls back to reading ID3 tags.
+  if (R2_ENABLED) {
+    try {
+      const res = await fetch(`${(R2_PUBLIC_BASE.music ?? '').replace(/\/$/, '')}/manifest.json`);
+      if (!res.ok) { return _cache ?? []; }
+      const items = (await res.json()) as Array<string | { name: string; title?: string; artist?: string; durationSec?: number }>;
+      const audio = items.filter((it) => AUDIO_RE.test(typeof it === 'string' ? it : it.name));
+      const tracks = await Promise.all(audio.map(async (it): Promise<MusicTrack> => {
+        const name = typeof it === 'string' ? it : it.name;
+        const url = publicR2Url(BUCKET, name);
+        const provided = typeof it === 'object' ? it : null;
+        if (provided?.title) {
+          return { id: name, url, title: provided.title, artist: provided.artist, durationSec: provided.durationSec };
+        }
+        const meta = await readMeta(name, url, '', undefined);
+        return { id: name, url, title: meta.title || filenameTitle(name), artist: meta.artist, durationSec: meta.durationSec };
+      }));
+      _cache = tracks;
+      return tracks;
+    } catch { return _cache ?? []; }
+  }
+
   const { data, error } = await supabase.storage.from(BUCKET).list('', {
     limit: 200,
     sortBy: { column: 'name', order: 'asc' },

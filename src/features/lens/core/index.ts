@@ -8,3 +8,4 @@ export * from './primitives';
 export * from './environment';
 export * from './realism';
 export * from './meshContours';
+export * from './delaunay';

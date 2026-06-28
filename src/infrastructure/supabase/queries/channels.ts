@@ -2,6 +2,8 @@ import { log } from '../../logging/logger';
 import RNFS from 'react-native-fs';
 import { supabase, SUPABASE_ANON_KEY } from '../client';
 import { fetchBlockedIds } from './blocks';
+import { R2_ENABLED } from '../../storage/r2Config';
+import { uploadToR2 } from '../../storage/uploadToR2';
 import type { OverlayRecipe } from '../../../features/studio/effectRecipe';
 import { DEMO_MODE } from '../../../demo/demoMode';
 import {
@@ -1206,6 +1208,8 @@ export async function addChannelPostEmojiReaction(
 }
 
 async function uploadClipToCloud(localPath: string, uploadPath: string): Promise<string> {
+  if (R2_ENABLED) { return uploadToR2('channel-clips', uploadPath, localPath); }
+
   const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
 
   const { data: { session } } = await supabase.auth.getSession();
@@ -1362,6 +1366,8 @@ export async function removeChannelPostEmojiReaction(
 // ── Reviews ("Side B") ──────────────────────────────────────────────────────
 
 async function uploadReviewToCloud(localPath: string, uploadPath: string): Promise<string> {
+  if (R2_ENABLED) { return uploadToR2('reviews', uploadPath, localPath); }
+
   const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
 
   const { data: { session } } = await supabase.auth.getSession();

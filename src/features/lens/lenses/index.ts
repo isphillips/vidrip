@@ -83,6 +83,8 @@ export const LENSES: Lens[] = [
   { key: 'glam', label: 'Glam', icon: 'diamond-outline', Comp: GlamLook, mesh: true, beauty: true },
   // ── Face-mesh lenses (full 478-pt mesh) ──
   // These render via their reactive *Rx (faceLens REACTIVE_RENDERERS) for both live AND bake — no legacy Comp.
+  { key: 'drippy', label: 'Drippy', icon: 'happy', mesh: true, featured: true }, // ✦ become the mascot — slime skin
+  { key: 'melt', label: 'Melt', icon: 'water', mesh: true, featured: true }, // ✦ signature liquid-chrome mask
   { key: 'cyber', label: 'Cyber Mesh', icon: 'grid', mesh: true },
   { key: 'starmap', label: 'Star Map', icon: 'star-outline', mesh: true },
   { key: 'gilded', label: 'Gilded', icon: 'diamond-outline', mesh: true },
@@ -119,10 +121,14 @@ export const LENSES: Lens[] = [
   { key: 'swirl', label: 'Swirl', icon: 'sync', Comp: WarpGhost, warp: 'swirl' },
   { key: 'glitch', label: 'Glitch', icon: 'pulse', Comp: WarpGhost, warp: 'glitch' },
   { key: 'kaleido', label: 'Kaleidoscope', icon: 'aperture', Comp: WarpGhost, warp: 'kaleido' },
+  { key: 'shockring', label: 'Shock Ring', icon: 'pulse', Comp: WarpGhost, warp: 'shockwave', featured: true }, // ✦ refractive pixel-bend ring
+
   // ── Expression-interaction lenses (driven by face-mesh blendshapes) ──
   // mesh:true requests the Face Landmarker track so smile/brow/jaw blendshapes are reliable; they
   // still show in the Gesture tab (lensCategory checks `gesture` first) and degrade to a faint idle
   // state when blendshapes are absent (BlazeFace builds / replay).
+  { key: 'overdrive', label: 'Overdrive', icon: 'flash', mesh: true, gesture: true, featured: true }, // ✦ charge (brows) → unleash (yell)
+  { key: 'blobstorm', label: 'Blob Storm', icon: 'happy', mesh: true, gesture: true, featured: true }, // ✦ open mouth → blob friends pour out
   { key: 'firebreath', label: 'Fire Breath', icon: 'flame-outline', Comp: FireBreath, gesture: true },
   { key: 'rainbreath', label: 'Rainbow Mouth', icon: 'color-wand', Comp: RainbowBreath, gesture: true },
   { key: 'bubblegum', label: 'Bubblegum', icon: 'balloon', Comp: Bubblegum, gesture: true },

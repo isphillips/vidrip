@@ -1,6 +1,8 @@
 import { log } from '../logging/logger';
 import { supabase } from '../supabase/client';
 import { moveToReactionsDir, localPathForReaction, downloadReaction, hasLocalCopy } from './localReactionStorage';
+import { R2_ENABLED } from './r2Config';
+import { uploadToR2, signR2Url } from './uploadToR2';
 import type { StorageMode } from './config';
 import type { EmojiHit } from '../../components/EmojiFountain';
 
@@ -65,6 +67,8 @@ export interface SaveReactionResult {
  *  existing object at the path (intros use a deterministic path so retries /
  *  re-records replace rather than orphan). */
 export async function uploadToCloud(localPath: string, uploadPath: string, upsert = false): Promise<string> {
+  if (R2_ENABLED) { return uploadToR2('reactions', uploadPath, localPath); }
+
   const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
 
   const { data: { session } } = await supabase.auth.getSession();
@@ -219,6 +223,7 @@ export async function saveReaction({
 
 /** Sign a reactions-bucket URL for playback (used for afterthought outro clips). */
 export async function signReactionUrl(url: string): Promise<string | null> {
+  if (url.startsWith('r2://')) { return signR2Url(url); }
   const m = url.match(/\/storage\/v1\/object\/(?:public\/)?reactions\/(.+?)(?:\?|$)/);
   if (!m) { return null; }
   const { data } = await supabase.storage.from('reactions').createSignedUrl(decodeURIComponent(m[1]), 3600);
@@ -251,7 +256,13 @@ export async function resolveReactionUri(reaction: {
 
   // 2. Cloud URL available → can download or stream
   if (reaction.video_url) {
-    // Generate a fresh signed URL
+    // R2 (private) marker → resolve to a fresh presigned URL via the Pages Function.
+    if (reaction.video_url.startsWith('r2://')) {
+      const signed = await signR2Url(reaction.video_url);
+      if (signed) { return { uri: signed, source: 'cloud', needsDownload: true, cloudUrl: signed }; }
+      return null;
+    }
+    // Legacy Supabase URL → re-sign with the storage client.
     const pathMatch = reaction.video_url.match(
       /\/storage\/v1\/object\/(?:public\/)?reactions\/(.+?)(?:\?|$)/,
     );

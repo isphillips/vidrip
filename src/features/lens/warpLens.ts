@@ -100,6 +100,27 @@ half4 main(float2 xy) {
   return image.eval(p);
 }`;
 
+// Shockwave: a refractive RING around the face — pixels are pushed radially where a gaussian ring band
+// (peak at `radius`, falloff `width`) lives, with a subtle per-channel chromatic split across the ring.
+// Bends the real background like a pressure wave / heat-shimmer lens centred on the head.
+const SHOCKWAVE = `
+uniform shader image;
+uniform float2 center; uniform float radius; uniform float width; uniform float strength;
+half4 main(float2 xy) {
+  float2 d = xy - center;
+  float dist = length(d);
+  float2 dir = dist > 0.001 ? d / dist : float2(0.0, 0.0);
+  float ring = exp(-pow((dist - radius) / width, 2.0));  // 1 at the ring, fading outward
+  float disp = ring * strength;
+  float2 base = xy - dir * disp;                          // pull pixels toward the centre at the ring
+  half4 c;
+  c.r = image.eval(base + dir * (disp * 0.18)).r;
+  c.g = image.eval(base).g;
+  c.b = image.eval(base - dir * (disp * 0.18)).b;
+  c.a = 1.0;
+  return c;
+}`;
+
 // Beauty skin-retouch: a 9-tap tent blur blended back toward the source (`strength`) — the ubiquitous
 // "soft skin" look. `texel` is the blur step in frame-buffer px. Full-frame, no face needed.
 const SMOOTH = `
@@ -140,7 +161,7 @@ half4 main(float2 xy) {
 // centre; glitch/kaleido/smooth/glow are full-frame. Make() returns null on a compile failure rather
 // than throwing, so a shader the platform's Skia rejects shows up here as null (see warning below)
 // instead of crashing.
-type EffectKey = 'eyes' | 'bulge' | 'swirl' | 'glitch' | 'kaleido' | 'smooth' | 'glow';
+type EffectKey = 'eyes' | 'bulge' | 'swirl' | 'glitch' | 'kaleido' | 'smooth' | 'glow' | 'shockwave';
 const EFFECTS: Record<EffectKey, SkRuntimeEffect | null> = {
   eyes: Skia.RuntimeEffect.Make(EYE_BULGE),
   bulge: Skia.RuntimeEffect.Make(BULGE),
@@ -149,12 +170,13 @@ const EFFECTS: Record<EffectKey, SkRuntimeEffect | null> = {
   kaleido: Skia.RuntimeEffect.Make(KALEIDO),
   smooth: Skia.RuntimeEffect.Make(SMOOTH),
   glow: Skia.RuntimeEffect.Make(GLOW),
+  shockwave: Skia.RuntimeEffect.Make(SHOCKWAVE),
 };
 
 // Which shader each warp lens drives.
 const WARP_EFFECT: Record<WarpKey, EffectKey> = {
   eyes: 'eyes', bighead: 'bulge', tinyface: 'bulge', swirl: 'swirl', glitch: 'glitch', kaleido: 'kaleido',
-  smooth: 'smooth', glow: 'glow',
+  smooth: 'smooth', glow: 'glow', shockwave: 'shockwave',
 };
 
 // Warps that don't need face keypoints — built from frame size alone (apply with or without a face,
@@ -262,6 +284,13 @@ function buildFacePaint(warp: WarpKey, a: FaceAnchors): SkPaint | null {
     case 'swirl':
       return make(EFFECTS.swirl, b => {
         b.setUniform('center', [a.nx, a.ny]); b.setUniform('radius', [a.faceSpan * 1.7]); b.setUniform('angle', [2.4]);
+      });
+    case 'shockwave':
+      return make(EFFECTS.shockwave, b => {
+        b.setUniform('center', [a.cx, a.cy]);
+        b.setUniform('radius', [a.faceSpan * 0.95]);
+        b.setUniform('width', [a.faceSpan * 0.38]);
+        b.setUniform('strength', [a.faceSpan * 0.22]);
       });
     default:
       return null;

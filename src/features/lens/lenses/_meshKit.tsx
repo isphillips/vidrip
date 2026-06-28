@@ -89,6 +89,43 @@ export function useFaceWire(f: SharedValue<MeshFrame | null>): SharedValue<SkPat
   });
 }
 
+/** Profile-safe full-face mask boundary: the dilated convex hull of the mesh — covers the nose +
+ *  cheeks even in 3/4 / side views (where the face-oval contour lets them poke out). `dilate` expands
+ *  it outward from the centroid (fraction of radius) to reach the skin edge. Subsamples the dense mesh
+ *  for speed and always folds in the nose tip (idx 1) so it stays enclosed in profile. */
+export function useHullPath(f: SharedValue<MeshFrame | null>, dilate = 0.12): SharedValue<SkPath> {
+  return useDerivedValue(() => {
+    const path = Skia.Path.Make();
+    const xy = f.value?.xy;
+    if (!xy) { return path; }
+    const pts: Pt[] = [];
+    for (let i = 0; i < xy.length; i += 10) { if (!isNaN(xy[i])) { pts.push({ x: xy[i], y: xy[i + 1] }); } }
+    if (!isNaN(xy[2])) { pts.push({ x: xy[2], y: xy[3] }); } // nose tip (canonical idx 1)
+    if (pts.length < 3) { return path; }
+    let cx = 0, cy = 0;
+    for (let i = 0; i < pts.length; i++) { cx += pts[i].x; cy += pts[i].y; }
+    cx /= pts.length; cy /= pts.length;
+    pts.sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+    const cross = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const lower: Pt[] = [];
+    for (let i = 0; i < pts.length; i++) { const q = pts[i]; while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) { lower.pop(); } lower.push(q); }
+    const upper: Pt[] = [];
+    for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) { upper.pop(); } upper.push(q); }
+    lower.pop(); upper.pop();
+    const hull = lower.concat(upper);
+    if (hull.length < 3) { return path; }
+    const k = 1 + dilate;
+    const H = hull.map((v) => ({ x: cx + (v.x - cx) * k, y: cy + (v.y - cy) * k }));
+    const n = H.length;
+    const mid = (a: Pt, b: Pt) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    const m0 = mid(H[n - 1], H[0]);
+    path.moveTo(m0.x, m0.y);
+    for (let i = 0; i < n; i++) { const cur = H[i]; const m = mid(cur, H[(i + 1) % n]); path.quadTo(cur.x, cur.y, m.x, m.y); }
+    path.close();
+    return path;
+  });
+}
+
 /** Reactive face-oval (jaw) path — for clipping a fill to the face. */
 export function useOvalPath(f: SharedValue<MeshFrame | null>): SharedValue<SkPath> {
   return useDerivedValue(() => {

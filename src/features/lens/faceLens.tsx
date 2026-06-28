@@ -11,6 +11,9 @@ import { NebulaRx } from './lenses/nebulaRx';
 import { PixelRx } from './lenses/pixelRx';
 import { WebRx } from './lenses/webRx';
 import { GildedRx } from './lenses/gildedRx';
+import { OverdriveRx } from './lenses/overdriveRx';
+import { MeltRx, DrippyRx } from './lenses/meltRx';
+import { BlobSpewRx } from './lenses/blobSpewRx';
 import { ANON_LENS_KEY } from './useAnonymousMode';
 
 // Lenses migrated to the reactive (UI-thread, no-React-re-render) renderer. When the active lens is in
@@ -24,6 +27,10 @@ const REACTIVE_RENDERERS: Record<string, React.FC<ReactiveLensProps>> = {
   pixel: PixelRx,
   web: WebRx,
   gilded: GildedRx,
+  overdrive: OverdriveRx,
+  melt: MeltRx,
+  drippy: DrippyRx,
+  blobstorm: BlobSpewRx,
 };
 
 // Bake helpers (used by ShareBaker's Skia-snapshot lens bake). Any lens registered in

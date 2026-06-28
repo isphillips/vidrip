@@ -2,6 +2,8 @@ import RNFS from 'react-native-fs';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import { supabase } from '../supabase/client';
 import { postVideoComment, updateVideoCommentUrl } from '../supabase/queries/videoComments';
+import { R2_ENABLED, publicR2Url } from './r2Config';
+import { uploadToR2 } from './uploadToR2';
 
 const SUPABASE_URL = 'https://ltpscwticavqutbzrrjb.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0cHNjd3RpY2F2cXV0YnpycmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMDEwMTEsImV4cCI6MjA5NTc3NzAxMX0.wHXV1IFLk7UbRWOrJWZN-sjsw8Kau0Rn6OKs29debKo';
@@ -22,8 +24,11 @@ function commentThumbStoragePath(authorId: string, commentId: string): string {
 
 /** Public URL for a comment's stored thumbnail (derivable from author + comment id). */
 export function commentThumbPublicUrl(authorId: string, commentId: string): string {
-  return supabase.storage.from('comment-videos')
-    .getPublicUrl(commentThumbStoragePath(authorId, commentId)).data.publicUrl;
+  const path = commentThumbStoragePath(authorId, commentId);
+  // After migration every thumbnail exists at the R2 domain (rclone copies the .jpg too),
+  // so this can flip wholesale with R2_ENABLED.
+  if (R2_ENABLED) { return publicR2Url('comment-videos', path); }
+  return supabase.storage.from('comment-videos').getPublicUrl(path).data.publicUrl;
 }
 
 async function ensureDir(): Promise<void> {
@@ -33,6 +38,8 @@ async function ensureDir(): Promise<void> {
 }
 
 async function uploadToCloud(localPath: string, uploadPath: string): Promise<string> {
+  if (R2_ENABLED) { return uploadToR2('comment-videos', uploadPath, localPath); }
+
   const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
 
   const { data: { session } } = await supabase.auth.getSession();
@@ -68,6 +75,10 @@ async function uploadThumbnail(localVideoPath: string, authorId: string, comment
   try {
     const fileUri = localVideoPath.startsWith('file://') ? localVideoPath : `file://${localVideoPath}`;
     const { path } = await createThumbnail({ url: fileUri, timeStamp: 100, format: 'jpeg' });
+    if (R2_ENABLED) {
+      await uploadToR2('comment-videos', commentThumbStoragePath(authorId, commentId), path, 'image/jpeg');
+      return;
+    }
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     if (!token) { return; }

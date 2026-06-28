@@ -113,8 +113,16 @@ export function faceFrame(lm: FaceLandmarks, w: number, h: number, frameAspect?:
     const pm = (i: number) => { const p = lm.mesh![i]; return p ? { x: mx(p.x), y: my(p.y) } : undefined; };
     const cr = pm(61), cl = pm(291);            // mouth corners → spacing widens with a smile
     if (cr && cl) { smile = Math.max(0, Math.min(1, (Math.hypot(cr.x - cl.x, cr.y - cl.y) / eyeDist - 0.95) / 0.55)); }
-    const br = pm(105), ey = pm(159);           // right brow ↔ upper lid → gap grows when the brow lifts
-    if (br && ey) { browRaise = Math.max(0, Math.min(1, (Math.hypot(br.x - ey.x, br.y - ey.y) / eyeDist - 0.42) / 0.32)); }
+    // Brow-lift = the vertical brow↔upper-lid gap (averaged across BOTH brows), normalized by the
+    // eyes→mouth length `dl`. Normalizing by `dl` (a VERTICAL reference that foreshortens together with
+    // the gap) instead of the horizontal `eyeDist` is what stops it from false-firing on head-yaw —
+    // eyeDist collapses when you look to the side, which used to inflate this ratio. Rough REST/RANGE.
+    const brR = pm(105), lidR = pm(159), brL = pm(334), lidL = pm(386);
+    if (brR && lidR && brL && lidL && dl > 0) {
+      const gR = Math.hypot(brR.x - lidR.x, brR.y - lidR.y);
+      const gL = Math.hypot(brL.x - lidL.x, brL.y - lidL.y);
+      browRaise = Math.max(0, Math.min(1, (((gR + gL) / 2) / dl - 0.28) / 0.22));
+    }
   }
   return {
     le, re,

@@ -124,7 +124,7 @@ export default function CreateGroupChatScreen({
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1 },
+  list: { flex: 1, backgroundColor: C.BG_SOLID },
   listContent: { paddingBottom: SPACE.XXL },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACE.XL },
   header: {

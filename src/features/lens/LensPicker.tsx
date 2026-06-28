@@ -11,7 +11,7 @@ import { LENSES, lensCategory, type LensCategory } from './faceLens';
 const FLOW = ['#FF4FA3', '#A05CFF', '#2DD4BF'];
 const PANEL_BG = '#190A33';
 
-type Option = { key: string | null; label: string; icon: string };
+type Option = { key: string | null; label: string; icon: string; featured?: boolean };
 
 // Picker tabs, in display order, each with a small glyph that hints at the category.
 const TABS: { cat: LensCategory; label: string; icon: string }[] = [
@@ -71,10 +71,12 @@ export default function LensPicker({
   const cellW = Math.max(56, Math.floor((innerW - GAP * (COLS - 1)) / COLS));
   const cellH = Math.round(cellW * 1.18);
 
-  // None + the lenses in the active tab.
+  // None + the lenses in the active tab, with featured (signature/new) lenses floated to the front.
+  const inTab = LENSES.filter(l => lensCategory(l) === tab)
+    .sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
   const opts: Option[] = [
     { key: null, label: 'None', icon: 'ban-outline' },
-    ...LENSES.filter(l => lensCategory(l) === tab).map(l => ({ key: l.key, label: l.label, icon: l.icon })),
+    ...inTab.map(l => ({ key: l.key, label: l.label, icon: l.icon, featured: l.featured })),
   ];
 
   const select = (k: string | null) => { onChange(k); setOpen(false); };
@@ -125,10 +127,15 @@ export default function LensPicker({
                 const on = o.key === lensKey;
                 return (
                   <TouchableOpacity key={o.key ?? 'none'} activeOpacity={0.85} onPress={() => select(o.key)} style={{ width: cellW }}>
-                    <View style={[styles.cell, { width: cellW, height: cellH }, on && styles.cellOn]}>
+                    <View style={[styles.cell, { width: cellW, height: cellH }, o.featured && styles.cellFeatured, on && styles.cellOn]}>
                       <IconTile icon={o.icon} on={on} w={cellW} h={cellH} />
+                      {o.featured && (
+                        <LinearGradient colors={FLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.newBadge}>
+                          <Text style={styles.newTxt}>NEW</Text>
+                        </LinearGradient>
+                      )}
                     </View>
-                    <Text style={[styles.cellLabel, on && styles.cellLabelOn]} numberOfLines={1}>{o.label}</Text>
+                    <Text style={[styles.cellLabel, (on || o.featured) && styles.cellLabelOn]} numberOfLines={1}>{o.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -175,6 +182,9 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: 'transparent', overflow: 'hidden',
   },
   cellOn: { borderColor: C.ACCENT_HOT },
+  cellFeatured: { borderColor: 'rgba(255,79,163,0.55)', backgroundColor: 'rgba(255,79,163,0.10)' },
+  newBadge: { position: 'absolute', top: 4, right: 4, borderRadius: RADIUS.FULL },
+  newTxt: { color: '#FFFFFF', fontFamily: FONT.BODY_BOLD, fontSize: 8, letterSpacing: 0.5, paddingHorizontal: 5, paddingVertical: 1 },
   cellLabel: { color: C.SUBTLE, fontFamily: FONT.BODY_MEDIUM, fontSize: FONT.SIZES.XS, textAlign: 'center', marginTop: 4 },
   cellLabelOn: { color: C.WHITE, fontFamily: FONT.BODY_BOLD },
 });
