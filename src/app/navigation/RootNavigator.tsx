@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Linking, View } from 'react-native';
-import type { NavigationContainerRef } from '@react-navigation/native';
+import { navigationRef } from './navigationRef';
 import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
 import { useAuthStore } from '../../store/authStore';
@@ -22,6 +22,7 @@ import {
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import ProfileDrawer from '../../components/ProfileDrawer';
+import FriendsMenuOverlay from '../../components/FriendsMenuOverlay';
 import ProfileReactionPlayer from '../../components/ProfileReactionPlayer';
 import MfaChallengeScreen from '../../features/auth/screens/MfaChallengeScreen';
 import RecordReactionScreen from '../../features/record/screens/RecordReactionScreen';
@@ -70,7 +71,8 @@ export default function RootNavigator() {
   const { ready: onbReady, seen: onboarded, complete: completeOnboarding } = useOnboarding();
   const replaying = useOnboardingStore(s => s.replaying);
   const endReplay = useOnboardingStore(s => s.endReplay);
-  const navRef = useRef<NavigationContainerRef<any>>(null);
+  // Shared navigation ref (also drives FriendsMenuOverlay, which lives outside any screen).
+  const navRef = navigationRef;
   // The animated launch scene stays mounted on top until it dissolves itself (once the app is ready).
   const [splashGone, setSplashGone] = useState(false);
   // Closed-launch creator intro: a signed-out visitor gets the cinematic creator pitch instead of the
@@ -398,6 +400,8 @@ export default function RootNavigator() {
       {session && <ProfileDrawer />}
       {/* Full-screen player for reactions opened from a profile drawer. */}
       {session && <ProfileReactionPlayer />}
+      {/* Global friends menu (the header drip-blob dropdown) — overlays everything, no RN Modal. */}
+      {session && <FriendsMenuOverlay />}
       </NavigationContainer>
     );
   }
