@@ -6,6 +6,7 @@ import { navigationRef } from './navigationRef';
 import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
 import { useAuthStore } from '../../store/authStore';
+import { fetchThreadCounterpart } from '../../infrastructure/supabase/queries/threads';
 import { useBlockStore } from '../../store/blockStore';
 import { useOAuthStore } from '../../store/oauthStore';
 import { useShareIntentStore } from '../../store/shareIntentStore';
@@ -83,12 +84,29 @@ export default function RootNavigator() {
   useEffect(() => {
     ensureReactionsDir().catch(() => {});
 
-    // Wire notification tap → navigate to thread
+    // Reaction push (someone reacted to a video I sent) carries only thread_id. Resolve the friend
+    // from the thread and open the CONVERSATION; fall back to the bare Thread if resolution fails.
     setNotificationOpenedHandler((threadId: string) => {
-      navRef.current?.navigate('Main', {
-        screen: 'Feed',
-        params: { screen: 'Thread', params: { threadId } },
-      });
+      const myId = useAuthStore.getState().user?.id;
+      (async () => {
+        const friend = myId ? await fetchThreadCounterpart(threadId, myId).catch(() => null) : null;
+        if (friend) {
+          navRef.current?.navigate('Main', {
+            screen: 'Messages',
+            params: {
+              screen: 'FriendConversation',
+              params: {
+                friendUserId: friend.friendUserId,
+                displayName: friend.displayName,
+                handle: friend.handle,
+                avatarUrl: friend.avatarUrl,
+              },
+            },
+          });
+        } else {
+          navRef.current?.navigate('Main', { screen: 'Feed', params: { screen: 'Thread', params: { threadId } } });
+        }
+      })();
     });
 
     // Wire channel notification tap → navigate to private channel

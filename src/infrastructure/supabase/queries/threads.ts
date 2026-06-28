@@ -179,6 +179,121 @@ export async function fetchThread(threadId: string, userId: string): Promise<Thr
   };
 }
 
+// One video share in a 1:1 conversation, in EITHER direction. `direction` is from the viewer's POV;
+// `reacted`/`reactedAt` describe the RECIPIENT's reaction (theirs → my reaction; mine → the friend's),
+// so the conversation can sink reacted shares to the bottom ordered by reaction time.
+export type ConversationShare = {
+  id: string;
+  direction: 'mine' | 'theirs';
+  video_id: string | null;
+  video_title: string | null;
+  video_thumbnail: string | null;
+  source_type: 'youtube' | 'tiktok' | 'instagram' | 'facebook' | null;
+  thread_kind: 'reaction' | 'studio_share';
+  sentAt: number;     // created_at (ms)
+  reacted: boolean;   // did the recipient record a reaction?
+  reactedAt: number;  // recipient's reaction created_at (ms), 0 if none
+};
+
+const convMs = (iso?: string | null) => (iso ? Date.parse(iso) || 0 : 0);
+
+// All video shares between me and one friend, BOTH directions. RLS scopes `threads` to ones I can see
+// (mine as sender, or where I'm a member), so we fetch shares sent by either of us and keep the ones
+// that actually involve both. Embeds thread_members(status) + reactions(user_id, created_at) so the
+// recipient's reaction state + time come back in one round-trip.
+export async function fetchConversationShares(myId: string, friendUserId: string): Promise<ConversationShare[]> {
+  // Primary path: a SECURITY DEFINER RPC returns BOTH directions. A direct table read can't see my
+  // OUTBOUND threads (threads RLS only exposes threads I'm a member of, and the sender isn't a member
+  // of their own thread), so without the RPC the screen only shows what the friend sent me. Falls back
+  // to that inbound-only read if the RPC isn't deployed yet, so the conversation never goes blank.
+  try {
+    const { data, error } = await (supabase as any).rpc('conversation_shares', { p_friend: friendUserId });
+    if (error) { throw error; }
+    return (data ?? []).map((r: any): ConversationShare => ({
+      id: r.id,
+      direction: r.direction === 'mine' ? 'mine' : 'theirs',
+      video_id: r.video_id ?? null,
+      video_title: r.video_title ?? null,
+      video_thumbnail: r.video_thumbnail ?? null,
+      source_type: r.source_type ?? null,
+      thread_kind: (r.thread_kind as 'reaction' | 'studio_share') ?? 'reaction',
+      sentAt: convMs(r.sent_at),
+      reacted: !!r.reacted,
+      reactedAt: r.reacted_at ? convMs(r.reacted_at) : 0,
+    }));
+  } catch {
+    return conversationSharesFromTable(myId, friendUserId);
+  }
+}
+
+// Inbound-only fallback via a direct table read (RLS hides my outbound threads). Used until the
+// conversation_shares RPC is deployed.
+async function conversationSharesFromTable(myId: string, friendUserId: string): Promise<ConversationShare[]> {
+  const { data, error } = await (supabase as any)
+    .from('threads')
+    .select(`
+      id, video_id, video_title, video_thumbnail, source_type, thread_kind, sender_id, created_at,
+      thread_members(user_id, status),
+      reactions(user_id, created_at)
+    `)
+    .or(`sender_id.eq.${myId},sender_id.eq.${friendUserId}`)
+    .order('created_at', { ascending: true });
+  if (error) { throw error; }
+
+  return (data ?? [])
+    .filter((t: any) => {
+      const ids = new Set<string>([t.sender_id, ...((t.thread_members ?? []).map((m: any) => m.user_id))]);
+      return ids.has(myId) && ids.has(friendUserId);   // a genuine 1:1 between us
+    })
+    .map((t: any): ConversationShare => {
+      const mine = t.sender_id === myId;
+      const recipientId = mine ? friendUserId : myId;
+      const recipMember = (t.thread_members ?? []).find((m: any) => m.user_id === recipientId);
+      const recipReaction = (t.reactions ?? []).find((r: any) => r.user_id === recipientId);
+      return {
+        id: t.id,
+        direction: mine ? 'mine' : 'theirs',
+        video_id: t.video_id,
+        video_title: t.video_title,
+        video_thumbnail: t.video_thumbnail ?? null,
+        source_type: t.source_type ?? null,
+        thread_kind: (t.thread_kind as 'reaction' | 'studio_share') ?? 'reaction',
+        sentAt: convMs(t.created_at),
+        reacted: recipMember?.status === 'reacted' || !!recipReaction,
+        reactedAt: recipReaction?.created_at ? convMs(recipReaction.created_at) : 0,
+      };
+    });
+}
+
+// The OTHER participant in a 1:1 thread (everyone but me) + their profile — used to route a
+// reaction push notification (which carries only thread_id) to the friend CONVERSATION rather than
+// the bare Thread screen. Two small queries so we don't depend on a thread_members→users FK name.
+export async function fetchThreadCounterpart(
+  threadId: string, myId: string,
+): Promise<{ friendUserId: string; displayName: string; handle: string; avatarUrl: string | null } | null> {
+  const { data: t } = await (supabase as any)
+    .from('threads')
+    .select('sender_id, thread_members(user_id)')
+    .eq('id', threadId)
+    .single();
+  if (!t) { return null; }
+  const ids = new Set<string>([t.sender_id, ...((t.thread_members ?? []).map((m: any) => m.user_id))]);
+  ids.delete(myId);
+  const friendId = [...ids][0];
+  if (!friendId) { return null; }
+  const { data: u } = await (supabase as any)
+    .from('users')
+    .select('id, handle, display_name, avatar_url')
+    .eq('id', friendId)
+    .single();
+  return {
+    friendUserId: friendId,
+    displayName: u?.display_name ?? '',
+    handle: u?.handle ?? '',
+    avatarUrl: u?.avatar_url ?? null,
+  };
+}
+
 // Quick emoji reactions on SHARES (threads). Fetched SEPARATELY from fetchThread (not as an embedded
 // join) so a thread still loads if the thread_emoji_reactions table isn't deployed yet — the query just
 // returns nothing. Batched by thread id → map.

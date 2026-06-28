@@ -22,6 +22,7 @@ import { IG_BLOCK_LAUNCH_JS } from '../../shared/igBlockLaunch';
 import { IG_REEL_JS } from '../../shared/igReelPlayer';
 import {
   checkHeadphonesConnected,
+  configureForVideoRecording,
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
@@ -174,6 +175,11 @@ export default function ReactionRecorder({
     const task = InteractionManager.runAfterInteractions(() => setCamActive(true));
     return () => task.cancel();
   }, []);
+  // Put the audio session into video-recording mode (PlayAndRecord + MixWithOthers) on mount, BEFORE
+  // the source plays or we capture. A prior watch screen leaves the session in Playback-only
+  // (configureForMixedPlayback), and recording the mic into that session makes the AVAssetWriter fail
+  // to finalize on stop (AVFoundation -11800/-12780). Done before any playback so it never blips audio.
+  useEffect(() => { configureForVideoRecording().catch(() => {}); }, []);
   // AR face lens for the reaction (null = none). Replayed/baked the same as the studio.
   const [lensKey, setLensKey] = useState<string | null>(null);
   // React Anonymously: force the silhouette lens (overriding any pick), hide the picker, and bake the

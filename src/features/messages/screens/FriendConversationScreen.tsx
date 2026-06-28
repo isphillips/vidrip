@@ -12,8 +12,9 @@ import GradientIcon from '../../../components/GradientIcon';
 import DrippyEyes from '../../../components/DrippyEyes';
 import { supabase } from '../../../infrastructure/supabase/client';
 import {
-  fetchThread, markThreadSeen, fetchThreadEmojiReactions,
+  markThreadSeen, fetchThreadEmojiReactions,
   addThreadEmojiReaction, removeThreadEmojiReaction,
+  fetchConversationShares, type ConversationShare,
 } from '../../../infrastructure/supabase/queries/threads';
 import {
   fetchChannelPosts, postChannelAudio, markChannelAsRead, ensurePrivateChannel, findPrivateChannel,
@@ -31,10 +32,12 @@ import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 const questionmark = require('../../../assets/questionmark.png');
 
-// One row of the merged friend timeline: either a video share (thread) or a DM clip/audio post.
+// One row of the merged friend timeline: either a video share (thread, EITHER direction) or a DM
+// clip/audio post. `at` is the EFFECTIVE timestamp used for ordering — a share's reaction time once
+// reacted (so it sinks to the bottom), otherwise its sent time.
 type TimelineItem =
-  | { kind: 'share'; at: number; key: string; threadId: string; title: string;
-      thumbnail: string | null; reacted: boolean; sourceType: string;
+  | { kind: 'share'; at: number; key: string; share: ConversationShare;
+      title: string; thumbnail: string | null;
       emojiReactions: { emoji: string; user_id: string }[] }
   | { kind: 'post'; at: number; key: string; post: ChannelPost };
 
@@ -101,11 +104,13 @@ export default function FriendConversationScreen({
     if (!user) { return []; }
     const cid = channelIdRef.current;
     const limit = loadedCountRef.current;
-    const [threadDetails, posts, reactByThread] = await Promise.all([
-      Promise.all(threadIds.map(id => fetchThread(id, user.id).catch(() => null))),
+    // Shares now come from the friend pair (BOTH directions), not the inbound-only route threadIds.
+    const [shares, posts] = await Promise.all([
+      fetchConversationShares(user.id, friendUserId).catch(() => [] as ConversationShare[]),
       cid ? loadChannelPostsResilient(cid, user.id, limit) : Promise.resolve([] as ChannelPost[]),
-      fetchThreadEmojiReactions(threadIds).catch(() => new Map<string, { emoji: string; user_id: string }[]>()),
     ]);
+    const reactByThread = await fetchThreadEmojiReactions(shares.map(s => s.id))
+      .catch(() => new Map<string, { emoji: string; user_id: string }[]>());
 
     const postItems: TimelineItem[] = posts
       .filter(p => p.post_type !== 'status' || !!p.message)
@@ -119,24 +124,22 @@ export default function FriendConversationScreen({
     const oldestPostAt = postItems.reduce((m, p) => (p.at && p.at < m ? p.at : m), Infinity);
     const lowerBound = more && oldestPostAt !== Infinity ? oldestPostAt : 0;
 
-    const shareItems: TimelineItem[] = threadDetails
-      .filter(Boolean)
-      .map((t: any) => ({
+    const shareItems: TimelineItem[] = shares
+      .map((s): TimelineItem => ({
         kind: 'share' as const,
-        at: ms(t.created_at),
-        key: `share:${t.id}`,
-        threadId: t.id,
-        title: t.video_title ?? 'Video',
-        thumbnail: t.video_thumbnail
-          ?? (t.source_type === 'youtube' && t.video_id ? `https://img.youtube.com/vi/${t.video_id}/hqdefault.jpg` : null),
-        reacted: t.my_status === 'reacted',
-        sourceType: t.source_type ?? 'youtube',
-        emojiReactions: reactByThread.get(t.id) ?? [],
+        // Effective order: reaction time once reacted (sinks to the bottom), else sent time.
+        at: s.reacted && s.reactedAt ? s.reactedAt : s.sentAt,
+        key: `share:${s.id}`,
+        share: s,
+        title: s.video_title ?? 'Video',
+        thumbnail: s.video_thumbnail
+          ?? (s.source_type === 'youtube' && s.video_id ? `https://img.youtube.com/vi/${s.video_id}/hqdefault.jpg` : null),
+        emojiReactions: reactByThread.get(s.id) ?? [],
       }))
       .filter(s => s.at >= lowerBound);
 
     return [...shareItems, ...postItems].sort((a, b) => a.at - b.at);
-  }, [user, threadIds]);
+  }, [user, friendUserId]);
 
   // Scroll-up handler: grow the window by one page and refetch (load() keeps the current scroll via the
   // ScrollView's maintainVisibleContentPosition — no jump-to-bottom).
@@ -273,10 +276,11 @@ export default function FriendConversationScreen({
   ) => {
     if (!user) { return; }
     const uid = user.id;
+    const threadId = share.share.id;
     const mine = share.emojiReactions.some(r => r.user_id === uid && r.emoji === emoji);
     // Optimistic: update this share's reactions in place; reconcile via load() only on failure.
     setItems(prev => prev.map(it =>
-      it.kind === 'share' && it.threadId === share.threadId
+      it.kind === 'share' && it.share.id === threadId
         ? {
             ...it,
             emojiReactions: mine
@@ -285,8 +289,8 @@ export default function FriendConversationScreen({
           }
         : it));
     try {
-      if (mine) { await removeThreadEmojiReaction(share.threadId, uid, emoji); }
-      else { await addThreadEmojiReaction(share.threadId, uid, emoji); }
+      if (mine) { await removeThreadEmojiReaction(threadId, uid, emoji); }
+      else { await addThreadEmojiReaction(threadId, uid, emoji); }
     } catch { load(); }
   }, [user, load]);
 
@@ -330,47 +334,60 @@ export default function FriendConversationScreen({
                 ? <Text style={styles.stamp}>{fmtStamp(item.at)}</Text>
                 : null;
               if (item.kind === 'share') {
+                const mine = item.share.direction === 'mine';
+                const reacted = item.share.reacted;
+                // Theirs: blurred until I react (the blind-reveal mechanic). Mine: my own video, always shown.
+                const showThumb = !!item.thumbnail && (mine || reacted);
                 return (
                   <React.Fragment key={item.key}>
                     {stamp}
-                    {/* Long-press the card → iOS-style reaction menu; a tap still opens the thread. */}
-                    <ReactionMenu
-                      style={styles.shareCard}
-                      emojis={QUICK_EMOJIS}
-                      mine={item.emojiReactions.filter(r => r.user_id === user?.id).map(r => r.emoji)}
-                      onPick={emoji => handleShareEmojiToggle(item, emoji)}
-                      onPress={() => navigation.navigate('Thread', { threadId: item.threadId })}>
-                      <View style={styles.shareThumb}>
-                        {item.reacted && item.thumbnail ? (
-                          <Image source={{ uri: item.thumbnail }} style={styles.shareThumbImg} />
-                        ) : (
-                          <View style={styles.shareThumbBlind}><Image source={questionmark} style={styles.shareThumbBlindImg} resizeMode="contain" /></View>
-                        )}
-                      </View>
-                      <View style={styles.shareInfo}>
-                        <Text style={styles.shareTitle} numberOfLines={2}>
-                          {item.reacted ? item.title : 'Sent you a video to react to'}
-                        </Text>
-                        {item.reacted ? (
-                          <Text style={styles.shareMeta}>✓ Reacted · tap to view</Text>
-                        ) : (
-                          <View style={styles.shareMetaRow}>
-                            <DrippyEyes size={12} />
-                            <Text style={styles.shareMeta}>Tap to react</Text>
-                          </View>
-                        )}
-                      </View>
-                    </ReactionMenu>
-                    {item.emojiReactions.length > 0 && (
-                      <View style={styles.shareReacts}>
-                        <EmojiChips
-                          reactions={item.emojiReactions}
-                          userId={user?.id}
-                          onToggle={emoji => handleShareEmojiToggle(item, emoji)}
-                          showAdd={false}
-                        />
-                      </View>
-                    )}
+                    {/* Aligned column: mine → right, theirs → left, capped at 80% width. */}
+                    <View style={[styles.shareCol, { alignSelf: mine ? 'flex-end' : 'flex-start' }]}>
+                      {/* Long-press the card → iOS-style reaction menu; a tap opens the thread. */}
+                      <ReactionMenu
+                        style={[styles.shareCard, mine && styles.shareCardMine]}
+                        emojis={QUICK_EMOJIS}
+                        mine={item.emojiReactions.filter(r => r.user_id === user?.id).map(r => r.emoji)}
+                        onPick={emoji => handleShareEmojiToggle(item, emoji)}
+                        onPress={() => navigation.navigate('Thread', { threadId: item.share.id })}>
+                        <View style={styles.shareThumb}>
+                          {showThumb ? (
+                            <Image source={{ uri: item.thumbnail as string }} style={styles.shareThumbImg} />
+                          ) : (
+                            <View style={styles.shareThumbBlind}><Image source={questionmark} style={styles.shareThumbBlindImg} resizeMode="contain" /></View>
+                          )}
+                        </View>
+                        <View style={styles.shareInfo}>
+                          <Text style={styles.shareTitle} numberOfLines={2}>
+                            {mine
+                              ? item.title   /* my own video — always show its title (+ status below) */
+                              : (reacted ? item.title : 'Sent you a video to react to')}
+                          </Text>
+                          {mine ? (
+                            reacted
+                              ? <Text style={styles.shareMeta}>✓ They reacted · tap to view</Text>
+                              : <Text style={styles.shareMeta}>Waiting for their reaction…</Text>
+                          ) : reacted ? (
+                            <Text style={styles.shareMeta}>✓ Reacted · tap to view</Text>
+                          ) : (
+                            <View style={styles.shareMetaRow}>
+                              <DrippyEyes size={12} />
+                              <Text style={styles.shareMeta}>Tap to react</Text>
+                            </View>
+                          )}
+                        </View>
+                      </ReactionMenu>
+                      {item.emojiReactions.length > 0 && (
+                        <View style={[styles.shareReacts, { alignSelf: mine ? 'flex-end' : 'flex-start' }]}>
+                          <EmojiChips
+                            reactions={item.emojiReactions}
+                            userId={user?.id}
+                            onToggle={emoji => handleShareEmojiToggle(item, emoji)}
+                            showAdd={false}
+                          />
+                        </View>
+                      )}
+                    </View>
                   </React.Fragment>
                 );
               }
@@ -451,12 +468,19 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: FONT.SIZES.LG, fontWeight: '700', color: C.INK },
   emptySubtitle: { fontSize: FONT.SIZES.MD, color: C.MUTED, textAlign: 'center' },
 
+  // Aligned column wrapping a share bubble + its emoji chips (mine → right, theirs → left).
+  // Use a DEFINED width (not maxWidth): alignSelf makes this column shrink-wrap, and a shrink-wrapped
+  // parent gives the card's flex:1 text column (shareInfo) zero width — collapsing the title/status to
+  // nothing (only the fixed thumbnail + eyes show). 80% gives the text real room to flex into.
+  shareCol: { width: '80%', gap: 4 },
   // Video-share card in the timeline
   shareCard: {
     flexDirection: 'row', alignItems: 'center', gap: SPACE.MD,
     backgroundColor: C.SURFACE, borderRadius: RADIUS.LG, padding: SPACE.MD,
     borderWidth: 1, borderColor: C.BORDER,
   },
+  // My own sent video — accent-tinted bubble so the two sides read like a chat.
+  shareCardMine: { backgroundColor: C.ACCENT_LITE, borderColor: C.ACCENT },
   shareThumb: { width: 64, height: 64, borderRadius: RADIUS.MD, overflow: 'hidden', backgroundColor: C.SURFACE_2 },
   shareThumbImg: { width: 64, height: 64 },
   shareThumbBlind: { width: 64, height: 64, backgroundColor: C.BLACK, alignItems: 'center', justifyContent: 'center' },
@@ -465,8 +489,8 @@ const styles = StyleSheet.create({
   shareTitle: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
   shareMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   shareMeta: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
-  // Emoji reaction strip under a share card, indented to line up with the card's text column.
-  shareReacts: { marginTop: 4, marginBottom: 2, marginLeft: 64 + SPACE.MD + SPACE.MD },
+  // Emoji reaction strip under a share bubble (aligned to the bubble's side inline).
+  shareReacts: { marginTop: 2, marginBottom: 2 },
 
   // Centered date/time separator (only shown when >1h has passed since the previous item).
   stamp: { alignSelf: 'center', textAlign: 'center', fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.SUBTLE, paddingVertical: 2 },

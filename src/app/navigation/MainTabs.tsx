@@ -17,7 +17,7 @@ import { screenLayout, GRADIENT_DARK } from '../../components/ScreenGradient';
 
 import FeedHomeScreen from '../../features/feed/screens/FeedHomeScreen';
 import MessagesHomeScreen from '../../features/messages/screens/MessagesHomeScreen';
-import FriendConversationScreen from '../../features/feed/screens/FriendConversationScreen';
+import FriendConversationScreen from '../../features/messages/screens/FriendConversationScreen';
 import ThreadScreen from '../../features/threads/screens/ThreadScreen';
 import WatchReactionScreen from '../../features/threads/screens/WatchReactionScreen';
 import WatchReviewScreen from '../../features/channels/screens/WatchReviewScreen';
