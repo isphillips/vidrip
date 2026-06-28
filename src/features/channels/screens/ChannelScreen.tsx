@@ -107,7 +107,7 @@ export default function ChannelhamburderScreen({
     isMembersOnly && ownerHandle ? `${ownerHandle}` : channelName,
   );
   // Channel intro/advertising video (owner/admin-set; shown to everyone).
-  const [adVideo, setAdVideo] = useState<{ url: string | null; duration: number | null }>({ url: null, duration: null });
+  const [adVideo, setAdVideo] = useState<{ url: string | null; duration: number | null; thumb: string | null }>({ url: null, duration: null, thumb: null });
   const [adPlaying, setAdPlaying] = useState(false);
   const refreshAdVideo = useCallback(() => {
     fetchChannelAdVideo(channelId).then(setAdVideo).catch(() => {});
@@ -381,8 +381,26 @@ export default function ChannelhamburderScreen({
     isPinned: boolean;
     locked: boolean;         // invite-only room, viewer not invited → 🔒, no entry
     badge: string | null;    // '▶' reaction · '★' review
+    intro?: boolean;         // the pinned channel-intro tile → highlighted "Watch channel intro" overlay
     onPress: () => void;
   };
+  // The channel intro/advertising video as a pinned, highlighted first tile (default grid only).
+  const introTile = useMemo<GridTile | null>(() => (
+    adVideo.url ? {
+      key: '__intro__',
+      thumbnail: adVideo.thumb,
+      handle: null,
+      title: null,
+      meta: '',
+      views: 0,
+      obscured: false,
+      isPinned: false,
+      locked: false,
+      badge: null,
+      intro: true,
+      onPress: () => setAdPlaying(true),
+    } : null
+  ), [adVideo.url, adVideo.thumb]);
   // Invite-only rooms lock their videos for anyone who isn't the owner or a member.
   const inviteLocked = inviteOnly && !isOwner && !joined;
   // TikTok: ignore the stored (expired) URL — use the freshly resolved one.
@@ -424,7 +442,7 @@ export default function ChannelhamburderScreen({
         onPress: () => navigation.navigate('WatchReview', { reviewId: r.id }),
       }));
     }
-    return gridPosts.map(item => {
+    const postTiles = gridPosts.map(item => {
       const isOwnerOrPoster = isOwner || item.poster_id === user?.id;
       const obscured = !inviteLocked && !isOwnerOrPoster && !item.has_my_reaction;
       return {
@@ -453,8 +471,10 @@ export default function ChannelhamburderScreen({
         },
       };
     });
+    // Intro video pinned as the first tile (when set), highlighted in renderItem.
+    return introTile ? [introTile, ...postTiles] : postTiles;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, reactionTiles, reviewTiles, gridPosts, isOwner, user?.id, channelId, joined, navigation, ttThumbs, inviteLocked]);
+  }, [filter, reactionTiles, reviewTiles, gridPosts, introTile, isOwner, user?.id, channelId, joined, navigation, ttThumbs, inviteLocked]);
 
   // ── Audio recording handlers ──────────────────────────────────────────────
   const handleMicPressIn = useCallback(async () => {
@@ -551,8 +571,10 @@ export default function ChannelhamburderScreen({
         )}
       </View>
 
-      {/* Channel intro/advertising video — big play banner at the top, for everyone. */}
-      {adVideo.url && (
+      {/* Channel intro/advertising video. In the video grid (public/Members Only) it's the pinned,
+          highlighted first tile (see introTile). Private group chats have no grid, so they keep the
+          banner here. */}
+      {adVideo.url && !isPublic && (
         <TouchableOpacity style={styles.adBanner} activeOpacity={0.85} onPress={() => setAdPlaying(true)}>
           <View style={styles.adBannerInner}>
             <Ionicons name="play-circle" size={40} color={C.WHITE} />
@@ -613,7 +635,7 @@ export default function ChannelhamburderScreen({
             }
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.gridCard, { width: cardW }]}
+                style={[styles.gridCard, { width: cardW }, item.intro && styles.introCard]}
                 activeOpacity={0.8}
                 onPress={item.onPress}>
                 <View style={[styles.gridThumb, { height: cardH }]}>
@@ -629,7 +651,14 @@ export default function ChannelhamburderScreen({
                     <Image source={{ uri: item.thumbnail }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                   ) : (
                     <View style={[styles.gridThumbBlind, { backgroundColor: C.SURFACE_2 }]}>
-                      <Text style={styles.gridThumbBlindIcon}>▶</Text>
+                      {!item.intro && <Text style={styles.gridThumbBlindIcon}>▶</Text>}
+                    </View>
+                  )}
+                  {/* Intro tile: dark scrim + play-circle + label, always over the poster frame. */}
+                  {item.intro && (
+                    <View style={styles.introOverlay} pointerEvents="none">
+                      <Ionicons name="play-circle" size={38} color={C.WHITE} />
+                      <Text style={styles.introOverlayTxt}>Watch channel intro</Text>
                     </View>
                   )}
                   {item.isPinned && (
@@ -648,17 +677,21 @@ export default function ChannelhamburderScreen({
                     <ViewBadge count={item.views} style={styles.tileViews} />
                   )}
                 </View>
-                {item.obscured ? (
+                {item.intro ? (
+                  <Text style={styles.gridTitle} numberOfLines={1}>Channel intro</Text>
+                ) : item.obscured ? (
                   <Text style={styles.gridTitleObscured}>React to reveal</Text>
                 ) : item.title ? (
                   <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
                 ) : null}
-                <Text style={[
-                  styles.gridReactionCount,
-                  !item.obscured && !item.title && styles.gridReactionCountNoTitle,
-                ]}>
-                  {item.meta}
-                </Text>
+                {!item.intro && (
+                  <Text style={[
+                    styles.gridReactionCount,
+                    !item.obscured && !item.title && styles.gridReactionCountNoTitle,
+                  ]}>
+                    {item.meta}
+                  </Text>
+                )}
               </TouchableOpacity>
             )}
           />
@@ -805,6 +838,10 @@ const styles = StyleSheet.create({
   adBanner: { marginHorizontal: SPACE.LG, marginTop: SPACE.SM, marginBottom: SPACE.XS, height: 92, borderRadius: RADIUS.MD, overflow: 'hidden', backgroundColor: C.SURFACE_2, borderWidth: 1, borderColor: C.ACCENT },
   adBannerInner: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SPACE.SM },
   adBannerTxt: { color: C.WHITE, fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD },
+  // Pinned intro tile in the grid: an accent ring + a dark scrim with a play-circle and label.
+  introCard: { borderWidth: 1.5, borderColor: C.ACCENT_HOT },
+  introOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.42)' },
+  introOverlayTxt: { color: C.WHITE, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_SEMIBOLD, textAlign: 'center' },
   adBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', alignItems: 'center', justifyContent: 'center' },
   adPlayer: { width: '100%', height: '80%', backgroundColor: '#000' },
   adClose: { position: 'absolute', top: SPACE.MD, right: SPACE.MD, width: 36, height: 36, borderRadius: RADIUS.FULL, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },

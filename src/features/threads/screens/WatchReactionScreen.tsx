@@ -178,10 +178,20 @@ export default function WatchReactionScreen({
           fetchReactions(r.thread_id)
             .then(list => {
               siblingIdsRef.current = list.map(x => x.id);
-              // Studio share: the source clip has no embed id — it's the SENDER's own reaction row.
-              // Find it among the siblings and use its resolved URI as the source PIP.
-              if ((r.threadKind === 'studio_share' || r.source_type === 'studio') && r.senderId) {
-                const clip = list.find(x => x.id !== r.id && x.user?.id === r.senderId);
+              // Studio share: the source clip has no external embed — it's the thread SENDER's own
+              // reaction row. Detect it structurally (no yt id, not a real external source) so it works
+              // even when `threadKind` is unavailable: `fetchReactionById` reads threadKind/senderId from
+              // a thread join that's RLS-blocked for the SENDER (who isn't a member of their own thread),
+              // so when the creator watches a friend react to their own clip both come back null.
+              const noEmbed = !r.yt_video_id
+                && r.source_type !== 'tiktok' && r.source_type !== 'instagram' && r.source_type !== 'facebook';
+              if (r.threadKind === 'studio_share' || noEmbed) {
+                // The clip is by the thread sender. Members get senderId from the join; when it's null
+                // (the sender's own RLS-blocked view) the sender IS the viewer, so fall back to our id.
+                const senderId = r.senderId ?? user?.id ?? null;
+                const clip = senderId
+                  ? list.find(x => x.id !== r.id && x.user?.id === senderId)
+                  : null;
                 if (clip?.resolvedUri) { setStudioSourceUri(clip.resolvedUri); }
               }
             })

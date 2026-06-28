@@ -496,6 +496,18 @@ export default function ReactionRecorder({
     stopTimer();
     capAnim.stopAnimation();
 
+    // No real camera mounted (the iOS Simulator has no camera device, so cameraRef stays null and
+    // startRecording/stopRecording are both no-ops). There's nothing to finalize — bail cleanly instead
+    // of waiting out the 15s stop-timeout ("Recording timed out"). On a real device cameraRef is always
+    // set here, so this branch never runs in production.
+    if (!cameraRef.current) {
+      if (__DEV__) { log.warn('[ReactionRecorder] no camera device (simulator?) — nothing to finalize, skipping'); }
+      setIsRecording(false);
+      StatusBar.setHidden(false, 'fade');
+      cancelTrack();
+      return;
+    }
+
     // Don't finalize an empty file. If the source ended almost immediately after it started, the
     // camera may not have appended a single frame yet — VisionCamera would write a 0-frame file and
     // report "AVAssetWriter completed with status: writing" (-11800/-12780), losing the reaction.
@@ -549,7 +561,7 @@ export default function ReactionRecorder({
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
       setUploading(false);
     }
-  }, [isRecording, stopTimer, capAnim, stopTrack, allowAfterthought, finalize]);
+  }, [isRecording, stopTimer, capAnim, stopTrack, cancelTrack, allowAfterthought, finalize]);
 
   // Afterthought decision countdown — auto-sends (no outro) when it hits zero.
   useEffect(() => {

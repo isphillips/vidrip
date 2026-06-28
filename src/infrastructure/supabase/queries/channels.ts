@@ -1,5 +1,6 @@
 import { log } from '../../logging/logger';
 import RNFS from 'react-native-fs';
+import { createThumbnail } from 'react-native-create-thumbnail';
 import { supabase, SUPABASE_ANON_KEY } from '../client';
 import { fetchBlockedIds } from './blocks';
 import { R2_ENABLED } from '../../storage/r2Config';
@@ -756,11 +757,19 @@ export const banMember = (channelId: string, userId: string) =>
 
 // ── Channel advertisement / intro video ────────────────────────────────────────
 
-/** The channel's owner/admin-set intro/advertising video (shown on the channel). */
-export async function fetchChannelAdVideo(channelId: string): Promise<{ url: string | null; duration: number | null }> {
+/** The channel's owner/admin-set intro/advertising video (shown on the channel). The poster frame is
+ *  stored alongside the video as a `.jpg` sibling at upload time (see uploadChannelAdVideo), so its URL
+ *  is derived from the video URL — no extra column. Older videos (no sibling) resolve to a 404 that the
+ *  UI falls back from. */
+export async function fetchChannelAdVideo(channelId: string): Promise<{ url: string | null; duration: number | null; thumb: string | null }> {
   const { data } = await (supabase as any)
     .from('groups').select('ad_video_url, ad_video_duration').eq('id', channelId).single();
-  return { url: data?.ad_video_url ?? null, duration: data?.ad_video_duration ?? null };
+  const url = data?.ad_video_url ?? null;
+  return {
+    url,
+    duration: data?.ad_video_duration ?? null,
+    thumb: url && /\.mp4$/i.test(url) ? url.replace(/\.mp4$/i, '.jpg') : null,
+  };
 }
 
 /** Set (or clear) the channel ad video via the owner/admin-gated RPC. */
@@ -790,6 +799,23 @@ export async function uploadChannelAdVideo(channelId: string, localUri: string, 
   });
   if (!res.ok) { throw new Error(`ad video upload ${res.status}: ${await res.text().catch(() => '')}`); }
   const { data: { publicUrl } } = supabase.storage.from('channel-clips').getPublicUrl(path);
+
+  // Poster frame: generated from the LOCAL file (remote cloud URLs can't be frame-grabbed on-device)
+  // and uploaded as a `.jpg` sibling of the video, so the channel grid can show a real thumbnail for
+  // the intro tile. Best-effort — a failure just means the tile falls back to its play placeholder.
+  try {
+    const { path: thumbLocal } = await createThumbnail({ url: fileUri, timeStamp: 1000, format: 'jpeg' });
+    const thumbUri = thumbLocal.startsWith('file://') ? thumbLocal : `file://${thumbLocal}`;
+    const thumbForm = new FormData();
+    (thumbForm as any).append('file', { uri: thumbUri, type: 'image/jpeg', name: 'ad.jpg' });
+    await fetch(`${STORAGE_BASE}/channel-clips/${path.replace(/\.mp4$/, '.jpg')}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY, 'x-upsert': 'true' },
+      body: thumbForm,
+    });
+    RNFS.unlink(thumbUri.replace('file://', '')).catch(() => {});
+  } catch (e) { log.warn('[channels] ad video thumbnail failed (non-fatal)', e); }
+
   await setChannelAdVideo(channelId, publicUrl, durationSec ? Math.round(durationSec) : null);
   return publicUrl;
 }
