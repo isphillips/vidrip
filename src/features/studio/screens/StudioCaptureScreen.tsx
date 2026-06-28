@@ -219,7 +219,12 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
             format={format}
             fps={targetFps}
             videoBitRate={2}
-            isActive
+            // Deactivate the camera while the lens/voice bake runs. Recording has already stopped by
+            // then (stopRecording resolves before `processing` flips), and the bake works off the
+            // recorded file + lens TRACK — never the live camera. Leaving it active kept the capture
+            // session + frame processor + MediaPipe + Skia lens render all fighting the encoder for the
+            // GPU, which is why a lensed clip baked so slowly (and could OOM/crash).
+            isActive={!processing}
             video
             // Pre-mode music: mic OFF (audio={false}) so the recording is video-only and the track
             // becomes the audio on export. Otherwise capture the mic normally.
@@ -238,7 +243,7 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
           />
           {/* Full-screen AR lens — overlay lenses only; warp + spike lenses are drawn into the preview above.
               LiveFaceLens subscribes to the tracker and re-renders in isolation, so this screen doesn't. */}
-          {!isWarp && !isSpike && (
+          {!isWarp && !isSpike && !processing && (
             <LiveFaceLens lens={effLensKey} subscribe={subscribeFace} width={width} height={height} frameAspect={frameAspect} />
           )}
         </>
@@ -249,6 +254,10 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
             : <ActivityIndicator color={C.ACCENT} />}
         </View>
       )}
+
+      {/* Cover the deactivated camera during the bake so it reads as intentional, not a black glitch.
+          The "Processing video…" pill renders on top of this. */}
+      {processing && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(7,0,14,0.92)' }]} pointerEvents="none" />}
 
       {/* Top bar: close + flip (timer moved above the record button so the lens picker can own the top) */}
       <View style={[styles.topBar, { top: top + SPACE.SM }]}>

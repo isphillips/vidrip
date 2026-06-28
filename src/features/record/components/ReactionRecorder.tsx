@@ -114,6 +114,13 @@ export interface ReactionRecorderProps {
 
 const AFTERTHOUGHT_MAX = 30;       // seconds
 const AFTERTHOUGHT_COUNTDOWN = 5;  // decision window after the reaction finishes
+// Minimum capture window (ms) before a recording may finalize. A source that bounces
+// playing→ended/paused within a few ms (very short clip, or a buffering hiccup that defeats the
+// one-shot spurious-pause skip) would otherwise stop the recording before the camera appends a
+// single frame — VisionCamera then finalizes an EMPTY file ("AVAssetWriter completed with status:
+// writing", AVFoundation -11800/-12780) and the reaction is lost. Holding the capture open this long
+// guarantees real footage reaches the AVAssetWriter.
+const MIN_REC_MS = 800;
 
 // Flatten a VisionCamera/AVFoundation recording error into greppable fields so logs identify the exact
 // failure — e.g. AVFoundationErrorDomain -11800 with an underlying OSStatus -12780 (the opaque
@@ -261,6 +268,8 @@ export default function ReactionRecorder({
   const cameraRef = useRef<Camera>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef(0);
+  // Wall-clock ms when the camera actually started recording — used to enforce MIN_REC_MS on stop.
+  const recStartMsRef = useRef(0);
   const hasStartedRef = useRef(false);
   const skipNextPausedRef = useRef(false);
   const ytKeyRef = useRef(0);
@@ -376,16 +385,19 @@ export default function ReactionRecorder({
         setSpeakerToast(true);
         setTimeout(() => setSpeakerToast(false), 3000);
       }
-    } catch { 
-      recordedWithHeadphonesRef.current = false; 
+    } catch {
+      recordedWithHeadphonesRef.current = false;
     }
 
+    recStartMsRef.current = Date.now();
     cameraRef.current?.startRecording({
       fileType: 'mp4',
       onRecordingFinished: (video) => { recordingCallbackRef.current?.(video); recordingCallbackRef.current = null; recordingRejectRef.current = null; },
       onRecordingError: (error: any) => {
         const msg = `${error?.code ?? 'error'}: ${error?.message ?? String(error)}`;
-        log.error('[ReactionRecorder] MAIN recording failed', describeRecordingError(error));
+        // Include how long the camera was actually capturing — a near-zero value means the writer got
+        // no frames (the "status: writing" / -11800 empty-file case), which MIN_REC_MS is meant to prevent.
+        log.error('[ReactionRecorder] MAIN recording failed', { ...describeRecordingError(error), recordedMs: Date.now() - recStartMsRef.current });
         // Reject the pending stop-promise (if any) so handleStop surfaces the real error
         // immediately instead of waiting out the 15s timeout.
         recordingRejectRef.current?.(error instanceof Error ? error : new Error(msg));
@@ -482,6 +494,17 @@ export default function ReactionRecorder({
     hasStartedRef.current = false;
     stopTimer();
     capAnim.stopAnimation();
+
+    // Don't finalize an empty file. If the source ended almost immediately after it started, the
+    // camera may not have appended a single frame yet — VisionCamera would write a 0-frame file and
+    // report "AVAssetWriter completed with status: writing" (-11800/-12780), losing the reaction.
+    // Keep the capture running (camera is still recording here) until MIN_REC_MS has elapsed so there's
+    // always real footage to finalize. Only ever waits for degenerate sub-second takes.
+    const recordedMs = Date.now() - recStartMsRef.current;
+    if (recordedMs < MIN_REC_MS) {
+      await new Promise<void>(resolve => setTimeout(resolve, MIN_REC_MS - recordedMs));
+    }
+
     setIsRecording(false);
     StatusBar.setHidden(false, 'fade');
     // Finalize the captured lens track (null when no lens was on / no face seen).
@@ -505,7 +528,9 @@ export default function ReactionRecorder({
       ]);
       mainVideoRef.current = {
         path: video.path,
-        duration: elapsedRef.current,
+        // elapsedRef ticks per whole second, so a sub-second take reads 0 — floor the saved duration at
+        // the real wall-clock length so a short reaction never reports a 0s duration downstream.
+        duration: Math.max(elapsedRef.current, (Date.now() - recStartMsRef.current) / 1000),
         ytStartOffset: ytStartOffsetRef.current,
         headphones: recordedWithHeadphonesRef.current,
         lensTrack: lensTrackRef.current,
@@ -801,11 +826,13 @@ export default function ReactionRecorder({
           </View>
         </View>
       ) : videoId && sourceType === 'facebook' ? (
-        // Public Facebook reel: the plugins/video.php iframe is cross-origin (no play/pause bridge and
-        // no autoplay), so the user taps FB's own play button to start it. We SPY on that tap via the
-        // responder capture (return false → don't intercept) to begin recording — but ONLY once the
-        // iframe has loaded (fbReady), otherwise an early tap starts a videoless recording and raises
-        // the shield with nothing to play. Until then the veil ABSORBS taps so none are wasted/stuck.
+        // Public Facebook reel via the plugins/video.php embed. There's no autoplay, so the user taps
+        // FB's own play button to start; we SPY on that tap via the responder capture (return false →
+        // don't intercept) to begin recording — but ONLY once the embed is ready (fbReady), otherwise an
+        // early tap starts a videoless take. STOPPING is the tricky part: the embed gives no JS bridge.
+        // But the WebView doc is same-origin with the embed (baseUrl facebook.com), so the injected JS
+        // below reads the embedded <video>'s media events for duration + 'ended' — no FB SDK / app id /
+        // permissions. When FB's CSP blocks that DOM access it simply doesn't wire (behavior = before).
         <View style={styles.ytCover}>
           <View
             style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}
@@ -827,13 +854,37 @@ export default function ReactionRecorder({
               domStorageEnabled
               setSupportMultipleWindows={false}
               onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:') || req.url.startsWith('data:')}
-              // Signal readiness when the FB iframe finishes loading (a timer is the fallback if its
-              // load event already fired / never does), so the tap-to-record only arms once it's playable.
-              // fb-ready arms tap-to-record. On Android the iframe 'load' fires BEFORE FB's player is
-              // interactive, so wait a settle delay AFTER load there (iOS stays instant). Until ready the
-              // veil shows "Loading…" and absorbs taps, so a too-early tap can't start a videoless take.
-              injectedJavaScript={`(function(){var f=document.querySelector('iframe');var sent=false;function fire(){if(sent)return;sent=true;window.ReactNativeWebView&&window.ReactNativeWebView.postMessage('fb-ready');}var d=${Platform.OS === 'android' ? 1800 : 0};if(f){f.addEventListener('load',function(){setTimeout(fire,d);});}setTimeout(fire,6000);})(); true;`}
-              onMessage={e => { if (e.nativeEvent.data === 'fb-ready') { setFbReady(true); } }}
+              // Two jobs, both via window.postMessage(JSON):
+              // 1. {type:'ready'} arms tap-to-record once the embed is interactive. On Android the iframe
+              //    'load' fires BEFORE FB's player is interactive, so wait a settle delay there (iOS instant).
+              //    Until ready the veil shows "Loading…" and absorbs taps so a too-early tap can't start a
+              //    videoless take. This is independent of DOM access, so the veil always lifts promptly.
+              // 2. Best-effort end-detection: the doc is same-origin with the embed, so when FB allows it we
+              //    read the <video>'s media events → {type:'duration'} (feeds the cap-timer auto-stop) and
+              //    {type:'ended'} (stops immediately). If CSP blocks the contentDocument we never wire and
+              //    fall back to the duration cap / manual stop — no FB SDK, app id, or permissions.
+              injectedJavaScript={`(function(){
+                function post(o){try{window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify(o));}catch(e){}}
+                var f=document.querySelector('iframe'),sent=false,sd=${Platform.OS === 'android' ? 1800 : 0};
+                function ready(){if(sent)return;sent=true;post({type:'ready'});}
+                if(f){f.addEventListener('load',function(){setTimeout(ready,sd);});}
+                setTimeout(ready,6000);
+                var wired=false;
+                function find(doc){try{var v=doc.querySelector('video');if(v)return v;var fr=doc.querySelectorAll('iframe');for(var i=0;i<fr.length;i++){try{var d=fr[i].contentDocument;if(d){var r=find(d);if(r)return r;}}catch(e){}}}catch(e){}return null;}
+                function wire(v){if(wired)return;wired=true;function dur(){if(v.duration&&isFinite(v.duration))post({type:'duration',value:v.duration});}v.addEventListener('loadedmetadata',dur);v.addEventListener('durationchange',dur);dur();v.addEventListener('ended',function(){post({type:'ended'});});}
+                var n=0,iv=setInterval(function(){n++;var v=find(document);if(v){ready();wire(v);clearInterval(iv);}else if(n>50){clearInterval(iv);}},300);
+              })(); true;`}
+              onMessage={e => {
+                const data = e.nativeEvent.data;
+                if (data === 'fb-ready') { setFbReady(true); return; }   // back-compat with older bare-string builds
+                try {
+                  const msg = JSON.parse(data);
+                  if (msg.type === 'ready') { setFbReady(true); return; }
+                  if (msg.type === 'duration') { captureDuration(Number(msg.value)); return; }
+                  // The reel finished on its own → finish & save, exactly like every other source's 'ended'.
+                  if (msg.type === 'ended') { onYtStateChange('ended'); return; }
+                } catch { /* ignore non-JSON */ }
+              }}
             />
             {/* Blurred branded veil. While the iframe loads it shows a spinner and ABSORBS taps (no
                 flash) so you wait instead of tapping early; once ready it's pointer-transparent and the

@@ -293,7 +293,10 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           <EffectPlayer
             uri={fileUri}
             recipe={recipe}
-            paused={fullscreen || uploaded}
+            // Pause the preview (video decode + live effect-recipe replay) while a bake runs
+            // (publish/share/upload). Otherwise it competes with the encoder for the GPU and the
+            // overlay/watermark bake crawls.
+            paused={fullscreen || uploaded || uploading || sharing}
             style={StyleSheet.absoluteFill}
           />
           <TouchableOpacity style={styles.fullscreenBtn} onPress={() => setFullscreen(true)} hitSlop={8}>
