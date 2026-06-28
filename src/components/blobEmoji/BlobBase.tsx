@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { Pressable, View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, useDerivedValue, withRepeat, withTiming, withSequence, withDelay,
@@ -9,6 +9,12 @@ import LinearGradient from 'react-native-linear-gradient';
 // Blink driver shared with the eye primitives via context (so we don't thread it through all 10 blobs).
 // 0 = eyes open, →1 = closed; the open-eye parts read this and squash their height when it spikes.
 export const BlinkContext = createContext<SharedValue<number> | null>(null);
+
+// "Static" mode (provided by context so we don't thread a prop through all 11 blob variants): skip the
+// idle breathe/blink/action loops entirely. A Reanimated useAnimatedStyle only re-runs when a shared
+// value it reads CHANGES — so with the loops never started, every blob worklet runs once and then costs
+// nothing per frame. Used by the EmojiFountain, where dozens of blobs fly by too fast to read a breathe.
+export const BlobStaticContext = createContext(false);
 
 export type BlobAnim = { bob: SharedValue<number>; pop: SharedValue<number>; blink: SharedValue<number> };
 export type BlobChildCtx = { w: number; h: number; anim: BlobAnim };
@@ -59,20 +65,24 @@ export default function BlobBase({
   // just overrides it with a full burst — no loop bookkeeping.
   const idle = useSharedValue(0);
   const drive = useDerivedValue(() => Math.max(idle.value, pop.value));
+  // When true (e.g. inside the EmojiFountain), render a frozen rest pose: skip every idle loop so the
+  // body/face worklets evaluate once and never tick again. Huge when many blobs are on screen at once.
+  const staticMode = useContext(BlobStaticContext);
 
   useEffect(() => {
     // Skip the idle loop at tiny sizes (inline reaction tallies): the ±4% breathe is sub-pixel there,
-    // so it's pure cost in dense lists. Tap-burst (pop) still works at every size.
-    if (size < 20) { return; }
+    // so it's pure cost in dense lists. Tap-burst (pop) still works at every size. Static mode skips it
+    // at every size (fountain particles).
+    if (staticMode || size < 20) { return; }
     // Phase-offset so neighbouring blobs breathe out of sync; loops forever, auto-reversing.
     bob.value = withDelay(
       Math.round(idlePhase * IDLE_MS),
       withRepeat(withTiming(1, { duration: IDLE_MS, easing: Easing.inOut(Easing.quad) }), -1, true),
     );
-  }, [bob, idlePhase, size]);
+  }, [bob, idlePhase, size, staticMode]);
 
   useEffect(() => {
-    if (size < 20) { return; } // no perceptible blink on tiny inline blobs
+    if (staticMode || size < 20) { return; } // no perceptible blink on tiny inline / frozen blobs
     // A long open hold, then a quick close→open; phase-offset (and slightly varied) so a row of blobs
     // doesn't blink in unison. The open-eye parts read `blink` from context and squash their height.
     blink.value = withDelay(
@@ -86,10 +96,10 @@ export default function BlobBase({
         -1,
       ),
     );
-  }, [blink, idlePhase, size]);
+  }, [blink, idlePhase, size, staticMode]);
 
   useEffect(() => {
-    if (size < 20) { return; } // tiny inline blobs stay still
+    if (staticMode || size < 20) { return; } // tiny inline / frozen blobs stay still
     // Perform the action (ramp 0→1), hold at the end-state to rest (particles have faded there), then
     // snap back and replay. Phase-offset so a row doesn't perform in unison.
     const ACTION = 900, REST = 1500;
@@ -104,7 +114,7 @@ export default function BlobBase({
         -1,
       ),
     );
-  }, [idle, idlePhase, size]);
+  }, [idle, idlePhase, size, staticMode]);
 
   const burst = () => {
     pop.value = 0;

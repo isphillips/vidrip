@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Image, Pressable, ScrollView,
+  View, Text, StyleSheet, TouchableOpacity, Image, Pressable,
   ActivityIndicator, Alert, StatusBar, useWindowDimensions, Animated, InteractionManager, Platform,
 } from 'react-native';
 import Orientation from 'react-native-orientation-locker';
@@ -26,9 +26,10 @@ import {
   restoreAudioRoute,
 } from '../../../infrastructure/native/audioRecorder';
 import BunnyVideoLayer from '../../studio/components/BunnyVideoLayer';
-import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
+import { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import EmojiFountain, { type EmojiFountainHandle, type EmojiHit } from '../../../components/EmojiFountain';
 import DraggablePip from './DraggablePip';
+import DraggableEmojiRail, { RAIL_W, RAIL_H } from './DraggableEmojiRail';
 import SourceVeil from './SourceVeil';
 import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import { createThumbnail } from 'react-native-create-thumbnail';
@@ -721,6 +722,21 @@ export default function ReactionRecorder({
     maxY: Math.max(topInset + SPACE.SM, height - bottomInset - PIP_H - SPACE.SM),
   };
   const pipStart = { x: SPACE.LG, y: Math.max(pipBounds.minY, height - bottomInset - 100 - PIP_H) };
+
+  // Emoji launcher placement: draggable anywhere on screen (grip handle), clamped to these bounds.
+  // Starts pinned to the RIGHT edge and high up (~22% down) so it's near the action and out of the way
+  // of the bottom controls/PIP — the reactor can drag it wherever suits the source.
+  const emojiBounds = {
+    minX: SPACE.SM,
+    maxX: Math.max(SPACE.SM, width - RAIL_W - SPACE.SM),
+    minY: topInset + SPACE.SM,
+    maxY: Math.max(topInset + SPACE.SM, height - bottomInset - RAIL_H - SPACE.SM),
+  };
+  const emojiStart = {
+    x: emojiBounds.maxX,
+    y: Math.min(emojiBounds.maxY, Math.max(emojiBounds.minY, Math.round(height * 0.22))),
+  };
+
   // During the afterthought the source video is gone, so the camera goes full-screen.
   const camAsPip = pipCamera && afterPhase === 'none';
 
@@ -1016,18 +1032,16 @@ export default function ReactionRecorder({
       {/* Thrown-emoji fountain (record + the live throws), launched from the bottom-centre. */}
       <EmojiFountain ref={fountainRef} />
 
-      {/* Emoji launcher — a vertical, scrollable strip (3 in view) above the PIP, once the source
-          is playing. Tapping throws an emoji (rate-limited to 1/sec) + records it to the track. */}
+      {/* Emoji launcher — a vertical, scrollable strip (3 in view), draggable by its grip handle, once
+          the source is playing. Tapping throws an emoji (rate-limited to 1/sec) + records it to the track. */}
       {(srcStarted || isRecording) && !uploading && afterPhase === 'none' && (
-        <View style={[styles.emojiLauncher, { right: SPACE.SM, bottom: bottomInset + 100 + PIP_H + SPACE.MD }]}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.emojiLauncherContent}>
-            {QUICK_EMOJIS.map(e => (
-              <View key={e} style={styles.emojiLauncherItem}>
-                <EmojiGlyph emoji={e} size={38} onPress={() => throwEmoji(e)} />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
+        <DraggableEmojiRail
+          emojis={QUICK_EMOJIS}
+          startX={emojiStart.x}
+          startY={emojiStart.y}
+          bounds={emojiBounds}
+          onThrow={throwEmoji}
+        />
       )}
 
       {/* Speaker toast */}
@@ -1201,9 +1215,6 @@ const styles = StyleSheet.create({
   demoCamPip: { width: PIP_W + 75, marginLeft: -40, height: PIP_H + 75 },
   pipRecDot: { position: 'absolute', top: SPACE.XS, right: SPACE.XS, width: 8, height: 8, borderRadius: RADIUS.FULL, backgroundColor: C.ACCENT_HOT },
   // Vertical emoji launcher above the PIP — height = 3 items, so exactly 3 show and the rest scroll.
-  emojiLauncher: { position: 'absolute', width: 54, height: 3 * 52, borderRadius: RADIUS.LG, backgroundColor: 'rgba(0,0,0,0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', overflow: 'hidden' },
-  emojiLauncherContent: { paddingVertical: 2, alignItems: 'center' },
-  emojiLauncherItem: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
   toast: { position: 'absolute', alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: SPACE.MD, paddingVertical: SPACE.XS, borderRadius: RADIUS.FULL },
   toastText: { color: C.WHITE, fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY },
   capTrack: { position: 'absolute', left: 0, right: 0, height: 4, backgroundColor: 'rgba(0,0,0,0.4)' },

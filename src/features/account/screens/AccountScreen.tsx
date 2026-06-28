@@ -592,8 +592,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
 }
 
 const styles = StyleSheet.create({
-  // Opaque (not C.BG = transparent): otherwise, on first render right after login the still-tearing-down
-  // AuthScene (the slime-land "hills") shows through underneath until it unmounts. Opaque = no bleed.
   screen: { flex: 1, backgroundColor: C.BG_SOLID },
   navbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.LG, paddingBottom: SPACE.SM },
   navTitle: { fontSize: FONT.SIZES.XL, fontFamily: FONT.DISPLAY_BOLD, color: C.INK, letterSpacing: -1, textTransform: 'uppercase', marginTop: 5 },

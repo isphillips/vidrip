@@ -76,6 +76,9 @@ export default function RootNavigator() {
   const navRef = navigationRef;
   // The animated launch scene stays mounted on top until it dissolves itself (once the app is ready).
   const [splashGone, setSplashGone] = useState(false);
+  // Stable so SplashScene's one-shot dissolve effect doesn't re-run on every RootNavigator render
+  // (which would restart its fade and leave the slime-land scene bleeding over the app).
+  const handleSplashHidden = useCallback(() => setSplashGone(true), []);
   // Closed-launch creator intro: a signed-out visitor gets the cinematic creator pitch instead of the
   // login wall (CREATOR_INTRO). Tapping its "log in" link forces the auth flow for this session.
   const [authForced, setAuthForced] = useState(false);
@@ -427,7 +430,7 @@ export default function RootNavigator() {
   return (
     <View style={{ flex: 1, backgroundColor: C.BG_SOLID }}>
       {content}
-      {!splashGone && <SplashScene ready={appReady} onHidden={() => setSplashGone(true)} />}
+      {!splashGone && <SplashScene ready={appReady} onHidden={handleSplashHidden} />}
     </View>
   );
 }

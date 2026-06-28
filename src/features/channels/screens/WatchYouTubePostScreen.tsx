@@ -1,13 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSharedValue, withTiming, Easing } from 'react-native-reanimated';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { usePendingChannelReactionsStore } from '../../../store/pendingChannelReactionsStore';
-import { fetchChannelPost, commitChannelClip, uploadChannelClipRelay } from '../../../infrastructure/supabase/queries/channels';
+import { fetchChannelPost, commitChannelClip, uploadChannelClipRelay, fetchMyChannelRole, joinChannel } from '../../../infrastructure/supabase/queries/channels';
 import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import ReactionRecorder from '../../record/components/ReactionRecorder';
-import { C } from '../../../theme';
+import GradientButton from '../../studio/components/GradientButton';
+import { JoinScene } from '../components/JoinScene';
+import { CopyScrim, TEXT_GLOW } from '../../../components/scene/sceneKit';
+import { C, FONT, SPACE } from '../../../theme';
 import { reactionReplayRecipe, type OverlayRecipe } from '../../studio/effectRecipe';
 import type { FaceLensTrack } from '../../lens/faceLens';
 import type { EmojiHit } from '../../../components/EmojiFountain';
@@ -26,6 +31,41 @@ export default function WatchYouTubePostScreen({
   const [recipe, setRecipe] = useState<OverlayRecipe | null>(null);
   const [sourceType, setSourceType] = useState<'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook'>('youtube');
   const [loaded, setLoaded] = useState(false);
+  // Posting a reaction inserts a child channel_posts row, which RLS only allows for channel members.
+  // Gate the recorder on membership so a non-member sees "Join to react" instead of recording a whole
+  // clip that fails on insert. `undefined` = still checking. Fail OPEN (treat as member on error) so a
+  // transient lookup failure never blocks a real member — the RLS insert is still the hard backstop.
+  const [isMember, setIsMember] = useState<boolean | undefined>(undefined);
+  const [joining, setJoining] = useState(false);
+  const insets = useSafeAreaInsets();
+  const enter = useSharedValue(0);   // drives the JoinScene mount fade (only when the gate shows)
+
+  useEffect(() => {
+    if (!user?.id) { return; }
+    fetchMyChannelRole(channelId, user.id)
+      .then(role => setIsMember(role != null))
+      .catch(() => setIsMember(true));
+  }, [channelId, user?.id]);
+
+  // Animate the inviting scene in the moment we know they're not a member (the gate is about to show).
+  useEffect(() => {
+    if (isMember === false) {
+      enter.value = withTiming(1, { duration: 650, easing: Easing.out(Easing.cubic) });
+    }
+  }, [isMember, enter]);
+
+  const join = useCallback(async () => {
+    if (!user?.id || joining) { return; }
+    setJoining(true);
+    try {
+      await joinChannel(channelId, user.id);
+      setIsMember(true);   // now a member → the recorder renders
+    } catch (e: any) {
+      Alert.alert('Join', e?.message ?? 'Could not join this channel. Try opening it from the channel page.');
+    } finally {
+      setJoining(false);
+    }
+  }, [channelId, user?.id, joining]);
 
   useEffect(() => {
     fetchChannelPost(postId).then(async p => {
@@ -71,6 +111,33 @@ export default function WatchYouTubePostScreen({
     });
   }, [channelId, postId, user, profile, enqueue, addPendingReaction]);
 
+  // Membership gate — checked before (and independent of) the source load, so a non-member gets the
+  // "Join to react" prompt immediately instead of waiting for the video, and never reaches the recorder.
+  if (isMember === undefined) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={C.ACCENT_HOT} size="large" />
+      </View>
+    );
+  }
+  if (!isMember) {
+    return (
+      <View style={styles.gate}>
+        <JoinScene enter={enter} />
+        {/* Copy + CTA over the lower half; the waving huddle owns the top. */}
+        <View style={[styles.gateContent, { paddingBottom: insets.bottom + SPACE.XL }]}>
+          <CopyScrim style={styles.gateScrim} />
+          <Text style={styles.gateTitle}>Join to react</Text>
+          <Text style={styles.gateMsg}>Hop in! Join this channel to record your reaction to its videos.</Text>
+          <GradientButton label="Join channel" onPress={join} loading={joining} style={styles.gateBtn} />
+          <TouchableOpacity onPress={onBack} hitSlop={10} style={styles.gateCancelBtn}>
+            <Text style={styles.gateCancel}>Not now</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   // Instagram + Facebook creator reels play from a re-hosted MP4 file (sourceUri).
   const fileBacked = sourceType === 'instagram' || sourceType === 'facebook';
   const ready = sourceType === 'bunny' ? !!embedUrl
@@ -101,4 +168,16 @@ export default function WatchYouTubePostScreen({
 
 const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  // #160826 = the scene's sky-top, so there's no flash before the gradient world paints.
+  gate: { flex: 1, backgroundColor: '#160826', overflow: 'hidden' },
+  gateContent: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    alignItems: 'center', paddingHorizontal: SPACE.XL, paddingTop: SPACE.XXL,
+  },
+  gateScrim: { top: -SPACE.XXL },   // feather the dark band a bit above the copy for contrast over the scene
+  gateTitle: { color: C.WHITE, fontFamily: FONT.DISPLAY_BOLD, fontSize: FONT.SIZES.XL, marginBottom: SPACE.SM, ...TEXT_GLOW },
+  gateMsg: { color: 'rgba(245,235,250,0.85)', fontFamily: FONT.BODY, fontSize: FONT.SIZES.MD, textAlign: 'center', lineHeight: 22, marginBottom: SPACE.XL, paddingHorizontal: SPACE.SM, ...TEXT_GLOW },
+  gateBtn: { borderRadius: 14, overflow: 'hidden', width: '88%' },
+  gateCancelBtn: { padding: SPACE.MD, marginTop: SPACE.XS },
+  gateCancel: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.MD, ...TEXT_GLOW },
 });

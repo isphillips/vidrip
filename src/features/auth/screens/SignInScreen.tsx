@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, interpolate } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
@@ -22,6 +23,10 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  // Unmount the sceneKit world when this screen isn't focused — the AuthStack's cross-fade keeps prior
+  // screens composited underneath, so an always-mounted scene bleeds onto whatever we push to (e.g.
+  // CreateProfile). Same dusk root bg, so no flash. (See WelcomeScreen for the full rationale.)
+  const focused = useIsFocused();
 
   const enter = useSharedValue(0);
   useEffect(() => { enter.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) }); }, [enter]);
@@ -71,7 +76,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
   if (sent) {
     return (
       <View style={styles.root}>
-        <AuthScene gated enter={enter} />
+        {focused && <AuthScene gated enter={enter} />}
         {BackButton}
         <View style={styles.sentWrap}>
           <Animated.View style={[styles.card, formStyle]}>
@@ -88,7 +93,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
 
   return (
     <View style={styles.root}>
-      <AuthScene gated enter={enter} />
+      {focused && <AuthScene gated enter={enter} />}
       {BackButton}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView

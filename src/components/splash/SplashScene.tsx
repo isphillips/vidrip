@@ -131,6 +131,12 @@ export default function SplashScene({ ready, onHidden }: { ready: boolean; onHid
   const [finishing, setFinishing] = useState(false);
   const [msg, setMsg] = useState(0);
 
+  // The dissolve must run EXACTLY once. The fade effect below depends on `onHidden`, and a parent
+  // re-render (many fire as session/onboarding/MFA state settles right after launch) would otherwise
+  // re-run it and restart the opacity fade — pinning the splash at partial opacity so its slime-land
+  // hills bleed over the freshly-mounted app. This latch is set when the fade actually begins.
+  const finishedRef = useRef(false);
+
   const opacity = useSharedValue(1);
   const progress = useSharedValue(0);
   const enter = useSharedValue(0);
@@ -152,16 +158,24 @@ export default function SplashScene({ ready, onHidden }: { ready: boolean; onHid
   }, []);
 
   useEffect(() => {
-    if (!ready) { return; }
+    if (!ready || finishedRef.current) { return; }
     const wait = Math.max(0, MIN_VISIBLE_MS - (Date.now() - mountAt));
+    let failsafe: ReturnType<typeof setTimeout>;
     const id = setTimeout(() => {
+      // Latch only when the dissolve truly starts, so a re-run that clears this timeout BEFORE it
+      // fires can still reschedule — but once the fade is underway, nothing can restart it.
+      if (finishedRef.current) { return; }
+      finishedRef.current = true;
       setFinishing(true);
       progress.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.quad) });
       opacity.value = withDelay(360, withTiming(0, { duration: 520, easing: Easing.inOut(Easing.quad) }, (fin) => {
         if (fin) { runOnJS(onHidden)(); }
       }));
+      // Failsafe: tear down even if Reanimated drops the completion callback (e.g. the animation
+      // is interrupted), so the launch scene can NEVER linger over the app. Idempotent with onHidden.
+      failsafe = setTimeout(onHidden, 360 + 520 + 250);
     }, wait);
-    return () => clearTimeout(id);
+    return () => { clearTimeout(id); clearTimeout(failsafe); };
   }, [ready, mountAt, progress, opacity, onHidden]);
 
   const containerStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));

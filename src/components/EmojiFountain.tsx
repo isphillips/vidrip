@@ -4,6 +4,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, Easing, interpolate, runOnJS, type SharedValue,
 } from 'react-native-reanimated';
 import EmojiGlyph from './EmojiGlyph';
+import { BlobStaticContext } from './blobEmoji/BlobBase';
 
 // A full-screen, pointer-transparent overlay that THROWS emoji from the bottom-centre with real
 // projectile physics — an initial launch velocity + constant gravity, so they shoot up, decelerate,
@@ -21,8 +22,12 @@ export type EmojiHit = { e: string; t: number };
 
 const SIZE = 46;
 const GRAVITY = 2600;          // px/s² downward — the constant that makes it feel like gravity
-const SMOKE_COUNT = 6;         // puffs dropped along the launch path
+const SMOKE_COUNT = 4;         // puffs dropped along the launch path (each is a per-frame worklet → keep lean)
 const SMOKE_LIFE = 0.6;        // seconds each puff lives
+// Hard cap on simultaneous throws. Every live particle runs (1 flight + SMOKE_COUNT) worklets per frame,
+// so an unbounded burst (rapid spam, or playback re-emitting clustered hits) is what tanks the framerate
+// over a playing video. Past the cap we recycle the oldest — visually unnoticeable in a dense fountain.
+const MAX_PARTICLES = 16;
 
 type Particle = {
   id: number; emoji: string;
@@ -56,11 +61,14 @@ function SmokePuff({ clock, birth, bx, by, size }: { clock: SharedValue<number>;
   );
 }
 
-function FlyingEmoji({ p, onDone }: { p: Particle; onDone: () => void }) {
+// Memoised so adding/removing a throw never re-renders the OTHER live particles (the particle object
+// and the stable `onDone` keep props referentially equal). Without this, every emit reconciled the whole
+// growing list. `onDone` takes the id so it can stay stable across renders.
+const FlyingEmoji = React.memo(function FlyingEmoji({ p, onDone }: { p: Particle; onDone: (id: number) => void }) {
   const clock = useSharedValue(0); // seconds since launch
   useEffect(() => {
     clock.value = withTiming(p.total, { duration: Math.round(p.total * 1000), easing: Easing.linear },
-      (finished) => { if (finished) { runOnJS(onDone)(); } });
+      (finished) => { if (finished) { runOnJS(onDone)(p.id); } });
   }, [clock, p, onDone]);
 
   // Smoke puffs are dropped at points the emoji passes through over the first ~0.3s of flight (jittered).
@@ -109,7 +117,7 @@ function FlyingEmoji({ p, onDone }: { p: Particle; onDone: () => void }) {
       </Animated.View>
     </>
   );
-}
+});
 
 const EmojiFountain = forwardRef<EmojiFountainHandle>(function EmojiFountain(_props, ref) {
   const { width, height } = useWindowDimensions();
@@ -127,21 +135,28 @@ const EmojiFountain = forwardRef<EmojiFountainHandle>(function EmojiFountain(_pr
       const drift = (Math.random() * 2 - 1) * width * 0.28; // random sideways throw distance
       const vx = drift / total;
       const spin = (Math.random() * 2 - 1) * 4;          // tumble (rad/s)
-      setParts(prev => [...prev, { id, emoji, vy0, vx, spin, apex, total }]);
+      setParts(prev => {
+        const next = [...prev, { id, emoji, vy0, vx, spin, apex, total }];
+        // Recycle the oldest beyond the cap so a burst can't grow the per-frame worklet load unbounded.
+        return next.length > MAX_PARTICLES ? next.slice(next.length - MAX_PARTICLES) : next;
+      });
     },
   }), [height, width]);
 
   const remove = useCallback((id: number) => setParts(prev => prev.filter(x => x.id !== id)), []);
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {parts.map(pt => (
-        // Each throw launches from the bottom-centre; transforms are relative to this anchor.
-        <View key={pt.id} pointerEvents="none" style={[styles.anchor, { left: width / 2 - SIZE / 2 }]}>
-          <FlyingEmoji p={pt} onDone={() => remove(pt.id)} />
-        </View>
-      ))}
-    </View>
+    // Freeze every blob in the fountain (no breathe/blink/idle loops) — see BlobStaticContext.
+    <BlobStaticContext.Provider value={true}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        {parts.map(pt => (
+          // Each throw launches from the bottom-centre; transforms are relative to this anchor.
+          <View key={pt.id} pointerEvents="none" style={[styles.anchor, { left: width / 2 - SIZE / 2 }]}>
+            <FlyingEmoji p={pt} onDone={remove} />
+          </View>
+        ))}
+      </View>
+    </BlobStaticContext.Provider>
   );
 });
 

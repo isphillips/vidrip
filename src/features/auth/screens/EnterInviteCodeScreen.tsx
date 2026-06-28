@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, interpolate } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { supabase } from '../../../infrastructure/supabase/client';
@@ -19,6 +20,9 @@ export default function EnterInviteCodeScreen({
   const { top, bottom } = useSafeAreaInsets();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  // Unmount the sceneKit world when unfocused so it doesn't bleed onto pushed screens (the AuthStack's
+  // cross-fade keeps prior screens composited). Same dusk root bg → no flash. (See WelcomeScreen.)
+  const focused = useIsFocused();
 
   const enter = useSharedValue(0);
   useEffect(() => { enter.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) }); }, [enter]);
@@ -67,7 +71,7 @@ export default function EnterInviteCodeScreen({
 
   return (
     <View style={styles.root}>
-      <AuthScene gated enter={enter} />
+      {focused && <AuthScene gated enter={enter} />}
 
       <TouchableOpacity style={[styles.back, { top: top + SPACE.SM }]} onPress={() => navigation.goBack()} hitSlop={12} activeOpacity={0.75}>
         <Ionicons name="chevron-back" size={22} color={C.INK} />

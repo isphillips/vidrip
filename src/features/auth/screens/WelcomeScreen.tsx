@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Linking } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, interpolate } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 import { FONT, SPACE, RADIUS, C } from '../../../theme';
 import { TEXT_GLOW } from '../../../components/scene/sceneKit';
 import { AuthScene } from '../components/AuthScene';
@@ -16,6 +17,12 @@ const DRIP_RAMP = [{ color: '#FF4FA3' }, { color: '#E04FC0' }, { color: '#BC5CE5
 // two ways in. Buttons zoom-fade into the gated invite/login screens (AuthStack animation: 'fade').
 export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welcome'>) {
   const { bottom } = useSafeAreaInsets();
+  // The AuthStack cross-fades (`animation: 'fade'`), which makes react-native-screens keep this
+  // screen mounted+composited UNDER the screens you push to — so the sceneKit world (balloons, crew,
+  // stars, Drippy) and its endless Reanimated loops would bleed through onto SignIn/CreateProfile and
+  // keep running. Gate the scene on focus so it FULLY unmounts the moment we leave (and remounts on
+  // return). No flash: the root bg (#160826) equals the auth scenes' sky-top, so it's a constant dusk.
+  const focused = useIsFocused();
   const enter = useSharedValue(0);
   useEffect(() => {
     enter.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
@@ -32,7 +39,7 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
 
   return (
     <View style={styles.root}>
-      <AuthScene enter={enter} />
+      {focused && <AuthScene enter={enter} />}
 
       {/* wordmark + tagline (Drippy floats above it from the scene) */}
       <Animated.View style={[styles.titleWrap, titleStyle]} pointerEvents="none">
