@@ -214,6 +214,12 @@ export default function ReactionRecorder({
   // on the iframe actually being loaded — tapping before it's ready used to start a videoless recording
   // and raise the touch shield, leaving the user unable to tap FB's play button.
   const [fbReady, setFbReady] = useState(false);
+  // Source player readiness (YouTube / TikTok embeds). On Android the embed's play button isn't
+  // tappable the instant the veil appears — the player needs a moment to initialise — so keep the
+  // "Loading…" veil (which absorbs taps) until the player's onReady fires, then reveal the play
+  // button. Without this, the first tap hits an un-ready player and arms a videoless recording
+  // behind the touch shield. onReady self-times: near-instant on iOS, as long as needed on Android.
+  const [sourceReady, setSourceReady] = useState(false);
   // The source video's own length (seconds), captured once it loads, so the countdown
   // and cap bar can reflect when the video actually ends (null until/unless known).
   const [sourceDuration, setSourceDuration] = useState<number | null>(null);
@@ -577,6 +583,7 @@ export default function ReactionRecorder({
     await cameraRef.current?.stopRecording().catch(() => {});
     setSrcStarted(false);  // re-blur the source so the next take starts behind the play button
     setFbReady(false);     // the FB WebView remounts (ytKey) → wait for its iframe to reload
+    setSourceReady(false); // YT/TikTok embeds remount too → re-gate on their onReady
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
   }, [stopTimer, cancelTrack, capAnim]);
@@ -709,10 +716,11 @@ export default function ReactionRecorder({
               ref={ttRef}
               style={{ width, height: letterH, backgroundColor: '#000' }}
               videoId={videoId}
+              onReady={() => setSourceReady(true)}
               onChangeState={onYtStateChange}
               onCurrentTime={(_t, dur) => captureDuration(dur)}
             />
-            {!srcStarted && <SourceVeil platform="tiktok" thumbUri={veilThumb} />}
+            {!srcStarted && <SourceVeil platform="tiktok" thumbUri={veilThumb} loading={Platform.OS === 'android' && !sourceReady} />}
           </View>
         </View>
       ) : videoId && sourceType === 'instagram' ? (
@@ -808,6 +816,7 @@ export default function ReactionRecorder({
                 width={coverW}
                 videoId={videoId}
                 play={ytPlaying}
+                onReady={() => setSourceReady(true)}
                 onChangeState={onYtStateChange}
                 initialPlayerParams={YT_PARAMS}
                 webViewStyle={YT_WV_STYLE}
@@ -817,7 +826,7 @@ export default function ReactionRecorder({
             {/* Pre-record veil: heavy blur of the video's own frame + a crisp YouTube
                 play button. Pointer-transparent, so the tap passes through to YouTube's
                 real play button underneath (which plays + starts recording). */}
-            {!srcStarted && <SourceVeil platform="youtube" thumbUri={veilThumb} />}
+            {!srcStarted && <SourceVeil platform="youtube" thumbUri={veilThumb} loading={Platform.OS === 'android' && !sourceReady} />}
           </View>
         );
       })() : <View style={styles.ytCover} />}
