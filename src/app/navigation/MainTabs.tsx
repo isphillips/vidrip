@@ -78,10 +78,10 @@ function FeedNavigator() {
       <FeedStack.Screen name="FriendConversation" component={FriendConversationScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <FeedStack.Screen name="Channel" component={ChannelScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <FeedStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
-      <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
+      <FeedStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push', contentStyle: { backgroundColor: '#000' } }} />
       <FeedStack.Screen name="WatchReview" component={WatchReviewScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <FeedStack.Screen name="ChannelVideoRecord" component={ChannelVideoRecordScreen as any} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-      <FeedStack.Screen name="WatchChannelClip" component={WatchChannelClipScreen as any} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
+      <FeedStack.Screen name="WatchChannelClip" component={WatchChannelClipScreen as any} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push', contentStyle: { backgroundColor: '#000' } }} />
       <FeedStack.Screen name="GiftReveal" component={GiftRevealScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
       <FeedStack.Screen name="ExclusiveCollection" component={ExclusiveCollectionScreen} options={{ headerShown: false }} />
       <FeedStack.Screen name="ExclusiveWatch" component={ExclusiveWatchScreen} options={{ headerShown: false }} />
@@ -98,10 +98,10 @@ function MessagesNavigator() {
       <MessagesStack.Screen name="FriendConversation" component={FriendConversationScreen} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <MessagesStack.Screen name="Channel" component={ChannelScreen as any} options={{ headerShown: false, animation: 'slide_from_right' }} />
       <MessagesStack.Screen name="Thread" component={ThreadScreen} options={{ headerShown: false }} />
-      <MessagesStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
+      <MessagesStack.Screen name="WatchReaction" component={WatchReactionScreen} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push', contentStyle: { backgroundColor: '#000' } }} />
       <MessagesStack.Screen name="WatchReview" component={WatchReviewScreen} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <MessagesStack.Screen name="ChannelVideoRecord" component={ChannelVideoRecordScreen as any} options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-      <MessagesStack.Screen name="WatchChannelClip" component={WatchChannelClipScreen as any} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push' }} />
+      <MessagesStack.Screen name="WatchChannelClip" component={WatchChannelClipScreen as any} options={{ headerShown: false, animation: 'slide_from_right', animationTypeForReplace: 'push', contentStyle: { backgroundColor: '#000' } }} />
       <MessagesStack.Screen name="GiftReveal" component={GiftRevealScreen} options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }} />
       <MessagesStack.Screen name="ExclusiveCollection" component={ExclusiveCollectionScreen} options={{ headerShown: false }} />
       <MessagesStack.Screen name="ExclusiveWatch" component={ExclusiveWatchScreen} options={{ headerShown: false }} />

@@ -63,9 +63,11 @@ function FriendListModal() {
   );
 }
 
-// Dark purple base so cold-start / any uncovered area matches the app gradient
-// (instead of the default white/black flash).
-const navTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: C.BG_SOLID } };
+// Backstop for any uncovered area (cold start, transition gaps, a full-screen black player's bottom
+// edge while the tab bar is mid-hide). PURE BLACK so it's invisible behind the immersive video players
+// (which are #000); the difference vs the gradient's darkest tone (#030109) is imperceptible on gradient
+// screens, so this stays seamless there too. The old C.BG_SOLID purple peeked on the black players.
+const navTheme = { ...DarkTheme, colors: { ...DarkTheme.colors, background: '#000000' } };
 
 export default function RootNavigator() {
   const { session, isLoading, setSession, setProfile, setLoading } = useAuthStore();

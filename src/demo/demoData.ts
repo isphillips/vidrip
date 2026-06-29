@@ -108,7 +108,7 @@ export const demoChannelUpdates: ChannelUpdateSummary[] = [
 const channelCard = (o: Partial<ChannelSummary> & Pick<ChannelSummary, 'id' | 'name' | 'created_by' | 'owner'>): ChannelSummary => ({
   description: null, is_public: true,
   pinned_video_id: null, pinned_video_title: null, pinned_video_thumbnail: null,
-  member_count: 0, post_count: 0, is_joined: false, unread_count: 0, last_message_at: null,
+  member_count: 0, post_count: 0, live_count: 0, is_joined: false, unread_count: 0, last_message_at: null,
   ...o,
 });
 

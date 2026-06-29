@@ -67,7 +67,7 @@ export default function ChannelCard({
           ) : null}
           <View style={styles.footer}>
             <Text style={styles.memberCount}>
-              {channel.post_count.toLocaleString()} video{channel.post_count !== 1 ? 's' : ''}
+              {channel.live_count.toLocaleString()} video{channel.live_count !== 1 ? 's' : ''}
             </Text>
             {isOwner
               ? null

@@ -32,6 +32,9 @@ export type ChannelSummary = {
   member_count: number;
   // Count of top-level content posts (videos/clips, excluding reactions + status messages).
   post_count: number;
+  // Subset of post_count that is actually LIVE now — release_date is null or already passed (the same
+  // gate the channel grid uses). Lets the UI ignore not-yet-released drip/scheduled posts.
+  live_count: number;
   is_joined: boolean;
   unread_count: number;
   last_message_at: string | null;
@@ -117,17 +120,24 @@ export type MyChannelReaction = {
 // Count top-level content posts (the channel's videos/clips) per channel, for the card stamp.
 // Excludes reactions (parent_post_id set) and status messages. One grouped query in JS — avoids
 // a per-channel round-trip and keeps it migration-free.
-async function countPostsByChannel(channelIds: string[]): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
+// Per-channel content-post tallies: `total` = all source posts; `live` = only those released now
+// (release_date null or <= now — the same gate the grid applies), so scheduled/drip posts aren't counted
+// as live. Both come from ONE query.
+async function countPostsByChannel(channelIds: string[]): Promise<Map<string, { total: number; live: number }>> {
+  const counts = new Map<string, { total: number; live: number }>();
   if (!channelIds.length) { return counts; }
+  const now = Date.now();
   const { data } = await (supabase as any)
     .from('channel_posts')
-    .select('channel_id')
+    .select('channel_id, release_date')
     .in('channel_id', channelIds)
     .is('parent_post_id', null)
     .neq('post_type', 'status');
   (data ?? []).forEach((p: any) => {
-    counts.set(p.channel_id, (counts.get(p.channel_id) ?? 0) + 1);
+    const cur = counts.get(p.channel_id) ?? { total: 0, live: 0 };
+    cur.total += 1;
+    if (p.release_date == null || new Date(p.release_date).getTime() <= now) { cur.live += 1; }
+    counts.set(p.channel_id, cur);
   });
   return counts;
 }
@@ -203,7 +213,8 @@ export async function fetchPublicChannels(userId: string): Promise<ChannelSummar
     ad_video_url: c.ad_video_url ?? null,
     ad_video_duration: c.ad_video_duration ?? null,
     member_count: c.member_count ?? 0,
-    post_count: postCounts.get(c.id) ?? 0,
+    post_count: postCounts.get(c.id)?.total ?? 0,
+    live_count: postCounts.get(c.id)?.live ?? 0,
     is_joined: joinedIds.has(c.id),
     unread_count: joinedIds.has(c.id) ? (unreactedByChannel.get(c.id) ?? 0) : 0,
     last_message_at: null,
@@ -270,7 +281,8 @@ export async function fetchMembersOnlyChannels(userId: string): Promise<ChannelS
     ad_video_url: c.ad_video_url ?? null,
     ad_video_duration: c.ad_video_duration ?? null,
     member_count: c.member_count ?? 0,
-    post_count: postCounts.get(c.id) ?? 0,
+    post_count: postCounts.get(c.id)?.total ?? 0,
+    live_count: postCounts.get(c.id)?.live ?? 0,
     is_joined: joinedIds.has(c.id),
     unread_count: joinedIds.has(c.id) ? (unreactedByChannel.get(c.id) ?? 0) : 0,
     last_message_at: null,
@@ -393,6 +405,7 @@ export async function fetchPrivateChannels(userId: string): Promise<ChannelSumma
     pinned_video_thumbnail: null,
     member_count: c.member_count ?? 0,
     post_count: 0,
+    live_count: 0,
     is_joined: true,
     unread_count: unreadMap.get(c.id)?.count ?? 0,
     last_message_at: unreadMap.get(c.id)?.lastMsg ?? null,
@@ -1133,7 +1146,8 @@ export async function fetchMyChannels(userId: string): Promise<ChannelSummary[]>
     ad_video_url: c.ad_video_url ?? null,
     ad_video_duration: c.ad_video_duration ?? null,
     member_count: c.member_count ?? 0,
-    post_count: postCounts.get(c.id) ?? 0,
+    post_count: postCounts.get(c.id)?.total ?? 0,
+    live_count: postCounts.get(c.id)?.live ?? 0,
     is_joined: true,
     unread_count: 0,
     last_message_at: null,
@@ -1184,7 +1198,8 @@ export async function fetchSubscribedChannels(userId: string): Promise<ChannelSu
     pinned_video_title: null,
     pinned_video_thumbnail: null,
     member_count: g.member_count ?? 0,
-    post_count: postCounts.get(g.id) ?? 0,
+    post_count: postCounts.get(g.id)?.total ?? 0,
+    live_count: postCounts.get(g.id)?.live ?? 0,
     is_joined: true,
     unread_count: 0,
     last_message_at: null,
