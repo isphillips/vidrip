@@ -39,10 +39,12 @@ const MAX_FRAMES = 300;       // cap capture cost / disk for long clips (view-sh
 // cap kicks in (900 = 30s @ 30fps). Beyond that effFps eases down so processing time stays bounded.
 // Tune against real on-device timing — higher = smoother long clips but longer processing.
 const MAX_LENS_FRAMES = 900;
-// The mesh track is now keyed to each frame's CAPTURE timestamp (see faceTracking), so the baked overlay
-// already lands on the right frame — no latency to compensate. Left as a fine-tune for any small residual
-// start-offset between the recording's first frame and the first tracked frame; 0 = no shift.
-const LENS_BAKE_LEAD_MS = 0;
+// The mesh track is keyed to each frame's CAPTURE timestamp (see faceTracking), but a residual ~1-frame
+// lag remains in the bake DURING MOTION (the overlay trails a head turn; dead-on at rest → it's temporal,
+// not a calibration offset). This pulls the sampled track frame FORWARD by ~the pipeline latency so the
+// mesh lands on the moving face. Same latency the LIVE preview cancels with prediction (~40ms). TUNE on a
+// device: raise if it still trails a fast turn; lower if the mesh now LEADS/overshoots the face on a stop.
+const LENS_BAKE_LEAD_MS = 40;
 const STAGE_H = 640;          // capture height in points (×scale → ~1920px on @3x)
 // Render the lens bake at the SAME logical height as the live preview (the window height). faceFrame
 // maps the mesh with sy = canvasHeight, and the lens art (dot radius, glow, stroke widths) is in logical

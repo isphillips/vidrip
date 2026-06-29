@@ -37,8 +37,34 @@ const CHAN_DESC = args['channel-desc'] ?? null;
 
 const admin = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
+// Supabase error objects (AuthError / PostgrestError) carry their useful fields non-enumerably, so a
+// bare `${e}` / e.message prints "{}". Pull out everything that matters.
+function describe(e) {
+  if (!e) { return String(e); }
+  const pick = {};
+  for (const k of ['name', 'message', 'status', 'code', 'details', 'hint', 'error', 'error_description']) {
+    if (e[k] != null && e[k] !== '') { pick[k] = e[k]; }
+  }
+  if (Object.keys(pick).length) { return JSON.stringify(pick); }
+  try { return JSON.stringify(e, Object.getOwnPropertyNames(e)); } catch { return String(e); }
+}
+const fail = (where, e) => { throw new Error(`${where}: ${describe(e)}`); };
+
 async function ensureHouseUser() {
-  // 1. Auth user (idempotent: reuse if the email already exists).
+  // 0. Reuse by handle first — the signup trigger creates a public.users row from the metadata, so a
+  //    prior (even partly-failed) run leaves a profile we can resolve WITHOUT the flaky admin listUsers
+  //    endpoint (which 500s here).
+  {
+    const { data: prof, error: e } = await admin.from('users').select('id').eq('handle', HANDLE).maybeSingle();
+    if (e) { fail('lookup profile by handle', e); }
+    if (prof?.id) {
+      await admin.from('users').update({ display_name: NAME }).eq('id', prof.id);
+      console.log(`• Reusing existing user @${HANDLE} → ${prof.id}`);
+      return prof.id;
+    }
+  }
+
+  // 1. Otherwise create the auth user (the trigger then makes the profile from the metadata).
   let userId;
   const { data: created, error } = await admin.auth.admin.createUser({
     email: EMAIL,
@@ -47,12 +73,11 @@ async function ensureHouseUser() {
     user_metadata: { handle: HANDLE, display_name: NAME },
   });
   if (error) {
-    const dup = /registered|exists/i.test(error.message ?? '');
-    if (!dup) { throw error; }
-    const { data: list, error: lErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    if (lErr) { throw lErr; }
+    // Email exists but no profile row was found above → resolve the id via admin listUsers (small page).
+    const { data: list, error: lErr } = await admin.auth.admin.listUsers({ perPage: 200 });
+    if (lErr) { fail(`listUsers (email exists: ${describe(error)})`, lErr); }
     const existing = list.users.find((u) => u.email?.toLowerCase() === EMAIL.toLowerCase());
-    if (!existing) { throw new Error(`Email ${EMAIL} reported as existing but not found in listUsers.`); }
+    if (!existing) { fail('resolve existing email', new Error(`${EMAIL} registered but not in first page`)); }
     userId = existing.id;
     console.log(`• Reusing existing auth user ${userId}`);
   } else {
@@ -60,13 +85,11 @@ async function ensureHouseUser() {
     console.log(`• Created auth user ${userId}`);
   }
 
-  // 2. Profile row. A signup trigger may already have made it from the metadata above; upsert by id
-  //    makes it exist either way (and sets the handle/name). If your users table has extra NOT NULL
-  //    columns without defaults, add them here.
+  // 2. Ensure the profile row exists (upsert by id; covers the no-trigger case + sets handle/name).
   const { error: pErr } = await admin
     .from('users')
     .upsert({ id: userId, handle: HANDLE, display_name: NAME }, { onConflict: 'id' });
-  if (pErr) { throw new Error(`profile upsert failed: ${pErr.message}`); }
+  if (pErr) { fail('profile upsert', pErr); }
   console.log(`• Profile ensured: @${HANDLE} (${NAME})`);
   return userId;
 }
@@ -86,7 +109,7 @@ async function createChannel(ownerId) {
     })
     .select('id')
     .single();
-  if (error) { throw new Error(`channel insert failed: ${error.message}`); }
+  if (error) { fail('channel insert', error); }
   console.log(`• Created channel "${CHANNEL}" → ${data.id}`);
   return data.id;
 }
@@ -101,10 +124,10 @@ async function createChannel(ownerId) {
     console.log(`  houseAccountId: ${houseId}`);
     if (channelId) {
       console.log(`  channelId:      ${channelId}`);
-      console.log('\n  Test the refill:');
+      console.log('\n  Test the refill (needs the channel-refill fn deployed + YOUTUBE_API_KEY set):');
       console.log(`  curl -X POST "$SUPABASE_URL/functions/v1/channel-refill" \\
     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "content-type: application/json" \\
-    -d '{"channelId":"${channelId}","houseAccountId":"${houseId}","strategy":"discover","subreddits":["aww","AnimalsBeingDerps","rarepuppers"],"limit":6,"dripHours":3}'`);
+    -d '{"channelId":"${channelId}","houseAccountId":"${houseId}","strategy":"discover","youtubeQuery":["cute animals","funny pets"],"shortsOnly":true,"limit":6,"dripHours":3}'`);
     }
   } catch (e) {
     console.error('\n✖ Setup failed:', e?.message ?? e);

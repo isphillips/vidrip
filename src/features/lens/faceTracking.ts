@@ -118,6 +118,29 @@ class OneEuroBank {
   }
 }
 
+// Zero-phase smoother for the RECORDED track (run at stopTrack, where the whole series is known). Runs
+// the One-Euro filter forward AND backward over a scalar series and averages → the same adaptive jitter
+// rejection as the live preview, but with NO net lag, so each frame still lands on its recorded video
+// frame. No prediction (lead=0): the bake composites onto real frames, so there's no display latency to
+// cancel. Resets across null gaps (frames with no detection). Off the hot path — runs once per clip.
+function smoothTrackSeries(n: number, minCutoff: number, beta: number, get: (i: number) => number | null, set: (i: number, v: number) => void): void {
+  const dt = 1 / TRACK_FPS;
+  const fwdBank = new OneEuroBank(1, minCutoff, beta);
+  const fwd: (number | null)[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const v = get(i);
+    if (v == null) { fwdBank.resetIndex(0); fwd[i] = null; } else { fwd[i] = fwdBank.step(0, v, dt, 0); }
+  }
+  const bwdBank = new OneEuroBank(1, minCutoff, beta);
+  for (let i = n - 1; i >= 0; i--) {
+    const v = get(i);
+    if (v == null) { bwdBank.resetIndex(0); continue; }
+    const b = bwdBank.step(0, v, dt, 0);
+    const f = fwd[i];
+    if (f != null) { set(i, (f + b) / 2); }
+  }
+}
+
 // SPIKE FLAG. true → use the 478-pt Face Landmarker ('faceMesh' plugin: richer, jitter-resistant
 // anchors, heavier inference). false → the lightweight BlazeFace 6-keypoint detector ('faceLandmarks').
 // Both return the same { points: [[x,y]×6] } anchor contract, so the reduce()/orientation path below is
@@ -173,6 +196,10 @@ const MESH_BETA         = 25;
 const ANCHOR_PREDICT_S = 40 / 1000;
 const MESH_PREDICT_S   = 28 / 1000;
 
+// Apply the same (zero-phase, no-prediction) One-Euro smoothing to the RECORDED track at stopTrack, so
+// exported/replayed clips are as jitter-free as the live preview. Off → the track keeps raw detections.
+const SMOOTH_TRACK = true;
+
 // One filter instance per tracking session. Anchors and mesh are separate banks (different cutoffs);
 // roll is filtered too (currently 0 from reduce(), so a no-op until 3D pose lands in Tier 1).
 function makeLandmarkFilter() {
@@ -227,7 +254,10 @@ const EAR_L = 5;
 // y = p0 — with NO reflection/lift/roll-fix. Earlier hacks (eye-line reflection, centroid reflection)
 // were fighting a 180°-rotated output from the pinned-frame.orientation default; feeding 'up' fixes it
 // at the source so position, structure, AND pitch are all correct from one trivial map.
-function reduce(points: number[][] | null | undefined, _aspect: number, orientation: string, _mirrored: boolean, _isMesh: boolean, meshRaw?: number[]): FaceLandmarks | null {
+// `meshRaw` may arrive in EITHER wire format and we auto-detect per call (meshRaw[0] is a number → the
+// new FLAT [x0,y0,x1,y1,…] build; an array → the OLD nested [[x,y]×478] build). So this JS runs against
+// whichever native build is installed — no flag to keep in sync across a native rebuild.
+function reduce(points: number[][] | null | undefined, _aspect: number, orientation: string, _mirrored: boolean, _isMesh: boolean, meshRaw?: number[] | number[][]): FaceLandmarks | null {
   'worklet';
   if (!points || points.length < 6) { return null; }
 
@@ -248,13 +278,16 @@ function reduce(points: number[][] | null | undefined, _aspect: number, orientat
     };
     const le = am(points[LEFT_EYE]), re = am(points[RIGHT_EYE]), nose = am(points[NOSE_TIP]), mouth = am(points[MOUTH]);
     const er = am(points[EAR_R]), el = am(points[EAR_L]);
-    // De-interleave the flat mesh [x0,y0,x1,y1,…] with the SAME per-vertex map as the anchors.
+    // Decode the mesh (flat or nested — auto-detected) with the SAME per-vertex map as the anchors.
     let mesh: Pt[] | undefined;
     if (meshRaw) {
-      const n = meshRaw.length >> 1;
+      const flat = typeof meshRaw[0] === 'number';
+      const fr = meshRaw as number[]; const nr = meshRaw as number[][];
+      const n = flat ? fr.length >> 1 : nr.length;
       mesh = new Array(n);
       for (let i = 0; i < n; i++) {
-        const p0 = meshRaw[2 * i], p1 = meshRaw[2 * i + 1];
+        const p0 = flat ? fr[2 * i] : nr[i][0];
+        const p1 = flat ? fr[2 * i + 1] : nr[i][1];
         mesh[i] = { x: (ll ? 1 - p1 : p1) + ANDROID_DX, y: (ll ? 1 - p0 : p0) + dy };
       }
     }
@@ -273,12 +306,18 @@ function reduce(points: number[][] | null | undefined, _aspect: number, orientat
   const le = map(points[LEFT_EYE]), re = map(points[RIGHT_EYE]);
   const nose = map(points[NOSE_TIP]), mouth = map(points[MOUTH]);
   const earR = map(points[EAR_R]), earL = map(points[EAR_L]);
-  // De-interleave the flat mesh [x0,y0,x1,y1,…] with the SAME axis-swap+mirror map as the anchors.
+  // Decode the mesh (flat or nested — auto-detected) with the SAME axis-swap+mirror map as the anchors.
   let mesh: Pt[] | undefined;
   if (meshRaw) {
-    const n = meshRaw.length >> 1;
+    const flat = typeof meshRaw[0] === 'number';
+    const fr = meshRaw as number[]; const nr = meshRaw as number[][];
+    const n = flat ? fr.length >> 1 : nr.length;
     mesh = new Array(n);
-    for (let i = 0; i < n; i++) { mesh[i] = { x: 1 - meshRaw[2 * i + 1], y: meshRaw[2 * i] }; }
+    for (let i = 0; i < n; i++) {
+      const p0 = flat ? fr[2 * i] : nr[i][0];
+      const p1 = flat ? fr[2 * i + 1] : nr[i][1];
+      mesh[i] = { x: 1 - p1, y: p0 };
+    }
   }
   return {
     leftEye: le,
@@ -478,7 +517,7 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       const perf: any = (globalThis as any).performance;
       const t0 = perf && perf.now ? perf.now() : 0;
       const res = (wantMesh ? plugin!.call(frame, { mesh: true, ori: IOS_MESH_ORI }) : plugin!.call(frame, { ori: IOS_MESH_ORI })) as unknown as
-        { points?: number[][]; mesh?: number[]; err?: string } | null;
+        { points?: number[][]; mesh?: number[] | number[][]; err?: string } | null;
       const infMs = t0 ? Math.round(perf.now() - t0) : 0;
       // Claim the in-flight slot right before handing off; push() releases it when fully done. The
       // frame's capture timestamp is threaded through so the track is keyed to capture time, not arrival.
@@ -531,6 +570,39 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       // Mesh lenses: persist the picked mesh subset (full for studio bakes, contour-subset otherwise).
       if (lm?.mesh) { meshFrames[i] = quantizeMesh(lm.mesh, meshIndices); hasMesh = true; }
     }
+
+    // Zero-phase smoothing pass: same One-Euro jitter rejection as the live preview, applied forward+
+    // backward over the resampled grid so there's NO net lag (frames stay aligned to the recorded video).
+    if (SMOOTH_TRACK && USE_ONE_EURO) {
+      // Anchors (roll stays 0, so it's left untouched). Mutates the per-frame objects in place; r3 keeps
+      // the serialized track small.
+      const anchorSpecs: Array<[(l: FaceLandmarks) => number, (l: FaceLandmarks, v: number) => void]> = [
+        [l => l.leftEye.x,     (l, v) => { l.leftEye.x = v; }],
+        [l => l.leftEye.y,     (l, v) => { l.leftEye.y = v; }],
+        [l => l.rightEye.x,    (l, v) => { l.rightEye.x = v; }],
+        [l => l.rightEye.y,    (l, v) => { l.rightEye.y = v; }],
+        [l => l.noseTip.x,     (l, v) => { l.noseTip.x = v; }],
+        [l => l.noseTip.y,     (l, v) => { l.noseTip.y = v; }],
+        [l => l.mouthCenter.x, (l, v) => { l.mouthCenter.x = v; }],
+        [l => l.mouthCenter.y, (l, v) => { l.mouthCenter.y = v; }],
+        [l => l.faceWidth,     (l, v) => { l.faceWidth = v; }],
+      ];
+      for (const [read, write] of anchorSpecs) {
+        smoothTrackSeries(n, ANCHOR_MIN_CUTOFF, ANCHOR_BETA,
+          (i) => { const l = frames[i]; return l ? read(l) : null; },
+          (i, v) => { const l = frames[i]; if (l) { write(l, r3(v)); } });
+      }
+      // Mesh subset: meshFrames[i] is a flat [x0,y0,…] of ×1000 ints — smooth each scalar across time.
+      if (hasMesh) {
+        const mlen = meshIndices.length * 2;
+        for (let j = 0; j < mlen; j++) {
+          smoothTrackSeries(n, MESH_MIN_CUTOFF, MESH_BETA,
+            (i) => { const m = meshFrames[i]; return m ? m[j] : null; },
+            (i, v) => { const m = meshFrames[i]; if (m) { m[j] = Math.round(v); } });
+        }
+      }
+    }
+
     const track: FaceLensTrack = { lensId: rec.lensId, fps: TRACK_FPS, frames, frameAspect: rec.frameAspect };
     if (hasMesh) { track.meshIdx = meshIndices; track.meshFrames = meshFrames; }
     return track;
