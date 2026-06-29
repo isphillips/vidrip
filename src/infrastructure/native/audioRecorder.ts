@@ -15,7 +15,11 @@ export function cancelAudioRecording(): Promise<void> {
 }
 
 export function configureForVideoRecording(): Promise<void> {
-  if (!_AR) { return Promise.resolve(); }
+  // iOS-only: AVAudioSession play-and-record setup. Android has no equivalent (audio routing is
+  // handled by routeAudioToSpeaker/configureForMixedPlayback), so the native method doesn't exist
+  // there — guard the METHOD, not just the module, or calling undefined() throws on every recorder
+  // mount (`_AR.configureForVideoRecording is not a function`).
+  if (!_AR?.configureForVideoRecording) { return Promise.resolve(); }
   return _AR.configureForVideoRecording();
 }
 
