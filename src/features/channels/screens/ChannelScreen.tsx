@@ -90,7 +90,7 @@ export default function ChannelhamburderScreen({
   const draggedRef = useRef(false);   // armed on first user drag so the mount scroll-to-bottom can't trigger loadMore
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [joined, setJoined] = useState(isJoinedParam);
+  const [joined, setJoined] = useState(isJoinedParam ?? false);
   const [reviewsEnabled, setReviewsEnabled] = useState(false);
   const [inviteOnly, setInviteOnly] = useState(!!inviteOnlyParam);
   const [isListed, setIsListed] = useState(false); // groups.is_public — public visibility

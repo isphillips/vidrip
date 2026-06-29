@@ -87,8 +87,9 @@ export function clearBadge(): void {
 
 // ── Notification routing ─────────────────────────────────────────────────────
 
-type ThreadNotificationHandler = (threadId: string) => void;
-type ChannelNotificationHandler = (channelId: string, channelName: string) => void;
+// reactionId (when present) opens that reaction directly; postId opens the specific channel post.
+type ThreadNotificationHandler = (threadId: string, reactionId?: string) => void;
+type ChannelNotificationHandler = (channelId: string, channelName: string, postId?: string) => void;
 type AwardNotificationHandler = (awardId: string) => void;
 
 let _onNotificationOpened: ThreadNotificationHandler | null = null;
@@ -108,14 +109,16 @@ export function setAwardNotificationHandler(handler: AwardNotificationHandler): 
 }
 
 // Route a notification's data payload (shared between iOS/Android). Award > channel > thread.
-function route(data: { type?: string; award_id?: string; channel_id?: string; channel_name?: string; thread_id?: string } | undefined): void {
+function route(data: { type?: string; award_id?: string; channel_id?: string; channel_name?: string; post_id?: string; thread_id?: string; reaction_id?: string } | undefined): void {
   if (!data) { return; }
   if (data.type === 'award' && data.award_id && _onAwardNotification) {
     _onAwardNotification(data.award_id);
   } else if (data.channel_id && _onChannelNotification) {
-    _onChannelNotification(data.channel_id, data.channel_name ?? 'Channel');
+    // Forward post_id so a "reacted to your channel post" tap opens that POST, not just the channel.
+    _onChannelNotification(data.channel_id, data.channel_name ?? 'Channel', data.post_id);
   } else if (data.thread_id && _onNotificationOpened) {
-    _onNotificationOpened(data.thread_id);
+    // Forward reaction_id so a "reacted to your video" tap can open that reaction directly.
+    _onNotificationOpened(data.thread_id, data.reaction_id);
   }
 }
 

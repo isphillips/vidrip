@@ -89,9 +89,17 @@ export default function RootNavigator() {
   useEffect(() => {
     ensureReactionsDir().catch(() => {});
 
-    // Reaction push (someone reacted to a video I sent) carries only thread_id. Resolve the friend
-    // from the thread and open the CONVERSATION; fall back to the bare Thread if resolution fails.
-    setNotificationOpenedHandler((threadId: string) => {
+    // Reaction/message push. A reaction push carries reaction_id → open that reaction DIRECTLY in the
+    // player. A plain share/message carries only thread_id → resolve the friend and open the CONVERSATION
+    // (fall back to the bare Thread if resolution fails, e.g. a group thread with no single counterpart).
+    setNotificationOpenedHandler((threadId: string, reactionId?: string) => {
+      if (reactionId) {
+        navRef.current?.navigate('Main', {
+          screen: 'Messages',
+          params: { screen: 'WatchReaction', params: { reactionId } },
+        });
+        return;
+      }
       const myId = useAuthStore.getState().user?.id;
       (async () => {
         const friend = myId ? await fetchThreadCounterpart(threadId, myId).catch(() => null) : null;
@@ -114,14 +122,20 @@ export default function RootNavigator() {
       })();
     });
 
-    // Wire channel notification tap → navigate to private channel
-    setChannelNotificationHandler((channelId: string, channelName: string) => {
+    // Channel push. With a post_id (someone reacted to your channel post) → open that POST; otherwise the
+    // channel home. ChannelScreen resolves its own public/members flags when they're omitted, so we don't
+    // pass the previously-hardcoded (and often wrong) isPublic/isJoined.
+    setChannelNotificationHandler((channelId: string, channelName: string, postId?: string) => {
+      if (postId) {
+        navRef.current?.navigate('Main', {
+          screen: 'Channels',
+          params: { screen: 'ChannelPost', params: { postId, channelId, isJoined: true } },
+        });
+        return;
+      }
       navRef.current?.navigate('Main', {
         screen: 'Channels',
-        params: {
-          screen: 'Channel',
-          params: { channelId, channelName, isPublic: false, isJoined: true },
-        },
+        params: { screen: 'Channel', params: { channelId, channelName } },
       });
     });
 

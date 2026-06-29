@@ -217,7 +217,7 @@ serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const { user_id, title, body, thread_id, channel_id, post_id, channel_name, type, award_id, collection_id } = await req.json();
+  const { user_id, title, body, thread_id, reaction_id, channel_id, post_id, channel_name, type, award_id, collection_id } = await req.json();
   if (!user_id || !title || !body) {
     return new Response('Missing fields', { status: 400 });
   }
@@ -232,12 +232,17 @@ serve(async (req) => {
     return new Response('No token for user', { status: 200 });
   }
 
-  // Build notification data — award (gift reveal), channel, or thread.
+  // Build notification data — award (gift reveal), channel post, or thread/reaction. The app's `route()`
+  // deep-links on these: post_id → the specific channel post; reaction_id → that reaction's player;
+  // otherwise thread_id → the conversation. reaction_id/post_id are only present when the caller passes
+  // them (e.g. the reaction-notif trigger), so older callers keep their existing behaviour.
   const data = type === 'award'
     ? { type: 'award', award_id, collection_id, channel_name }
     : channel_id
       ? { channel_id, post_id, channel_name }
-      : { thread_id };
+      : reaction_id
+        ? { thread_id, reaction_id }
+        : { thread_id };
   const fcmData = toStringData(data);
 
   const results: { platform: string; ok: boolean }[] = [];

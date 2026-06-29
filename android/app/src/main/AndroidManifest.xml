@@ -7,12 +7,18 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- largeHeap: the reaction recorder is the app's heaviest screen — front camera +
+         MediaPipe face mesh + a hardware-video WebView (Facebook reels load FB's full player
+         page) all mounted at once. On default-heap devices that combination OOM-crashes on
+         mount. largeHeap lifts the per-process cap so the camera + WebView video decoders can
+         co-exist. -->
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
       android:icon="@mipmap/ic_launcher"
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
+      android:largeHeap="true"
       android:theme="@style/AppTheme"
       android:supportsRtl="true">
       <!-- FCM push small icon: a white drip silhouette (Android tints it) + brand color. -->
