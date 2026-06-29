@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { useFrameProcessor, runAtTargetFps, VisionCameraProxy } from 'react-native-vision-camera';
+import { useFrameProcessor, VisionCameraProxy } from 'react-native-vision-camera';
 import { Worklets, useSharedValue as useWorkletSharedValue } from 'react-native-worklets-core';
 import type { FaceLandmarks, FaceLensTrack } from './faceLens';
 import type { Pt } from './core/types';
@@ -79,6 +79,45 @@ function ema(prev: FaceLandmarks, cur: FaceLandmarks, a: number, aMesh: number):
   };
 }
 
+// ── One-Euro filter (Tier 0) ───────────────────────────────────────────────────────────────────────
+// A principled low-pass whose cutoff ADAPTS to signal speed: heavy smoothing when the face is still
+// (kills the idle landmark jitter that reads as "cheap" vs Snapchat), and almost none when moving fast
+// (so there's no lag). Replaces the hand-tuned speed-adaptive EMA above when USE_ONE_EURO is on.
+// State is a flat bank (typed arrays) so the 478-vertex mesh is just 956 scalars — cheap, zero per-frame
+// allocation. Works on NORMALISED coords with a real dt (seconds), so it's frame-rate independent.
+const oeAlpha = (cutoff: number, dt: number) => {
+  const tau = 1 / (2 * Math.PI * cutoff);
+  return 1 / (1 + tau / dt);
+};
+
+class OneEuroBank {
+  private xHat: Float64Array;
+  private dxHat: Float64Array;
+  private ready: Uint8Array;
+  constructor(n: number, private minCutoff: number, private beta: number, private dCutoff = 1) {
+    this.xHat = new Float64Array(n);
+    this.dxHat = new Float64Array(n);
+    this.ready = new Uint8Array(n);
+  }
+  resetAll() { this.ready.fill(0); }
+  resetIndex(i: number) { this.ready[i] = 0; }
+  // Filter scalar `i` toward `v` over elapsed `dt` (s), then dead-reckon `lead` seconds forward using the
+  // filtered velocity to cancel pipeline latency. dt<=0 (or the first sample) seeds & returns raw. The
+  // STATE (xHat) stays the un-predicted smoothed value — prediction is output-only, never fed back.
+  step(i: number, v: number, dt: number, lead: number): number {
+    if (!this.ready[i] || dt <= 0) { this.ready[i] = 1; this.xHat[i] = v; this.dxHat[i] = 0; return v; }
+    const aD = oeAlpha(this.dCutoff, dt);
+    const dv = (v - this.xHat[i]) / dt;
+    const edx = aD * dv + (1 - aD) * this.dxHat[i];
+    this.dxHat[i] = edx;
+    const cutoff = this.minCutoff + this.beta * Math.abs(edx);
+    const a = oeAlpha(cutoff, dt);
+    const x = a * v + (1 - a) * this.xHat[i];
+    this.xHat[i] = x;
+    return x + edx * lead;   // edx≈0 at rest → no overshoot; = velocity in motion → pulls forward to "now"
+  }
+}
+
 // SPIKE FLAG. true → use the 478-pt Face Landmarker ('faceMesh' plugin: richer, jitter-resistant
 // anchors, heavier inference). false → the lightweight BlazeFace 6-keypoint detector ('faceLandmarks').
 // Both return the same { points: [[x,y]×6] } anchor contract, so the reduce()/orientation path below is
@@ -115,6 +154,62 @@ const DEADBAND = faceTrackKind === 'mesh' ? 0.004 : 0.008;
 // fits at extreme pitch (the "flip"). Ramps to 1 (instant) at MOVE_FULL too, so real motion isn't slowed.
 const MESH_IDLE = 0.6;
 
+// One-Euro tuning (Tier 0). Flip USE_ONE_EURO to A/B against the legacy EMA on-device; the live DEV
+// status shows '1€' + 'j<n>' (mean smoothed motion ×1000 over 1s — hold still and watch it drop vs the
+// EMA path). These are normalised-coord starting points; tune on a real device: lower *_MIN_CUTOFF =
+// steadier at rest (slightly more lag); raise *_BETA = snappier under motion. The mesh gets stronger
+// smoothing than the anchors because its per-vertex jitter (and the extreme-pitch "flip") is the worst.
+const USE_ONE_EURO = true;
+const ANCHOR_MIN_CUTOFF = faceTrackKind === 'mesh' ? 1.5 : 1.0;
+const ANCHOR_BETA       = faceTrackKind === 'mesh' ? 30 : 20;
+const MESH_MIN_CUTOFF   = 1.0;
+const MESH_BETA         = 25;
+
+// Predictive lead (seconds): dead-reckon landmarks forward by their One-Euro velocity to CANCEL the
+// irreducible pipeline latency (the displayed mesh is always ~1 frame + inference old). 0 = off. Higher
+// = less trail but more overshoot on fast reversals/stops. Start below the true latency (~30–45ms) since
+// partial cancellation is safe; the MESH leads a touch less than the anchors so per-vertex velocity noise
+// doesn't make the wireframe "breathe". Dial up until a hard stop just barely overshoots, then back off.
+const ANCHOR_PREDICT_S = 40 / 1000;
+const MESH_PREDICT_S   = 28 / 1000;
+
+// One filter instance per tracking session. Anchors and mesh are separate banks (different cutoffs);
+// roll is filtered too (currently 0 from reduce(), so a no-op until 3D pose lands in Tier 1).
+function makeLandmarkFilter() {
+  const anchors = new OneEuroBank(10, ANCHOR_MIN_CUTOFF, ANCHOR_BETA); // 4 pts ×2 + faceWidth + roll
+  const mesh = new OneEuroBank(MESH_VERTS * 2, MESH_MIN_CUTOFF, MESH_BETA);
+  return {
+    reset() { anchors.resetAll(); mesh.resetAll(); },
+    // Smooth a full detection. dt<=0 seeds (used on snap/re-acquire so it locks on with no catch-up slide).
+    filter(lm: FaceLandmarks, dt: number): FaceLandmarks {
+      const a = (i: number, v: number) => anchors.step(i, v, dt, ANCHOR_PREDICT_S);
+      let outMesh: (Pt | undefined)[] | undefined;
+      if (lm.mesh) {
+        const m = lm.mesh;
+        outMesh = new Array(m.length);
+        for (let i = 0; i < m.length; i++) {
+          const p = m[i];
+          if (p && i < MESH_VERTS) {
+            outMesh[i] = { x: mesh.step(2 * i, p.x, dt, MESH_PREDICT_S), y: mesh.step(2 * i + 1, p.y, dt, MESH_PREDICT_S) };
+          } else {
+            if (i < MESH_VERTS) { mesh.resetIndex(2 * i); mesh.resetIndex(2 * i + 1); }
+            outMesh[i] = p;
+          }
+        }
+      }
+      return {
+        leftEye: { x: a(0, lm.leftEye.x), y: a(1, lm.leftEye.y) },
+        rightEye: { x: a(2, lm.rightEye.x), y: a(3, lm.rightEye.y) },
+        noseTip: { x: a(4, lm.noseTip.x), y: a(5, lm.noseTip.y) },
+        mouthCenter: { x: a(6, lm.mouthCenter.x), y: a(7, lm.mouthCenter.y) },
+        faceWidth: a(8, lm.faceWidth),
+        roll: a(9, lm.roll),
+        mesh: outMesh,
+      };
+    },
+  };
+}
+
 // BlazeFace keypoint indices (right/left as seen in the image).
 const RIGHT_EYE = 0;
 const LEFT_EYE = 1;
@@ -132,7 +227,7 @@ const EAR_L = 5;
 // y = p0 — with NO reflection/lift/roll-fix. Earlier hacks (eye-line reflection, centroid reflection)
 // were fighting a 180°-rotated output from the pinned-frame.orientation default; feeding 'up' fixes it
 // at the source so position, structure, AND pitch are all correct from one trivial map.
-function reduce(points: number[][] | null | undefined, _aspect: number, orientation: string, _mirrored: boolean, _isMesh: boolean, meshRaw?: number[][]): FaceLandmarks | null {
+function reduce(points: number[][] | null | undefined, _aspect: number, orientation: string, _mirrored: boolean, _isMesh: boolean, meshRaw?: number[]): FaceLandmarks | null {
   'worklet';
   if (!points || points.length < 6) { return null; }
 
@@ -153,10 +248,20 @@ function reduce(points: number[][] | null | undefined, _aspect: number, orientat
     };
     const le = am(points[LEFT_EYE]), re = am(points[RIGHT_EYE]), nose = am(points[NOSE_TIP]), mouth = am(points[MOUTH]);
     const er = am(points[EAR_R]), el = am(points[EAR_L]);
+    // De-interleave the flat mesh [x0,y0,x1,y1,…] with the SAME per-vertex map as the anchors.
+    let mesh: Pt[] | undefined;
+    if (meshRaw) {
+      const n = meshRaw.length >> 1;
+      mesh = new Array(n);
+      for (let i = 0; i < n; i++) {
+        const p0 = meshRaw[2 * i], p1 = meshRaw[2 * i + 1];
+        mesh[i] = { x: (ll ? 1 - p1 : p1) + ANDROID_DX, y: (ll ? 1 - p0 : p0) + dy };
+      }
+    }
     return {
       leftEye: le, rightEye: re, noseTip: nose, mouthCenter: mouth,
       faceWidth: Math.hypot(el.x - er.x, el.y - er.y), roll: 0,
-      mesh: meshRaw ? meshRaw.map(am) : undefined,
+      mesh,
     };
   }
 
@@ -168,6 +273,13 @@ function reduce(points: number[][] | null | undefined, _aspect: number, orientat
   const le = map(points[LEFT_EYE]), re = map(points[RIGHT_EYE]);
   const nose = map(points[NOSE_TIP]), mouth = map(points[MOUTH]);
   const earR = map(points[EAR_R]), earL = map(points[EAR_L]);
+  // De-interleave the flat mesh [x0,y0,x1,y1,…] with the SAME axis-swap+mirror map as the anchors.
+  let mesh: Pt[] | undefined;
+  if (meshRaw) {
+    const n = meshRaw.length >> 1;
+    mesh = new Array(n);
+    for (let i = 0; i < n; i++) { mesh[i] = { x: 1 - meshRaw[2 * i + 1], y: meshRaw[2 * i] }; }
+  }
   return {
     leftEye: le,
     rightEye: re,
@@ -175,7 +287,7 @@ function reduce(points: number[][] | null | undefined, _aspect: number, orientat
     mouthCenter: mouth,
     faceWidth: Math.hypot(earL.x - earR.x, earL.y - earR.y),
     roll: 0,
-    mesh: meshRaw ? meshRaw.map(map) : undefined,
+    mesh,
   };
 }
 
@@ -210,20 +322,54 @@ export function useFaceTracking(mirror = true, withMesh = false) {
   const fpsCountRef = useRef(0);
   const fpsWinRef = useRef(0);
   const detFpsRef = useRef(0);
-  // Back-pressure. The frame processor only hands a new frame to the JS thread when the previous one
-  // has been consumed (pending=false). Heavy mesh lenses can't render the 478-pt wireframe at 30fps, so
-  // without this the per-frame runOnJS handoffs queue up and the lens replays the backlog — a smooth
-  // ~1.75s "slide" that catches up only when you stop moving. Gating to ONE in-flight frame bounds the
-  // lag to ~1 frame (the stale frames in between are dropped, so tracking stays current).
-  const pending = useWorkletSharedValue(false);
+  // One-Euro smoothing state (Tier 0) + a tiny jitter HUD: mean motion of the SMOOTHED output over the
+  // 1s window (×1000). Hold the face still and compare the legacy EMA vs One-Euro — lower = less jitter.
+  const filterRef = useRef<ReturnType<typeof makeLandmarkFilter>>();
+  if (!filterRef.current) { filterRef.current = makeLandmarkFilter(); }
+  const lastTsRef = useRef(0);            // ms timestamp of the previous accepted detection (for dt)
+  const jitterAccRef = useRef(0);
+  const jitterCntRef = useRef(0);
+  const jitterRef = useRef(0);
+  // Diagnostic: mean NATIVE inference time (ms) — the plugin.call duration measured in the worklet. This
+  // is the decisive "is it the processor?" number: if inf≈cycle (1000/fps) the model is the wall; if inf
+  // is small but fps is still low, the cost is the worklet→JS round-trip, not MediaPipe.
+  const infAccRef = useRef(0);
+  const infCntRef = useRef(0);
+  const infRef = useRef(0);
+  // Diagnostic: RAW camera frame-delivery rate, counted in the worklet BEFORE any throttle/back-pressure.
+  // If cam≈det the bottleneck is the SENSOR (low-light fps drop / format) — not our pipeline. If cam≫det,
+  // it's the runAtTargetFps throttle or the JS round-trip dropping frames.
+  const camFpsRef = useRef(0);
+  const lastRawSnapRef = useRef(0);
+  // Back-pressure. Caps how many frames are mid-flight (detected, handed to JS, not yet consumed) so a
+  // slow JS thread can't build a runOnJS backlog that "slides". Inference is ~10ms but a full detect→JS
+  // round-trip is ~50ms, so gating to ONE in-flight serialised them and threw away frames waiting on the
+  // round-trip (capping ~20fps). Allowing TWO lets the next detect PIPELINE over the previous handoff —
+  // the bound stays tiny (≤2 frames of lag, dropped not queued), but the worklet no longer idles. */
+  const MAX_INFLIGHT = 2;
+  const inFlight = useWorkletSharedValue(0);
+  // setAspect is constant after the first frame, but was firing a full runOnJS hop EVERY frame (a second
+  // crossing on top of pushJs). Gate it to fire only when the aspect actually changes (≈once).
+  const lastAspectSent = useWorkletSharedValue(0);
+  const rawSV = useWorkletSharedValue(0);   // ++ every camera frame (pre-throttle) → true sensor fps
 
-  const push = useCallback((lm: FaceLandmarks | null, st: string, ts: number) => {
+  const push = useCallback((lm: FaceLandmarks | null, st: string, ts: number, infMs = 0) => {
    try {
     const now = Date.now();
     // Roll a 1s window of successful detections → effective tracking fps (folded into the DEV status).
     if (lm) { fpsCountRef.current++; }
-    if (now - fpsWinRef.current >= 1000) { detFpsRef.current = fpsCountRef.current; fpsCountRef.current = 0; fpsWinRef.current = now; }
-    const dispSt = st === 'ok' ? `ok ${detFpsRef.current}fps` : st;
+    if (infMs > 0) { infAccRef.current += infMs; infCntRef.current++; }
+    if (now - fpsWinRef.current >= 1000) {
+      detFpsRef.current = fpsCountRef.current; fpsCountRef.current = 0; fpsWinRef.current = now;
+      jitterRef.current = jitterCntRef.current ? jitterAccRef.current / jitterCntRef.current : 0;
+      jitterAccRef.current = 0; jitterCntRef.current = 0;
+      infRef.current = infCntRef.current ? Math.round(infAccRef.current / infCntRef.current) : 0;
+      infAccRef.current = 0; infCntRef.current = 0;
+      const raw = rawSV.value; camFpsRef.current = raw - lastRawSnapRef.current; lastRawSnapRef.current = raw;
+    }
+    const dispSt = st === 'ok'
+      ? `ok ${detFpsRef.current}fps cam${camFpsRef.current} inf${infRef.current}${USE_ONE_EURO ? ' 1€' : ''} j${Math.round(jitterRef.current * 1000)}`
+      : st;
     if (dispSt !== statusRef.current) { statusRef.current = dispSt; setStatus(dispSt); }
     if (lm) {
       lastGoodRef.current = now;
@@ -236,20 +382,44 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       const moved = prev
         ? Math.max(d(lm.noseTip, prev.noseTip), d(lm.leftEye, prev.leftEye), d(lm.rightEye, prev.rightEye), d(lm.mouthCenter, prev.mouthCenter))
         : 1;
-      // Below the deadband we hold the displayed pose (live doesn't update); above it we ease toward
-      // the detection. Speed-adaptive: idle → SMOOTH_IDLE (heavy, kills jitter), real motion (≥MOVE_FULL)
-      // → 1 (instant/snappy). Snap on first acquire or a big jump (≥SNAP) so markers don't crawl.
-      if (!prev || moved >= DEADBAND) {
-        const t = Math.min(1, Math.max(0, (moved - DEADBAND) / (MOVE_FULL - DEADBAND)));
-        const a = SMOOTH_IDLE + (1 - SMOOTH_IDLE) * t;
-        const aMesh = MESH_IDLE + (1 - MESH_IDLE) * t;
-        const out = prev && moved < SNAP ? ema(prev, lm, a, aMesh) : lm;
+      // Smooth the detection toward the displayed pose. Snap on first acquire or a big jump (≥SNAP) so
+      // markers don't crawl/slide on re-acquire or fast moves.
+      let out: FaceLandmarks | null = null;
+      if (USE_ONE_EURO) {
+        const filter = filterRef.current!;
+        if (!prev || moved >= SNAP) {
+          // Re-acquire / big jump → reset & seed the filter (dt=0) so it locks onto the new pose instantly.
+          filter.reset();
+          out = filter.filter(lm, 0);
+          lastTsRef.current = now;
+        } else {
+          // Real elapsed time between detections → frame-rate-independent cutoff. Clamp out absurd gaps.
+          let dt = (now - lastTsRef.current) / 1000;
+          lastTsRef.current = now;
+          if (!(dt > 0)) { dt = 1 / LIVE_FPS; }
+          dt = Math.min(0.1, Math.max(1 / 120, dt));
+          out = filter.filter(lm, dt);
+        }
+      } else {
+        // Legacy speed-adaptive EMA (kept for A/B). Below the deadband we hold the displayed pose; above
+        // it we ease: idle → SMOOTH_IDLE (heavy, kills jitter), real motion (≥MOVE_FULL) → 1 (instant).
+        if (!prev || moved >= DEADBAND) {
+          const t = Math.min(1, Math.max(0, (moved - DEADBAND) / (MOVE_FULL - DEADBAND)));
+          const a = SMOOTH_IDLE + (1 - SMOOTH_IDLE) * t;
+          const aMesh = MESH_IDLE + (1 - MESH_IDLE) * t;
+          out = prev && moved < SNAP ? ema(prev, lm, a, aMesh) : lm;
+        }
+      }
+      if (out) {
+        // Jitter HUD: residual motion of the SMOOTHED output (hold still → reads the leftover jitter).
+        if (prev) { jitterAccRef.current += Math.max(d(out.noseTip, prev.noseTip), d(out.leftEye, prev.leftEye), d(out.rightEye, prev.rightEye), d(out.mouthCenter, prev.mouthCenter)); jitterCntRef.current++; }
         smoothRef.current = out;
         subRef.current?.(out);
       }
     } else if (!hiddenRef.current && now - lastGoodRef.current > HIDE_MS) {
       hiddenRef.current = true;
       smoothRef.current = null;
+      filterRef.current?.reset();   // next acquisition snaps fresh instead of easing from a stale pose
       subRef.current?.(null);
     }
     // Record the RAW detection (not the eased/smoothed pose) so the bake — which sits on the ground-truth
@@ -264,11 +434,11 @@ export function useFaceTracking(mirror = true, withMesh = false) {
       rec.samples.push({ t: tsMs - rec.tsBase, lm: hiddenRef.current ? null : (lm ?? lastRawRef.current) });
     }
    } finally {
-     // Released only after this frame is fully handled (incl. the subscriber's setState), so the worklet
-     // can hand off the next one — never a backlog.
-     pending.value = false;
+     // Free one in-flight slot once this frame is fully handled (incl. the subscriber). The worklet may
+     // already have detected the next one in parallel (up to MAX_INFLIGHT), so detection never idles.
+     inFlight.value = Math.max(0, inFlight.value - 1);
    }
-  }, [pending]);
+  }, [inFlight]);
   const pushJs = Worklets.createRunOnJS(push);
 
   // Record the real frame aspect once (it doesn't change mid-session). Logged so we can confirm it
@@ -284,33 +454,42 @@ export function useFaceTracking(mirror = true, withMesh = false) {
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     if (!plugin) { return; }
-    runAtTargetFps(LIVE_FPS, () => {
-      'worklet';
-      // Back-pressure: if the JS thread hasn't finished the previous frame, skip this one entirely (incl.
-      // the detect) — keeps tracking on the LATEST frame instead of building a backlog that "slides".
-      if (pending.value) { return; }
+    rawSV.value = rawSV.value + 1;   // every delivered camera frame
+    // NO runAtTargetFps gate. It only runs the body once >1/target has elapsed, so against a ~30fps
+    // sensor, timing jitter dropped ~⅓ of frames (det stuck ~20 while cam=30). `inFlight` is the real
+    // back-pressure now, so attempt the detect on EVERY camera frame — bounded to MAX_INFLIGHT in-flight
+    // (dropped, not queued → no backlog "slide"). Self-regulates on 60fps cameras / heavy lenses too.
+    {
+      // Skip only if MAX_INFLIGHT frames are already mid-flight (detected, not yet consumed by JS).
+      if (inFlight.value >= MAX_INFLIGHT) { return; }
       // min/max is rotation-invariant, so this is the displayed portrait aspect regardless of sensor
       // orientation — the true space the keypoints live in.
       const aspect = Math.min(frame.width, frame.height) / Math.max(frame.width, frame.height);
-      setAspectJs(aspect);
+      // Constant after frame 1 — only cross to JS when it actually changes (was a wasted hop every frame).
+      if (Math.abs(aspect - lastAspectSent.value) > 0.001) { lastAspectSent.value = aspect; setAspectJs(aspect); }
       const ori = String(frame.orientation);
       // Only ask the native side for the full 478-pt mesh when a mesh-rendering lens needs it — keeps
       // the bridge to 6 anchors otherwise. `ori` pins the orientation fed to MediaPipe (see reduce()).
       const wantMesh = withMesh && useMesh;
       // VisionCamera throws "expected an Object" if the 2nd arg is explicitly undefined — always pass a
       // real object.
+      // Time the native detect (plugin.call) to isolate inference cost from the JS round-trip. Guarded:
+      // if the worklet runtime has no `performance.now`, infMs stays 0 (HUD shows inf0 → go native).
+      const perf: any = (globalThis as any).performance;
+      const t0 = perf && perf.now ? perf.now() : 0;
       const res = (wantMesh ? plugin!.call(frame, { mesh: true, ori: IOS_MESH_ORI }) : plugin!.call(frame, { ori: IOS_MESH_ORI })) as unknown as
-        { points?: number[][]; mesh?: number[][]; err?: string } | null;
+        { points?: number[][]; mesh?: number[]; err?: string } | null;
+      const infMs = t0 ? Math.round(perf.now() - t0) : 0;
       // Claim the in-flight slot right before handing off; push() releases it when fully done. The
       // frame's capture timestamp is threaded through so the track is keyed to capture time, not arrival.
       const ts = frame.timestamp;
       if (res && res.points) {
         const lm = reduce(res.points, aspect, ori, false, useMesh, res.mesh);
-        pending.value = true;
-        pushJs(lm, 'ok', ts);
-      } else { pending.value = true; pushJs(null, (res && res.err) || 'null', ts); }
-    });
-  }, [pushJs, setAspectJs, mirror, withMesh, pending]);
+        inFlight.value = inFlight.value + 1;
+        pushJs(lm, 'ok', ts, infMs);
+      } else { inFlight.value = inFlight.value + 1; pushJs(null, (res && res.err) || 'null', ts, infMs); }
+    }
+  }, [pushJs, setAspectJs, mirror, withMesh, inFlight, lastAspectSent, rawSV]);
 
   // ── Track capture ──────────────────────────────────────────────────────────
   // Start when recording begins; stop returns a time-sampled FaceLensTrack to persist with the clip;

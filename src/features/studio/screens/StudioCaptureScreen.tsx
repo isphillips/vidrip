@@ -42,9 +42,12 @@ export default function StudioCaptureScreen({ navigation }: StudioStackScreenPro
   const device = useCameraDevice(facing);
   const format = useCameraFormat(device, [
     { videoResolution: { width: 1280, height: 720 } },
-    { fps: 30 },
+    { fps: 60 },
   ]);
-  const targetFps = format ? Math.min(30, format.maxFps) : 30;
+  // 60fps capture → 60fps face detection → ~half the motion-to-photon latency of the live lens (the
+  // remaining "trail" after the One-Euro tune). Gracefully falls back to the format's max (e.g. 30) if
+  // the front camera can't do 720p60. NB: the recording is now 60fps too — see note in the bake path.
+  const targetFps = format ? Math.min(60, format.maxFps) : 30;
 
   // AR face lens (full-screen test surface for placement). Mirror only for the front camera.
   const [lensKey, setLensKey] = useState<string | null>(null);

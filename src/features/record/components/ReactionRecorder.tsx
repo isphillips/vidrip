@@ -36,7 +36,7 @@ import { createThumbnail } from 'react-native-create-thumbnail';
 import { supabase } from '../../../infrastructure/supabase/client';
 import type { OverlayRecipe } from '../../studio/effectRecipe';
 import { faceLensRecipe } from '../../studio/effectRecipe';
-import { LiveFaceLens, lensByKey, SPIKE_KEY, type FaceLensTrack } from '../../lens/faceLens';
+import { LiveFaceLens, lensByKey, SPIKE_KEY, type FaceLensTrack, type MeshFrame } from '../../lens/faceLens';
 import { useSpikeFrameProcessor } from '../../lens/spikeFrameProcessor';
 import LensPicker from '../../lens/LensPicker';
 import { MOCK_FACE } from '../../lens/useFaceLandmarks';
@@ -94,6 +94,11 @@ function BlinkingDot() {
   return <Animated.View style={[styles.recDot, { opacity: blink }]} />;
 }
 
+// Peak expression signals captured during the take (max over all frames a lens was active). Null when
+// no signal was available — smile/browRaise only come from MESH lenses (see faceFrame.ts). The save
+// site derives emoji_density separately from the emoji track. Powers the engagement-ranked channels.
+export type ReactionMetrics = { peakSmile: number | null; peakSurprise: number | null };
+
 export interface ReactionRecorderProps {
   videoId?: string;
   // Instagram has no embed player — its source plays from this re-hosted file URL.
@@ -103,7 +108,7 @@ export interface ReactionRecorderProps {
   // Animated overlay layer for a creator (Bunny) video — replayed live over the embed.
   recipe?: OverlayRecipe | null;
   sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'studio' | 'facebook';
-  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null, emojiTrack?: EmojiHit[]) => Promise<void>;
+  onSave: (filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean, lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null, emojiTrack?: EmojiHit[], reactionMetrics?: ReactionMetrics | null) => Promise<void>;
   onBack: () => void;
   uploadingText?: string;
   /** Hard cap in seconds — recording auto-stops when reached (e.g. 60s reviews). */
@@ -225,6 +230,15 @@ export default function ReactionRecorder({
   const fountainRef = useRef<EmojiFountainHandle>(null);
   const emojiTrackRef = useRef<EmojiHit[]>([]);
   const lastEmitRef = useRef(0);   // rate-limit: 1 throw / second
+  // Running peak expression over the take (reset per recording). Fed by the lens host's per-frame tap;
+  // null until a mesh lens reports a signal. Persisted as peak_smile / peak_surprise on the reaction.
+  const peaksRef = useRef<{ smile: number | null; brow: number | null }>({ smile: null, brow: null });
+  const onFrameMetrics = useCallback((mf: MeshFrame | null) => {
+    if (!mf) { return; }
+    const r = peaksRef.current;
+    if (mf.smile != null) { r.smile = Math.max(r.smile ?? 0, mf.smile); }
+    if (mf.browRaise != null) { r.brow = Math.max(r.brow ?? 0, mf.browRaise); }
+  }, []);
   const lensKeyRef = useRef<string | null>(null);
   useEffect(() => { lensKeyRef.current = effLensKey; }, [effLensKey]);
   // Captured lens track for the afterthought clip (anonymous mode bakes it too).
@@ -305,7 +319,7 @@ export default function ReactionRecorder({
   const [afterPhase, setAfterPhase] = useState<'none' | 'countdown' | 'recording'>('none');
   const [countdown, setCountdown] = useState(AFTERTHOUGHT_COUNTDOWN);
   const [afterElapsed, setAfterElapsed] = useState(0);
-  const mainVideoRef = useRef<{ path: string; duration: number; ytStartOffset: number; headphones: boolean; lensTrack: FaceLensTrack | null; emojiTrack: EmojiHit[] } | null>(null);
+  const mainVideoRef = useRef<{ path: string; duration: number; ytStartOffset: number; headphones: boolean; lensTrack: FaceLensTrack | null; emojiTrack: EmojiHit[]; metrics: ReactionMetrics } | null>(null);
   const afterCallbackRef = useRef<((v: VideoFile) => void) | null>(null);
   const afterElapsedRef = useRef(0);
   const afterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -371,6 +385,7 @@ export default function ReactionRecorder({
     hasStartedRef.current = true;
     ytStartOffsetRef.current = 0;
     emojiTrackRef.current = [];   // fresh emoji track per take
+    peaksRef.current = { smile: null, brow: null };   // fresh expression peaks per take
     lastEmitRef.current = 0;
     // Begin capturing the face-lens track (per-frame landmarks) if a lens is on.
     if (lensKeyRef.current) { startTrack(lensKeyRef.current, frameAspect); }
@@ -463,7 +478,7 @@ export default function ReactionRecorder({
             after = { ...afterRaw, path: bakedAfter };
           }
           dismissUpload(prepId);                                   // hand off cleanly to the save toast
-          await onSave(bakedMain, dur, ytOff, hp, null, after);    // shows the real "Saving…" toast
+          await onSave(bakedMain, dur, ytOff, hp, null, after, m.emojiTrack, m.metrics);    // shows the real "Saving…" toast
         } catch (e) {
           log.error('[ReactionRecorder] ANON bake failed (silhouette/voice-mod export)', describeRecordingError(e));
           dismissUpload(prepId);
@@ -476,7 +491,7 @@ export default function ReactionRecorder({
 
     setUploading(true);
     try {
-      await onSave(m.path, m.duration, m.ytStartOffset, m.headphones, m.lensTrack, afterthought, m.emojiTrack);
+      await onSave(m.path, m.duration, m.ytStartOffset, m.headphones, m.lensTrack, afterthought, m.emojiTrack, m.metrics);
       onBack();
     } catch (e: any) {
       Alert.alert('Could Not Save', e?.message ?? 'Something went wrong. Please try again.');
@@ -548,6 +563,7 @@ export default function ReactionRecorder({
         headphones: recordedWithHeadphonesRef.current,
         lensTrack: lensTrackRef.current,
         emojiTrack: emojiTrackRef.current,
+        metrics: { peakSmile: peaksRef.current.smile, peakSurprise: peaksRef.current.brow },
       };
       // Friend-share path: offer the afterthought window. Otherwise save straight away.
       if (allowAfterthought) {
@@ -997,6 +1013,7 @@ export default function ReactionRecorder({
               width={camAsPip ? PIP_W : width}
               height={camAsPip ? PIP_H : height}
               frameAspect={frameAspect}
+              onFrameMetrics={onFrameMetrics}
             />
             {isRecording && camAsPip && <View style={styles.pipRecDot} />}
           </>

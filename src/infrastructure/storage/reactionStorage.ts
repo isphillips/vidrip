@@ -21,9 +21,29 @@ export interface SaveReactionParams {
   afterthought?: { path: string; duration: number } | null;
   // Emoji throws captured during the take ({emoji, video-time}); stored best-effort, replayed on watch.
   emojiTrack?: EmojiHit[] | null;
+  // Engagement signals captured during the take (peak_smile / peak_surprise / emoji_density). Stored
+  // best-effort; powers the engagement-ranked auto-channels. Null fields = no signal (e.g. no mesh lens).
+  metrics?: ReactionMetricsInput | null;
   // Fires once the row is inserted and the local copy is in place (before the
   // slow relay upload), so the caller can show the reaction immediately.
   onCommitted?: (reactionId: string) => void;
+}
+
+export type ReactionMetricsInput = { peakSmile: number | null; peakSurprise: number | null; emojiDensity: number | null };
+
+/** Best-effort: store the engagement metrics on the reaction (graceful if the columns aren't deployed). */
+async function saveReactionMetrics(reactionId: string, metrics?: ReactionMetricsInput | null): Promise<void> {
+  if (!metrics) { return; }
+  const { peakSmile, peakSurprise, emojiDensity } = metrics;
+  if (peakSmile == null && peakSurprise == null && emojiDensity == null) { return; }
+  try {
+    const { error } = await (supabase as any).from('reactions')
+      .update({ peak_smile: peakSmile, peak_surprise: peakSurprise, emoji_density: emojiDensity })
+      .eq('id', reactionId);
+    if (error) { log.error('[saveReaction] metrics write failed:', JSON.stringify(error)); }
+  } catch (e) {
+    log.error('[saveReaction] metrics write threw:', JSON.stringify(e));
+  }
 }
 
 /** Best-effort: store the emoji throw track on the reaction (graceful if the column isn't deployed). */
@@ -112,6 +132,7 @@ export async function saveReaction({
   recordedWithHeadphones = false,
   afterthought = null,
   emojiTrack = null,
+  metrics = null,
   onCommitted,
 }: SaveReactionParams): Promise<SaveReactionResult> {
 
@@ -139,6 +160,7 @@ export async function saveReaction({
     const reactionId: string = data.id;
     const localPath = await moveToReactionsDir(filePath, reactionId);
     await saveEmojiTrack(reactionId, emojiTrack);
+    await saveReactionMetrics(reactionId, metrics);
     onCommitted?.(reactionId);
 
     let cloudUrl: string | null = null;
@@ -191,6 +213,7 @@ export async function saveReaction({
   // 2. Move temp file to permanent local location keyed by the reaction UUID
   const localPath = await moveToReactionsDir(filePath, reactionId);
   await saveEmojiTrack(reactionId, emojiTrack);
+  await saveReactionMetrics(reactionId, metrics);
   onCommitted?.(reactionId);   // local copy ready → caller can show it now
 
   // 3. Upload the relay copy so recipients can fetch it (best-effort; the local

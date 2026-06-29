@@ -119,10 +119,12 @@ public class FaceMeshFrameProcessor: FrameProcessorPlugin {
     ]
     var out: [String: Any] = ["points": points]
 
-    // Full 478-pt mesh, only when JS asks (Debug lens) — keeps the bridge cheap by default.
+    // Full 478-pt mesh, only when JS asks (mesh lenses) — keeps the bridge cheap by default. FLAT
+    // [x0,y0,x1,y1,…]: one numeric array marshals to JS far cheaper than 478 nested [x,y] arrays (that
+    // nesting was ~10ms of the per-frame budget on the mesh path). reduce() de-interleaves it in JS.
     if let wantMesh = arguments?["mesh"] as? Bool, wantMesh {
-      var mesh: [[Double]] = []; mesh.reserveCapacity(face.count)
-      for p in face { mesh.append([Double(p.x), Double(p.y)]) }
+      var mesh: [Double] = []; mesh.reserveCapacity(face.count * 2)
+      for p in face { mesh.append(Double(p.x)); mesh.append(Double(p.y)) }
       out["mesh"] = mesh
     }
 

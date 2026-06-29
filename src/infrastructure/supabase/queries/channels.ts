@@ -1274,6 +1274,9 @@ interface ChannelClipParams {
   recordedWithHeadphones?: boolean;
   // Replay layer for this clip (e.g. a captured AR face-lens track) → channel_posts.overlay_recipe.
   overlayRecipe?: OverlayRecipe | null;
+  // Engagement signals captured during the take (peak_smile / peak_surprise / emoji_density). Stored
+  // best-effort; powers the engagement-ranked auto-channels. Null fields = no signal (e.g. no mesh lens).
+  metrics?: { peakSmile: number | null; peakSurprise: number | null; emojiDensity: number | null } | null;
 }
 
 /**
@@ -1284,7 +1287,7 @@ interface ChannelClipParams {
  * away, while uploadChannelClipRelay() runs the slow upload in the background.
  */
 export async function commitChannelClip({
-  channelId, userId, filePath, duration, parentPostId, recordedWithHeadphones = false, overlayRecipe,
+  channelId, userId, filePath, duration, parentPostId, recordedWithHeadphones = false, overlayRecipe, metrics,
 }: ChannelClipParams): Promise<string> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
@@ -1303,6 +1306,16 @@ export async function commitChannelClip({
     .single();
   if (error) { throw error; }
   const postId = data.id as string;
+
+  // Engagement metrics (best-effort, separate write so a not-yet-deployed column can't fail the post).
+  if (metrics && (metrics.peakSmile != null || metrics.peakSurprise != null || metrics.emojiDensity != null)) {
+    try {
+      const { error: mErr } = await (supabase as any).from('channel_posts')
+        .update({ peak_smile: metrics.peakSmile, peak_surprise: metrics.peakSurprise, emoji_density: metrics.emojiDensity })
+        .eq('id', postId);
+      if (mErr) { log.error('[commitChannelClip] metrics write failed:', JSON.stringify(mErr)); }
+    } catch (e) { log.error('[commitChannelClip] metrics write threw:', JSON.stringify(e)); }
+  }
 
   // Keep a local copy for instant playback on this device (before the upload).
   // WatchChannelClipScreen / ChannelPostScreen use localPathForClip(postId).

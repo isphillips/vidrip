@@ -13,7 +13,7 @@ import {
   fetchChannelPost, fetchChannelPosts, commitChannelClip, uploadChannelClipRelay,
 } from '../../../infrastructure/supabase/queries/channels';
 import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
-import ReactionRecorder from '../components/ReactionRecorder';
+import ReactionRecorder, { type ReactionMetrics } from '../components/ReactionRecorder';
 import IntroPreroll from '../../threads/components/IntroPreroll';
 import { useReactQueueStore } from '../../../store/reactQueueStore';
 import { faceLensRecipe, type OverlayRecipe } from '../../studio/effectRecipe';
@@ -122,9 +122,17 @@ export default function RecordReactionScreen({
   const onSave = useCallback(async (
     filePath: string, duration: number, ytStartOffset: number, recordedWithHeadphones: boolean,
     lensTrack?: FaceLensTrack | null, afterthought?: { path: string; duration: number } | null,
-    emojiTrack?: EmojiHit[],
+    emojiTrack?: EmojiHit[], reactionMetrics?: ReactionMetrics | null,
   ) => {
     justSavedRef.current = true;   // committed → onBack advances the doom-react queue
+
+    // Engagement metrics persisted on the reaction (powers the auto-channel ranking). peak_smile /
+    // peak_surprise are captured live (null off mesh lenses); emoji_density = throws per second.
+    const metrics = {
+      peakSmile: reactionMetrics?.peakSmile ?? null,
+      peakSurprise: reactionMetrics?.peakSurprise ?? null,
+      emojiDensity: duration > 0 && emojiTrack ? emojiTrack.length / duration : null,
+    };
 
     // ── Channel-post reaction: commit a clip under the post (mirrors WatchYouTubePostScreen). ──
     if (isChannel && postId && channelId) {
@@ -133,6 +141,7 @@ export default function RecordReactionScreen({
         const newPostId = await commitChannelClip({
           channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones,
           overlayRecipe: lensTrack ? faceLensRecipe(lensTrack) : null,
+          metrics,
         });
         addPendingChannelReaction(postId, {
           id: newPostId, channel_id: channelId, poster_id: user!.id,
@@ -170,6 +179,7 @@ export default function RecordReactionScreen({
         recordedWithHeadphones,
         afterthought: afterthought ?? null,
         emojiTrack: emojiTrack ?? null,
+        metrics,
         // Surface the reaction in the thread immediately (plays from the local
         // copy), before the relay upload finishes. Reconciled once it's fetched.
         onCommitted: (reactionId) => {

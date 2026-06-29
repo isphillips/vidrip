@@ -107,6 +107,10 @@ type LiveProps = {
   lens?: string | null;
   subscribe: (fn: (lm: FaceLandmarks | null) => void) => () => void;
   width: number; height: number; frameAspect?: number; fallback?: FaceLandmarks | null;
+  // Optional per-frame expression tap (smile/browRaise/mouthOpen) for analytics — see ReactionRecorder's
+  // peak accumulator. Only the reactive (mesh) host fires it, which is also the only path that produces
+  // smile/browRaise; mesh-less lenses have no expression signal to report.
+  onFrameMetrics?: (mf: MeshFrame | null) => void;
 };
 
 // Selector: reactive lenses (mesh, UI-thread render) go through ReactiveLensHost; everything else uses
@@ -114,7 +118,7 @@ type LiveProps = {
 export function LiveFaceLens(props: LiveProps) {
   const ReactiveComp = props.lens ? REACTIVE_RENDERERS[props.lens] : undefined;
   return ReactiveComp
-    ? <ReactiveLensHost ReactiveComp={ReactiveComp} subscribe={props.subscribe} width={props.width} height={props.height} frameAspect={props.frameAspect} />
+    ? <ReactiveLensHost ReactiveComp={ReactiveComp} subscribe={props.subscribe} width={props.width} height={props.height} frameAspect={props.frameAspect} onFrameMetrics={props.onFrameMetrics} />
     : <LegacyLensHost {...props} />;
 }
 
@@ -134,19 +138,26 @@ function LegacyLensHost({ lens, subscribe, width, height, frameAspect, fallback 
 // ONCE. The lens reads the SharedValue via useDerivedValue, so the per-frame mesh render runs on the UI
 // thread with zero React reconciliation — the snappiest path, and leak-free (Reanimated runtime is GC'd).
 function ReactiveLensHost({
-  ReactiveComp, subscribe, width, height, frameAspect,
+  ReactiveComp, subscribe, width, height, frameAspect, onFrameMetrics,
 }: {
   ReactiveComp: React.FC<ReactiveLensProps>;
   subscribe: (fn: (lm: FaceLandmarks | null) => void) => () => void;
   width: number; height: number; frameAspect?: number;
+  onFrameMetrics?: (mf: MeshFrame | null) => void;
 }) {
   const face = useSharedValue<MeshFrame | null>(null);
   // meshFrameFor needs the box dims; keep them in a ref so the subscriber always reads the latest.
   const dims = useRef({ w: width, h: height, a: frameAspect });
   dims.current = { w: width, h: height, a: frameAspect };
   const clock = useLensClock(true);
+  // Keep onFrameMetrics in a ref so the subscription (set up once) always calls the latest callback.
+  const metricsCb = useRef(onFrameMetrics);
+  metricsCb.current = onFrameMetrics;
   useEffect(() => subscribe((lm) => {
-    face.value = lm ? meshFrameFor(lm, dims.current.w, dims.current.h, dims.current.a) : null;
+    const mf = lm ? meshFrameFor(lm, dims.current.w, dims.current.h, dims.current.a) : null;
+    face.value = mf;
+    // This callback already runs on JS once per frame (meshFrameFor is JS); the tap is a few Math.max.
+    metricsCb.current?.(mf);
   }), [subscribe, face]);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">

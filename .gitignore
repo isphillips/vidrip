@@ -79,6 +79,9 @@ yarn-error.log
 # testing
 /coverage
 
+/docs
+/supabase/migrations
+
 # Yarn
 .yarn/*
 !.yarn/patches

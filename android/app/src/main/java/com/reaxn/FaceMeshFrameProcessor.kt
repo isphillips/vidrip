@@ -51,9 +51,12 @@ class FaceMeshFrameProcessor(proxy: VisionCameraProxy, options: Map<String, Any>
     val out = HashMap<String, Any>()
     out["points"] = points
 
-    // Full 478-pt mesh, only when JS asks (Debug lens) — keeps the bridge cheap by default.
+    // Full 478-pt mesh, only when JS asks (mesh lenses) — keeps the bridge cheap by default. FLAT
+    // [x0,y0,x1,y1,…]: one numeric array marshals far cheaper than 478 nested arrays. reduce() de-interleaves.
     if (arguments?.get("mesh") == true) {
-      out["mesh"] = f.map { listOf(it.x().toDouble(), it.y().toDouble()) }
+      val mesh = ArrayList<Double>(f.size * 2)
+      for (p in f) { mesh.add(p.x().toDouble()); mesh.add(p.y().toDouble()) }
+      out["mesh"] = mesh
     }
 
     return out
