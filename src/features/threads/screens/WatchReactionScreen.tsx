@@ -119,6 +119,10 @@ export default function WatchReactionScreen({
   const [srcDismissed, setSrcDismissed] = useState(false);
   // Studio-share source: the sender's clip (a sibling reaction). Resolved playable URI for its PIP.
   const [studioSourceUri, setStudioSourceUri] = useState<string | null>(null);
+  // Facebook source: the SDK player posts 'ready' on xfbml.ready. Until then we hold a black + spinner
+  // gate (the FB embed loads behind it) so the reaction video never flashes first and an early tap can't
+  // start things out of order. Only relevant for source_type === 'facebook'.
+  const [fbReady, setFbReady] = useState(false);
   const [paused, setPaused] = useState(true);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -137,6 +141,7 @@ export default function WatchReactionScreen({
   const ttRef = useRef<TikTokPlayerHandle>(null);
   const igRef = useRef<InstagramPlayerHandle>(null);   // studio file-source PIP
   const igTimeRef = useRef(0);                          // latest studio-source playhead (onCurrentTime)
+  const fbWebRef = useRef<any>(null);                   // FB SDK player WebView — driven via injectJavaScript
   // True while force-stopping at the end — ignore the source's auto "playing"
   // (seekTo resumes YouTube, which would otherwise loop the source).
   const stoppingRef = useRef(false);
@@ -277,6 +282,14 @@ export default function WatchReactionScreen({
     if (reaction?.source_type !== 'tiktok') { return; }
     if (paused) { ttRef.current?.pause(); } else { ttRef.current?.play(); }
   }, [paused, reaction?.source_type]);
+
+  // Facebook: the SDK player reports its own start ('startedPlaying' → handleYtStateChange), but from
+  // then on the reaction is the master — mirror our paused state onto the FB player via injectJavaScript
+  // so pausing the reaction pauses FB too (window.fbPlayer is captured on xfbml.ready in the embed HTML).
+  useEffect(() => {
+    if (reaction?.source_type !== 'facebook' || !hasStarted) { return; }
+    fbWebRef.current?.injectJavaScript(`window.fbPlayer&&window.fbPlayer.${paused ? 'pause' : 'play'}();true;`);
+  }, [paused, hasStarted, reaction?.source_type]);
 
   // Studio source: a re-hosted file PIP driven imperatively (no `play` prop). Mirror TikTok: push
   // the paused state in, and nudge it back onto the reaction clock on drift (it starts at offset 0).
@@ -489,11 +502,17 @@ export default function WatchReactionScreen({
         />
       </View>
 
-      {/* Tap-to-play background — only when there's NO source PIP (or Instagram/Facebook,
-          which can't drive the reaction via embed events so the user taps to play directly). */}
+      {/* Tap-to-play background — only when there's NO source PIP (or Instagram, which can't drive the
+          reaction via embed events so the user taps to play directly). Facebook is special: the START
+          must come ONLY from FB's play button ('startedPlaying'), so the background does nothing until
+          the reaction has started — after which a main-area tap pauses/plays BOTH (via the FB sync). */}
       <Pressable
         style={StyleSheet.absoluteFill}
-        onPress={reaction?.yt_video_id && reaction.source_type !== 'instagram' && reaction.source_type !== 'facebook' ? undefined : handlePlayPause}
+        onPress={
+          reaction?.source_type === 'facebook'
+            ? (hasStarted ? handlePlayPause : undefined)
+            : (reaction?.yt_video_id && reaction.source_type !== 'instagram' ? undefined : handlePlayPause)
+        }
       />
 
       {/* Play icon — when tap-to-play is active. */}
@@ -514,10 +533,10 @@ export default function WatchReactionScreen({
         </View>
       )}
 
-      {/* Source player — full-screen, then animates into the corner on play. Hidden once the
-          afterthought outro takes over (the reaction is finished). Facebook videos have no
-          controllable embed, so reactions recorded from Facebook show no source PIP. */}
-      {sessionReady && !srcDismissed && !!reaction && reaction.source_type !== 'facebook'
+      {/* Source player — full-screen, then animates into the corner on play. Hidden once the afterthought
+          outro takes over. Facebook mounts WITHOUT waiting for sessionReady so its embed loads first
+          (behind the black gate below) rather than appearing over an already-shown reaction video. */}
+      {(sessionReady || reaction?.source_type === 'facebook') && !srcDismissed && !!reaction
         && (!!studioSourceUri || !!reaction.yt_video_id) && (
         <Animated.View style={[StyleSheet.absoluteFill, srcStyle]}>
           {studioSourceUri ? (
@@ -556,6 +575,36 @@ export default function WatchReactionScreen({
                 } catch { /* ignore */ }
               }}
             />
+          ) : reaction.source_type === 'facebook' ? (
+            // Facebook JS SDK embed (NOT the uncontrollable plugins/video.php iframe): the player fires a
+            // 'startedPlaying' event, which we postMessage out and feed into handleYtStateChange — so the
+            // moment the user taps FB's play, the reaction starts at the same instant (start-aligned) and
+            // this docks to the corner PIP, exactly like the Instagram path. appId-less: embedding a PUBLIC
+            // video is a social plugin (no app review / Login / Graph scope). Source carries the audio.
+            <View style={{ width, height }} pointerEvents={hasStarted ? 'none' : 'auto'}>
+              {/* Before play the embed is interactive (tap FB's play → 'startedPlaying' starts the
+                  reaction). Once started it's inert — all play/pause is driven from the reaction. */}
+              <WebView
+                ref={fbWebRef}
+                style={{ width, height, backgroundColor: '#000' }}
+                source={{
+                  html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0;box-sizing:border-box}html,body{background:#000;width:100vw;height:100vh;overflow:hidden}.fb-video{position:absolute!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important}</style></head><body><div id="fb-root"></div><div class="fb-video" data-href="${(reaction.yt_video_id as string).startsWith('http') ? (reaction.yt_video_id as string) : `https://www.facebook.com/reel/${reaction.yt_video_id}`}" data-width="${Math.round(width)}" data-show-text="false" data-autoplay="false" data-allowfullscreen="false"></div><script>function post(t){try{window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(t)}catch(e){}}window.fbAsyncInit=function(){FB.init({xfbml:true,version:'v21.0'});FB.Event.subscribe('xfbml.ready',function(m){if(m.type==='video'){window.fbPlayer=m.instance;post('ready');m.instance.subscribe('startedPlaying',function(){post('playing')})}})};(function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(d.getElementById(id))return;js=d.createElement(s);js.id=id;js.src='https://connect.facebook.net/en_US/sdk.js';fjs.parentNode.insertBefore(js,fjs)}(document,'script','facebook-jssdk'));</script></body></html>`,
+                  baseUrl: 'https://www.facebook.com',
+                }}
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                allowsFullscreenVideo={false}
+                javaScriptEnabled
+                domStorageEnabled
+                setSupportMultipleWindows={false}
+                onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:') || req.url.startsWith('data:')}
+                onMessage={(e) => {
+                  const d = e.nativeEvent.data;
+                  if (d === 'ready') { setFbReady(true); }
+                  else if (d === 'playing') { handleYtStateChange('playing'); }
+                }}
+              />
+            </View>
           ) : reaction.source_type === 'tiktok' ? (
             <TikTokPlayer
               ref={ttRef}
@@ -595,6 +644,15 @@ export default function WatchReactionScreen({
             </View>
           ) : null}
         </Animated.View>
+      )}
+
+      {/* Facebook load gate: a black screen + spinner that covers everything (and absorbs taps) while the
+          FB embed initialises behind it. Lifts on 'ready', revealing the full-screen FB source. Keeps the
+          reaction video from flashing first and blocks an early tap from starting things out of order. */}
+      {reaction?.source_type === 'facebook' && !fbReady && !srcDismissed && (
+        <View style={styles.fbGate}>
+          <ActivityIndicator size="large" color={C.ACCENT_HOT} />
+        </View>
       )}
 
       {/* Replayed emoji throws — re-emitted as playback reaches each recorded timestamp. */}
@@ -672,15 +730,6 @@ export default function WatchReactionScreen({
         onPress={() => navigation.goBack()}>
         <Text style={styles.closeTxt}>✕</Text>
       </TouchableOpacity>
-
-      {/* DEV: trigger the dock animation when the source won't play (e.g. TikTok in sim) */}
-      {__DEV__ && reaction?.yt_video_id && (
-        <TouchableOpacity
-          style={[styles.devDock, { top: topInset + SPACE.SM }]}
-          onPress={() => { setHasStarted(s => !s); setPaused(false); }}>
-          <Text style={styles.devDockTxt}>{hasStarted ? 'undock' : 'dock'}</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -714,6 +763,14 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  // FB load gate: opaque black + spinner over the video/source until the embed is ready (absorbs taps).
+  // No zIndex — render order already puts it above the source block, while the later-rendered controls
+  // (incl. back) stay on top, so the user is never trapped here if FB fails to load.
+  fbGate: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+    alignItems: 'center', justifyContent: 'center',
   },
   playCircle: {
     width: 72, height: 72, borderRadius: RADIUS.FULL,

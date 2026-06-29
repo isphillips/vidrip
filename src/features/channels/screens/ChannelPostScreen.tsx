@@ -272,7 +272,7 @@ export default function ChannelPostScreen({
   // (video_url); YouTube/TikTok from their embeds; Bunny via the signed-embed screen.
   // Gated to !obscured so it follows the existing reveal rule — the creator (poster) and
   // anyone who's reacted can play; non-reactors still have to react to reveal.
-  const thumbH = Math.max(240, height - belowH - tabBarHeight);
+  const thumbH = Math.max(240, height - 10 - tabBarHeight);
   const isFile = post.source_type === 'instagram' || post.source_type === 'facebook';
   const playableSource = post.source_type === 'bunny'
     ? true
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   reactBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD },
   reactedBadge: {
     marginBottom: SPACE.LG,
-    padding: SPACE.MD,
+    padding: SPACE.LG,
     borderRadius: RADIUS.MD,
     backgroundColor: C.SURFACE,
     alignItems: 'center',
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.ACCENT,
     borderRadius: RADIUS.MD,
     marginBottom: SPACE.LG,
-    paddingVertical: SPACE.MD,
+    paddingVertical: SPACE.LG,
     paddingHorizontal: SPACE.LG,
     alignItems: 'center',
     gap: 2,

@@ -103,6 +103,25 @@ async function fetchInstagramOg(
   }
 }
 
+// Best-effort title/thumbnail for a pasted public Facebook Reel/video, via the same tokenless Open Graph
+// scrape (the edge fn now accepts FB URLs too). Login-walled/private posts return nothing → caller falls
+// back to 'Facebook Reel' + the live FB embed for playback. The full URL is passed (FB needs the href).
+async function fetchFacebookOg(
+  url: string,
+): Promise<{ title: string; thumbnail: string; author: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('instagram-oembed', { body: { url } });
+    if (error || !data?.ok) { return { title: '', thumbnail: '', author: '' }; }
+    return {
+      title: (data.title ?? '').slice(0, 120),
+      thumbnail: data.thumbnail ?? '',
+      author: data.author ?? '',
+    };
+  } catch {
+    return { title: '', thumbnail: '', author: '' };
+  }
+}
+
 // Fit-only styling for the official IG /embed/ — fills the width and centers the
 // card on black, dropping just the embed's outer card margin/border. The header
 // (username) and footer ("View on Instagram") attribution stay intact, so the embed
@@ -937,14 +956,16 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
 
     const fbId = extractFacebookId(link);
     if (fbId) {
-      // No tokenless FB metadata scrape (unlike IG), so open with defaults. videoUrl carries the full
-      // link — the Facebook embed (plugins/video.php) needs the URL as its href, not just the id.
+      setPasting(true);
+      const og = await fetchFacebookOg(link);   // best-effort title + thumbnail (tokenless OG scrape)
+      setPasting(false);
+      // videoUrl carries the full link — the Facebook embed needs the URL as its href, not just the id.
       openPlayer({
         videoId: fbId,
         videoUrl: link,
-        title: 'Facebook Reel',
-        thumbnail: '',
-        channelTitle: '',
+        title: og.title || 'Facebook Reel',
+        thumbnail: og.thumbnail,
+        channelTitle: og.author,
         sourceType: 'facebook',
       });
       return;

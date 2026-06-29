@@ -62,10 +62,13 @@ async function scrapeOg(url: string) {
     const ogTitle = metaTag(html, "og:title");
     const ogDesc = metaTag(html, "og:description");
     const ogImage = metaTag(html, "og:image:secure_url") ?? metaTag(html, "og:image");
+    // IG encodes the caption in og:description and the author in og:title (parsed above). Facebook's
+    // og:title is already the reel/video title and og:image the thumbnail, so use them as-is there.
+    const isIg = /instagram\.com/.test(url);
     return {
-      title: captionFromDescription(ogDesc) ?? ogTitle,
+      title: isIg ? (captionFromDescription(ogDesc) ?? ogTitle) : (ogTitle ?? captionFromDescription(ogDesc)),
       thumbnail: ogImage,
-      author: authorFromTitle(ogTitle),
+      author: isIg ? authorFromTitle(ogTitle) : null,
     };
   } catch {
     return { title: null, thumbnail: null, author: null };
@@ -80,9 +83,11 @@ Deno.serve(async (req) => {
   try {
     const { url } = await req.json().catch(() => ({}));
     if (!url || typeof url !== "string") { return json({ error: "url required" }, 400); }
-    // Only proxy real Instagram post/reel URLs — never an arbitrary fetch target.
-    if (!/^https:\/\/(www\.)?instagram\.com\/(reel|reels|p|tv)\/[A-Za-z0-9_-]+/.test(url)) {
-      return json({ error: "not an instagram url" }, 400);
+    // Only proxy real Instagram or Facebook post/reel/video URLs — never an arbitrary fetch target.
+    const isIg = /^https:\/\/(www\.)?instagram\.com\/(reel|reels|p|tv)\/[A-Za-z0-9_-]+/.test(url);
+    const isFb = /^https:\/\/((www|web|m)\.)?(facebook\.com\/|fb\.watch\/)/.test(url);
+    if (!isIg && !isFb) {
+      return json({ error: "unsupported url" }, 400);
     }
 
     const { title, thumbnail, author } = await scrapeOg(url);

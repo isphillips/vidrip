@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import CameraWarmup from '../../lens/CameraWarmup';
 import EmojiChips from '../../../components/EmojiChips';
+import ReactionMenu from '../../../components/ReactionMenu';
+import { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 import Handle from '../../../components/Handle';
 import { openProfile } from '../../../store/profileDrawerStore';
 import { formatSourceType } from '../../../utils/sourceType';
@@ -295,17 +298,19 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
         const retryable = status === 'unavailable' && !expired;
 
         return (
-          <TouchableOpacity
+          <ReactionMenu
             key={r.id}
             style={styles.reactionCard}
-            activeOpacity={canWatch || retryable ? 0.8 : 1}
+            emojis={QUICK_EMOJIS}
+            mine={(r.emoji_reactions ?? []).filter(e => e.user_id === user?.id).map(e => e.emoji)}
+            onPick={emoji => handleEmojiToggle(r.id, emoji)}
             onPress={canWatch
               ? () => navigation.navigate('WatchReaction', { reactionId: r.id })
               : retryable
               ? () => retryDownload(r)
-              : undefined
-            }>
-
+              : undefined}
+            liftedStyle={styles.reactionLifted}>
+            {openPicker => (<>
             <View style={[styles.reactionThumb, status !== 'local' && styles.reactionThumbDim]}>
               {status === 'local' && <Text style={styles.reactionThumbIcon}>▶</Text>}
               {status === 'downloading' && (
@@ -338,12 +343,22 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
               )}
             </View>
 
-            <ReactionEmojiChips
-              reactions={r.emoji_reactions}
-              userId={user?.id}
-              onToggle={(emoji) => handleEmojiToggle(r.id, emoji)}
-            />
-          </TouchableOpacity>
+            {/* Emoji tally + a dedicated react trigger (opens the quick-pick), mirroring ChannelPostScreen. */}
+            <View style={styles.reactionReacts}>
+              {r.emoji_reactions.length > 0 && (
+                <ReactionEmojiChips
+                  reactions={r.emoji_reactions}
+                  userId={user?.id}
+                  onToggle={(emoji) => handleEmojiToggle(r.id, emoji)}
+                  showAdd={false}
+                />
+              )}
+              <TouchableOpacity onPress={openPicker} hitSlop={8} activeOpacity={0.7} style={styles.reactTrigger}>
+                <Ionicons name="happy-outline" size={20} color={C.MUTED} />
+              </TouchableOpacity>
+            </View>
+            </>)}
+          </ReactionMenu>
         );
       })}
 
@@ -397,7 +412,7 @@ const styles = StyleSheet.create({
   },
   reactBtnText: { color: C.WHITE, fontSize: FONT.SIZES.LG, fontFamily: FONT.BODY_BOLD },
   reactedBadge: {
-    padding: SPACE.MD,
+    padding: SPACE.LG,
     borderRadius: RADIUS.MD,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
@@ -423,6 +438,10 @@ const styles = StyleSheet.create({
     borderTopColor: C.BORDER,
     overflow: 'hidden',
   },
+  // Emoji tally + react-trigger row, and the lifted-preview backing (mirrors ChannelPostScreen).
+  reactionReacts: { flexDirection: 'row', alignItems: 'center', gap: SPACE.SM },
+  reactTrigger: { padding: 2 },
+  reactionLifted: { backgroundColor: C.SURFACE_2, borderRadius: RADIUS.MD, borderTopWidth: 0 },
   reactionThumb: {
     width: 56, height: 56,
     borderRadius: RADIUS.MD,
