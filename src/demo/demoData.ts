@@ -235,10 +235,10 @@ export const demoThreads: FeedThread[] = [
 
 // ── Exclusive: awarded collections + unopened gifts ────────────────────────────
 export const demoAwardedCollections: AwardedCollection[] = [
-  { id: 'demo-col-01', channelId: 'demo-c-01', creatorId: uid('maya'),  name: 'Backstage Pass',  coverUrl: thumb('concert', 301),         coverVideoUrl: null, videoCount: 6, channelName: 'Maya', awardId: 'demo-aw-01', awardedAt: ago(30),  seenAt: ago(20) },
-  { id: 'demo-col-02', channelId: 'demo-c-02', creatorId: uid('theo'),  name: 'Studio Sessions', coverUrl: thumb('recordingstudio', 302), coverVideoUrl: null, videoCount: 4, channelName: 'Theo', awardId: 'demo-aw-02', awardedAt: ago(5),   seenAt: null },
-  { id: 'demo-col-03', channelId: 'demo-c-05', creatorId: 'demo-u-51',  name: 'Secret Recipes',  coverUrl: thumb('cooking', 303),         coverVideoUrl: null, videoCount: 8, channelName: 'Rin',  awardId: 'demo-aw-03', awardedAt: ago(180), seenAt: ago(160) },
-  { id: 'demo-col-04', channelId: 'demo-c-04', creatorId: uid('jules'), name: 'Full Programs',   coverUrl: thumb('gym', 304),             coverVideoUrl: null, videoCount: 5, channelName: 'Jules', awardId: 'demo-aw-04', awardedAt: ago(50),  seenAt: null },
+  { id: 'demo-col-01', channelId: 'demo-c-01', creatorId: uid('maya'),  name: 'Backstage Pass',  coverUrl: thumb('concert', 301),         coverVideoUrl: null, videoCount: 6, status: 'published', publishAt: null, publishedAt: ago(30),  channelName: 'Maya', awardId: 'demo-aw-01', awardedAt: ago(30),  seenAt: ago(20) },
+  { id: 'demo-col-02', channelId: 'demo-c-02', creatorId: uid('theo'),  name: 'Studio Sessions', coverUrl: thumb('recordingstudio', 302), coverVideoUrl: null, videoCount: 4, status: 'published', publishAt: null, publishedAt: ago(5),   channelName: 'Theo', awardId: 'demo-aw-02', awardedAt: ago(5),   seenAt: null },
+  { id: 'demo-col-03', channelId: 'demo-c-05', creatorId: 'demo-u-51',  name: 'Secret Recipes',  coverUrl: thumb('cooking', 303),         coverVideoUrl: null, videoCount: 8, status: 'published', publishAt: null, publishedAt: ago(180), channelName: 'Rin',  awardId: 'demo-aw-03', awardedAt: ago(180), seenAt: ago(160) },
+  { id: 'demo-col-04', channelId: 'demo-c-04', creatorId: uid('jules'), name: 'Full Programs',   coverUrl: thumb('gym', 304),             coverVideoUrl: null, videoCount: 5, status: 'published', publishAt: null, publishedAt: ago(50),  channelName: 'Jules', awardId: 'demo-aw-04', awardedAt: ago(50),  seenAt: null },
 ];
 
 export const demoAwardGifts: AwardGift[] = [

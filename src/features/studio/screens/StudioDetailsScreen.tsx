@@ -16,6 +16,9 @@ import {
   type PostableChannel, type Visibility, type UploadHandle,
 } from '../../../infrastructure/creatorStudio/api';
 import { publishStudioClipToFriends } from '../../../infrastructure/creatorStudio/studioShare';
+import {
+  fetchMyCollections, createCollection, addVideoToCollection, type ExclusiveCollection,
+} from '../../../infrastructure/exclusive/api';
 import { findObjectionable, OBJECTIONABLE_MESSAGE } from '../../../infrastructure/moderation/textFilter';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import GradientButton from '../components/GradientButton';
@@ -56,6 +59,12 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   const [channels, setChannels]     = useState<PostableChannel[]>([]);
   const [channelId, setChannelId]   = useState<string | null>(initChannelId ?? null);
   const [visibility, setVisibility] = useState<Visibility>(initVisibility ?? 'public');
+  // Channel sub-destination: post to the public feed, or stage the video into an exclusive collection
+  // (the video is marked exclusive so it stays out of the feed; delivery to subs is a separate step).
+  const [postKind, setPostKind]     = useState<'feed' | 'exclusive'>('feed');
+  const [collections, setCollections] = useState<ExclusiveCollection[]>([]);
+  const [collectionTarget, setCollectionTarget] = useState<string | null>(null); // collection id, or '__new__'
+  const [newCollectionName, setNewCollectionName] = useState('');
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [uploading, setUploading]     = useState(false);
   const [uploaded, setUploaded]       = useState(false);
@@ -102,6 +111,14 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
     setLoadingFriends(true);
     fetchFriends(user.id).then(setFriends).catch(() => {}).finally(() => setLoadingFriends(false));
   }, [path, user?.id, friends.length]);
+
+  // Load the selected channel's collections for the "Exclusive" sub-destination; reset the picked
+  // target whenever the channel changes (its collection list differs).
+  useEffect(() => {
+    if (path !== 'channel' || !channelId) { return; }
+    setCollectionTarget(null);
+    fetchMyCollections(channelId).then(setCollections).catch(() => setCollections([]));
+  }, [path, channelId]);
 
   const toggleFriend = (id: string) => {
     if (uploading) { return; }
@@ -151,12 +168,22 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   const post = async () => {
     if (!channelId || uploading) { return; }
     if (!captionOk()) { return; }
-    const scheduling = publishMode === 'schedule';
+    const exclusive = postKind === 'exclusive';
+    if (exclusive) {
+      if (!user?.id) { return; }
+      if (!collectionTarget) { Alert.alert('Pick a collection', 'Choose an existing collection or create a new one.'); return; }
+      if (collectionTarget === '__new__' && !newCollectionName.trim()) { Alert.alert('Name the collection'); return; }
+    }
+    // Post-level scheduling applies only to public-feed posts; an exclusive video's delivery timing is a
+    // property of its collection (managed in Collections), so it always posts (staged) immediately.
+    const scheduling = !exclusive && publishMode === 'schedule';
     if (scheduling && releaseAt.getTime() <= Date.now()) {
       Alert.alert('Pick a future time', 'The scheduled time must be in the future.');
       return;
     }
     const releaseDate = scheduling ? releaseAt.toISOString() : null;
+    // Exclusive videos are always members-gated (access is by award); never public.
+    const effVisibility: Visibility = exclusive ? 'subscribers' : visibility;
     setUploading(true);
     progress.setValue(0);
     try {
@@ -172,13 +199,23 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error('thumb timeout')), 8000)),
         ]);
       } catch { /* best-effort — proceed without a custom thumbnail */ }
-      const create = await createCreatorVideo(channelId, title.trim() || 'Untitled', visibility, thumbUrl, recipe ?? null, releaseDate);
+      const create = await createCreatorVideo(channelId, title.trim() || 'Untitled', effVisibility, thumbUrl, recipe ?? null, releaseDate);
       const { promise, handle } = uploadCreatorVideo({
         create, fileUri, title: title.trim() || 'Untitled',
         onProgress: (f) => Animated.timing(progress, { toValue: f, duration: 120, useNativeDriver: false }).start(),
       });
       uploadRef.current = handle;
       await promise;
+      // Exclusive: attach the new video to its collection (creating one if needed). addVideoToCollection
+      // marks the post exclusive, so it stays out of the public feed. Delivery to subs happens separately.
+      if (exclusive) {
+        let cid = collectionTarget!;
+        if (cid === '__new__') {
+          const created = await createCollection({ channelId, creatorId: user!.id, name: newCollectionName.trim(), coverUrl: thumbUrl ?? null });
+          cid = created.id;
+        }
+        await addVideoToCollection(cid, create.postId);
+      }
       // Bytes are up → the draft is safely published; delete its local backups (raw + snapshot).
       if (draftId) { await deleteDraft(draftId).catch(() => {}); }
       // Bunny encodes server-side (the webhook flips it to 'ready' for the channel), but the local
@@ -270,10 +307,12 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           disabled: uploading || nSel === 0,
         }
       : {
-          label: uploading ? 'Uploading…' : publishMode === 'schedule' ? 'Schedule post' : 'Post video',
-          icon: (publishMode === 'schedule' ? 'calendar-outline' : undefined) as string | undefined,
+          label: uploading ? 'Uploading…'
+            : postKind === 'exclusive' ? 'Add to collection'
+            : publishMode === 'schedule' ? 'Schedule post' : 'Post video',
+          icon: (postKind === 'exclusive' ? 'diamond-outline' : publishMode === 'schedule' ? 'calendar-outline' : undefined) as string | undefined,
           onPress: post,
-          disabled: uploading || noChannels || !channelId,
+          disabled: uploading || noChannels || !channelId || (postKind === 'exclusive' && !collectionTarget),
         };
 
   return (
@@ -392,6 +431,54 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
               })
         }
 
+        {/* Channel sub-destination — public feed vs staged into an exclusive collection. */}
+        <Text style={styles.label}>Content type</Text>
+        <View style={styles.toggle}>
+          {([['feed', 'Public feed', 'globe-outline'], ['exclusive', 'Exclusive', 'diamond-outline']] as const).map(([k, lbl, icon]) => {
+            const active = postKind === k;
+            return (
+              <TouchableOpacity key={k}
+                style={[styles.toggleBtn, active && styles.toggleBtnActive, uploading && styles.toggleBtnDisabled]}
+                onPress={() => { if (!uploading) { setPostKind(k); } }}
+                activeOpacity={uploading ? 1 : 0.8}>
+                <Ionicons name={icon} size={16} color={active ? C.WHITE : C.MUTED} />
+                <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{lbl}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {postKind === 'exclusive' ? (
+          <>
+            <Text style={styles.label}>Collection</Text>
+            <Text style={styles.hint}>This video becomes exclusive — it won’t show in the public feed. Send the collection to subscribers from Collections.</Text>
+            {collections.map(c => {
+              const on = collectionTarget === c.id;
+              return (
+                <TouchableOpacity key={c.id} style={[styles.choice, on && styles.choiceActive]}
+                  onPress={() => { if (!uploading) { setCollectionTarget(c.id); } }} activeOpacity={0.8}>
+                  <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={18} color={on ? C.ACCENT_HOT : C.SUBTLE} />
+                  <Text style={[styles.choiceText, on && styles.choiceTextActive]} numberOfLines={1}>{c.name}</Text>
+                  {c.status !== 'published' && (
+                    <View style={styles.membersBadge}>
+                      <Text style={styles.membersBadgeTxt}>{c.status === 'scheduled' ? 'Scheduled' : 'Draft'}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity style={[styles.choice, collectionTarget === '__new__' && styles.choiceActive]}
+              onPress={() => { if (!uploading) { setCollectionTarget('__new__'); } }} activeOpacity={0.8}>
+              <Ionicons name={collectionTarget === '__new__' ? 'radio-button-on' : 'radio-button-off'} size={18} color={collectionTarget === '__new__' ? C.ACCENT_HOT : C.SUBTLE} />
+              <Text style={[styles.choiceText, collectionTarget === '__new__' && styles.choiceTextActive]}>New collection…</Text>
+            </TouchableOpacity>
+            {collectionTarget === '__new__' && (
+              <TextInput style={styles.input} value={newCollectionName} onChangeText={setNewCollectionName}
+                placeholder="Collection name" placeholderTextColor={C.SUBTLE} maxLength={80} editable={!uploading} />
+            )}
+          </>
+        ) : (
+        <>
         <Text style={styles.label}>Who can watch</Text>
         {subscribersOnly && (
           <Text style={styles.hint}>This channel is members-only. All posts are locked.</Text>
@@ -439,6 +526,8 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
         )}
         </>
         )}
+        </>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -483,19 +572,21 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
         <View style={styles.successOverlay}>
           <View style={styles.successCard}>
             <Ionicons
-              name={path === 'friends' ? 'paper-plane' : publishMode === 'schedule' ? 'calendar' : 'checkmark-circle'}
+              name={path === 'friends' ? 'paper-plane' : postKind === 'exclusive' ? 'diamond' : publishMode === 'schedule' ? 'calendar' : 'checkmark-circle'}
               size={46} color={C.ACCENT_HOT} />
             <Text style={styles.successTitle}>
-              {path === 'friends' ? 'Sent 🎉' : publishMode === 'schedule' ? 'Scheduled 🗓️' : 'Uploaded 🎬'}
+              {path === 'friends' ? 'Sent 🎉' : postKind === 'exclusive' ? 'Added 💎' : publishMode === 'schedule' ? 'Scheduled 🗓️' : 'Uploaded 🎬'}
             </Text>
             <Text style={styles.successSub}>
               {path === 'friends'
                 ? `Shared with ${nSel} friend${nSel === 1 ? '' : 's'} — they'll get it now.`
-                : publishMode === 'schedule'
-                  ? `Goes live ${fmtSchedule(releaseAt)}${selectedChannel ? ` in ${selectedChannel.name}` : ''}.`
-                  : selectedChannel
-                    ? `Processing now — going live in ${selectedChannel.name} shortly.`
-                    : 'Processing now — going live shortly.'}
+                : postKind === 'exclusive'
+                  ? 'Added to your collection. Send it to subscribers from Collections.'
+                  : publishMode === 'schedule'
+                    ? `Goes live ${fmtSchedule(releaseAt)}${selectedChannel ? ` in ${selectedChannel.name}` : ''}.`
+                    : selectedChannel
+                      ? `Processing now — going live in ${selectedChannel.name} shortly.`
+                      : 'Processing now — going live shortly.'}
             </Text>
             <View style={styles.successPreview}>
               {uploaded && (

@@ -13,6 +13,9 @@ import { useAuthStore } from '../../../store/authStore';
 import {
   fetchScheduledPosts, reschedulePost, unschedulePost, type ScheduledPost,
 } from '../../../infrastructure/creatorStudio/api';
+import {
+  fetchScheduledCollections, scheduleCollection, cancelSchedule, publishCollection, type ScheduledCollection,
+} from '../../../infrastructure/exclusive/api';
 import BunnyEmbedPlayer from '../components/BunnyEmbedPlayer';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
@@ -48,26 +51,38 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
   const { user } = useAuthStore();
   const [cursor, setCursor] = useState(() => new Date());
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [collections, setCollections] = useState<ScheduledCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ScheduledPost | null>(null);
+  const [selectedCol, setSelectedCol] = useState<ScheduledCollection | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [iosPickAt, setIosPickAt] = useState<Date | null>(null); // non-null → iOS reschedule sheet open
+  const [iosPickAt, setIosPickAt] = useState<Date | null>(null);    // non-null → iOS post-reschedule sheet
+  const [iosColAt, setIosColAt] = useState<Date | null>(null);      // non-null → iOS collection-reschedule sheet
 
   const load = useCallback(async () => {
     if (!user?.id) { setLoading(false); return; }
-    try { setPosts(await fetchScheduledPosts(user.id)); }
+    try {
+      const [p, c] = await Promise.all([fetchScheduledPosts(user.id), fetchScheduledCollections(user.id)]);
+      setPosts(p); setCollections(c);
+    }
     catch (e) { log.error('[studio] calendar load', e); }
     finally { setLoading(false); }
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // Group posts by local day for the grid.
+  // Group posts + scheduled collections by local day for the grid.
   const byDay = new Map<string, ScheduledPost[]>();
   for (const p of posts) {
     const k = dayKey(new Date(p.releaseDate));
     (byDay.get(k) ?? byDay.set(k, []).get(k)!).push(p);
   }
+  const colByDay = new Map<string, ScheduledCollection[]>();
+  for (const c of collections) {
+    const k = dayKey(new Date(c.publishAt));
+    (colByDay.get(k) ?? colByDay.set(k, []).get(k)!).push(c);
+  }
+  const upcoming = posts.length + collections.length;
 
   const shiftMonth = (delta: number) => setCursor(c => new Date(c.getFullYear(), c.getMonth() + delta, 1));
   const todayKey = dayKey(new Date());
@@ -102,12 +117,64 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
     });
   };
 
-  const cancelSchedule = (post: ScheduledPost) => {
+  const cancelPostSchedule = (post: ScheduledPost) => {
     Alert.alert('Publish now?', 'This removes the schedule and makes the video go live immediately.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Publish now', style: 'destructive', onPress: async () => {
           try { await unschedulePost(post.id); setSelected(null); await load(); }
+          catch (e: any) { Alert.alert('Failed', e?.message ?? 'Try again.'); }
+        },
+      },
+    ]);
+  };
+
+  // ── Scheduled collections ──
+  const applyColReschedule = async (collectionId: string, at: Date) => {
+    if (at.getTime() <= Date.now()) { Alert.alert('Pick a future time', 'The scheduled time must be in the future.'); return; }
+    try { await scheduleCollection(collectionId, at.toISOString()); setSelectedCol(null); await load(); }
+    catch (e: any) { Alert.alert('Could not reschedule', e?.message ?? 'Try again.'); }
+  };
+
+  const startColReschedule = (c: ScheduledCollection) => {
+    const current = new Date(c.publishAt);
+    if (Platform.OS === 'ios') { setIosColAt(current); return; }
+    DateTimePickerAndroid.open({
+      value: current, mode: 'date', minimumDate: new Date(),
+      onChange: (_e, d) => {
+        if (!d) { return; }
+        DateTimePickerAndroid.open({
+          value: d, mode: 'time', is24Hour: false,
+          onChange: (_e2, t) => {
+            if (!t) { return; }
+            const combined = new Date(d); combined.setHours(t.getHours(), t.getMinutes(), 0, 0);
+            applyColReschedule(c.id, combined);
+          },
+        });
+      },
+    });
+  };
+
+  const sendColNow = (c: ScheduledCollection) => {
+    Alert.alert('Send now?', 'This delivers the collection to all current subscribers of its tiers right away.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Send now', onPress: async () => {
+          try {
+            const n = await publishCollection(c.id); setSelectedCol(null); await load();
+            Alert.alert('Sent 🎁', n > 0 ? `Delivered to ${n} subscriber${n === 1 ? '' : 's'}.` : 'Delivered.');
+          } catch (e: any) { Alert.alert('Could not send', e?.message ?? 'Try again.'); }
+        },
+      },
+    ]);
+  };
+
+  const cancelColSchedule = (c: ScheduledCollection) => {
+    Alert.alert('Cancel schedule?', 'This returns the collection to draft — nothing is sent until you publish it.', [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Cancel schedule', style: 'destructive', onPress: async () => {
+          try { await cancelSchedule(c.id); setSelectedCol(null); await load(); }
           catch (e: any) { Alert.alert('Failed', e?.message ?? 'Try again.'); }
         },
       },
@@ -122,7 +189,7 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
         </TouchableOpacity>
         <View>
           <Text style={styles.title}>Schedule</Text>
-          <Text style={styles.subtitle}>{posts.length ? `${posts.length} upcoming` : 'Plan your drops'}</Text>
+          <Text style={styles.subtitle}>{upcoming ? `${upcoming} upcoming` : 'Plan your drops'}</Text>
         </View>
         <View style={styles.iconBtn} />
       </View>
@@ -151,9 +218,11 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
                   if (!date) { return <View key={di} style={styles.cell} />; }
                   const k = dayKey(date);
                   const dayPosts = byDay.get(k) ?? [];
+                  const dayCols = colByDay.get(k) ?? [];
+                  const total = dayPosts.length + dayCols.length;
                   const isToday = k === todayKey;
                   return (
-                    <View key={di} style={[styles.cell, dayPosts.length > 0 && styles.cellActive]}>
+                    <View key={di} style={[styles.cell, total > 0 && styles.cellActive]}>
                       {isToday
                         ? <View style={styles.todayPill}><Text style={styles.todayNum}>{date.getDate()}</Text></View>
                         : <Text style={styles.dayNum}>{date.getDate()}</Text>}
@@ -163,17 +232,23 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
                           <Text style={styles.barText} numberOfLines={1}>{fmtTime(p.releaseDate)}</Text>
                         </TouchableOpacity>
                       ))}
-                      {dayPosts.length > 3 && <Text style={styles.more}>+{dayPosts.length - 3} more</Text>}
+                      {dayCols.slice(0, Math.max(0, 3 - dayPosts.length)).map(c => (
+                        <TouchableOpacity key={c.id} style={[styles.bar, styles.colBar]}
+                          onPress={() => setSelectedCol(c)} activeOpacity={0.85}>
+                          <Text style={styles.barText} numberOfLines={1}>💎 {fmtTime(c.publishAt)}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      {total > 3 && <Text style={styles.more}>+{total - 3} more</Text>}
                     </View>
                   );
                 })}
               </View>
             ))}
-            {posts.length === 0 && (
+            {upcoming === 0 && (
               <View style={styles.emptyWrap}>
                 <Ionicons name="calendar-outline" size={34} color={C.SUBTLE} />
-                <Text style={styles.empty}>No scheduled posts yet.</Text>
-                <Text style={styles.emptyHint}>Choose “Schedule” when posting a video.</Text>
+                <Text style={styles.empty}>Nothing scheduled yet.</Text>
+                <Text style={styles.emptyHint}>Schedule a video post, or a collection drop from Collections.</Text>
               </View>
             )}
           </ScrollView>
@@ -216,7 +291,7 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
                     <Ionicons name="calendar-outline" size={18} color={C.INK} />
                     <Text style={styles.actionTxt}>Reschedule</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ flex: 1 }} onPress={() => cancelSchedule(selected)} activeOpacity={0.9}>
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => cancelPostSchedule(selected)} activeOpacity={0.9}>
                     <LinearGradient colors={FLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.actionPrimary}>
                       <Ionicons name="flash" size={17} color={C.WHITE} />
                       <Text style={[styles.actionTxt, styles.actionTxtPrimary]}>Publish now</Text>
@@ -228,6 +303,62 @@ export default function StudioCalendarScreen({ navigation }: StudioStackScreenPr
           </View>
         </View>
       </Modal>
+
+      {/* Scheduled-collection detail */}
+      <Modal visible={!!selectedCol} animationType="fade" transparent onRequestClose={() => setSelectedCol(null)}>
+        <View style={styles.sheetOverlay}>
+          <View style={styles.sheet}>
+            {selectedCol && (
+              <>
+                <View style={styles.sheetHead}>
+                  <Text style={styles.sheetTitle} numberOfLines={1}>💎 {selectedCol.name}</Text>
+                  <TouchableOpacity onPress={() => setSelectedCol(null)} hitSlop={10}><Ionicons name="close" size={22} color={C.INK} /></TouchableOpacity>
+                </View>
+                <View style={styles.sheetWhen}>
+                  <Ionicons name="time-outline" size={15} color={C.ACCENT_HOT} />
+                  <Text style={styles.sheetWhenTxt}>{fmtFull(selectedCol.publishAt)} · {selectedCol.channelName}</Text>
+                </View>
+                <Text style={styles.colNote}>Delivers to subscribers automatically at this time.</Text>
+                <View style={styles.sheetActions}>
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => startColReschedule(selectedCol)} activeOpacity={0.85}>
+                    <Ionicons name="calendar-outline" size={18} color={C.INK} />
+                    <Text style={styles.actionTxt}>Reschedule</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => sendColNow(selectedCol)} activeOpacity={0.9}>
+                    <LinearGradient colors={FLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.actionPrimary}>
+                      <Ionicons name="gift" size={17} color={C.WHITE} />
+                      <Text style={[styles.actionTxt, styles.actionTxtPrimary]}>Send now</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => cancelColSchedule(selectedCol)} style={styles.colCancel} activeOpacity={0.7}>
+                  <Text style={styles.colCancelTxt}>Cancel schedule</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* iOS collection-reschedule picker */}
+      {Platform.OS === 'ios' && (
+        <Modal visible={!!iosColAt} animationType="slide" transparent onRequestClose={() => setIosColAt(null)}>
+          <View style={styles.pickerOverlay}>
+            <View style={styles.pickerSheet}>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>Reschedule drop</Text>
+                <TouchableOpacity onPress={() => { const at = iosColAt; setIosColAt(null); if (selectedCol && at) { applyColReschedule(selectedCol.id, at); } }} hitSlop={10}>
+                  <Text style={styles.pickerDone}>Save</Text>
+                </TouchableOpacity>
+              </View>
+              {iosColAt && (
+                <DateTimePicker value={iosColAt} mode="datetime" display="spinner" minimumDate={new Date()} themeVariant="dark"
+                  onChange={(_e, d) => { if (d) { setIosColAt(d); } }} />
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* iOS reschedule picker */}
       {Platform.OS === 'ios' && (
@@ -275,6 +406,7 @@ const styles = StyleSheet.create({
   todayPill:   { alignSelf: 'flex-end', width: 22, height: 22, borderRadius: 11, backgroundColor: C.ACCENT_HOT, alignItems: 'center', justifyContent: 'center' },
   todayNum:    { fontSize: 12, color: C.WHITE, fontFamily: FONT.BODY_BOLD },
   bar:     { borderRadius: RADIUS.FULL, paddingHorizontal: 5, paddingVertical: 2 },
+  colBar:  { backgroundColor: '#6D28D9', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
   barText: { color: C.WHITE, fontSize: 9, fontFamily: FONT.BODY_BOLD },
   more:    { fontSize: 9, color: C.SUBTLE, fontFamily: FONT.BODY_MEDIUM, paddingLeft: 3 },
 
@@ -298,6 +430,9 @@ const styles = StyleSheet.create({
   actionPrimary:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,  borderRadius: RADIUS.MD },
   actionTxt:      { color: C.INK, fontFamily: FONT.BODY_SEMIBOLD, paddingVertical: SPACE.LG },
   actionTxtPrimary: { color: C.WHITE, paddingVertical: SPACE.MD },
+  colNote:        { color: C.SUBTLE, fontFamily: FONT.BODY, fontSize: FONT.SIZES.SM, marginTop: SPACE.SM },
+  colCancel:      { alignSelf: 'center', marginTop: SPACE.MD, paddingVertical: SPACE.XS },
+  colCancelTxt:   { color: C.SUBTLE, fontFamily: FONT.BODY_SEMIBOLD, fontSize: FONT.SIZES.SM },
 
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   pickerSheet:   { backgroundColor: C.SURFACE_2, borderTopLeftRadius: RADIUS.LG, borderTopRightRadius: RADIUS.LG, paddingBottom: SPACE.XL, borderTopWidth: 1, borderColor: C.BORDER },

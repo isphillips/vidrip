@@ -1,9 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
+import { supabase } from '../../../infrastructure/supabase/client';
+import { useAuthStore } from '../../../store/authStore';
 import {
   fetchMyAwardedCollections, fetchUnopenedAwards, type AwardedCollection, type AwardGift,
 } from '../../../infrastructure/exclusive/api';
@@ -16,8 +18,12 @@ export default function ExclusiveRail({ onOpenGift, onOpenCollection }: {
   onOpenGift: (awardId: string) => void;
   onOpenCollection: (collectionId: string) => void;
 }) {
+  const userId = useAuthStore(s => s.user?.id);
   const [collections, setCollections] = useState<AwardedCollection[]>([]);
   const [gifts, setGifts] = useState<AwardGift[]>([]);
+  // Covers that failed to load (e.g. a thumbnail URL the recipient can't read) → fall back to the
+  // grey diamond placeholder instead of an empty box.
+  const [brokenCovers, setBrokenCovers] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -27,6 +33,18 @@ export default function ExclusiveRail({ onOpenGift, onOpenCollection }: {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Live surfacing: a newly delivered award (push or scheduled drop) shows up in the rail without a
+  // refresh. RLS limits collection_awards to the viewer's own rows, so the filter is belt-and-suspenders.
+  useEffect(() => {
+    if (!userId) { return; }
+    const ch = supabase.channel(`awards-${userId}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'collection_awards', filter: `user_id=eq.${userId}` },
+        () => { load(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId, load]);
 
   if (collections.length === 0 && gifts.length === 0) { return null; }
   const giftIds = new Set(gifts.map(g => g.collectionId));
@@ -53,8 +71,9 @@ export default function ExclusiveRail({ onOpenGift, onOpenCollection }: {
         {/* Awarded collections (skip those still shown as an unopened gift) */}
         {collections.filter(c => !giftIds.has(c.id)).map(c => (
           <TouchableOpacity key={c.id} style={styles.tile} activeOpacity={0.85} onPress={() => onOpenCollection(c.id)}>
-            {c.coverUrl
-              ? <Image source={{ uri: c.coverUrl }} style={styles.cover} resizeMode="cover" />
+            {c.coverUrl && !brokenCovers.has(c.id)
+              ? <Image source={{ uri: c.coverUrl }} style={styles.cover} resizeMode="cover"
+                  onError={() => setBrokenCovers(prev => { const n = new Set(prev); n.add(c.id); return n; })} />
               : <View style={[styles.cover, styles.coverEmpty]}><Ionicons name="diamond-outline" size={24} color={C.SUBTLE} /></View>}
             <Text style={styles.tileName} numberOfLines={1}>{c.name}</Text>
             <Text style={styles.tileSub} numberOfLines={1}>{c.channelName}</Text>

@@ -62,7 +62,7 @@ export default function ExclusiveCollectionScreen({ route, navigation }: FeedSta
           <Text style={styles.title} numberOfLines={1}>{collection?.name ?? 'Collection'}</Text>
           {collection && <Text style={styles.subtitle} numberOfLines={1}>{collection.channelName} · exclusive</Text>}
         </View>
-        <View style={styles.iconBtn} />
+        <View />
       </View>
 
       <FlatList
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   title:     { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_BOLD, color: C.INK },
   subtitle:  { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_MEDIUM, color: C.ACCENT_HOT, marginTop: 1 },
   center:    { alignItems: 'center', justifyContent: 'center' },
-  cover:     { width: '100%', height: 160, marginBottom: SPACE.MD },
+  cover:     { width: '100%', maxHeight: 160, marginBottom: SPACE.MD },
   cell:      { gap: 4 },
   thumb:     { borderRadius: RADIUS.MD, backgroundColor: C.SURFACE_2, overflow: 'hidden' },
   playPill:  { position: 'absolute', bottom: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.FULL, padding: 6 },

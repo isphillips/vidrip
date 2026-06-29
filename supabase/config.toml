@@ -441,3 +441,10 @@ verify_jwt = false
 # Protected by x-internal-secret (no Supabase JWT), like the other internal cron functions.
 [functions.purge-bundles]
 verify_jwt = false
+
+# Awards exclusive collections. Serves THREE callers, two of which carry no Supabase JWT: the Stripe
+# webhook + the pg_cron deliver-due sweep authenticate via x-grant-secret, and the creator's app calls
+# pass a user JWT that the function parses itself. So the gateway JWT check must be off — otherwise the
+# secret-authed callers get a 401 before the code runs.
+[functions.award-collection]
+verify_jwt = false

@@ -30,6 +30,10 @@ export async function uploadCollectionCover(localUri: string, kind: 'image' | 'v
 // Exclusive collections client SDK. Tables are newer than the generated DB types, so queries run
 // untyped via `(supabase as any)`. Awards are immutable (no revoke) — see the migration.
 
+// Delivery lifecycle: 'draft' = staged, not sent; 'scheduled' = will deliver at publishAt; 'published' =
+// delivered (awards back-filled to subscribers). Older rows with no status read as 'published'.
+export type CollectionStatus = 'draft' | 'scheduled' | 'published';
+
 export type ExclusiveCollection = {
   id: string;
   channelId: string;
@@ -38,6 +42,9 @@ export type ExclusiveCollection = {
   coverUrl: string | null;
   coverVideoUrl: string | null;
   videoCount?: number;
+  status: CollectionStatus;
+  publishAt: string | null;
+  publishedAt: string | null;
 };
 
 export type AwardedCollection = ExclusiveCollection & {
@@ -62,6 +69,8 @@ const mapCollection = (r: any): ExclusiveCollection => ({
   id: r.id, channelId: r.channel_id, creatorId: r.creator_id, name: r.name,
   coverUrl: r.cover_url ?? null, coverVideoUrl: r.cover_video_url ?? null,
   videoCount: Array.isArray(r.collection_videos) ? r.collection_videos.length : undefined,
+  status: (r.status ?? 'published') as CollectionStatus,
+  publishAt: r.publish_at ?? null, publishedAt: r.published_at ?? null,
 });
 
 // ── Creator side ─────────────────────────────────────────────────────────────
@@ -177,6 +186,49 @@ export async function awardCollectionsToUsers(collectionIds: string[], userIds: 
   if (error) { throw new Error(error.message); }
   if ((data as any)?.error) { throw new Error((data as any).error); }
   return (data as any)?.awarded ?? 0;
+}
+
+// ── Delivery lifecycle (draft → scheduled → published) ─────────────────────────
+
+/** Publish/send a collection to subscribers now: the edge fn back-fills every CURRENT active subscriber of
+ *  its mapped tiers (sending each a gift push) and marks it published. Returns the count delivered. */
+export async function publishCollection(collectionId: string): Promise<number> {
+  const { data, error } = await supabase.functions.invoke('award-collection', { body: { publishCollectionId: collectionId } });
+  if (error) { throw new Error(error.message); }
+  if ((data as any)?.error) { throw new Error((data as any).error); }
+  return (data as any)?.awarded ?? 0;
+}
+
+/** Stage a collection for future delivery — pg_cron publishes it (awards + pushes) at publishAt. */
+export async function scheduleCollection(collectionId: string, publishAtISO: string): Promise<void> {
+  const { error } = await (supabase as any).from('exclusive_collections')
+    .update({ status: 'scheduled', publish_at: publishAtISO }).eq('id', collectionId);
+  if (error) { throw error; }
+}
+
+/** Cancel a schedule and return the collection to draft (nothing is delivered until published again). */
+export async function cancelSchedule(collectionId: string): Promise<void> {
+  const { error } = await (supabase as any).from('exclusive_collections')
+    .update({ status: 'draft', publish_at: null }).eq('id', collectionId);
+  if (error) { throw error; }
+}
+
+export type ScheduledCollection = {
+  id: string; name: string; channelId: string; channelName: string; coverUrl: string | null; publishAt: string;
+};
+
+/** A creator's collections staged for a future delivery (for the studio calendar). */
+export async function fetchScheduledCollections(creatorId: string): Promise<ScheduledCollection[]> {
+  const { data, error } = await (supabase as any).from('exclusive_collections')
+    .select('id, name, channel_id, cover_url, publish_at, channel:groups(name)')
+    .eq('creator_id', creatorId)
+    .eq('status', 'scheduled')
+    .order('publish_at', { ascending: true });
+  if (error) { throw error; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id, name: r.name, channelId: r.channel_id, channelName: r.channel?.name ?? 'Channel',
+    coverUrl: r.cover_url ?? null, publishAt: r.publish_at,
+  }));
 }
 
 // ── Viewer side ──────────────────────────────────────────────────────────────
