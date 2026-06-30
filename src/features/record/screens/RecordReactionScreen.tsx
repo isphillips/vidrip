@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, InteractionManager, Platform } from 'react-native';
 import { useAuthStore } from '../../../store/authStore';
 import { useUploadStore } from '../../../store/uploadStore';
 import { usePendingReactionsStore } from '../../../store/pendingReactionsStore';
@@ -53,6 +53,17 @@ export default function RecordReactionScreen({
   const [chSourceType, setChSourceType] =
     useState<'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook'>('youtube');
 
+  // Android only: defer the heavy ReactionRecorder mount until AFTER the screen-open transition, so
+  // the nav paints an instant loading state instead of freezing on the recorder's synchronous mount
+  // (camera hooks + source WebView/Camera2 cold-start blocking the first frame). iOS's native push is
+  // already decoupled from JS, so it starts ready (no extra spinner frame there).
+  const [transitionDone, setTransitionDone] = useState(Platform.OS !== 'android');
+  useEffect(() => {
+    if (Platform.OS !== 'android') { return; }
+    const task = InteractionManager.runAfterInteractions(() => setTransitionDone(true));
+    return () => task.cancel();
+  }, []);
+
   // Channel doom-react: resolve this channel's first pending post on mount (so the tap
   // could transition instantly), then chain its remaining posts AHEAD of the already-queued
   // feed-thread tail. With nothing pending, fall through to that tail, else just back out.
@@ -66,9 +77,20 @@ export default function RecordReactionScreen({
           && (p.post_type === 'youtube' || p.post_type === 'creator'))
         .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
       if (targets.length === 0) {
+        // This channel has no reactable posts (e.g. its only unseen update was a non-video `status`
+        // post). Chain to the next queued reaction if one exists (keeps the friend-thread tail
+        // going); otherwise don't dead-end on a blank back-stack — open the channel so the tap
+        // lands somewhere useful instead of a silent goBack().
         const next = useReactQueueStore.getState().shiftNext();
-        if (next) { navigation.replace('RecordReaction', { ...next, queued: true }); }
-        else { navigation.goBack(); }
+        if (next) {
+          navigation.replace('RecordReaction', { ...next, queued: true });
+        } else {
+          useReactQueueStore.getState().clear();
+          (navigation as any).navigate('Main', {
+            screen: 'Channels',
+            params: { screen: 'Channel', params: { channelId, channelName: '' } },
+          });
+        }
         return;
       }
       const [first, ...rest] = targets;
@@ -206,6 +228,12 @@ export default function RecordReactionScreen({
 
   if (introUrl && threadId && !introSeen.has(threadId)) {
     return <IntroPreroll introUrl={introUrl} onDone={() => markIntroSeen(threadId)} />;
+  }
+
+  // Paint an instant loading state while the nav transition settles (Android); the heavy recorder
+  // mounts on the next tick so the transition itself never stalls.
+  if (!transitionDone) {
+    return <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} size="large" /></View>;
   }
 
   if (isChannel) {
