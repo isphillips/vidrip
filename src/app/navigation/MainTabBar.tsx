@@ -336,9 +336,15 @@ function TabBtn({ route, label, active, toReact, onPress }: TabBtnProps) {
 
 // The raised camera button: a brand-gradient FAB with a continuously breathing glow, press feedback,
 // and a grounding "Studio" label so it sits with the other tabs.
-function GlowFab({ onPress }: { onPress: () => void }) {
+function GlowFab({ onPress, hot = false }: { onPress: () => void; hot?: boolean }) {
   const pulse = useSharedValue(0);
   const press = useSharedValue(0);
+  // On Studio Home the FAB jumps straight into a recording (a different action than "open the tab"),
+  // so it glows red/orange instead of the usual pink/purple to signal that.
+  const haloOutColor = hot ? '#FF3B30' : '#FF4FA3';
+  const haloInColor = hot ? '#FF8A00' : '#A05CFF';
+  const fabColors = hot ? ['#FFB000', '#FF6A00', '#FF2D55'] : ['#FF4FA3', '#A05CFF', '#3B82F6'];
+  const glowColor = hot ? '#FF6A00' : '#A05CFF';
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1, { duration: 2000, easing: ReEasing.inOut(ReEasing.quad) }), -1, true);
   }, [pulse]);
@@ -354,16 +360,16 @@ function GlowFab({ onPress }: { onPress: () => void }) {
   return (
     <View style={styles.fabSlot}>
       <View style={styles.fabRaise}>
-        <Reanimated.View style={[styles.haloOut, haloOut]} pointerEvents="none" />
-        <Reanimated.View style={[styles.haloIn, haloIn]} pointerEvents="none" />
+        <Reanimated.View style={[styles.haloOut, { backgroundColor: haloOutColor }, haloOut]} pointerEvents="none" />
+        <Reanimated.View style={[styles.haloIn, { backgroundColor: haloInColor }, haloIn]} pointerEvents="none" />
         <Pressable
           onPress={onPress}
           onPressIn={() => { press.value = withTiming(1, { duration: 90 }); }}
           onPressOut={() => { press.value = withTiming(0, { duration: 180 }); }}
           hitSlop={8}>
           <Reanimated.View style={btn}>
-            <View style={styles.fabShadow}>
-              <LinearGradient colors={['#FF4FA3', '#A05CFF', '#3B82F6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
+            <View style={[styles.fabShadow, { backgroundColor: glowColor, shadowColor: glowColor }]}>
+              <LinearGradient colors={fabColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fab}>
                 <Ionicons name="camera" size={28} color={C.WHITE} style={styles.fabIcon} />
               </LinearGradient>
             </View>
@@ -495,15 +501,17 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
         <TabBtn route="Feed"     label="Feed"     active={current === 'Feed'}     toReact={toReact} onPress={() => handleTabPress('Feed')} />
         <TabBtn route="Channels" label="Channels" active={current === 'Channels'} toReact={toReact} onPress={() => handleTabPress('Channels')} />
 
-        <GlowFab onPress={() => {
-          // On the Studio tab's home screen, the FAB jumps straight into a new recording. From any
-          // other tab (or screen) it behaves like a normal tab press → opens/resets Studio to its home.
-          if (current === 'Studio' && sub === 'StudioHome') {
-            (navigation.navigate as any)('Studio', { screen: 'StudioCapture' });
-          } else {
-            handleTabPress('Studio');
-          }
-        }} />
+        <GlowFab
+          hot={current === 'Studio' && sub === 'StudioHome'}
+          onPress={() => {
+            // On the Studio tab's home screen, the FAB jumps straight into a new recording. From any
+            // other tab (or screen) it behaves like a normal tab press → opens/resets Studio to its home.
+            if (current === 'Studio' && sub === 'StudioHome') {
+              (navigation.navigate as any)('Studio', { screen: 'StudioCapture' });
+            } else {
+              handleTabPress('Studio');
+            }
+          }} />
 
         <TabBtn route="Messages" label="Messages" active={current === 'Messages'} toReact={toReact} onPress={() => handleTabPress('Messages')} />
         <TabBtn route="Share"    label="Browse"   active={current === 'Share'}    toReact={toReact} onPress={() => handleTabPress('Share')} />

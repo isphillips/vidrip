@@ -74,7 +74,7 @@ export type FeedStackParamList = {
   Channel: { channelId: string; channelName: string; isPublic?: boolean; isJoined?: boolean; isOwner?: boolean; isMembersOnly?: boolean; inviteOnly?: boolean; ownerHandle?: string; justSubscribed?: boolean; isGroupChat?: boolean };
   GiftReveal: { awardId: string };
   ExclusiveCollection: { collectionId: string };
-  ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null };
+  ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null; posterId?: string | null };
 };
 
 // Messages stack — the conversation/group-chat experience (moved out of Feed). Mirrors the
@@ -100,7 +100,7 @@ export type MessagesStackParamList = {
   Channel: { channelId: string; channelName: string; isPublic?: boolean; isJoined?: boolean; isOwner?: boolean; isMembersOnly?: boolean; inviteOnly?: boolean; ownerHandle?: string; justSubscribed?: boolean; isGroupChat?: boolean };
   GiftReveal: { awardId: string };
   ExclusiveCollection: { collectionId: string };
-  ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null };
+  ExclusiveWatch: { postId: string; channelId: string; title?: string; thumbnail?: string | null; posterId?: string | null };
 };
 
 export type MessagesStackScreenProps<T extends keyof MessagesStackParamList> =
@@ -161,6 +161,7 @@ export type StudioStackParamList = {
   StudioCalendar: undefined;
   StudioCollections: undefined;
   StudioCollectionEdit: { collectionId?: string };
+  StudioVideoEdit: { postId: string };
 };
 
 export type StudioStackScreenProps<T extends keyof StudioStackParamList> =

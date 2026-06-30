@@ -321,7 +321,7 @@ export default function StudioCollectionEditScreen({ route, navigation }: Studio
             <TouchableOpacity onPress={deliverNow} disabled={saving} activeOpacity={0.9} style={{ marginTop: SPACE.SM }}>
               <View style={styles.sendNow}>
                 <Ionicons name="gift" size={17} color={C.WHITE} />
-                <Text style={styles.sendNowTxt}>{status === 'published' ? 'Send to current subscribers' : 'Send to subscribers now'}</Text>
+                <Text style={styles.sendNowTxt}>{status === 'published' ? 'Send to current tiers' : 'Send to tiers now'}</Text>
               </View>
             </TouchableOpacity>
           </>

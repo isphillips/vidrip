@@ -124,7 +124,9 @@ export default function TwoFactorScreen({ navigation }: AccountStackScreenProps<
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {/* "always" (not "handled"): once the code field blurs, a re-tap that the gesture system treats as
+          a keyboard-dismiss was being consumed instead of refocusing it — so the input felt stuck. */}
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="always">
       {verified ? (
         <>
           <Text style={styles.enabledBadge}>🔐 Two-factor is on</Text>

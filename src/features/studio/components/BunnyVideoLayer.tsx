@@ -13,6 +13,15 @@ const BLACK_BG_CSS = `(function(){
   document.head.appendChild(s); true;
 })();`;
 
+// Make the embed's <video> exactly FIT the WebView viewport — pinned to the viewport (not its player
+// container, which can be larger than the box and overflow/zoom the video) and contained so the whole
+// frame is visible. For small previews. Opt-in (breaks the overlay rect math, so don't pass a recipe).
+const FIT_CSS = `(function(){
+  var s=document.createElement('style');
+  s.innerHTML='video{position:fixed !important;top:0 !important;left:0 !important;width:100vw !important;height:100vh !important;object-fit:contain !important;background:#000 !important;margin:0 !important;}';
+  document.head.appendChild(s); true;
+})();`;
+
 // Bridges the played video out of the Bunny embed: the picture rect (for pinning the overlay),
 // play/pause state (for the clock + driving recording), first-frame (for the flash mask), and
 // ended. Also forces inline playback so a tap can't promote to native fullscreen.
@@ -53,7 +62,7 @@ const muteJs = (m: boolean) =>
   `(function(){function go(){var v=document.querySelector('video'); if(!v){return setTimeout(go,200);} v.muted=${m};} go(); true;})();`;
 
 export default function BunnyVideoLayer({
-  embedUrl, recipe, onStateChange, onFirstFrame, onDuration, autoplay = true, muted = false, style,
+  embedUrl, recipe, onStateChange, onFirstFrame, onDuration, autoplay = true, muted = false, fit = false, style,
 }: {
   embedUrl: string;
   recipe?: OverlayRecipe | null;
@@ -67,6 +76,9 @@ export default function BunnyVideoLayer({
   // Mute the source audio (e.g. reaction playback recorded without headphones — the source
   // already bled into the mic, so playing it again would double up).
   muted?: boolean;
+  // Fit the whole video to the WebView box (viewport-pinned, contained) — for small previews. Don't pass
+  // a recipe with this (it bypasses the overlay rect math).
+  fit?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const webRef = useRef<WebView>(null);
@@ -106,9 +118,18 @@ export default function BunnyVideoLayer({
         mediaPlaybackRequiresUserAction={!autoplay}
         allowsFullscreenVideo={false}
         javaScriptEnabled
-        injectedJavaScript={`${BLACK_BG_CSS}${BRIDGE_JS}`}
+        // Block any non-http(s) redirect (app deep links, store links) so a stray redirect can't surface
+        // WKWebView's "Redirection to URL with a scheme that is not HTTP(S)" error page over the video.
+        originWhitelist={['https://*', 'http://*']}
+        setSupportMultipleWindows={false}
+        onShouldStartLoadWithRequest={req => {
+          const u = req.url || '';
+          return u.startsWith('https://') || u.startsWith('http://') || u.startsWith('about:') || u.startsWith('data:');
+        }}
+        injectedJavaScript={`${BLACK_BG_CSS}${fit ? FIT_CSS : ''}${BRIDGE_JS}`}
         onMessage={onMessage}
-        onLoadEnd={() => { webRef.current?.injectJavaScript(BLACK_BG_CSS); webRef.current?.injectJavaScript(BRIDGE_JS); webRef.current?.injectJavaScript(muteJs(muted)); }}
+        onLoadEnd={() => { webRef.current?.injectJavaScript(BLACK_BG_CSS); if (fit) { webRef.current?.injectJavaScript(FIT_CSS); } webRef.current?.injectJavaScript(BRIDGE_JS); webRef.current?.injectJavaScript(muteJs(muted)); }}
+        renderError={() => <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />}
       />
 
       {/* Mask the WKWebView green/black flash between play start and the first frame. */}

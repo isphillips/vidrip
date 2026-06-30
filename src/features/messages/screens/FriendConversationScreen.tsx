@@ -199,8 +199,11 @@ export default function FriendConversationScreen({
       const cid = channelIdRef.current;
       if (cid) {
         markChannelAsRead(cid).catch(() => {});
+        // Unique topic per focus — removeChannel is async, so a static topic can still be registered
+        // on a fast refocus, making supabase.channel() reuse the already-subscribed object (the .on()
+        // then throws "cannot add postgres_changes callbacks after subscribe()").
         sub = supabase
-          .channel(`dm-${cid}`)
+          .channel(`dm-${cid}-${Date.now()}`)
           .on('postgres_changes',
             { event: 'INSERT', schema: 'public', table: 'channel_posts', filter: `channel_id=eq.${cid}` },
             () => { if (active) { load().then(scrollToEnd); } })

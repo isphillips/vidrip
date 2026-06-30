@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { StyleProp, ViewStyle, View, StyleSheet } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { tikTokPlayerUrl } from '../infrastructure/tiktok/api';
 
@@ -152,7 +152,16 @@ const TikTokPlayer = forwardRef<TikTokPlayerHandle, Props>(function TikTokPlayer
       ref={webRef as any}
       style={style}
       source={{ html, baseUrl: 'https://www.tiktok.com' }}
-      originWhitelist={['*']}
+      // Block "open in the TikTok app" redirects (snssdk*://, tiktok://, …). Without this, on a device
+      // with TikTok installed the embed redirects to its app scheme, WKWebView can't load it, and shows
+      // "Error loading page · Redirection to URL with a scheme that is not HTTP(S)" — a full-screen blank
+      // that reads as "the app didn't load content" (App Store 2.1 rejection). Cancelling the navigation
+      // here keeps the embedded player in place. originWhitelist double-gates it at the load layer.
+      originWhitelist={['https://*', 'http://*']}
+      onShouldStartLoadWithRequest={req => {
+        const u = req.url || '';
+        return u.startsWith('https://') || u.startsWith('http://') || u.startsWith('about:') || u.startsWith('data:');
+      }}
       onMessage={handleMessage}
       allowsInlineMediaPlayback
       mediaPlaybackRequiresUserAction={false}
@@ -161,6 +170,9 @@ const TikTokPlayer = forwardRef<TikTokPlayerHandle, Props>(function TikTokPlayer
       scrollEnabled={false}
       bounces={false}
       setSupportMultipleWindows={false}
+      // Safety net: if a load ever does fail, show black (the player bg) instead of WKWebView's scary
+      // default "Error loading page" white screen.
+      renderError={() => <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />}
     />
   );
 });

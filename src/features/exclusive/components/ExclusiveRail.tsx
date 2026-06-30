@@ -38,11 +38,17 @@ export default function ExclusiveRail({ onOpenGift, onOpenCollection }: {
   // refresh. RLS limits collection_awards to the viewer's own rows, so the filter is belt-and-suspenders.
   useEffect(() => {
     if (!userId) { return; }
-    const ch = supabase.channel(`awards-${userId}`)
+    // Unique per mount: removeChannel is async, so on a quick re-subscribe (refocus / StrictMode
+    // double-mount) a channel with a static topic may still be registered — supabase.channel() then
+    // returns that already-subscribed object and the .on() below throws ("cannot add postgres_changes
+    // callbacks after subscribe()"). A fresh topic each mount sidesteps the reuse entirely.
+    const ch = supabase.channel(`awards-${userId}-${Date.now()}`)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'collection_awards', filter: `user_id=eq.${userId}` },
         () => { load(); })
       .subscribe();
+    // removeChannel (not unsubscribe) also drops it from the client registry, so the next mount can't
+    // reuse this stale, already-subscribed channel.
     return () => { supabase.removeChannel(ch); };
   }, [userId, load]);
 

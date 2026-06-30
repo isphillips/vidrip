@@ -298,26 +298,63 @@ export async function fetchCollectionVideos(collectionId: string): Promise<{ pos
 export type ExclusiveVideo = {
   postId: string;
   title: string;
-  thumbnail: string | null;
+  thumbnail: string | null;   // stored yt_video_thumbnail (resolve via ytThumb on the client)
+  videoId: string | null;     // yt_video_id — drives the YouTube-img fallback + TikTok re-resolve
+  sourceType: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook';
+  posterId: string | null;    // the creator/poster — owner sees their own clips unobscured
   status: string;
   durationSec: number | null;
+  reactionCount: number;
+  viewCount: number;
+  hasMyReaction: boolean;     // viewer has reacted → reveal the thumbnail (mirrors channel grid)
 };
 
-/** Videos in an awarded collection, with playback metadata (joined from channel_posts). */
-export async function fetchExclusiveCollectionVideos(collectionId: string): Promise<ExclusiveVideo[]> {
+/** Videos in an awarded collection, with playback metadata (joined from channel_posts).
+ *  Mirrors the channel grid: each video carries the viewer's reaction state so the screen can
+ *  obscure unreacted videos (react-to-reveal). Pass the signed-in userId to compute that state. */
+export async function fetchExclusiveCollectionVideos(collectionId: string, userId?: string): Promise<ExclusiveVideo[]> {
   const { data, error } = await (supabase as any).from('collection_videos')
-    .select('post_id, post:channel_posts(id, yt_video_title, yt_video_thumbnail, media_status, duration, created_at)')
+    .select('post_id, post:channel_posts(id, poster_id, yt_video_title, yt_video_thumbnail, yt_video_id, source_type, media_status, duration, view_count, created_at, video_url)')
     .eq('collection_id', collectionId);
   if (error) { throw error; }
-  return (data ?? [])
-    .filter((r: any) => r.post)
-    .map((r: any) => ({
-      postId: r.post.id,
-      title: r.post.yt_video_title ?? 'Untitled',
-      thumbnail: r.post.yt_video_thumbnail ?? null,
-      status: r.post.media_status ?? 'processing',
-      durationSec: r.post.duration ?? null,
-    }));
+
+  const rows = (data ?? []).filter((r: any) => r.post);
+  const postIds = rows.map((r: any) => r.post.id);
+
+  // Reaction tallies + the viewer's own reactions — reactions are channel_posts rows whose
+  // parent_post_id points back at the source post (same structure as channels).
+  const reactionCount = new Map<string, number>();
+  const reactedIds = new Set<string>();
+  if (postIds.length) {
+    const { data: rx } = await (supabase as any).from('channel_posts')
+      .select('parent_post_id, poster_id')
+      .in('parent_post_id', postIds);
+    (rx ?? []).forEach((r: any) => {
+      reactionCount.set(r.parent_post_id, (reactionCount.get(r.parent_post_id) ?? 0) + 1);
+      if (userId && r.poster_id === userId) { reactedIds.add(r.parent_post_id); }
+    });
+  }
+
+  // Bunny auto-generates a thumbnail.jpg beside the HLS playlist — fall back to it when a creator
+  // video has no custom thumbnail, so the tile shows a poster instead of a placeholder.
+  const bunnyThumb = (post: any): string | null =>
+    post.source_type === 'bunny' && typeof post.video_url === 'string' && post.video_url.includes('playlist.m3u8')
+      ? post.video_url.replace('playlist.m3u8', 'thumbnail.jpg')
+      : null;
+
+  return rows.map((r: any) => ({
+    postId: r.post.id,
+    title: r.post.yt_video_title ?? 'Untitled',
+    thumbnail: r.post.yt_video_thumbnail ?? bunnyThumb(r.post),
+    videoId: r.post.yt_video_id ?? null,
+    sourceType: (r.post.source_type ?? 'youtube') as ExclusiveVideo['sourceType'],
+    posterId: r.post.poster_id ?? null,
+    status: r.post.media_status ?? 'processing',
+    durationSec: r.post.duration ?? null,
+    reactionCount: reactionCount.get(r.post.id) ?? 0,
+    viewCount: r.post.view_count ?? 0,
+    hasMyReaction: reactedIds.has(r.post.id),
+  }));
 }
 
 /** The collection's display info for a recipient (cover + name + channel). */

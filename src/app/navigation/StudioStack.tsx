@@ -12,6 +12,7 @@ import StudioDetailsScreen from '../../features/studio/screens/StudioDetailsScre
 import StudioCalendarScreen from '../../features/studio/screens/StudioCalendarScreen';
 import StudioCollectionsScreen from '../../features/studio/screens/StudioCollectionsScreen';
 import StudioCollectionEditScreen from '../../features/studio/screens/StudioCollectionEditScreen';
+import StudioVideoEditScreen from '../../features/studio/screens/StudioVideoEditScreen';
 
 const Stack = createNativeStackNavigator<StudioStackParamList>();
 
@@ -30,6 +31,7 @@ export default function StudioStack() {
       <Stack.Screen name="StudioCalendar" component={StudioCalendarScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="StudioCollections" component={StudioCollectionsScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="StudioCollectionEdit" component={StudioCollectionEditScreen} />
+      <Stack.Screen name="StudioVideoEdit" component={StudioVideoEditScreen} />
     </Stack.Navigator>
   );
 }

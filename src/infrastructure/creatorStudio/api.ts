@@ -144,6 +144,7 @@ export async function signCreatorVideo(postId: string): Promise<string> {
 export type MyCreatorVideo = {
   id: string;
   channelId: string;
+  channelName: string;
   title: string;
   thumbnail: string | null;
   status: 'uploading' | 'processing' | 'ready' | 'failed' | string;
@@ -151,7 +152,25 @@ export type MyCreatorVideo = {
   durationSec: number | null;
   createdAt: string;
   releaseDate: string | null; // ISO; non-null + future = scheduled (hidden from viewers until then)
+  isExclusive: boolean;
+  collectionName: string | null;  // the exclusive collection this video is in (if any)
+  reactionCount: number;          // reaction clips on this video — our engagement stat (no view tracking)
+  music: string | null;           // best-effort music track name baked into the export, else null
 };
+
+// Best-effort music label from the baked overlay_recipe (its audioTracks[].uri). The exact title isn't
+// stored, so derive a readable name from the file; hash-like names collapse to a plain "Music".
+function musicNameFromRecipe(recipe: any): string | null {
+  const tracks = recipe?.audioTracks;
+  if (!Array.isArray(tracks) || tracks.length === 0) { return null; }
+  const uri = tracks[0]?.uri;
+  if (typeof uri !== 'string') { return 'Music'; }
+  try {
+    const last = decodeURIComponent(uri.split('?')[0].split('/').pop() ?? '');
+    const name = last.replace(/\.(mp3|m4a|aac|wav)$/i, '').replace(/[_-]+/g, ' ').trim();
+    return name && !/^[0-9a-f]{16,}$/i.test(name) ? name : 'Music';
+  } catch { return 'Music'; }
+}
 
 /** A creator post scheduled for the future (release_date > now). Powers the studio calendar. */
 export type ScheduledPost = {
@@ -185,11 +204,12 @@ export async function fetchPostableChannels(userId: string): Promise<PostableCha
   }));
 }
 
-/** The signed-in creator's own uploads, for the "My Studio" manage list. */
+/** The signed-in creator's own uploads, for the "My Studio" manage list. One query: pulls the reaction
+ *  count (child clips), exclusive-collection membership, channel name, and the baked music in the joins. */
 export async function fetchMyCreatorVideos(userId: string): Promise<MyCreatorVideo[]> {
   const { data, error } = await (supabase as any)
     .from('channel_posts')
-    .select('id, channel_id, yt_video_title, yt_video_thumbnail, media_status, visibility, duration, created_at, release_date')
+    .select('id, channel_id, yt_video_title, yt_video_thumbnail, media_status, visibility, duration, created_at, release_date, is_exclusive, overlay_recipe, reactions:channel_posts!parent_post_id(count), collection_videos(collection:exclusive_collections(name)), channel:groups(name)')
     .eq('poster_id', userId)
     .eq('post_type', 'creator')
     .order('created_at', { ascending: false });
@@ -197,6 +217,7 @@ export async function fetchMyCreatorVideos(userId: string): Promise<MyCreatorVid
   return (data ?? []).map((r: any) => ({
     id: r.id,
     channelId: r.channel_id,
+    channelName: r.channel?.name ?? 'Channel',
     title: r.yt_video_title ?? 'Untitled',
     thumbnail: r.yt_video_thumbnail ?? null,
     status: r.media_status ?? 'processing',
@@ -204,7 +225,50 @@ export async function fetchMyCreatorVideos(userId: string): Promise<MyCreatorVid
     durationSec: r.duration ?? null,
     createdAt: r.created_at,
     releaseDate: r.release_date ?? null,
+    isExclusive: !!r.is_exclusive,
+    collectionName: r.collection_videos?.[0]?.collection?.name ?? null,
+    reactionCount: Array.isArray(r.reactions) ? (r.reactions[0]?.count ?? 0) : 0,
+    music: musicNameFromRecipe(r.overlay_recipe),
   }));
+}
+
+export type CreatorVideoEdit = {
+  title: string;
+  visibility: Visibility;
+  channelId: string;
+  releaseDate: string | null;
+  isExclusive: boolean;
+  isMembersOnly: boolean;       // channel is members-only → visibility locked to subscribers
+  collectionId: string | null;  // the exclusive collection it's currently in (if any)
+};
+
+/** Load one creator video's current editable metadata (for the edit screen). */
+export async function fetchCreatorVideoForEdit(postId: string): Promise<CreatorVideoEdit | null> {
+  const { data } = await (supabase as any)
+    .from('channel_posts')
+    .select('yt_video_title, visibility, channel_id, release_date, is_exclusive, channel:groups(is_members_only), collection_videos(collection_id)')
+    .eq('id', postId).maybeSingle();
+  if (!data) { return null; }
+  return {
+    title: data.yt_video_title ?? '',
+    visibility: (data.visibility ?? 'public') as Visibility,
+    channelId: data.channel_id,
+    releaseDate: data.release_date ?? null,
+    isExclusive: !!data.is_exclusive,
+    isMembersOnly: !!data.channel?.is_members_only,
+    collectionId: data.collection_videos?.[0]?.collection_id ?? null,
+  };
+}
+
+/** Edit a published video's metadata (title / visibility). Direct authenticated own-post update, like
+ *  reschedulePost. Looks/music/trim are baked into the export and can't be changed here. */
+export async function updateCreatorVideo(postId: string, patch: { title?: string; visibility?: Visibility }): Promise<void> {
+  const row: any = {};
+  if (patch.title !== undefined) { row.yt_video_title = patch.title; }
+  if (patch.visibility !== undefined) { row.visibility = patch.visibility; }
+  if (Object.keys(row).length === 0) { return; }
+  const { error } = await (supabase as any).from('channel_posts').update(row).eq('id', postId);
+  if (error) { throw error; }
 }
 
 /** The creator's posts scheduled for the future (release_date > now), for the studio calendar. */
