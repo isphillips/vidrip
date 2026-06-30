@@ -30,12 +30,16 @@ import {
 import ConversationRow from '../../../components/conversation/ConversationRow';
 import { relativeTime } from '../../../utils/relativeTime';
 import ExclusiveRail from '../../exclusive/components/ExclusiveRail';
+import FeedVideoWarmer, { type WarmSource } from '../components/FeedVideoWarmer';
 import { useFriendConversations } from '../conversation/useFriendConversations';
 import type { FeedItem } from '../conversation/friendConversation';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 // One Feed row: a friend conversation, a group chat, or a followed channel with unseen uploads.
 type FeedRow = FeedItem | { kind: 'channel'; sortAt: number; channel: ChannelUpdateSummary };
+
+// Sources the Feed video-warmer can pre-warm (studio clips aren't in the doom-react path).
+const WARMABLE_SOURCES = ['youtube', 'tiktok', 'instagram', 'facebook'];
 
 // Flowing-water wordmark: a pink↔purple gradient slides under a "drip" text mask.
 const FLOW_PINK = '#FF4FA3';
@@ -81,6 +85,38 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
     () => channelUpdates.filter(c => c.kind === 'channel').reduce((n, c) => n + c.unseen_count, 0),
     [channelUpdates],
   );
+
+  // PROTOTYPE (video pool): pre-warm the most-likely next reaction. Default to the top pending video, but
+  // re-target to whatever the user has scrolled to — the topmost visible friend row's first pending video —
+  // so "starting in the middle" warms the right one instead of the top. FeedVideoWarmer mounts it off-screen
+  // so its player JS + page (and YouTube's first segments) cache before the tap; changing target remounts it.
+  const isPendingWarm = useCallback((th: any) =>
+    th.sender_id !== user?.id && th.my_status !== 'reacted' && th.thread_kind !== 'studio_share'
+    && !!th.video_id && WARMABLE_SOURCES.includes((th.source_type ?? '') as string), [user?.id]);
+
+  const topWarm = useMemo<{ videoId: string; sourceType: WarmSource } | null>(() => {
+    const t = threads.find(isPendingWarm);
+    return t ? { videoId: t.video_id as string, sourceType: t.source_type as WarmSource } : null;
+  }, [threads, isPendingWarm]);
+
+  // The conversation the user has scrolled to the top of the viewport (anchor); null → use the feed top.
+  const [anchorThreadIds, setAnchorThreadIds] = useState<string[] | null>(null);
+  const warmTarget = useMemo<{ videoId: string; sourceType: WarmSource } | null>(() => {
+    if (anchorThreadIds) {
+      const ids = new Set(anchorThreadIds);
+      const t = threads.find(th => ids.has(th.id) && isPendingWarm(th));
+      if (t) { return { videoId: t.video_id as string, sourceType: t.source_type as WarmSource }; }
+    }
+    return topWarm;   // anchor has nothing to react to (or is a group/channel row) → fall back to the top
+  }, [anchorThreadIds, threads, isPendingWarm, topWarm]);
+
+  // Track the topmost visible friend row → re-anchor the warmer to it. Stable refs so FlatList doesn't warn;
+  // minimumViewTime avoids thrashing the warm player while the user scrolls quickly past rows.
+  const onViewRef = useRef(({ viewableItems }: { viewableItems: Array<{ item: FeedRow }> }) => {
+    const first = viewableItems[0]?.item;
+    setAnchorThreadIds(first && first.kind === 'friend' ? first.conv.threadIds : null);
+  });
+  const viewConfigRef = useRef({ itemVisiblePercentThreshold: 60, minimumViewTime: 300 });
 
   // "Doom-react": tapping an entry opens its first pending video and chains through every pending
   // video (this entry's first, then the rest). Returns false if there's nothing to react to.
@@ -200,6 +236,8 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
       <FlatList
         style={styles.fill}
         data={rows}
+        onViewableItemsChanged={onViewRef.current}
+        viewabilityConfig={viewConfigRef.current}
         keyExtractor={it => (
           it.kind === 'friend' ? `f:${it.conv.friendUserId}`
           : it.kind === 'group' ? `g:${it.group.channelId}`
@@ -298,6 +336,9 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* PROTOTYPE: off-screen 1-deep video warm pool (renders nothing visible). */}
+      <FeedVideoWarmer videoId={warmTarget?.videoId ?? null} sourceType={warmTarget?.sourceType ?? null} />
     </View>
   );
 }

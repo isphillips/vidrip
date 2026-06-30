@@ -62,6 +62,12 @@ async function scrapeOg(url: string) {
     const ogTitle = metaTag(html, "og:title");
     const ogDesc = metaTag(html, "og:description");
     const ogImage = metaTag(html, "og:image:secure_url") ?? metaTag(html, "og:image");
+    // Video vs image: a reel/video post carries an og:video tag (and og:type contains "video"); a photo
+    // post has neither. The recorder uses this to special-case image posts (which can't tap-to-play and
+    // whose clickthrough would deep-link out of the app).
+    const ogVideo = metaTag(html, "og:video:secure_url") ?? metaTag(html, "og:video:url") ?? metaTag(html, "og:video");
+    const ogType = metaTag(html, "og:type");
+    const isVideo = !!ogVideo || /video/i.test(ogType ?? "");
     // IG encodes the caption in og:description and the author in og:title (parsed above). Facebook's
     // og:title is already the reel/video title and og:image the thumbnail, so use them as-is there.
     const isIg = /instagram\.com/.test(url);
@@ -69,9 +75,10 @@ async function scrapeOg(url: string) {
       title: isIg ? (captionFromDescription(ogDesc) ?? ogTitle) : (ogTitle ?? captionFromDescription(ogDesc)),
       thumbnail: ogImage,
       author: isIg ? authorFromTitle(ogTitle) : null,
+      isVideo,
     };
   } catch {
-    return { title: null, thumbnail: null, author: null };
+    return { title: null, thumbnail: null, author: null, isVideo: null };
   }
 }
 
@@ -90,13 +97,13 @@ Deno.serve(async (req) => {
       return json({ error: "unsupported url" }, 400);
     }
 
-    const { title, thumbnail, author } = await scrapeOg(url);
+    const { title, thumbnail, author, isVideo } = await scrapeOg(url);
 
     if (!title && !thumbnail && !author) {
       // Login-walled / private / removed → let the client fall back to its defaults.
       return json({ ok: false, error: "no metadata available" });
     }
-    return json({ ok: true, title, thumbnail, author });
+    return json({ ok: true, title, thumbnail, author, isVideo });
   } catch (e: any) {
     console.error("[instagram-oembed]", e);
     return json({ error: e?.message ?? String(e) }, 500);

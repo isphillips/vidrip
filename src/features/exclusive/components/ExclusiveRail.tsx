@@ -47,18 +47,24 @@ export default function ExclusiveRail({ onOpenGift, onOpenCollection }: {
   }, [userId, load]);
 
   if (collections.length === 0 && gifts.length === 0) { return null; }
+  // One tile per collection: dedupe by collection id so re-delivering (or any stray duplicate award
+  // row) can't render the same collection twice.
   const giftIds = new Set(gifts.map(g => g.collectionId));
+  const seenGift = new Set<string>();
+  const uniqueGifts = gifts.filter(g => (seenGift.has(g.collectionId) ? false : (seenGift.add(g.collectionId), true)));
+  const seenCol = new Set<string>();
+  const awarded = collections.filter(c => !giftIds.has(c.id) && (seenCol.has(c.id) ? false : (seenCol.add(c.id), true)));
 
   return (
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
         <Ionicons name="diamond-outline" size={14} color={C.ACCENT_HOT} />
         <Text style={styles.heading}>Exclusive Content</Text>
-        {gifts.length > 0 && <View style={styles.newDot}><Text style={styles.newDotTxt}>{gifts.length}</Text></View>}
+        {uniqueGifts.length > 0 && <View style={styles.newDot}><Text style={styles.newDotTxt}>{uniqueGifts.length}</Text></View>}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {/* Unopened gifts */}
-        {gifts.map(g => (
+        {uniqueGifts.map(g => (
           <TouchableOpacity key={`gift-${g.awardId}`} style={styles.tile} activeOpacity={0.85} onPress={() => onOpenGift(g.awardId)}>
             <LinearGradient colors={FLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.giftCover}>
               <Ionicons name="gift" size={30} color={C.WHITE} />
@@ -69,7 +75,7 @@ export default function ExclusiveRail({ onOpenGift, onOpenCollection }: {
           </TouchableOpacity>
         ))}
         {/* Awarded collections (skip those still shown as an unopened gift) */}
-        {collections.filter(c => !giftIds.has(c.id)).map(c => (
+        {awarded.map(c => (
           <TouchableOpacity key={c.id} style={styles.tile} activeOpacity={0.85} onPress={() => onOpenCollection(c.id)}>
             {c.coverUrl && !brokenCovers.has(c.id)
               ? <Image source={{ uri: c.coverUrl }} style={styles.cover} resizeMode="cover"

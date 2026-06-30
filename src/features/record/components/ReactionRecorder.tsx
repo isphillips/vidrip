@@ -263,6 +263,11 @@ export default function ReactionRecorder({
   // button. Without this, the first tap hits an un-ready player and arms a videoless recording
   // behind the touch shield. onReady self-times: near-instant on iOS, as long as needed on Android.
   const [sourceReady, setSourceReady] = useState(false);
+  // Instagram post type. An IG share can be a video REEL (tap-to-play embed, current behavior) OR a photo
+  // POST — for a photo, IG's clickthrough deep-links out of the app and recording never starts, so we
+  // detect the type via the OG scrape and special-case images (static image + blocking veil + 15s cap).
+  // null = still detecting; defaults to reel behavior if detection fails (most IG shares are reels).
+  const [igIsVideo, setIgIsVideo] = useState<boolean | null>(null);
   // The source video's own length (seconds), captured once it loads, so the countdown
   // and cap bar can reflect when the video actually ends (null until/unless known).
   const [sourceDuration, setSourceDuration] = useState<number | null>(null);
@@ -355,9 +360,15 @@ export default function ReactionRecorder({
     } else if (sourceType === 'tiktok' && videoId) {
       resolveTikTokThumbnail(videoId).then(set).catch(() => {});
     } else if (sourceType === 'instagram' && videoId) {
+      // /p/ is the canonical URL for ALL post types (reel, video, image, carousel); the scrape returns the
+      // thumbnail AND whether it's a video. Detection failure → assume reel (the common case + safe default).
       supabase.functions
-        .invoke('instagram-oembed', { body: { url: `https://www.instagram.com/reel/${videoId}/` } })
-        .then(({ data }: any) => set(data?.thumbnail)).catch(() => {});
+        .invoke('instagram-oembed', { body: { url: `https://www.instagram.com/p/${videoId}/` } })
+        .then(({ data }: any) => {
+          set(data?.thumbnail);
+          if (alive) { setIgIsVideo(typeof data?.isVideo === 'boolean' ? data.isVideo : false); }
+        })
+        .catch(() => { if (alive) { setIgIsVideo(true); } });
     } else if (videoId) {
       set(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);   // youtube
     }
@@ -428,6 +439,18 @@ export default function ReactionRecorder({
     startTimer();
     // The cap bar is driven by the effect below (it retargets when the source duration resolves).
   }, [startTimer, stopTimer, startTrack, frameAspect]);
+
+  // An IG photo post has no playable video, so cap the reaction at a fixed 15s (the cap bar + auto-stop
+  // then behave like any timed source). Set as soon as we detect the post is an image.
+  useEffect(() => { if (igIsVideo === false) { setSourceDuration(15); } }, [igIsVideo]);
+
+  // IG photo post: there's nothing to "play", so the blocking veil's tap both reveals the image and starts
+  // the (15s-capped) recording — mirroring how a video source's play begins recording.
+  const startIgImage = useCallback(() => {
+    if (srcStarted) { return; }
+    setSrcStarted(true);
+    beginRecording();
+  }, [srcStarted, beginRecording]);
 
   // Throw a reaction emoji: rate-limited to 1/sec, launched on the fountain, and recorded at the
   // current video time so it replays at the same moment when the reaction is watched back.
@@ -836,37 +859,42 @@ export default function ReactionRecorder({
       ) : videoId && sourceType === 'instagram' ? (
         <View style={styles.ytCover}>
           <View style={[styles.sourceLetterbox, { top: letterTop, height: letterH }]}>
-          <WebView
-            key={ytKey}
-            style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
-            source={{ uri: `https://www.instagram.com/reel/${videoId}/?l=1` }}
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            allowsFullscreenVideo={false}
-            javaScriptEnabled
-            // The live IG reel page's "open in app" uses window.open('instagram://…'),
-            // which spawns a popup WebView that launches the IG app and ruins the
-            // reaction. Disabling multiple windows kills that popup; the https guard
-            // blocks any main-frame app-redirect too. (Keeps the ?l=1 look.)
-            setSupportMultipleWindows={false}
-            onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
-            injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
-            injectedJavaScript={IG_REEL_JS}
-            onMessage={(e) => {
-              try {
-                const msg = JSON.parse(e.nativeEvent.data);
-                // The reel reports its own length once known → cap bar / auto-stop track the real end.
-                if (msg.type === 'duration') { captureDuration(Number(msg.value)); return; }
-                // Tap-to-play: the user's tap starts the reel → 'playing' begins the
-                // recording (and drops the veil). Ignore 'paused' (fires during
-                // buffering); manual Stop handles early exit.
-                if (msg.type && msg.type !== 'paused') { onYtStateChange(msg.type); }
-              } catch { /* ignore non-JSON messages */ }
-            }}
-          />
-          {/* Pointer-transparent veil — the tap reaches the WebView reel (the real touch
-              that composites + plays the video, which begins recording). */}
-          {!srcStarted && <SourceVeil platform="instagram" thumbUri={veilThumb} />}
+            <WebView
+              key={ytKey}
+              style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}
+              source={{ uri: `https://www.instagram.com/reel/${videoId}/?l=1` }}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              allowsFullscreenVideo={false}
+              javaScriptEnabled
+              // The live IG reel page's "open in app" uses window.open('instagram://…'),
+              // which spawns a popup WebView that launches the IG app and ruins the
+              // reaction. Disabling multiple windows kills that popup; the https guard
+              // blocks any main-frame app-redirect too. (Keeps the ?l=1 look.)
+              setSupportMultipleWindows={false}
+              onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
+              injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
+              injectedJavaScript={IG_REEL_JS}
+              onMessage={(e) => {
+                try {
+                  const msg = JSON.parse(e.nativeEvent.data);
+                  // The reel reports its own length once known → cap bar / auto-stop track the real end.
+                  if (msg.type === 'duration') { captureDuration(Number(msg.value)); return; }
+                  // Tap-to-play: the user's tap starts the reel → 'playing' begins the
+                  // recording (and drops the veil). Ignore 'paused' (fires during
+                  // buffering); manual Stop handles early exit.
+                  if (msg.type && msg.type !== 'paused') { onYtStateChange(msg.type); }
+                } catch { /* ignore non-JSON messages */ }
+              }}
+            />
+            {/* Veil is pointer-transparent once we KNOW it's a reel (the tap reaches the WebView reel and
+                starts it). While detecting the post type (igIsVideo === null) it's a BLOCKING loading veil
+                so a too-early tap on what turns out to be a photo can't deep-link out. */}
+            {igIsVideo === false ? (
+              !srcStarted && <SourceVeil platform="instagram" thumbUri={veilThumb} onPress={startIgImage} />
+            ): (
+              !srcStarted && <SourceVeil platform="instagram" thumbUri={veilThumb} loading={igIsVideo === null} />
+            )}
           </View>
         </View>
       ) : videoId && sourceType === 'facebook' ? (
@@ -1122,8 +1150,9 @@ export default function ReactionRecorder({
       {/* Controls. Source-driven (reactions, incl. Bunny): the source video's play/end
           drives start/stop, so the record button must NOT show before it plays — once
           recording, Stop/Restart still appear (via isRecording). Only IG WebView reels
-          and non-source clips/reviews use the manual record button to start. */}
-      {!uploading && afterPhase === 'none' && (!sourceDriven || isRecording || igWebEmbed) && (
+          and non-source clips/reviews use the manual record button to start. An IG PHOTO
+          post starts from its blocking veil tap, not this button. */}
+      {!uploading && afterPhase === 'none' && (!sourceDriven || isRecording || (igWebEmbed && igIsVideo !== false)) && (
         <View style={[styles.controls, { bottom: bottomInset + SPACE.XL }]}>
           {isRecording ? (
             <>
