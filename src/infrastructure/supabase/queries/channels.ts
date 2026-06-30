@@ -71,6 +71,7 @@ export type ChannelPost = {
   emoji_reactions: { emoji: string; user_id: string }[];
   reaction_count: number;
   view_count?: number;
+  is_exclusive?: boolean;   // in an exclusive collection → reactions/reviews are members-only, not public
   has_my_reaction: boolean;
   review_count: number;
   has_my_review: boolean;
@@ -1001,7 +1002,7 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
     .select(`
       id, channel_id, poster_id, post_type, source_type, message,
       yt_video_id, yt_video_title, yt_video_thumbnail,
-      video_url, duration, is_pinned, view_count, created_at, recorded_with_headphones,
+      video_url, duration, is_pinned, is_exclusive, view_count, created_at, recorded_with_headphones,
       parent_post_id,
       parent:channel_posts!parent_post_id(yt_video_id, source_type),
       poster:users!poster_id(handle),
@@ -1016,6 +1017,7 @@ export async function fetchChannelPost(postId: string): Promise<ChannelPost | nu
     poster: data.poster ?? null,
     source_type: data.source_type ?? 'youtube',
     message: data.message ?? null,
+    is_exclusive: !!data.is_exclusive,
     emoji_reactions: data.emoji_reactions ?? [],
     reaction_count: 0,
     has_my_reaction: false,

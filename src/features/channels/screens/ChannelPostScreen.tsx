@@ -249,6 +249,23 @@ export default function ChannelPostScreen({
     );
   }
 
+  // Exclusive content is members-only — its reactions/reviews must never surface in this PUBLIC channel-post
+  // screen (the channel-feed query already hides exclusive posts; this guards the open-by-id path). Members
+  // watch it via their collection (ExclusiveWatch); the creator/poster still manages it here.
+  if (post.is_exclusive && ownerId !== user?.id && post.poster_id !== user?.id) {
+    return (
+      <View style={[styles.center, { gap: SPACE.MD }]}>
+        <Text style={styles.muted}>💎 This is exclusive content.</Text>
+        <Text style={[styles.muted, { textAlign: 'center', paddingHorizontal: SPACE.XL }]}>
+          Its reactions and reviews are only visible to members of the collection it belongs to.
+        </Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.handle}>Go back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   const thumbnail = post.source_type === 'tiktok'
     ? ttThumb  // stored TikTok URL is expired; use the freshly resolved one
     : (post.yt_video_thumbnail ??
