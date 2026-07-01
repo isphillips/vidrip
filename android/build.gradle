@@ -20,3 +20,16 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// The Android SDK levels are declared in buildscript.ext above, but several third-party RN library
+// modules (e.g. react-native-gesture-handler) resolve them from rootProject.ext via safeExtGet — a
+// different scope — and otherwise fail to configure with "compileSdkVersion is not specified". Mirror
+// them at the project level so every subproject resolves them. Keep in sync with the buildscript.ext above.
+ext {
+    buildToolsVersion = "35.0.0"
+    minSdkVersion = 26
+    compileSdkVersion = 35
+    targetSdkVersion = 35
+    ndkVersion = "26.1.10909125"
+    kotlinVersion = "1.9.24"
+}

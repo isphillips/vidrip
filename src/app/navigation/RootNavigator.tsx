@@ -7,6 +7,7 @@ import { C } from '../../theme';
 import { supabase } from '../../infrastructure/supabase/client';
 import { useAuthStore } from '../../store/authStore';
 import { fetchThreadCounterpart } from '../../infrastructure/supabase/queries/threads';
+import { resolveNotifChannel } from '../../infrastructure/supabase/queries/channels';
 import { useBlockStore } from '../../store/blockStore';
 import { useOAuthStore } from '../../store/oauthStore';
 import { useShareIntentStore } from '../../store/shareIntentStore';
@@ -127,17 +128,49 @@ export default function RootNavigator() {
     // channel home. ChannelScreen resolves its own public/members flags when they're omitted, so we don't
     // pass the previously-hardcoded (and often wrong) isPublic/isJoined.
     setChannelNotificationHandler((channelId: string, channelName: string, postId?: string) => {
-      if (postId) {
+      const myId = useAuthStore.getState().user?.id;
+      (async () => {
+        // A message push carries a channel id — route it by what that channel actually is: a 1:1 DM opens
+        // the friend conversation, a group chat opens the group-chat view, a creator channel keeps the
+        // post/channel routing below.
+        const target = myId
+          ? await resolveNotifChannel(channelId, myId).catch(() => ({ kind: 'channel' as const }))
+          : { kind: 'channel' as const };
+        if (target.kind === 'dm') {
+          navRef.current?.navigate('Main', {
+            screen: 'Messages',
+            params: {
+              screen: 'FriendConversation',
+              params: {
+                friendUserId: target.friendUserId,
+                displayName: target.displayName,
+                handle: target.handle,
+                avatarUrl: target.avatarUrl,
+                dmChannelId: channelId,
+              },
+            },
+          });
+          return;
+        }
+        if (target.kind === 'group') {
+          navRef.current?.navigate('Main', {
+            screen: 'Messages',
+            params: { screen: 'Channel', params: { channelId, channelName, isGroupChat: true, isPublic: false, isJoined: true } },
+          });
+          return;
+        }
+        if (postId) {
+          navRef.current?.navigate('Main', {
+            screen: 'Channels',
+            params: { screen: 'ChannelPost', params: { postId, channelId, isJoined: true } },
+          });
+          return;
+        }
         navRef.current?.navigate('Main', {
           screen: 'Channels',
-          params: { screen: 'ChannelPost', params: { postId, channelId, isJoined: true } },
+          params: { screen: 'Channel', params: { channelId, channelName } },
         });
-        return;
-      }
-      navRef.current?.navigate('Main', {
-        screen: 'Channels',
-        params: { screen: 'Channel', params: { channelId, channelName } },
-      });
+      })();
     });
 
     // Wire award notification tap → open the gift reveal in the Feed tab.

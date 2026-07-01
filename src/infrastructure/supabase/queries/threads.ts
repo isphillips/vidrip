@@ -20,6 +20,9 @@ export type FeedThread = {
   // Entry point for "My Reactions" → opens the reaction viewer directly (my own
   // reaction if present, else the first one) instead of the chat thread.
   my_reaction_id: string | null;
+  // Every reaction on this thread (who reacted, when). Lets the Messages list surface a received
+  // reaction on MY shares as fresh inbound activity on the reactor's conversation row.
+  reactions: { userId: string; at: number }[];
 };
 
 export type ThreadDetail = {
@@ -77,7 +80,7 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
       id, video_id, video_title, video_thumbnail, source_type, thread_kind, sender_id, created_at,
       sender:users!sender_id(handle, display_name),
       thread_members(user_id, status),
-      reactions(id, user_id)
+      reactions(id, user_id, created_at)
     `)
     .order('created_at', { ascending: false });
 
@@ -99,6 +102,9 @@ export async function fetchFeedThreads(userId: string): Promise<FeedThread[]> {
       thread_kind: (t.thread_kind as 'reaction' | 'studio_share') ?? 'reaction',
       reaction_count: t.reactions?.length ?? 0,
       my_reaction_id: myReaction?.id ?? t.reactions?.[0]?.id ?? null,
+      reactions: (t.reactions ?? []).map((r: any) => ({
+        userId: r.user_id, at: r.created_at ? Date.parse(r.created_at) || 0 : 0,
+      })),
     };
   });
 }

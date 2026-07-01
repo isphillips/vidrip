@@ -454,6 +454,62 @@ export async function fetchPrivateChannelPeers(
   return map;
 }
 
+// Latest DM message per channel (who sent it, its type, when) — powers the Messages list preview line
+// ("@handle sent a video/audio message"). One batched query across all the viewer's DM channels; the
+// caller keys the result by channel_id. Only the single most-recent message per channel is kept, so a
+// newer text message correctly supersedes an older clip/audio (no stale preview).
+export type DmLastPost = { channelId: string; posterId: string; postType: string; at: number };
+export async function fetchLastDmPosts(channelIds: string[]): Promise<Map<string, DmLastPost>> {
+  const out = new Map<string, DmLastPost>();
+  if (DEMO_MODE || channelIds.length === 0) { return out; }
+  const { data } = await (supabase as any)
+    .from('channel_posts')
+    .select('channel_id, poster_id, post_type, created_at')
+    .in('channel_id', channelIds)
+    .in('post_type', ['clip', 'audio', 'status'])
+    .is('parent_post_id', null)
+    .order('created_at', { ascending: false });
+  for (const r of (data ?? [])) {
+    if (out.has(r.channel_id)) { continue; }   // rows are newest-first → first seen per channel is latest
+    out.set(r.channel_id, {
+      channelId: r.channel_id, posterId: r.poster_id, postType: r.post_type,
+      at: r.created_at ? Date.parse(r.created_at) || 0 : 0,
+    });
+  }
+  return out;
+}
+
+// Classifies the channel a message-notification points at, so the tap opens the right place:
+//   'dm'      → a 1:1 DM → the friend conversation (+ the peer's profile for the header)
+//   'group'   → a group chat → the group-chat view
+//   'channel' → a creator/public channel (or unresolvable) → the existing channel/post routing
+export type NotifChannelTarget =
+  | { kind: 'dm'; friendUserId: string; displayName: string; handle: string; avatarUrl: string | null }
+  | { kind: 'group' }
+  | { kind: 'channel' };
+
+export async function resolveNotifChannel(channelId: string, myId: string): Promise<NotifChannelTarget> {
+  if (DEMO_MODE) { return { kind: 'channel' }; }
+  const { data: g } = await (supabase as any)
+    .from('groups').select('is_public, is_members_only, is_group_chat').eq('id', channelId).single();
+  if (!g) { return { kind: 'channel' }; }
+  if (g.is_group_chat) { return { kind: 'group' }; }
+  if (g.is_public || g.is_members_only) { return { kind: 'channel' }; }
+  // Private + non-group + non-members = a 1:1 DM → resolve the peer + profile for the conversation header.
+  const { data: members } = await (supabase as any).rpc('get_channel_members', { p_channel_id: channelId });
+  const friendId = (members ?? []).map((m: any) => m.user_id as string).find((id: string) => id !== myId);
+  if (!friendId) { return { kind: 'channel' }; }
+  const { data: u } = await (supabase as any)
+    .from('users').select('handle, display_name, avatar_url').eq('id', friendId).single();
+  return {
+    kind: 'dm',
+    friendUserId: friendId,
+    displayName: u?.display_name ?? '',
+    handle: u?.handle ?? '',
+    avatarUrl: u?.avatar_url ?? null,
+  };
+}
+
 export type GroupMember = { url: string | null; initial: string };
 
 // Fetches up to 4 other-member avatar + initial data per group chat channel — used for the
@@ -578,13 +634,22 @@ export async function fetchChannelUpdatesSummary(userId: string): Promise<Channe
     kind: (r.kind === 'group' ? 'group' : 'channel') as 'channel' | 'group',
     created_by: '',
   }));
-  // Attach each channel's creator so the Feed can hide rows from users the viewer has blocked
+  // Re-resolve each row's creator AND name straight from `groups`, keyed by the row's own channel_id.
+  // The RPC sometimes returns the creator's MAIN channel name for an update that belongs to a DIFFERENT
+  // channel the same creator owns (e.g. an upload to "Reaction Classics" showing as "Man Knees"), so the
+  // authoritative groups.name for this exact channel_id wins. created_by also powers block-filtering
   // (App Store 1.2 — a blocked user disappears from every surface, channels included).
   const ids = rows.map(r => r.channel_id);
   if (ids.length) {
-    const { data: gs } = await (supabase as any).from('groups').select('id, created_by').in('id', ids);
-    const creatorById = new Map<string, string>((gs ?? []).map((g: any) => [g.id, g.created_by]));
-    for (const r of rows) { r.created_by = creatorById.get(r.channel_id) ?? ''; }
+    const { data: gs } = await (supabase as any).from('groups').select('id, name, created_by').in('id', ids);
+    const byId = new Map<string, { name: string | null; created_by: string | null }>(
+      (gs ?? []).map((g: any) => [g.id, { name: g.name ?? null, created_by: g.created_by ?? null }]),
+    );
+    for (const r of rows) {
+      const g = byId.get(r.channel_id);
+      r.created_by = g?.created_by ?? '';
+      if (g?.name) { r.name = g.name; }
+    }
   }
   return rows;
 }

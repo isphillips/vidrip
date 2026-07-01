@@ -216,6 +216,7 @@ export const demoPostReactions: ChannelPost[] = [
 const thread = (o: Pick<FeedThread, 'id' | 'sender_id' | 'video_title' | 'video_thumbnail' | 'created_at'> & Partial<FeedThread>): FeedThread => ({
   video_id: 'demo-th', source_type: 'youtube',
   sender: null, my_status: 'pending', thread_kind: 'reaction', reaction_count: 1, my_reaction_id: null,
+  reactions: [],
   ...o,
 });
 const sender = (handle: string) => {

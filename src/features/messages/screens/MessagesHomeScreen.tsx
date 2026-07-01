@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   TextInput,
+  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,13 +26,22 @@ import FriendsMenu from '../../../components/FriendsMenu';
 import GroupAvatarGrid from '../../../components/conversation/GroupAvatarGrid';
 import ChannelsFeedBlock from '../../feed/components/ChannelsFeedBlock';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useFriendConversations, convKey } from '../../feed/conversation/useFriendConversations';
+import { useFriendConversations } from '../../feed/conversation/useFriendConversations';
+import type { FeedItem } from '../../feed/conversation/friendConversation';
 import type { MessagesStackScreenProps } from '../../../app/navigation/types';
 
 // ── Messages: the full conversation home — 1:1 friend chats + group chats, newest first ─────────
 export default function MessagesHomeScreen({ navigation }: MessagesStackScreenProps<'MessagesHome'>) {
   const { top } = useSafeAreaInsets();
-  const { items, loading, refreshing, refresh, hideConversation } = useFriendConversations();
+  const { items, loading, refreshing, refresh, hideConversation, leaveConversation } = useFriendConversations();
+
+  // Leaving a group removes you for good — confirm first.
+  const confirmLeave = (item: FeedItem) => {
+    Alert.alert('Leave group?', "You'll be removed from this chat and stop receiving its messages.", [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Leave', style: 'destructive', onPress: () => leaveConversation(item) },
+    ]);
+  };
 
   // Long-press a group chat → rename it (any member can; empty reverts to auto name).
   const [renaming, setRenaming] = useState<{ channelId: string; name: string } | null>(null);
@@ -87,10 +97,18 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
           <Swipeable
             overshootRight={false}
             renderRightActions={() => (
-              <TouchableOpacity style={styles.hideAction} activeOpacity={0.85} onPress={() => hideConversation(convKey(item))}>
-                <Ionicons name="eye-off-outline" size={20} color={C.WHITE} />
-                <Text style={styles.hideActionTxt}>Hide</Text>
-              </TouchableOpacity>
+              <View style={styles.swipeActions}>
+                {item.kind === 'group' && (
+                  <TouchableOpacity style={styles.leaveAction} activeOpacity={0.85} onPress={() => confirmLeave(item)}>
+                    <Ionicons name="exit-outline" size={20} color={C.BLACK} />
+                    <Text style={styles.leaveActionTxt}>Leave</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.hideAction} activeOpacity={0.85} onPress={() => hideConversation(item)}>
+                  <Ionicons name="eye-off-outline" size={20} color={C.WHITE} />
+                  <Text style={styles.hideActionTxt}>Hide</Text>
+                </TouchableOpacity>
+              </View>
             )}>
             {item.kind === 'friend' ? (
           <ConversationRow
@@ -98,7 +116,7 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
             fallbackInitial={(item.conv.displayName || item.conv.handle || '?').charAt(0).toUpperCase()}
             title={item.conv.displayName || `@${item.conv.handle}`}
             subtitle={item.conv.dmUnread > 0 ? `${item.conv.dmUnread} new`
-              : item.conv.lastActivityAt > 0 ? 'Tap to chat' : 'Say hi'}
+              : item.conv.preview || (item.conv.lastActivityAt > 0 ? 'Tap to chat' : 'Say hi')}
             unreadCount={item.conv.dmUnread}
             state={item.conv.dmUnread > 0 ? 'unread' : 'caughtup'}
             timestamp={relativeTime(item.conv.lastActivityAt)}
@@ -205,12 +223,18 @@ const styles = StyleSheet.create({
   menuItemText: { fontSize: FONT.SIZES.MD, fontFamily: FONT.BODY_SEMIBOLD, color: C.INK },
   menuDivider: { height: 1, backgroundColor: C.BORDER, marginHorizontal: SPACE.SM },
 
-  // Swipe-to-hide action (delete-for-me)
+  // Swipe actions (right-swipe): Leave (group chats only) + Hide.
+  swipeActions: { flexDirection: 'row' },
   hideAction: {
     width: 88, alignItems: 'center', justifyContent: 'center', gap: 2,
     backgroundColor: C.ACCENT, marginVertical: 1,
   },
+  leaveAction: {
+    width: 88, alignItems: 'center', justifyContent: 'center', gap: 2,
+    backgroundColor: C.DANGER, marginVertical: 1,
+  },
   hideActionTxt: { color: C.WHITE, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_BOLD },
+  leaveActionTxt: { color: C.BLACK, fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_BOLD },
 
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   empty: { alignItems: 'center', padding: SPACE.XL, gap: SPACE.SM },

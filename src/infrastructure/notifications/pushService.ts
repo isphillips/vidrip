@@ -18,7 +18,15 @@ let messagingInstance: any = null;
 if (Platform.OS === 'android') {
   const { getApp } = require('@react-native-firebase/app');
   messaging = require('@react-native-firebase/messaging');
-  messagingInstance = messaging.getMessaging(getApp());
+  const app = getApp();
+  messagingInstance = messaging.getMessaging(app);
+  // A placeholder google-services.json can never obtain a real FCM token, so Android push silently
+  // fails while iOS (APNs, separate credentials) keeps working. Surface it loudly at startup.
+  if (app?.options?.projectId === 'vidrip-placeholder') {
+    log.error('[Push] google-services.json is a PLACEHOLDER (projectId=vidrip-placeholder). '
+      + 'Replace android/app/google-services.json with the real Firebase config (same project as the '
+      + "server's FCM_SERVICE_ACCOUNT) or Android push will never arrive.");
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,9 +75,17 @@ export async function registerPushToken(userId: string): Promise<void> {
       }
     }
 
-    const token = await messaging.getToken(messagingInstance);
-    if (token) {
-      await saveToken(userId, token, 'android');
+    try {
+      const token = await messaging.getToken(messagingInstance);
+      if (token) {
+        await saveToken(userId, token, 'android');
+      } else {
+        log.warn('[Push] Android FCM getToken returned empty — no token saved');
+      }
+    } catch (e) {
+      // Most commonly a bad/placeholder google-services.json or an FCM project mismatch. Log instead of
+      // letting the caller's .catch swallow it silently (which is why this was invisible before).
+      log.error('[Push] Android FCM getToken failed (check google-services.json / Firebase project):', JSON.stringify(e));
     }
   }
 }
@@ -167,10 +183,13 @@ export function bootstrapNotifications(): () => void {
   }
 
   if (Platform.OS === 'android') {
-    // Foreground messages
-    const unsubForeground = messaging.onMessage(messagingInstance, handleAndroidNotification);
+    // Foreground messages: DON'T navigate. onMessage fires when a push arrives while the app is open —
+    // routing here yanked the user to the target screen with no banner ("it just goes directly"). The
+    // in-app lists already update via realtime, so a foreground push needs no action. (FCM only auto-
+    // displays a banner when the app is backgrounded; a foreground banner would need a local-notif lib.)
+    const unsubForeground = messaging.onMessage(messagingInstance, () => { /* no-op — navigate only on tap */ });
 
-    // Background/quit tap → app opened
+    // Background/quit TAP → route to the target screen.
     messaging.onNotificationOpenedApp(messagingInstance, handleAndroidNotification);
 
     // App opened from quit state

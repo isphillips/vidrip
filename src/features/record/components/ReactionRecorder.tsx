@@ -105,6 +105,9 @@ export interface ReactionRecorderProps {
   sourceUri?: string;
   // Creator (Bunny) videos play from a signed iframe embed URL (token-authed).
   embedUrl?: string;
+  // Stored still frame for the source (creator/Bunny posts have no derivable thumbnail like YouTube,
+  // and a signed embed can't be frame-grabbed) — used as the pre-record veil's blur backdrop.
+  sourceThumb?: string | null;
   // Animated overlay layer for a creator (Bunny) video — replayed live over the embed.
   recipe?: OverlayRecipe | null;
   sourceType?: 'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'studio' | 'facebook';
@@ -168,6 +171,7 @@ export default function ReactionRecorder({
   videoId,
   sourceUri,
   embedUrl,
+  sourceThumb,
   recipe,
   sourceType = 'youtube',
   onSave,
@@ -296,7 +300,7 @@ export default function ReactionRecorder({
   // Still frame used as the blur backdrop on the pre-record veil, for ANY source
   // (best-effort). YouTube derives instantly; the rest resolve async in the effect below.
   const [veilThumb, setVeilThumb] = useState<string | null>(
-    videoId && sourceType === 'youtube' ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null,
+    videoId && sourceType === 'youtube' ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : (sourceThumb ?? null),
   );
   const [isRecording, setIsRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -397,11 +401,13 @@ export default function ReactionRecorder({
           if (alive) { setIgIsVideo(data?.isVideo !== false); }
         })
         .catch(() => { if (alive) { setIgIsVideo(true); } });
+    } else if (bunnyEmbed) {
+      set(sourceThumb);   // creator/Bunny signed embed → use the post's stored thumbnail
     } else if (videoId) {
       set(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);   // youtube
     }
     return () => { alive = false; };
-  }, [sourceType, videoId, sourceUri, fileSource]);
+  }, [sourceType, videoId, sourceUri, fileSource, bunnyEmbed, sourceThumb]);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); }
@@ -869,6 +875,10 @@ export default function ReactionRecorder({
             onDuration={captureDuration}
             autoplay={false}
           />
+          {/* Pass-through pre-record veil (studio-branded): the tap reaches the Bunny embed's own play
+              button, which starts playback → onStateChange('playing') drops the veil and begins recording.
+              No thumb lookup for signed embeds, so it falls back to the frosted scrim. */}
+          {!srcStarted && <SourceVeil platform="generic" thumbUri={veilThumb} />}
         </View>
       ) : fileSource ? (
         <View style={styles.ytCover}>

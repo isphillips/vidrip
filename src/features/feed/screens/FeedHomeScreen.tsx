@@ -85,9 +85,9 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   // Channel rows ('channel' kind only — group chats already arrive via the conversations hook) are
   // interleaved by their last unseen upload time.
   const rows = useMemo<FeedRow[]>(() => {
-    const convRows: FeedRow[] = items.filter(it =>
-      it.kind === 'friend' ? it.conv.unreadCount > 0 : it.group.unreadCount > 0,
-    );
+    // The Feed is the reaction surface: only friends who've sent a reaction REQUEST appear. DM
+    // video/audio/text messages (dmUnread) and group chats are messaging — they live in the Messages tab.
+    const convRows: FeedRow[] = items.filter(it => it.kind === 'friend' && it.conv.reactionUnread > 0);
     const channelRows: FeedRow[] = channelUpdates
       // Hide channels from users I've blocked (App Store 1.2 — a blocked user vanishes everywhere).
       .filter(c => c.kind === 'channel' && c.unseen_count > 0 && !blocked.has(c.created_by))

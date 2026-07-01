@@ -1,7 +1,7 @@
 import { buildFriendConversations, buildGroupConversations, mergeFeedItems } from './friendConversation';
 import type { Friend } from '../../../infrastructure/supabase/queries/friends';
 import type { FeedThread } from '../../../infrastructure/supabase/queries/threads';
-import type { ChannelSummary } from '../../../infrastructure/supabase/queries/channels';
+import type { ChannelSummary, DmLastPost } from '../../../infrastructure/supabase/queries/channels';
 
 const ME = 'me';
 
@@ -9,7 +9,11 @@ const friend = (userId: string, displayName = userId): Friend =>
   ({ userId, handle: userId, displayName, avatarUrl: null } as unknown as Friend);
 
 const thread = (id: string, sender_id: string, my_status: string, created_at: string): FeedThread =>
-  ({ id, sender_id, my_status, created_at } as unknown as FeedThread);
+  ({ id, sender_id, my_status, created_at, reactions: [] } as unknown as FeedThread);
+
+// My outbound thread carrying a reaction from a friend (a received reaction).
+const threadWithReaction = (id: string, reactorId: string, at: string): FeedThread =>
+  ({ id, sender_id: ME, my_status: null, created_at: at, reactions: [{ userId: reactorId, at: Date.parse(at) }] } as unknown as FeedThread);
 
 const dm = (
   id: string, last_message_at: string | null, unread_count = 0,
@@ -17,9 +21,12 @@ const dm = (
 ): ChannelSummary =>
   ({ id, last_message_at, unread_count, is_group_chat, name, member_count } as unknown as ChannelSummary);
 
+const lastPost = (channelId: string, posterId: string, postType: string, at: string): DmLastPost =>
+  ({ channelId, posterId, postType, at: Date.parse(at) });
+
 const base = { myId: ME, blocked: new Set<string>(), hidden: new Set<string>() };
 const build = (over: any) =>
-  buildFriendConversations({ ...base, friends: [], threads: [], dmChannels: [], peerByChannel: new Map(), ...over });
+  buildFriendConversations({ ...base, friends: [], threads: [], dmChannels: [], peerByChannel: new Map(), dmLastPosts: new Map(), ...over });
 
 describe('buildFriendConversations', () => {
   it('marks a friend who sent an unreacted video as unread/pending', () => {
@@ -71,12 +78,82 @@ describe('buildFriendConversations', () => {
     expect(conv.state).toBe('unread');
   });
 
+  it('reactionUnread counts reaction requests only, never DM messages (the Feed filter)', () => {
+    // A pending reaction request → the Feed shows it.
+    const [req] = build({ friends: [friend('alice')], threads: [thread('t1', 'alice', 'pending', '2026-06-01T10:00:00Z')] });
+    expect(req.reactionUnread).toBe(1);
+
+    // A DM message only → reactionUnread 0 (stays out of the Feed) even though dmUnread > 0.
+    const [dmOnly] = build({
+      friends: [friend('bob')],
+      dmChannels: [dm('ch1', '2026-06-02T10:00:00Z', 2)],
+      peerByChannel: new Map([['ch1', 'bob']]),
+    });
+    expect(dmOnly.reactionUnread).toBe(0);
+    expect(dmOnly.dmUnread).toBe(2);
+  });
+
   it('sorts by most-recent activity first', () => {
     const convs = build({
       friends: [friend('alice'), friend('bob')],
       threads: [thread('t1', 'alice', 'reacted', '2026-06-01T10:00:00Z'), thread('t2', 'bob', 'reacted', '2026-06-05T10:00:00Z')],
     });
     expect(convs[0].friendUserId).toBe('bob');
+  });
+
+  it('previews an inbound share as "requested a reaction"', () => {
+    const [conv] = build({ friends: [friend('alice')], threads: [thread('t1', 'alice', 'pending', '2026-06-01T10:00:00Z')] });
+    expect(conv.preview).toBe('@alice requested a reaction');
+  });
+
+  it('previews a received reaction and bumps the reactor to the top with a refreshed time', () => {
+    const convs = build({
+      friends: [friend('alice'), friend('bob')],
+      // bob shared long ago; alice reacted to MY video just now → alice should sort first.
+      threads: [
+        thread('t1', 'bob', 'reacted', '2026-06-01T10:00:00Z'),
+        threadWithReaction('t2', 'alice', '2026-06-09T10:00:00Z'),
+      ],
+    });
+    expect(convs[0].friendUserId).toBe('alice');
+    expect(convs[0].preview).toBe('@alice sent a reaction');
+    expect(convs[0].lastActivityAt).toBe(Date.parse('2026-06-09T10:00:00Z'));
+  });
+
+  it('previews the latest DM clip / audio the friend sent', () => {
+    const [vid] = build({
+      friends: [friend('alice')],
+      dmChannels: [dm('ch1', '2026-06-02T10:00:00Z', 0)],
+      peerByChannel: new Map([['ch1', 'alice']]),
+      dmLastPosts: new Map([['ch1', lastPost('ch1', 'alice', 'clip', '2026-06-02T10:00:00Z')]]),
+    });
+    expect(vid.preview).toBe('@alice sent a video message');
+
+    const [aud] = build({
+      friends: [friend('alice')],
+      dmChannels: [dm('ch1', '2026-06-02T10:00:00Z', 0)],
+      peerByChannel: new Map([['ch1', 'alice']]),
+      dmLastPosts: new Map([['ch1', lastPost('ch1', 'alice', 'audio', '2026-06-02T10:00:00Z')]]),
+    });
+    expect(aud.preview).toBe('@alice sent an audio message');
+  });
+
+  it('does not preview a DM message I sent, or a text status', () => {
+    const [mine] = build({
+      friends: [friend('alice')],
+      dmChannels: [dm('ch1', '2026-06-02T10:00:00Z', 0)],
+      peerByChannel: new Map([['ch1', 'alice']]),
+      dmLastPosts: new Map([['ch1', lastPost('ch1', ME, 'clip', '2026-06-02T10:00:00Z')]]),
+    });
+    expect(mine.preview).toBe('');
+
+    const [status] = build({
+      friends: [friend('alice')],
+      dmChannels: [dm('ch1', '2026-06-02T10:00:00Z', 0)],
+      peerByChannel: new Map([['ch1', 'alice']]),
+      dmLastPosts: new Map([['ch1', lastPost('ch1', 'alice', 'status', '2026-06-02T10:00:00Z')]]),
+    });
+    expect(status.preview).toBe('');
   });
 });
 

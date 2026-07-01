@@ -49,6 +49,7 @@ export default function RecordReactionScreen({
   const [chVideoId, setChVideoId] = useState<string | null>(null);
   const [chSourceUri, setChSourceUri] = useState<string | null>(null);
   const [chEmbedUrl, setChEmbedUrl] = useState<string | null>(null);
+  const [chThumb, setChThumb] = useState<string | null>(null);
   const [chRecipe, setChRecipe] = useState<OverlayRecipe | null>(null);
   const [chSourceType, setChSourceType] =
     useState<'youtube' | 'tiktok' | 'instagram' | 'bunny' | 'facebook'>('youtube');
@@ -114,6 +115,12 @@ export default function RecordReactionScreen({
       if (!active) { return; }
       setChVideoId(p?.yt_video_id ?? null);
       setChSourceUri(p?.video_url ?? null);
+      // Bunny auto-generates a thumbnail.jpg beside the HLS playlist — fall back to it when a creator
+      // video has no custom thumbnail (mirrors the exclusive/channel grids), so the veil blurs a poster.
+      const bunnyThumb = st === 'bunny' && typeof p?.video_url === 'string' && p.video_url.includes('playlist.m3u8')
+        ? p.video_url.replace('playlist.m3u8', 'thumbnail.jpg')
+        : null;
+      setChThumb(p?.yt_video_thumbnail ?? bunnyThumb);
       setChSourceType(st);
       if (st === 'bunny') {
         try { const e = await signCreatorVideo(postId); if (active) { setChEmbedUrl(e); } } catch { /* not ready */ }
@@ -254,6 +261,7 @@ export default function RecordReactionScreen({
         videoId={(fileBacked || chSourceType === 'bunny') ? undefined : (chVideoId ?? undefined)}
         sourceUri={chSourceUri ?? undefined}
         embedUrl={chEmbedUrl ?? undefined}
+        sourceThumb={chThumb}
         recipe={chRecipe}
         sourceType={chSourceType}
         onBack={onBack}
