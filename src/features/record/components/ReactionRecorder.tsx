@@ -144,6 +144,23 @@ function describeRecordingError(error: any): Record<string, unknown> {
 
 const YT_PARAMS = { rel: false as const, controls: true as const };
 const YT_WV_STYLE = { backgroundColor: '#000000' };
+// Android-only: the source MUST be started by a real in-WebView touch (Android blocks programmatic /
+// bridge-driven playVideo() for the cross-origin YouTube iframe — it just spins). The veil passes taps
+// through to the player, but Android WebViews eat the FIRST tap focusing themselves, so YouTube's own
+// play button needs a couple of taps. A document-level `touchend` listener fires on that first tap
+// (touch events aren't focus-gated the way `click` is) and starts playback with sound from inside the
+// gesture. `{ once: true }` arms only the initial start — later taps fall through to YouTube's native
+// controls, so a pause still ends the take. Purely additive: if it ever doesn't fire, the native play
+// button underneath still works exactly as before.
+const YT_TAP_TO_PLAY = `
+  (function () {
+    document.addEventListener('touchend', function () {
+      try { if (window.player && player.playVideo) { player.unMute(); player.playVideo(); } } catch (e) {}
+    }, { once: true });
+  })();
+  true;
+`;
+const YT_WV_PROPS = Platform.OS === 'android' ? { injectedJavaScript: YT_TAP_TO_PLAY } : undefined;
 const PIP_W = 110;
 const PIP_H = 155;
 
@@ -263,6 +280,11 @@ export default function ReactionRecorder({
   // button. Without this, the first tap hits an un-ready player and arms a videoless recording
   // behind the touch shield. onReady self-times: near-instant on iOS, as long as needed on Android.
   const [sourceReady, setSourceReady] = useState(false);
+  // Between the play-tap and playback actually beginning there's a gap (YouTube goes 'buffering' first).
+  // Show the veil's spinner over that gap so the tap gets immediate feedback and the still frame doesn't
+  // just sit there. Driven off the real 'buffering' state, so it can't get stuck: if play never starts,
+  // 'buffering' never fires and the veil stays on its play button.
+  const [sourceBuffering, setSourceBuffering] = useState(false);
   // Instagram post type. An IG share can be a video REEL (tap-to-play embed, current behavior) OR a photo
   // POST — for a photo, IG's clickthrough deep-links out of the app and recording never starts, so we
   // detect the type via the OG scrape and special-case images (static image + blocking veil + 15s cap).
@@ -702,6 +724,7 @@ export default function ReactionRecorder({
     setSrcStarted(false);  // re-blur the source so the next take starts behind the play button
     setFbReady(false);     // the FB WebView remounts (ytKey) → wait for its iframe to reload
     setSourceReady(false); // YT/TikTok embeds remount too → re-gate on their onReady
+    setSourceBuffering(false);
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
   }, [stopTimer, cancelTrack, capAnim]);
@@ -716,13 +739,19 @@ export default function ReactionRecorder({
   const onYtStateChange = useCallback((state: string) => {
     if (state === 'playing') {
       skipNextPausedRef.current = true;
+      setSourceBuffering(false);
       setYtPlaying(true);
       setSrcStarted(true);   // tap landed on the video → reveal it (drop the blur/play button)
       // Capture the source length so the countdown/bar reflect the real end (YouTube reports it here;
       // the other source types report it via captureDuration from their own players/embeds).
       ytRef.current?.getDuration?.().then((d: number) => captureDuration(d)).catch(() => {});
       beginRecording();
+    } else if (state === 'buffering') {
+      // The tap landed and the source is spinning up — show the veil's loader over the gap until
+      // 'playing' reveals the video. (Fires only while the veil is still up, i.e. before srcStarted.)
+      setSourceBuffering(true);
     } else if (state === 'paused') {
+      setSourceBuffering(false);
       setYtPlaying(false);
       // Source drives the reaction: a genuine pause finishes & saves it. The first
       // paused event right after play is spurious (buffering fires 'buffering', not
@@ -733,6 +762,7 @@ export default function ReactionRecorder({
         handleStopRef.current();
       }
     } else if (state === 'ended') {
+      setSourceBuffering(false);
       setYtPlaying(false);
       skipNextPausedRef.current = false;
       if (hasStartedRef.current) { handleStopRef.current(); }
@@ -984,13 +1014,15 @@ export default function ReactionRecorder({
                 onChangeState={onYtStateChange}
                 initialPlayerParams={YT_PARAMS}
                 webViewStyle={YT_WV_STYLE}
+                webViewProps={YT_WV_PROPS}
               />
             </View>
 
-            {/* Pre-record veil: heavy blur of the video's own frame + a crisp YouTube
-                play button. Pointer-transparent, so the tap passes through to YouTube's
-                real play button underneath (which plays + starts recording). */}
-            {!srcStarted && <SourceVeil platform="youtube" thumbUri={veilThumb} loading={Platform.OS === 'android' && !sourceReady} />}
+            {/* Pre-record veil: heavy blur of the video's own frame + a crisp YouTube play button.
+                Pointer-transparent, so the tap passes through to the player underneath — which plays +
+                starts recording. On Android the injected touchend handler (YT_TAP_TO_PLAY) makes that
+                first tap reliable; iOS delivers the tap to YouTube's own button directly. */}
+            {!srcStarted && <SourceVeil platform="youtube" thumbUri={veilThumb} loading={(Platform.OS === 'android' && !sourceReady) || sourceBuffering} />}
           </View>
         );
       })() : <View style={styles.ytCover} />}
