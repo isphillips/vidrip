@@ -757,6 +757,9 @@ export default function ShareHomeScreen({ navigation: _nav }: ShareStackScreenPr
       if (!newVideo) { transitioningRef.current = false; return; }
       setSelectedVideo(newVideo);
       setSelectedIndex(newIdx);
+      // Fresh video → clear the per-recipient "sent" state so friends aren't stuck showing "sent"
+      // from the previous clip; lets you keep swiping and sending to the same people.
+      setSentThisSession(new Set());
 
       // Unmute/play the newly active slot — current was already muted before animation
       injectActivate(nextActive, newVideo.sourceType);
