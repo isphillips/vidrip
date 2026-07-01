@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  InteractionManager,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -31,6 +33,7 @@ import ConversationRow from '../../../components/conversation/ConversationRow';
 import { relativeTime } from '../../../utils/relativeTime';
 import ExclusiveRail from '../../exclusive/components/ExclusiveRail';
 import FeedVideoWarmer, { type WarmSource } from '../components/FeedVideoWarmer';
+import RecorderWarmup, { recorderWarmed } from '../../lens/RecorderWarmup';
 import { useFriendConversations } from '../conversation/useFriendConversations';
 import type { FeedItem } from '../conversation/friendConversation';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
@@ -52,6 +55,16 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   const { user } = useAuthStore();
   const { items, threads, toReactCount, loading, refreshing, refresh } = useFriendConversations();
   const setQueue = useReactQueueStore(s => s.setQueue);
+
+  // Warm the recorder's frame-processor/worklets runtime (~3s cold spin-up) once, off the critical
+  // path, while the user browses the feed — so the first reaction-recorder open is warm (~0.1s) instead
+  // of freezing on tap. Android-only (iOS opens fast already); deferred past the feed's first paint.
+  const [warmRecorder, setWarmRecorder] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'android' || recorderWarmed()) { return; }
+    const t = InteractionManager.runAfterInteractions(() => setWarmRecorder(true));
+    return () => t.cancel();
+  }, []);
 
   // Followed channels (public/members-only) with unseen uploads, fetched alongside the
   // conversation sources so each can be slotted into the recency-sorted Feed.
@@ -339,6 +352,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
 
       {/* PROTOTYPE: off-screen 1-deep video warm pool (renders nothing visible). */}
       <FeedVideoWarmer videoId={warmTarget?.videoId ?? null} sourceType={warmTarget?.sourceType ?? null} />
+      {warmRecorder && <RecorderWarmup />}
     </View>
   );
 }
