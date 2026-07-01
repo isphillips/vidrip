@@ -190,12 +190,12 @@ const styles = StyleSheet.create({
     color: C.SUBTLE,
   },
   joinedPill: {
-    backgroundColor: C.SURFACE_2,
+    backgroundColor: C.ACCENT_LITE,
     borderRadius: RADIUS.FULL,
     paddingHorizontal: SPACE.SM,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: C.BORDER,
+    borderColor: C.ACCENT,
   },
   joinedText: {
     fontSize: FONT.SIZES.XS,

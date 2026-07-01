@@ -86,6 +86,11 @@ export default function ExclusiveCollectionScreen({ route, navigation }: FeedSta
           ) : (
             <View style={[StyleSheet.absoluteFill, styles.center]}><Ionicons name="film-outline" size={22} color={C.SUBTLE} /></View>
           )}
+          {/* Always-on "exclusive" marker so a member can tell this is members-only content at a glance. */}
+          <View style={styles.exclBadge}>
+            <Ionicons name="diamond" size={9} color="#fff" />
+            <Text style={styles.exclBadgeTxt}>Exclusive</Text>
+          </View>
           {!obscured && (
             <View style={styles.playPill}>
               <Ionicons name={ready ? 'play' : 'hourglass-outline'} size={16} color="#fff" />
@@ -111,7 +116,7 @@ export default function ExclusiveCollectionScreen({ route, navigation }: FeedSta
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title} numberOfLines={1}>{collection?.name ?? 'Collection'}</Text>
-          {collection && <Text style={styles.subtitle} numberOfLines={1}>{collection.channelName} · exclusive</Text>}
+          {collection && <Text style={styles.subtitle} numberOfLines={1}>{collection.channelName} · Exclusive Content</Text>}
         </View>
         <View />
       </View>
@@ -149,6 +154,8 @@ const styles = StyleSheet.create({
   blindImg:  { width: 36, height: 52 },
   playPill:  { position: 'absolute', bottom: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.FULL, padding: 6 },
   viewBadge: { position: 'absolute', right: 8, bottom: 8 },
+  exclBadge: { position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.FULL, paddingHorizontal: 6, paddingVertical: 3 },
+  exclBadgeTxt: { color: '#fff', fontFamily: FONT.BODY_BOLD, fontSize: 9, letterSpacing: 0.3 },
   vtitle:    { color: C.INK, fontFamily: FONT.BODY_MEDIUM, fontSize: FONT.SIZES.SM },
   vtitleObscured: { color: C.MUTED, fontFamily: FONT.BODY, fontSize: FONT.SIZES.XS, fontStyle: 'italic' },
   vmeta:     { color: C.MUTED, fontFamily: FONT.BODY, fontSize: FONT.SIZES.XS },

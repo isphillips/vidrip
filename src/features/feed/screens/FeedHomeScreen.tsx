@@ -20,6 +20,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AccountBlob from '../../../components/AccountBlob';
+import MegaphoneBlob from '../../../components/MegaphoneBlob';
 import FriendsMenu from '../../../components/FriendsMenu';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useFeedStore } from '../../../store/feedStore';
@@ -313,6 +314,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         ) : (
           <ConversationRow
             avatarUrl={null}
+            customAvatar={<MegaphoneBlob />}
             fallbackInitial="📢"
             title={item.channel.name}
             subtitle={`${item.channel.unseen_count} new video${item.channel.unseen_count !== 1 ? 's' : ''} to react to`}

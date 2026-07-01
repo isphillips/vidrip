@@ -599,19 +599,24 @@ export default function ChannelhamburderScreen({
         <SubscriberPaywall label={title} />
       ) : isPublic ? (
         <>
-          {/* Reviews filter pills — public grid only, when the creator enabled reviews */}
-          {isPublic && reviewsEnabled && !loading && (
-            <View style={styles.filterRow}>
-              {GRID_FILTERS.map(f => {
-                const active = filter === f.key;
-                return (
-                  <TouchableOpacity key={f.key} style={[styles.pill, active && styles.pillActive]}
-                    onPress={() => setFilter(f.key)} activeOpacity={0.8}>
-                    <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          {/* Posts / Reactions / Reviews filter pills — OWNER ONLY. Reactions & Reviews are the creator's
+              own management views across the channel; visitors just see the posts grid (filter stays 'all').
+              The Reviews pill only appears when the creator has enabled reviews. */}
+          {isPublic && isOwner && !loading && (
+            <>
+              <Text style={styles.filterNote}>Only you can see these. Visitors just see your posts.</Text>
+              <View style={styles.filterRow}>
+                {GRID_FILTERS.filter(f => f.key !== 'reviews' || reviewsEnabled).map(f => {
+                  const active = filter === f.key;
+                  return (
+                    <TouchableOpacity key={f.key} style={[styles.pill, active && styles.pillActive]}
+                      onPress={() => setFilter(f.key)} activeOpacity={0.8}>
+                      <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
           )}
 
           <FlatList
@@ -698,19 +703,24 @@ export default function ChannelhamburderScreen({
         </>
       ) : (
         <>
-          {/* Reviews filter pills — public grid only, when the creator enabled reviews */}
-          {isPublic && reviewsEnabled && !loading && (
-            <View style={styles.filterRow}>
-              {GRID_FILTERS.map(f => {
-                const active = filter === f.key;
-                return (
-                  <TouchableOpacity key={f.key} style={[styles.pill, active && styles.pillActive]}
-                    onPress={() => setFilter(f.key)} activeOpacity={0.8}>
-                    <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          {/* Posts / Reactions / Reviews filter pills — OWNER ONLY. Reactions & Reviews are the creator's
+              own management views across the channel; visitors just see the posts grid (filter stays 'all').
+              The Reviews pill only appears when the creator has enabled reviews. */}
+          {isPublic && isOwner && !loading && (
+            <>
+              <Text style={styles.filterNote}>Only you can see these. Visitors just see your posts.</Text>
+              <View style={styles.filterRow}>
+                {GRID_FILTERS.filter(f => f.key !== 'reviews' || reviewsEnabled).map(f => {
+                  const active = filter === f.key;
+                  return (
+                    <TouchableOpacity key={f.key} style={[styles.pill, active && styles.pillActive]}
+                      onPress={() => setFilter(f.key)} activeOpacity={0.8}>
+                      <Text style={[styles.pillTxt, active && styles.pillTxtActive]}>{f.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
           )}
 
           <ScrollView
@@ -908,6 +918,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE.LG,
     paddingVertical: SPACE.SM,
     alignItems: 'center',
+  },
+  filterNote: {
+    fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY, color: C.SUBTLE,
+    paddingHorizontal: SPACE.LG, marginTop: SPACE.MD, marginLeft: SPACE.XS
   },
   pill: {
     paddingHorizontal: SPACE.MD,

@@ -22,6 +22,9 @@ const BAR_H = 58;
 const SHOW_STUDIO_PILL = false;
 // Repeating pink→purple→teal→purple→pink — symmetric ends so a one-period slide loops seamlessly.
 const FLOW = ['#FF4FA3', '#A05CFF', '#2DD4BF', '#A05CFF', '#FF4FA3'];
+// Studio-Home "hot" border: bright orange at the MIDPOINT (under the camera FAB) fading to red at both
+// edges — a static, symmetric center-out gradient (no slide) so the colour radiates from the middle.
+const FLOW_HOT = ['#FF2D55', '#FF6A00', '#FFB000', '#FF6A00', '#FF2D55'];
 
 const NAV_ITEM_NAMES = {
   Feed: 'Feed',
@@ -381,6 +384,22 @@ function GlowFab({ onPress, hot = false }: { onPress: () => void; hot?: boolean 
   );
 }
 
+// Studio-Home "hot" top border: the orange center-out gradient GROWS from the midpoint to the edges
+// (scaleX 0→1; RN scales a view around its own centre) each time you land on Studio Home.
+function HotBorder({ width }: { width: number }) {
+  const grow = useSharedValue(0);
+  useEffect(() => {
+    grow.value = 0;
+    grow.value = withTiming(1, { duration: 1000, easing: ReEasing.out(ReEasing.cubic) });
+  }, [grow]);
+  const st = useAnimatedStyle(() => ({ transform: [{ scaleX: grow.value }] }));
+  return (
+    <Reanimated.View style={[{ width, height: 3 }, st]}>
+      <LinearGradient colors={FLOW_HOT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ width, height: 3 }} />
+    </Reanimated.View>
+  );
+}
+
 // Full-screen immersive screens (recorders + video players) reached inside a tab's stack.
 // The bottom bar hides on these — they're nested fullScreenModals that don't cover the tab
 // bar, so otherwise the bar's strip (and the purple navTheme behind it) peeks under the
@@ -442,6 +461,12 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
     return null;
   }
 
+  // On the Studio tab's home the FAB changes action (jump into a recording) → it + the top border go
+  // "hot" (orange). On the FIRST load the nested Studio stack hasn't reported its state yet, so `sub` is
+  // undefined — but the stack's initial screen IS StudioHome, so treat undefined-sub-on-Studio as home
+  // (otherwise the hot state only kicked in after navigating away and back).
+  const onStudioHome = current === 'Studio' && (sub === 'StudioHome' || !sub);
+
   // Everyone gets the Studio FAB now (the editor is open to all users). The creator-only
   // chrome — the flowing gradient top border + STUDIO pill — stays gated by `canCreate`;
   // the publish-time fork (friends vs channel) is what actually differentiates creators.
@@ -487,14 +512,19 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
 
       {/* The bar */}
       <View style={[styles.bar, { height: BAR_H + bottom, paddingBottom: bottom }]}>
-        {/* Animated gradient top border (creator-studio only) */}
-        {canCreate && (
+        {/* Gradient top border. On Studio Home → static center-out orange (follows the hot FAB). Otherwise
+            the creator-only flowing pink/purple/teal slide. */}
+        {(onStudioHome || canCreate) && (
           <View style={styles.borderClip} pointerEvents="none">
-            <AnimatedGradient
-              colors={FLOW}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={{ width: width * 2, height: 3, transform: [{ translateX: borderX }] }}
-            />
+            {onStudioHome ? (
+              <HotBorder width={width} />
+            ) : (
+              <AnimatedGradient
+                colors={FLOW}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ width: width * 2, height: 3, transform: [{ translateX: borderX }] }}
+              />
+            )}
           </View>
         )}
 
@@ -502,11 +532,11 @@ export default function MainTabBar({ state, navigation, canCreate }: BottomTabBa
         <TabBtn route="Channels" label="Channels" active={current === 'Channels'} toReact={toReact} onPress={() => handleTabPress('Channels')} />
 
         <GlowFab
-          hot={current === 'Studio' && sub === 'StudioHome'}
+          hot={onStudioHome}
           onPress={() => {
             // On the Studio tab's home screen, the FAB jumps straight into a new recording. From any
             // other tab (or screen) it behaves like a normal tab press → opens/resets Studio to its home.
-            if (current === 'Studio' && sub === 'StudioHome') {
+            if (onStudioHome) {
               (navigation.navigate as any)('Studio', { screen: 'StudioCapture' });
             } else {
               handleTabPress('Studio');

@@ -249,22 +249,6 @@ export default function ChannelPostScreen({
     );
   }
 
-  // Exclusive content is members-only — its reactions/reviews must never surface in this PUBLIC channel-post
-  // screen (the channel-feed query already hides exclusive posts; this guards the open-by-id path). Members
-  // watch it via their collection (ExclusiveWatch); the creator/poster still manages it here.
-  if (post.is_exclusive && ownerId !== user?.id && post.poster_id !== user?.id) {
-    return (
-      <View style={[styles.center, { gap: SPACE.MD }]}>
-        <Text style={styles.muted}>💎 This is exclusive content.</Text>
-        <Text style={[styles.muted, { textAlign: 'center', paddingHorizontal: SPACE.XL }]}>
-          Its reactions and reviews are only visible to members of the collection it belongs to.
-        </Text>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.handle}>Go back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   const thumbnail = post.source_type === 'tiktok'
     ? ttThumb  // stored TikTok URL is expired; use the freshly resolved one
@@ -359,6 +343,11 @@ export default function ChannelPostScreen({
 
         {/* Overlay — same position for both states */}
         <View style={styles.blindOverlay}>
+          {post.is_exclusive && (
+            <View style={styles.exclusiveRow}>
+              <Text style={styles.exclusiveNote}>💎 Exclusive · only members see reactions &amp; reviews</Text>
+            </View>
+          )}
           <Text style={styles.posterHandle}>
             Posted by{' '}
             <Handle userId={post.poster_id} handle={post.poster?.handle ?? '?'} style={styles.handle} />
@@ -576,6 +565,8 @@ const styles = StyleSheet.create({
   meta: { padding: SPACE.LG, gap: SPACE.XS },
   videoTitle: { fontSize: FONT.SIZES.LG, fontFamily: FONT.DISPLAY_SEMIBOLD, color: C.INK },
   posterHandle: { fontSize: FONT.SIZES.SM, fontFamily: FONT.BODY, color: C.MUTED },
+  exclusiveRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  exclusiveNote: { fontSize: FONT.SIZES.XS, fontFamily: FONT.BODY_SEMIBOLD, color: C.ACCENT_HOT },
   handle: { color: C.ACCENT_HOT, fontFamily: FONT.BODY_MEDIUM },
   reactBtn: {
     backgroundColor: C.ACCENT,
