@@ -15,6 +15,7 @@ import AccountBlob from '../../../components/AccountBlob';
 import FriendsMenu from '../../../components/FriendsMenu';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useAuthStore } from '../../../store/authStore';
+import { useBlockStore } from '../../../store/blockStore';
 import {
   fetchPublicChannels,
   fetchMembersOnlyChannels,
@@ -27,6 +28,7 @@ import {
   type ChannelSummary,
 } from '../../../infrastructure/supabase/queries/channels';
 import ChannelCard from '../components/ChannelCard';
+import { MONETIZATION_ENABLED } from '../../../infrastructure/config/monetization';
 import type { RowState } from '../../../components/conversation/useRowState';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
@@ -47,6 +49,7 @@ export default function ChannelsHomeScreen({
 }: ChannelsStackScreenProps<'ChannelsHome'>) {
   const { user } = useAuthStore();
   const { top } = useSafeAreaInsets();
+  const blocked = useBlockStore(s => s.blocked);
 
   const [publicChannels, setPublicChannels] = useState<ChannelSummary[]>([]);
   const [membersOnly, setMembersOnly] = useState<ChannelSummary[]>([]);
@@ -150,6 +153,13 @@ export default function ChannelsHomeScreen({
     // Owned channels first so an owner's full metadata (incl. private/unlisted ones the public
     // sections drop) wins the dedup; the sort below is unchanged.
     for (const c of [...myChannels, ...subscribed, ...membersOnly, ...publicChannels]) {
+      // Hide channels created by users I've blocked (App Store 1.2 — a blocked user vanishes everywhere).
+      if (blocked.has(c.created_by)) { continue; }
+      // Paywalled channels are hidden entirely while monetization is off (App Store 3.1.1 — no
+      // subscriber content without IAP): subscriber_mode = locked behind subscription tiers, subscribed
+      // = a room the user pays for (fetchSubscribedChannels doesn't carry subscriber_mode, so check both).
+      // Free creator channels (is_members_only but not paid: public react-to-reveal grids) still show.
+      if (!MONETIZATION_ENABLED && (c.subscriber_mode || c.subscribed)) { continue; }
       if (!byId.has(c.id)) {
         byId.set(c.id, subscribedIds.has(c.id) ? { ...c, subscribed: true } : c);
       }
@@ -163,7 +173,7 @@ export default function ChannelsHomeScreen({
       if (at !== bt) { return bt.localeCompare(at); }
       return b.member_count - a.member_count;
     });
-  }, [publicChannels, membersOnly, subscribed, myChannels]);
+  }, [publicChannels, membersOnly, subscribed, myChannels, blocked]);
 
   // Filter is applied AFTER the sort (no sort change): all / public / invite-only / my channels.
   const filtered = useMemo(() => {

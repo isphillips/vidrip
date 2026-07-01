@@ -39,6 +39,7 @@ import CreateGroupChatScreen from '../../features/channels/screens/CreateGroupCh
 import OnboardingScreen from '../../features/onboarding/OnboardingScreen';
 import CreatorOnboardingScreen from '../../features/onboarding/creator/CreatorOnboardingScreen';
 import { CREATOR_INTRO } from '../../features/onboarding/config';
+import { MONETIZATION_ENABLED } from '../../infrastructure/config/monetization';
 import ScreenGradient from '../../components/ScreenGradient';
 import SplashScene from '../../components/splash/SplashScene';
 import { useOnboarding, useOnboardingStore } from '../../features/onboarding/onboarding';
@@ -140,12 +141,15 @@ export default function RootNavigator() {
     });
 
     // Wire award notification tap → open the gift reveal in the Feed tab.
-    setAwardNotificationHandler((awardId: string) => {
-      navRef.current?.navigate('Main', {
-        screen: 'Feed',
-        params: { screen: 'GiftReveal', params: { awardId } },
+    // Awards are an exclusive/paid surface — leave the tap inert while monetization is off (App Store 3.1.1).
+    if (MONETIZATION_ENABLED) {
+      setAwardNotificationHandler((awardId: string) => {
+        navRef.current?.navigate('Main', {
+          screen: 'Feed',
+          params: { screen: 'GiftReveal', params: { awardId } },
+        });
       });
-    });
+    }
 
     const cleanup = bootstrapNotifications();
     return cleanup;

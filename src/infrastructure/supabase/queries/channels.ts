@@ -557,6 +557,8 @@ export type ChannelUpdateSummary = {
   last_unseen_at: string | null;
   is_members_only: boolean;
   kind: 'channel' | 'group';
+  // Channel creator — lets the Feed hide rows from users the viewer has blocked (App Store 1.2).
+  created_by: string;
 };
 
 // One call powering the Feed "Channels" rows + ticker — channels (public/members-only) the
@@ -567,14 +569,24 @@ export async function fetchChannelUpdatesSummary(userId: string): Promise<Channe
   const { data, error } = await (supabase as any)
     .rpc('get_channel_updates_summary', { p_user_id: userId });
   if (error) { return []; }
-  return (data ?? []).map((r: any) => ({
+  const rows: ChannelUpdateSummary[] = (data ?? []).map((r: any) => ({
     channel_id: r.channel_id,
     name: r.name ?? 'a channel',
     unseen_count: Number(r.unseen_count ?? 0),
     last_unseen_at: r.last_unseen_at ?? null,
     is_members_only: !!r.is_members_only,
     kind: (r.kind === 'group' ? 'group' : 'channel') as 'channel' | 'group',
+    created_by: '',
   }));
+  // Attach each channel's creator so the Feed can hide rows from users the viewer has blocked
+  // (App Store 1.2 — a blocked user disappears from every surface, channels included).
+  const ids = rows.map(r => r.channel_id);
+  if (ids.length) {
+    const { data: gs } = await (supabase as any).from('groups').select('id, created_by').in('id', ids);
+    const creatorById = new Map<string, string>((gs ?? []).map((g: any) => [g.id, g.created_by]));
+    for (const r of rows) { r.created_by = creatorById.get(r.channel_id) ?? ''; }
+  }
+  return rows;
 }
 
 // Create a friends-only group chat (private channel with >=2 other members). Auto-named

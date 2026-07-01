@@ -84,7 +84,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
     if (!next) {
       Alert.alert(
         'Turn off creator mode?',
-        'Your Members Only channel will be removed from the public Channels screen. Turn creator mode back on anytime to restore it.',
+        'Your creator channel will be removed from the public Channels screen. Turn creator mode back on anytime to restore it.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Turn Off', style: 'destructive', onPress: apply },
@@ -376,7 +376,7 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
         <>
           <Text style={styles.sectionLabel}>Creator Accounts</Text>
           <Text style={styles.sectionHint}>
-            Enable an account to open a public “Members Only” channel under your handle, so people can react to your videos.
+            Enable an account to open a public creator channel under your handle, so people can react to your videos.
           </Text>
           <View style={styles.section}>
             {PROVIDERS.map(({ key, label }, i) => {

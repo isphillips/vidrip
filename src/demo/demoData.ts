@@ -98,10 +98,10 @@ export const demoPending: PendingRequest[] = [
 
 // ── Feed: the Channels block marquee ("N new in …") ────────────────────────────
 export const demoChannelUpdates: ChannelUpdateSummary[] = [
-  { channel_id: 'demo-c-01', name: 'Maya',  unseen_count: 3, last_unseen_at: ago(15),  is_members_only: true,  kind: 'channel' },
-  { channel_id: 'demo-c-02', name: 'Theo',  unseen_count: 1, last_unseen_at: ago(95),  is_members_only: true,  kind: 'channel' },
-  { channel_id: 'demo-c-05', name: 'Rin',   unseen_count: 2, last_unseen_at: ago(120), is_members_only: true,  kind: 'channel' },
-  { channel_id: 'demo-c-03', name: 'Movie Night', unseen_count: 5, last_unseen_at: ago(140), is_members_only: false, kind: 'group' },
+  { channel_id: 'demo-c-01', name: 'Maya',  unseen_count: 3, last_unseen_at: ago(15),  is_members_only: true,  kind: 'channel', created_by: 'demo-u-01' },
+  { channel_id: 'demo-c-02', name: 'Theo',  unseen_count: 1, last_unseen_at: ago(95),  is_members_only: true,  kind: 'channel', created_by: 'demo-u-02' },
+  { channel_id: 'demo-c-05', name: 'Rin',   unseen_count: 2, last_unseen_at: ago(120), is_members_only: true,  kind: 'channel', created_by: 'demo-u-05' },
+  { channel_id: 'demo-c-03', name: 'Movie Night', unseen_count: 5, last_unseen_at: ago(140), is_members_only: false, kind: 'group', created_by: 'demo-u-01' },
 ];
 
 // ── Channels tab: channel cards ────────────────────────────────────────────────

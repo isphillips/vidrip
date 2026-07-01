@@ -20,6 +20,7 @@ import {
   fetchMyCollections, createCollection, addVideoToCollection, type ExclusiveCollection,
 } from '../../../infrastructure/exclusive/api';
 import { findObjectionable, OBJECTIONABLE_MESSAGE } from '../../../infrastructure/moderation/textFilter';
+import { MONETIZATION_ENABLED } from '../../../infrastructure/config/monetization';
 import { fetchFriends, type Friend } from '../../../infrastructure/supabase/queries/friends';
 import GradientButton from '../components/GradientButton';
 import SaveForLaterButton from '../components/SaveForLaterButton';
@@ -88,7 +89,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
         if (!initChannelId) {
           const first = cs[0] ?? null;
           setChannelId(first?.id ?? null);
-          if (first?.isMembersOnly) { setVisibility('subscribers'); }
+          if (MONETIZATION_ENABLED && first?.isMembersOnly) { setVisibility('subscribers'); }
         }
       })
       .catch(() => {})
@@ -132,7 +133,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
   const selectChannel = (ch: PostableChannel) => {
     if (uploading) { return; }
     setChannelId(ch.id);
-    if (ch.isMembersOnly) { setVisibility('subscribers'); }
+    if (MONETIZATION_ENABLED && ch.isMembersOnly) { setVisibility('subscribers'); }
   };
 
   const selectedChannel = channels.find(c => c.id === channelId) ?? null;
@@ -420,7 +421,7 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
                     <Ionicons name={active ? 'radio-button-on' : 'radio-button-off'} size={18}
                       color={active ? C.ACCENT_HOT : C.SUBTLE} />
                     <Text style={[styles.choiceText, active && styles.choiceTextActive]} numberOfLines={1}>{ch.name}</Text>
-                    {ch.isMembersOnly && (
+                    {ch.isMembersOnly && MONETIZATION_ENABLED && (
                       <View style={styles.membersBadge}>
                         <Ionicons name="lock-closed" size={11} color={C.ACCENT_HOT} />
                         <Text style={styles.membersBadgeTxt}>Subs only</Text>
@@ -431,7 +432,11 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
               })
         }
 
-        {/* Channel sub-destination — public feed vs staged into an exclusive collection. */}
+        {/* Channel sub-destination — public feed vs staged into an exclusive collection.
+            Exclusive (members-only) publishing is hidden while monetization is off (App Store 3.1.1);
+            postKind stays 'feed', so every post goes to the public feed. */}
+        {MONETIZATION_ENABLED && (
+        <>
         <Text style={styles.label}>Content type</Text>
         <View style={styles.toggle}>
           {([['feed', 'Public feed', 'globe-outline'], ['exclusive', 'Exclusive', 'diamond-outline']] as const).map(([k, lbl, icon]) => {
@@ -447,6 +452,8 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
             );
           })}
         </View>
+        </>
+        )}
 
         {postKind === 'exclusive' ? (
           <>
@@ -479,6 +486,10 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
           </>
         ) : (
         <>
+        {/* Members-only visibility is a paid surface — hidden while monetization is off (App Store 3.1.1).
+            Visibility stays 'public'. */}
+        {MONETIZATION_ENABLED && (
+        <>
         <Text style={styles.label}>Who can watch</Text>
         {subscribersOnly && (
           <Text style={styles.hint}>This channel is members-only. All posts are locked.</Text>
@@ -501,6 +512,8 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
             );
           })}
         </View>
+        </>
+        )}
 
         <Text style={styles.label}>When to publish</Text>
         <View style={styles.toggle}>

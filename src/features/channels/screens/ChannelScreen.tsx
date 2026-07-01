@@ -46,7 +46,6 @@ import {
 import { resolveTikTokThumbnail } from '../../../infrastructure/tiktok/api';
 import ChannelMessageBubble from '../components/ChannelMessageBubble';
 import ChannelSettingsSheet from '../components/ChannelSettingsSheet';
-import SubscriberPaywall from '../components/SubscriberPaywall';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 
 type GridFilter = 'all' | 'reactions' | 'reviews';
@@ -595,8 +594,6 @@ export default function ChannelhamburderScreen({
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={C.ACCENT_HOT} /></View>
-      ) : gated ? (
-        <SubscriberPaywall label={title} />
       ) : isPublic ? (
         <>
           {/* Posts / Reactions / Reviews filter pills — OWNER ONLY. Reactions & Reviews are the creator's

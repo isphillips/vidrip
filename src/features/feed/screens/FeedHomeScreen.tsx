@@ -25,6 +25,7 @@ import FriendsMenu from '../../../components/FriendsMenu';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { useFeedStore } from '../../../store/feedStore';
 import { useAuthStore } from '../../../store/authStore';
+import { useBlockStore } from '../../../store/blockStore';
 import { useReactQueueStore, type ReactTarget } from '../../../store/reactQueueStore';
 import {
   renameGroupChat, fetchChannelUpdatesSummary,
@@ -33,6 +34,7 @@ import {
 import ConversationRow from '../../../components/conversation/ConversationRow';
 import { relativeTime } from '../../../utils/relativeTime';
 import ExclusiveRail from '../../exclusive/components/ExclusiveRail';
+import { MONETIZATION_ENABLED } from '../../../infrastructure/config/monetization';
 import FeedVideoWarmer, { type WarmSource } from '../components/FeedVideoWarmer';
 import RecorderWarmup, { recorderWarmed } from '../../lens/RecorderWarmup';
 import { useFriendConversations } from '../conversation/useFriendConversations';
@@ -56,6 +58,7 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
   const { user } = useAuthStore();
   const { items, threads, toReactCount, loading, refreshing, refresh } = useFriendConversations();
   const setQueue = useReactQueueStore(s => s.setQueue);
+  const blocked = useBlockStore(s => s.blocked);
 
   // Warm the recorder's frame-processor/worklets runtime (~3s cold spin-up) once, off the critical
   // path, while the user browses the feed — so the first reaction-recorder open is warm (~0.1s) instead
@@ -86,14 +89,15 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
       it.kind === 'friend' ? it.conv.unreadCount > 0 : it.group.unreadCount > 0,
     );
     const channelRows: FeedRow[] = channelUpdates
-      .filter(c => c.kind === 'channel' && c.unseen_count > 0)
+      // Hide channels from users I've blocked (App Store 1.2 — a blocked user vanishes everywhere).
+      .filter(c => c.kind === 'channel' && c.unseen_count > 0 && !blocked.has(c.created_by))
       .map(c => ({
         kind: 'channel' as const,
         sortAt: c.last_unseen_at ? Date.parse(c.last_unseen_at) || 0 : 0,
         channel: c,
       }));
     return [...convRows, ...channelRows].sort((a, b) => b.sortAt - a.sortAt);
-  }, [items, channelUpdates]);
+  }, [items, channelUpdates, blocked]);
 
   const channelToReact = useMemo(
     () => channelUpdates.filter(c => c.kind === 'channel').reduce((n, c) => n + c.unseen_count, 0),
@@ -242,10 +246,12 @@ export default function FeedHomeScreen({ navigation }: FeedStackScreenProps<'Fee
         </View>
       </View>
 
-      <ExclusiveRail
-        onOpenGift={awardId => navigation.navigate('GiftReveal', { awardId })}
-        onOpenCollection={collectionId => navigation.navigate('ExclusiveCollection', { collectionId })}
-      />
+      {MONETIZATION_ENABLED && (
+        <ExclusiveRail
+          onOpenGift={awardId => navigation.navigate('GiftReveal', { awardId })}
+          onOpenCollection={collectionId => navigation.navigate('ExclusiveCollection', { collectionId })}
+        />
+      )}
 
       <FlatList
         style={styles.fill}

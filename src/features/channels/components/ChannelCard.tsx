@@ -6,6 +6,7 @@ import ExclusiveGlow from '../../../components/conversation/ExclusiveGlow';
 import { rowStateStyle, type RowState } from '../../../components/conversation/useRowState';
 import type { ChannelSummary } from '../../../infrastructure/supabase/queries/channels';
 import { DEMO_MODE } from '../../../demo/demoMode';
+import { MONETIZATION_ENABLED } from '../../../infrastructure/config/monetization';
 
 type Props = {
   channel: ChannelSummary;
@@ -71,7 +72,7 @@ export default function ChannelCard({
             </Text>
             {isOwner
               ? null
-              : channel.subscribed ? (
+              : channel.subscribed && MONETIZATION_ENABLED ? (
                 <View style={styles.joinedPill}>
                   <Text style={styles.joinedText}>Subscribed</Text>
                 </View>
@@ -91,7 +92,7 @@ export default function ChannelCard({
               ) : channel.invite_only ? (
                 <View style={styles.lockPill}>
                   <Text style={styles.lockText}>
-                    {channel.subscriber_mode ? '⭐ Members Only' : '🔒 Invite only'}
+                    {channel.subscriber_mode && MONETIZATION_ENABLED ? '⭐ Members Only' : '🔒 Invite only'}
                   </Text>
                 </View>
               ) : null

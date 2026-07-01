@@ -16,6 +16,7 @@ import {
   signCreatorVideo, type MyCreatorVideo, type Visibility,
 } from '../../../infrastructure/creatorStudio/api';
 import { deleteChannelPost } from '../../../infrastructure/supabase/queries/channels';
+import { MONETIZATION_ENABLED } from '../../../infrastructure/config/monetization';
 import { listDrafts, deleteDraft, type StudioDraft } from '../../../infrastructure/storage/studioDraftStorage';
 import BunnyEmbedPlayer from '../components/BunnyEmbedPlayer';
 import BunnyVideoLayer from '../components/BunnyVideoLayer';
@@ -235,7 +236,7 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
             {item.music && (
               <View style={styles.chip}><Ionicons name="musical-notes" size={11} color={C.SUBTLE} /><Text style={styles.chipTxt} numberOfLines={1}>{item.music}</Text></View>
             )}
-            {item.isExclusive && (
+            {item.isExclusive && MONETIZATION_ENABLED && (
               <View style={[styles.chip, styles.exclChip]}>
                 <Ionicons name="diamond" size={11} color={C.ACCENT_HOT} />
                 <Text style={[styles.chipTxt, { color: C.ACCENT_HOT }]} numberOfLines={1}>{item.collectionName ?? 'Exclusive'}</Text>
@@ -336,9 +337,11 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
         <View style={styles.headerActions}>
           {isCreatorStudio && (
             <>
-              <TouchableOpacity onPress={() => navigation.navigate('StudioCollections')} hitSlop={10}>
-                <Ionicons name="diamond-outline" size={22} color={C.INK} />
-              </TouchableOpacity>
+              {MONETIZATION_ENABLED && (
+                <TouchableOpacity onPress={() => navigation.navigate('StudioCollections')} hitSlop={10}>
+                  <Ionicons name="diamond-outline" size={22} color={C.INK} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={() => navigation.navigate('StudioCalendar')} hitSlop={10}>
                 <Ionicons name="calendar-outline" size={23} color={C.INK} />
               </TouchableOpacity>
@@ -406,10 +409,14 @@ export default function StudioHomeScreen({ navigation }: StudioStackScreenProps<
           <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
             <FilterGroup label="Status" value={fStatus} onChange={v => setFStatus(v as StatusFilter)}
               options={[['all', 'All'], ['ready', 'Live'], ['processing', 'Processing'], ['failed', 'Failed']]} />
-            <FilterGroup label="Visibility" value={fVis} onChange={v => setFVis(v as VisFilter)}
-              options={[['all', 'All'], ['public', 'Public'], ['subscribers', 'Members']]} />
-            <FilterGroup label="Exclusive" value={fExcl} onChange={v => setFExcl(v as ExclFilter)}
-              options={[['all', 'All'], ['yes', 'Exclusive'], ['no', 'Non-exclusive']]} />
+            {MONETIZATION_ENABLED && (
+              <FilterGroup label="Visibility" value={fVis} onChange={v => setFVis(v as VisFilter)}
+                options={[['all', 'All'], ['public', 'Public'], ['subscribers', 'Members']]} />
+            )}
+            {MONETIZATION_ENABLED && (
+              <FilterGroup label="Exclusive" value={fExcl} onChange={v => setFExcl(v as ExclFilter)}
+                options={[['all', 'All'], ['yes', 'Exclusive'], ['no', 'Non-exclusive']]} />
+            )}
             {channelOptions.length > 1 && (
               <FilterGroup label="Channel" value={fChannel ?? 'all'} onChange={v => setFChannel(v === 'all' ? null : v)}
                 options={[['all', 'All'], ...channelOptions.map(c => [c.id, c.name] as [string, string])]} />

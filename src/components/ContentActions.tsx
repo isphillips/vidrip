@@ -4,6 +4,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { C, FONT, SPACE, RADIUS } from '../theme';
 import { useAuthStore } from '../store/authStore';
 import { useBlockStore } from '../store/blockStore';
+import { navigationRef } from '../app/navigation/navigationRef';
 import { reportContent, type ReportTargetType } from '../infrastructure/supabase/queries/reports';
 
 const REASONS: { key: string; label: string }[] = [
@@ -83,7 +84,16 @@ export default function ContentActions({
       { text: 'Cancel', style: 'cancel' },
       { text: 'Block', style: 'destructive', onPress: async () => {
         setBusy(true);
-        try { await block(targetUserId!); onBlocked?.(); Alert.alert('Blocked', `You won’t see ${who} anymore.`); }
+        try {
+          await block(targetUserId!);
+          onBlocked?.();
+          // Drop the viewer straight back to the Feed — the blocked user is now gone from every
+          // surface, so leave whatever content/profile screen we blocked from and land somewhere clean.
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('Main', { screen: 'Feed', params: { screen: 'FeedHome' } });
+          }
+          Alert.alert('Blocked', `You won’t see ${who} anymore.`);
+        }
         catch { Alert.alert('Couldn’t block', 'Please try again.'); }
         finally { setBusy(false); }
       } },

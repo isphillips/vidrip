@@ -12,6 +12,7 @@ import YoutubePlayer from 'react-native-youtube-iframe';
 import TikTokPlayer from '../../../components/TikTokPlayer';
 import { C, FONT, SPACE, RADIUS } from '../../../theme';
 import { DEMO_MODE } from '../../../demo/demoMode';
+import { MONETIZATION_ENABLED } from '../../../infrastructure/config/monetization';
 import { useAuthStore } from '../../../store/authStore';
 import { useBlockStore } from '../../../store/blockStore';
 import { usePendingChannelReactionsStore } from '../../../store/pendingChannelReactionsStore';
@@ -343,7 +344,7 @@ export default function ChannelPostScreen({
 
         {/* Overlay — same position for both states */}
         <View style={styles.blindOverlay}>
-          {post.is_exclusive && (
+          {post.is_exclusive && MONETIZATION_ENABLED && (
             <View style={styles.exclusiveRow}>
               <Text style={styles.exclusiveNote}>💎 Exclusive · only members see reactions &amp; reviews</Text>
             </View>

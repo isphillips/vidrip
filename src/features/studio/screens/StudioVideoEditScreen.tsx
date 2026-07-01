@@ -14,6 +14,7 @@ import {
   type ExclusiveCollection,
 } from '../../../infrastructure/exclusive/api';
 import { findObjectionable, OBJECTIONABLE_MESSAGE } from '../../../infrastructure/moderation/textFilter';
+import { MONETIZATION_ENABLED } from '../../../infrastructure/config/monetization';
 import GradientButton from '../components/GradientButton';
 import type { StudioStackScreenProps } from '../../../app/navigation/types';
 
@@ -138,6 +139,9 @@ export default function StudioVideoEditScreen({ route, navigation }: StudioStack
         <Text style={styles.label}>Title</Text>
         <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Give it a title…" placeholderTextColor={C.SUBTLE} maxLength={120} />
 
+        {/* Members-only visibility is a paid surface — hidden while monetization is off (App Store 3.1.1). */}
+        {MONETIZATION_ENABLED && (
+        <>
         <Text style={styles.label}>Who can watch</Text>
         {visLocked && <Text style={styles.hint}>This channel is members-only. All posts are locked to members.</Text>}
         <View style={styles.toggle}>
@@ -154,6 +158,8 @@ export default function StudioVideoEditScreen({ route, navigation }: StudioStack
             );
           })}
         </View>
+        </>
+        )}
 
         <Text style={styles.label}>When to publish</Text>
         <View style={styles.toggle}>
@@ -175,6 +181,10 @@ export default function StudioVideoEditScreen({ route, navigation }: StudioStack
           </TouchableOpacity>
         )}
 
+        {/* Exclusive (members-only) publishing is a paid surface — hidden while monetization is off
+            (App Store 3.1.1). exclusiveOn stays as loaded, so the save leaves the post as-is. */}
+        {MONETIZATION_ENABLED && (
+        <>
         <Text style={styles.label}>Exclusive</Text>
         <TouchableOpacity style={styles.exclToggle} onPress={() => setExclusiveOn(o => !o)} activeOpacity={0.85}>
           <Ionicons name={exclusiveOn ? 'diamond' : 'diamond-outline'} size={18} color={exclusiveOn ? C.ACCENT_HOT : C.SUBTLE} />
@@ -198,6 +208,8 @@ export default function StudioVideoEditScreen({ route, navigation }: StudioStack
                   );
                 })}
           </>
+        )}
+        </>
         )}
       </ScrollView>
 

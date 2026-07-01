@@ -9,6 +9,7 @@ import { FONT } from '../../theme';
 import { useClock, sawtooth, triangle } from './effectClock';
 import { useStudioQuality, scaleCount } from './studioQuality';
 import { MonsoonCanvas, InfernoCanvas } from './components/SkiaParticles';
+import { MONETIZATION_ENABLED } from '../../infrastructure/config/monetization';
 
 const BRAND = ['#FF4FA3', '#A05CFF', '#3B82F6'];
 
@@ -1250,6 +1251,10 @@ const overlays: StickerDef[] = [
   },
 ];
 
+// Subscribe-CTA stickers are hidden while monetization is off (App Store 3.1.1 — no subscribe prompts
+// without IAP). `sc_subscribe` is the creator PNG, `sub` the branded "SUBSCRIBE 💜" pill.
+const MONETIZATION_STICKER_KEYS = new Set(['sc_subscribe', 'sub']);
+
 export const STICKERS: StickerDef[] = [
   ...stickers,
   ...branded,
@@ -1262,7 +1267,7 @@ export const STICKERS: StickerDef[] = [
     ].map(emoji),
   ...animated,
   ...overlays,
-];
+].filter(st => MONETIZATION_ENABLED || !MONETIZATION_STICKER_KEYS.has(st.key));
 
 export const stickerByKey = (k: string) => STICKERS.find(s => s.key === k);
 
