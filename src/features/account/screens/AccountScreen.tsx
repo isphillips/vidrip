@@ -476,13 +476,6 @@ export default function AccountScreen({ navigation }: AccountStackScreenProps<'A
       <View style={styles.section}>
         <TouchableOpacity
           style={styles.row}
-          onPress={() => navigation.navigate('InviteManagement')}>
-          <Text style={styles.rowLabel}>Invite Codes</Text>
-          <Text style={styles.rowChevron}>›</Text>
-        </TouchableOpacity>
-        <View style={styles.divider} />
-        <TouchableOpacity
-          style={styles.row}
           onPress={() => navigation.navigate('PasswordSetup')}>
           <Text style={styles.rowLabel}>Password Login</Text>
           <Text style={styles.rowChevron}>›</Text>

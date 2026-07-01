@@ -62,12 +62,19 @@ async function scrapeOg(url: string) {
     const ogTitle = metaTag(html, "og:title");
     const ogDesc = metaTag(html, "og:description");
     const ogImage = metaTag(html, "og:image:secure_url") ?? metaTag(html, "og:image");
-    // Video vs image: a reel/video post carries an og:video tag (and og:type contains "video"); a photo
-    // post has neither. The recorder uses this to special-case image posts (which can't tap-to-play and
-    // whose clickthrough would deep-link out of the app).
+    // Video vs image. A reel/video post carries an og:video tag (og:type "video.*") — BUT Instagram
+    // strips those from crawler/datacenter fetches, so they're often absent even for reels. The reliable
+    // signal that survives is the CANONICAL URL: reels/videos canonicalize to a /reel/ (or /tv/) URL,
+    // exposed both via og:url and the final redirected URL, while a photo post stays on /p/. The recorder
+    // uses this to special-case image posts (which can't tap-to-play and whose clickthrough deep-links out).
     const ogVideo = metaTag(html, "og:video:secure_url") ?? metaTag(html, "og:video:url") ?? metaTag(html, "og:video");
     const ogType = metaTag(html, "og:type");
-    const isVideo = !!ogVideo || /video/i.test(ogType ?? "");
+    const ogUrl = metaTag(html, "og:url");
+    const isReelUrl = /\/(reel|reels|tv)\//i.test(ogUrl ?? "") || /\/(reel|reels|tv)\//i.test(res.url ?? "");
+    // Last-resort video markers that IG sometimes leaves in the page JSON — all video-specific, so they
+    // can't false-positive a photo (a photo is media_type 1 / GraphImage, never these).
+    const htmlVideoHint = /"is_video"\s*:\s*true|"product_type"\s*:\s*"clips"|"__typename"\s*:\s*"[A-Za-z]*GraphVideo"|"media_type"\s*:\s*2\b/i.test(html);
+    const isVideo = !!ogVideo || /video/i.test(ogType ?? "") || isReelUrl || htmlVideoHint;
     // IG encodes the caption in og:description and the author in og:title (parsed above). Facebook's
     // og:title is already the reel/video title and og:image the thumbnail, so use them as-is there.
     const isIg = /instagram\.com/.test(url);

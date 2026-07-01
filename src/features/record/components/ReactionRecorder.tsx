@@ -306,6 +306,9 @@ export default function ReactionRecorder({
 
   const ytRef = useRef<YoutubeIframeRef>(null);
   const ttRef = useRef<TikTokPlayerHandle>(null);
+  // Safety net for the TikTok start-tap: if playback doesn't begin, drop the spinner back to the play
+  // button so the user can retry (instead of an endless spinner).
+  const ttStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const igRef = useRef<InstagramPlayerHandle>(null);
   const cameraRef = useRef<Camera>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -358,6 +361,7 @@ export default function ReactionRecorder({
     return () => {
       Orientation.unlockAllOrientations();
       if (timerRef.current) { clearInterval(timerRef.current); }
+      if (ttStartTimerRef.current) { clearTimeout(ttStartTimerRef.current); }
       if (speakerOverrideRef.current) { restoreAudioRoute().catch(() => {}); }
     };
   }, []);
@@ -383,12 +387,14 @@ export default function ReactionRecorder({
       resolveTikTokThumbnail(videoId).then(set).catch(() => {});
     } else if (sourceType === 'instagram' && videoId) {
       // /p/ is the canonical URL for ALL post types (reel, video, image, carousel); the scrape returns the
-      // thumbnail AND whether it's a video. Detection failure → assume reel (the common case + safe default).
+      // thumbnail AND whether it's a video. Only treat it as a photo when the scrape POSITIVELY says so —
+      // IG login-walls / strips the video signals from datacenter fetches, so "unknown" must default to
+      // reel (the common case), otherwise a real video gets rendered as a still.
       supabase.functions
         .invoke('instagram-oembed', { body: { url: `https://www.instagram.com/p/${videoId}/` } })
         .then(({ data }: any) => {
           set(data?.thumbnail);
-          if (alive) { setIgIsVideo(typeof data?.isVideo === 'boolean' ? data.isVideo : false); }
+          if (alive) { setIgIsVideo(data?.isVideo !== false); }
         })
         .catch(() => { if (alive) { setIgIsVideo(true); } });
     } else if (videoId) {
@@ -473,6 +479,19 @@ export default function ReactionRecorder({
     setSrcStarted(true);
     beginRecording();
   }, [srcStarted, beginRecording]);
+
+  // TikTok: the embed doesn't emit a 'buffering' state before it plays, and the tap must pass through to
+  // the embed's own play button (the only reliable way to start it — programmatic play is dropped when
+  // the player isn't command-ready, which we can't detect on Android). So the veil stays pass-through
+  // and TikTokPlayer reports the tap via onUserTap (blur-detected); we just show the spinner over the
+  // gap until onYtStateChange('playing') reveals the source. A timer reverts the spinner if playback
+  // never lands, so it can't hang.
+  const handleTikTokTap = useCallback(() => {
+    if (srcStarted || sourceBuffering) { return; }
+    setSourceBuffering(true);
+    if (ttStartTimerRef.current) { clearTimeout(ttStartTimerRef.current); }
+    ttStartTimerRef.current = setTimeout(() => { setSourceBuffering(false); }, 6000);
+  }, [srcStarted, sourceBuffering]);
 
   // Throw a reaction emoji: rate-limited to 1/sec, launched on the fountain, and recorded at the
   // current video time so it replays at the same moment when the reaction is watched back.
@@ -725,6 +744,7 @@ export default function ReactionRecorder({
     setFbReady(false);     // the FB WebView remounts (ytKey) → wait for its iframe to reload
     setSourceReady(false); // YT/TikTok embeds remount too → re-gate on their onReady
     setSourceBuffering(false);
+    if (ttStartTimerRef.current) { clearTimeout(ttStartTimerRef.current); ttStartTimerRef.current = null; }
     ytKeyRef.current += 1;
     setYtKey(ytKeyRef.current);
   }, [stopTimer, cancelTrack, capAnim]);
@@ -739,6 +759,7 @@ export default function ReactionRecorder({
   const onYtStateChange = useCallback((state: string) => {
     if (state === 'playing') {
       skipNextPausedRef.current = true;
+      if (ttStartTimerRef.current) { clearTimeout(ttStartTimerRef.current); ttStartTimerRef.current = null; }
       setSourceBuffering(false);
       setYtPlaying(true);
       setSrcStarted(true);   // tap landed on the video → reveal it (drop the blur/play button)
@@ -882,8 +903,11 @@ export default function ReactionRecorder({
               onReady={() => setSourceReady(true)}
               onChangeState={onYtStateChange}
               onCurrentTime={(_t, dur) => captureDuration(dur)}
+              onUserTap={handleTikTokTap}
             />
-            {!srcStarted && <SourceVeil platform="tiktok" thumbUri={veilThumb} loading={Platform.OS === 'android' && !sourceReady} />}
+            {/* Pass-through veil: the tap reaches the embed's own play button (the reliable start on
+                Android). handleTikTokTap (blur-detected) shows the spinner over the gap until 'playing'. */}
+            {!srcStarted && <SourceVeil platform="tiktok" thumbUri={veilThumb} loading={(Platform.OS === 'android' && !sourceReady) || sourceBuffering} />}
           </View>
         </View>
       ) : videoId && sourceType === 'instagram' ? (

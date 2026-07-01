@@ -1,6 +1,7 @@
 import React, {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -44,6 +45,9 @@ type Props = {
   onChangeState?: (state: PlayerState) => void;
   onReady?: () => void;
   onCurrentTime?: (currentTime: number, duration: number) => void;
+  // Fired when the user taps the player (detected via the window blurring as focus enters the iframe).
+  // Used by the recorder to show a loading spinner between the tap and playback beginning.
+  onUserTap?: () => void;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -82,6 +86,18 @@ function buildHtml(src: string): string {
       if (d.type.indexOf('on') !== 0) { return; }
       send({ type: d.type, value: d.value });
     });
+    // Tap detection: touch events inside the (cross-origin) player iframe never reach this document,
+    // but tapping it moves focus into the iframe, blurring this window — the one reliable signal that
+    // the user tapped play. Armed after a beat so load-time focus churn doesn't count as a tap; fires
+    // once. Lets the host show a spinner over the gap between the tap and playback actually starting.
+    var _tapped = false;
+    setTimeout(function(){
+      window.addEventListener('blur', function(){
+        if (_tapped) { return; }
+        _tapped = true;
+        send({ type: 'onUserTap' });
+      });
+    }, 1000);
   })();
   true;
 </script>
@@ -90,10 +106,13 @@ function buildHtml(src: string): string {
 }
 
 const TikTokPlayer = forwardRef<TikTokPlayerHandle, Props>(function TikTokPlayer(
-  { videoId, controls = true, startMuted = false, onChangeState, onReady, onCurrentTime, style },
+  { videoId, controls = true, startMuted = false, onChangeState, onReady, onCurrentTime, onUserTap, style },
   ref,
 ) {
   const webRef = useRef<WebView>(null);
+  // `onReady` fires once — from the embed's onPlayerReady, or from a load-based fallback (below).
+  const readyRef = useRef(false);
+  const readyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const html = useMemo(
     () => buildHtml(tikTokPlayerUrl(videoId, { controls, autoplay: false })),
@@ -104,6 +123,25 @@ const TikTokPlayer = forwardRef<TikTokPlayerHandle, Props>(function TikTokPlayer
     const arg = value === undefined ? 'undefined' : JSON.stringify(value);
     webRef.current?.injectJavaScript(`window.__tt && window.__tt(${JSON.stringify(type)}, ${arg}); true;`);
   }, []);
+
+  const fireReady = useCallback(() => {
+    if (readyRef.current) { return; }
+    readyRef.current = true;
+    if (readyTimer.current) { clearTimeout(readyTimer.current); readyTimer.current = null; }
+    if (startMuted) { command('mute'); }
+    onReady?.();
+  }, [onReady, startMuted, command]);
+
+  // Android safety net: the TikTok embed's onPlayerReady postMessage often never reaches the host there,
+  // which would leave a readiness-gated caller (the reaction recorder's veil) spinning forever. Once the
+  // page has loaded, reveal after a short grace period even if onPlayerReady never arrives. iOS gets
+  // onPlayerReady near-instantly, so this fallback no-ops there.
+  const scheduleReadyFallback = useCallback(() => {
+    if (readyRef.current || readyTimer.current) { return; }
+    readyTimer.current = setTimeout(fireReady, 1800);
+  }, [fireReady]);
+
+  useEffect(() => () => { if (readyTimer.current) { clearTimeout(readyTimer.current); } }, []);
 
   useImperativeHandle(
     ref,
@@ -127,8 +165,7 @@ const TikTokPlayer = forwardRef<TikTokPlayerHandle, Props>(function TikTokPlayer
       }
       switch (msg.type) {
         case 'onPlayerReady':
-          if (startMuted) { command('mute'); }
-          onReady?.();
+          fireReady();
           break;
         case 'onStateChange': {
           const state = TT_STATE[Number(msg.value)];
@@ -140,11 +177,14 @@ const TikTokPlayer = forwardRef<TikTokPlayerHandle, Props>(function TikTokPlayer
             onCurrentTime?.(Number(msg.value.currentTime), Number(msg.value.duration));
           }
           break;
+        case 'onUserTap':
+          onUserTap?.();
+          break;
         default:
           break;
       }
     },
-    [onChangeState, onReady, onCurrentTime, startMuted, command],
+    [onChangeState, onCurrentTime, fireReady, onUserTap],
   );
 
   return (
@@ -163,6 +203,7 @@ const TikTokPlayer = forwardRef<TikTokPlayerHandle, Props>(function TikTokPlayer
         return u.startsWith('https://') || u.startsWith('http://') || u.startsWith('about:') || u.startsWith('data:');
       }}
       onMessage={handleMessage}
+      onLoadEnd={scheduleReadyFallback}
       allowsInlineMediaPlayback
       mediaPlaybackRequiresUserAction={false}
       javaScriptEnabled
