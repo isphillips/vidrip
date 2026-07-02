@@ -207,6 +207,13 @@ export default function FriendConversationScreen({
           .on('postgres_changes',
             { event: 'INSERT', schema: 'public', table: 'channel_posts', filter: `channel_id=eq.${cid}` },
             () => { if (active) { load().then(scrollToEnd); } })
+          // The DM timeline also folds in shared videos + their reactions (fetchConversationShares), which
+          // live in `reactions`, NOT channel_posts — so listen there too or a new share/reaction wouldn't
+          // appear until refocus. No column filter (a share isn't keyed by this channel); postgres_changes
+          // is RLS-scoped, and load() rebuilds pair-scoped, so unrelated inserts are a cheap no-op refetch.
+          .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'reactions' },
+            () => { if (active) { load().then(scrollToEnd); } })
           .subscribe();
       }
     })();

@@ -35,6 +35,7 @@ import {
   downloadChannelClip,
   hasLocalAudio,
   localPathForAudio,
+  downloadChannelAudio,
 } from '../../../infrastructure/storage/localChannelClipStorage';
 import type { ChannelsStackScreenProps } from '../../../app/navigation/types';
 import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
@@ -130,11 +131,13 @@ function WatchChannelClipImpl({
   // Latest reaction playhead (seconds) — read by the source-sync loop without re-running it.
   const progressRef = useRef(0);
 
-  // Audio model: a no-headphones recording captured the speaker bleed, so its clip audio is the
+  // Audio model: a no-headphones REACTION captured the speaker bleed, so its clip audio is the
   // echoey/contaminated one. Mute the CLIP in that case and let the clean, sync-locked live source
   // carry the audio (you see the reaction, hear the source). With headphones the clip is clean
   // voice, so it plays alongside the source.
-  const muteClip = !post?.recorded_with_headphones;
+  // BUT only when there's a parent source to carry the audio — a standalone DM message (voice/audio or
+  // a plain video message, no parent_post_id) has no source, so muting it would leave it silent.
+  const muteClip = !!post?.parent_post_id && !post?.recorded_with_headphones;
 
   // Replay of the reactor's emoji throws ({e,t}[]), re-emitted as the clip's playhead crosses each t.
   const fountainRef = useRef<EmojiFountainHandle>(null);
@@ -192,15 +195,22 @@ function WatchChannelClipImpl({
 
       const isAudio = p.post_type === 'audio';
 
-      // Audio posts are always local — no cloud URL
+      // Audio: play the local copy if this device has it (the sender does), else download the uploaded
+      // copy (the recipient path — audio is now uploaded to channel-clips, no longer local-only).
       if (isAudio) {
         if (await hasLocalAudio(postId)) {
           const path = localPathForAudio(postId);
           setLocalUri(Platform.OS === 'ios' ? path : `file://${path}`);
           setLoadState('ready');
-        } else {
-          setLoadState('unavailable');
+          return;
         }
+        if (!p.video_url) { setLoadState('unavailable'); return; }
+        setLoadState('downloading');
+        try {
+          const dest = await downloadChannelAudio(postId, p.video_url, setDownloadPct);
+          setLocalUri(Platform.OS === 'ios' ? dest : `file://${dest}`);
+          setLoadState('ready');
+        } catch { setLoadState('unavailable'); }
         return;
       }
 

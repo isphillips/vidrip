@@ -16,6 +16,7 @@ import {
   type PostableChannel, type Visibility, type UploadHandle,
 } from '../../../infrastructure/creatorStudio/api';
 import { publishStudioClipToFriends } from '../../../infrastructure/creatorStudio/studioShare';
+import { captureCoverFrame } from '../../../infrastructure/media/coverFrame';
 import {
   fetchMyCollections, createCollection, addVideoToCollection, type ExclusiveCollection,
 } from '../../../infrastructure/exclusive/api';
@@ -194,8 +195,8 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
       try {
         thumbUrl = await Promise.race([
           (async () => {
-            const { path } = await createThumbnail({ url: fileUri, timeStamp: 1000, format: 'jpeg' });
-            return await uploadCreatorThumbnail(path);
+            const path = await captureCoverFrame(fileUri, 1000);
+            return path ? await uploadCreatorThumbnail(path) : undefined;
           })(),
           new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error('thumb timeout')), 8000)),
         ]);
@@ -244,8 +245,8 @@ export default function StudioDetailsScreen({ route, navigation }: StudioStackSc
       try {
         thumbUrl = await Promise.race([
           (async () => {
-            const { path: tp } = await createThumbnail({ url: baked, timeStamp: 1000, format: 'jpeg' });
-            return await uploadCreatorThumbnail(tp);
+            const tp = await captureCoverFrame(baked, 1000);
+            return tp ? await uploadCreatorThumbnail(tp) : undefined;
           })(),
           new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error('thumb timeout')), 8000)),
         ]);

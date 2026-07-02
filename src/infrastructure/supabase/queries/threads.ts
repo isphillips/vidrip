@@ -62,6 +62,9 @@ export type ReactionItem = {
   // SENDER's own reaction row, so playback resolves it from the siblings by matching user.id === senderId.
   senderId?: string | null;
   threadKind?: 'reaction' | 'studio_share' | null;
+  // Parent thread's poster image (source_type's thumbnail / studio_share cover). Used as the source
+  // player's `poster` so a studio clip shows its thumbnail instead of black while it loads.
+  threadThumbnail?: string | null;
   // Afterthought "outro" clip — plays after this reaction finishes.
   afterthought_url?: string | null;
   afterthought_duration?: number | null;
@@ -388,7 +391,7 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
       afterthought_url, afterthought_duration,
       user:users!user_id(id, handle, display_name),
       emoji_reactions(emoji, user_id),
-      thread:threads!thread_id(intro_url, intro_duration, sender_id, thread_kind)
+      thread:threads!thread_id(intro_url, intro_duration, sender_id, thread_kind, video_thumbnail)
     `)
     .eq('id', reactionId)
     .single();
@@ -403,6 +406,7 @@ export async function fetchReactionById(reactionId: string): Promise<ReactionIte
     // playback finds it among the siblings (see WatchReactionScreen's studio PIP).
     senderId: (data as any).thread?.sender_id ?? null,
     threadKind: ((data as any).thread?.thread_kind as 'reaction' | 'studio_share') ?? null,
+    threadThumbnail: (data as any).thread?.video_thumbnail ?? null,
   };
 }
 

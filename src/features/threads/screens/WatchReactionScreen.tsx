@@ -54,6 +54,21 @@ import type { FeedStackScreenProps } from '../../../app/navigation/types';
 
 import EmojiGlyph, { QUICK_EMOJIS } from '../../../components/EmojiGlyph';
 const MAX_EMOJIS_PER_USER = 10;
+
+// IG PHOTO post: no video to tap-to-play, so the reaction is driven by tapping the post. A native
+// overlay Pressable would work on iOS, but Android WebViews eat the FIRST tap focusing themselves, so
+// it'd need two taps. Instead a document-level `touchend` inside the page (touch isn't focus-gated the
+// way `click` is — see the recorder's YT_TAP_TO_PLAY) posts a 'tap' that drives play/pause on the first
+// touch, on both platforms. Also keeps the page black so letterboxing reads black.
+const IG_PHOTO_TAP_JS = `(function(){
+  function imp(el,k,v){ if(el&&el.style){ el.style.setProperty(k,v,'important'); } }
+  function paint(){ imp(document.documentElement,'background-color','#000'); if(document.body){ imp(document.body,'background-color','#000'); } }
+  function post(){ try{ if(window.ReactNativeWebView){ window.ReactNativeWebView.postMessage(JSON.stringify({type:'tap'})); } }catch(e){} }
+  document.addEventListener('touchend', post, true);
+  document.addEventListener('click', post, true);
+  paint();
+  var n=0, iv=setInterval(function(){ n++; paint(); if(n>60){ clearInterval(iv); } }, 100);
+})(); true;`;
 type DownloadState = 'idle' | 'downloading' | 'ready' | 'unavailable';
 
 // ── Animated emoji button ────────────────────────────────────────────────────
@@ -119,10 +134,6 @@ export default function WatchReactionScreen({
   const [srcDismissed, setSrcDismissed] = useState(false);
   // Studio-share source: the sender's clip (a sibling reaction). Resolved playable URI for its PIP.
   const [studioSourceUri, setStudioSourceUri] = useState<string | null>(null);
-  // Facebook source: the SDK player posts 'ready' on xfbml.ready. Until then we hold a black + spinner
-  // gate (the FB embed loads behind it) so the reaction video never flashes first and an early tap can't
-  // start things out of order. Only relevant for source_type === 'facebook'.
-  const [fbReady, setFbReady] = useState(false);
   const [paused, setPaused] = useState(true);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -136,10 +147,19 @@ export default function WatchReactionScreen({
   // reaction video's `paused` on this flag (set once the first frame is ready) so the play intent is
   // only delivered to a ready player. iOS already starts reliably; the gate is a harmless no-op there.
   const [canPlay, setCanPlay] = useState(false);
+  // The source player has reported ready (YouTube/TikTok/studio onReady, FB 'ready', IG page load) — or
+  // there's no source to wait for. Paired with `canPlay` (reaction first frame) to hold a single load
+  // spinner until BOTH are ready, so the reaction and source never appear one-loading-over-the-other.
+  const [sourceReady, setSourceReady] = useState(false);
+  // Instagram post-type: an IG share is either a video REEL (a controllable embed, like YouTube) or a
+  // photo POST (no playable video — show the still image as the source). null = still detecting via the
+  // OG scrape (which also yields the photo's image url). Mirrors the recorder's igIsVideo detection.
+  const [igIsVideo, setIgIsVideo] = useState<boolean | null>(null);
   const videoRef = useRef<any>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
   const ttRef = useRef<TikTokPlayerHandle>(null);
   const igRef = useRef<InstagramPlayerHandle>(null);   // studio file-source PIP
+  const igReelRef = useRef<any>(null);                  // IG reel WebView — driven via injectJavaScript to sync with the reaction
   const igTimeRef = useRef(0);                          // latest studio-source playhead (onCurrentTime)
   const fbWebRef = useRef<any>(null);                   // FB SDK player WebView — driven via injectJavaScript
   // True while force-stopping at the end — ignore the source's auto "playing"
@@ -198,6 +218,7 @@ export default function WatchReactionScreen({
                   ? list.find(x => x.id !== r.id && x.user?.id === senderId)
                   : null;
                 if (clip?.resolvedUri) { setStudioSourceUri(clip.resolvedUri); }
+                else { setSourceReady(true); }   // studio share but no locatable clip → no source to wait on
               }
             })
             .catch(() => {});
@@ -233,6 +254,37 @@ export default function WatchReactionScreen({
     return () => clearTimeout(t);
   }, [loading]);
 
+  // Safety net for the both-ready load gate: if a source never reports ready (e.g. an IG reel has no
+  // ready event, or the sibling fetch failed), reveal anyway after a few seconds rather than spin forever.
+  useEffect(() => {
+    if (loading || sourceReady) { return; }
+    const t = setTimeout(() => setSourceReady(true), 8000);
+    return () => clearTimeout(t);
+  }, [loading, sourceReady]);
+
+  // Instagram: detect reel vs photo post via the OG scrape (same as the recorder). A photo has no video,
+  // so we render its still image as the source; the scrape also returns that image url. Default to reel
+  // when unknown/failed (the common case), matching the recorder.
+  useEffect(() => {
+    if (reaction?.source_type !== 'instagram' || !reaction.yt_video_id) { return; }
+    let alive = true;
+    supabase.functions
+      .invoke('instagram-oembed', { body: { url: `https://www.instagram.com/p/${reaction.yt_video_id}/` } })
+      .then(({ data }: any) => {
+        if (!alive) { return; }
+        const isVid = data?.isVideo !== false;
+        setIgIsVideo(isVid);
+        if (!isVid) {
+          // A photo has no video to load — mark the source ready NOW so the load gate lifts on the
+          // reaction alone; the IG post page fills into its WebView behind it (may be slow / black
+          // first). Don't block playback on the embed.
+          setSourceReady(true);
+        }
+      })
+      .catch((e) => { if (alive) { setIgIsVideo(true); } });
+    return () => { alive = false; };
+  }, [reaction?.source_type, reaction?.yt_video_id]);
+
   // Realtime emoji updates
   useEffect(() => {
     const channel = (supabase as any)
@@ -256,6 +308,30 @@ export default function WatchReactionScreen({
       return !prev;
     });
   }, []);
+
+  // Restart from the top (like the recorder's ↺): rewind the reaction AND every possible source to the
+  // start, re-arm the emoji replay, drop out of the afterthought outro, and play. Seeks are fired on all
+  // player refs unconditionally — inactive ones are null and no-op.
+  const handleRestart = useCallback(() => {
+    const offset = reaction?.yt_start_offset ?? 0;
+    stoppingRef.current = false;
+    pendingYtSeekRef.current = false;
+    setPlayingAfterthought(false);
+    progressRef.current = 0;
+    setProgress(0);
+    firedRef.current = 0;
+    lastReplayTimeRef.current = 0;
+    videoRef.current?.seek?.(0);
+    ytRef.current?.seekTo?.(offset, true);
+    ttRef.current?.seekTo?.(offset);
+    igRef.current?.seekTo?.(0);
+    // IG reel: no player handle — rewind + replay its <video> via injected JS (its layer is already
+    // composited from the initial tap, so play() is safe here).
+    igReelRef.current?.injectJavaScript?.('(function(){var v=document.querySelector("video");if(v){try{v.currentTime=0;var p=v.play();if(p&&p.catch){p.catch(function(){});}}catch(e){}}})();true;');
+    fbWebRef.current?.injectJavaScript?.('window.fbPlayer&&window.fbPlayer.seek(0);true;');
+    setHasStarted(true);
+    setPaused(false);
+  }, [reaction?.yt_start_offset]);
 
   const handleYtStateChange = useCallback((state: string) => {
     if (state === 'playing') {
@@ -290,6 +366,17 @@ export default function WatchReactionScreen({
     if (reaction?.source_type !== 'facebook' || !hasStarted) { return; }
     fbWebRef.current?.injectJavaScript(`window.fbPlayer&&window.fbPlayer.${paused ? 'pause' : 'play'}();true;`);
   }, [paused, hasStarted, reaction?.source_type]);
+
+  // Instagram: after the reel has been started by a real tap (its GPU layer is composited), mirror our
+  // paused state onto it via injectJavaScript — so pausing/resuming the reaction pauses/resumes the reel
+  // in sync, the same way the YouTube source follows the reaction. Only after hasStarted so the initial
+  // touch (which composites + starts the reel, avoiding the WKWebView black-layer bug) isn't fought.
+  useEffect(() => {
+    if (reaction?.source_type !== 'instagram' || igIsVideo === false || !hasStarted) { return; }
+    igReelRef.current?.injectJavaScript?.(
+      `(function(){var v=document.querySelector('video');if(v){try{${paused ? 'v.pause()' : 'v.play()'};}catch(e){}}})();true;`,
+    );
+  }, [paused, hasStarted, reaction?.source_type, igIsVideo]);
 
   // Studio source: a re-hosted file PIP driven imperatively (no `play` prop). Mirror TikTok: push
   // the paused state in, and nudge it back onto the reaction clock on drift (it starts at offset 0).
@@ -410,14 +497,20 @@ export default function WatchReactionScreen({
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
+  // Pin full-screen states to the WINDOW height, not the flex-filled card. This screen is immersive, so
+  // the tab bar hides once the nav state reflects it — which lags the push transition a frame, briefly
+  // resizing the card and making a `flex: 1` centered spinner jitter up/down. A fixed window height is
+  // immune to that resize, so the loader stays put during the transition.
+  const windowFill = { position: 'absolute' as const, top: 0, left: 0, right: 0, height };
+
   // ── Loading states ──────────────────────────────────────────────────────
   if (loading || downloadState === 'idle') {
-    return <View style={styles.center}><ActivityIndicator color={C.ACCENT} size="large" /></View>;
+    return <View style={[styles.center, windowFill]}><ActivityIndicator color={C.ACCENT} size="large" /></View>;
   }
 
   if (downloadState === 'downloading') {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, windowFill]}>
         <ActivityIndicator color={C.ACCENT} size="large" />
         <Text style={styles.downloadText}>Downloading reaction…</Text>
         {downloadPct > 0 && (
@@ -432,7 +525,7 @@ export default function WatchReactionScreen({
 
   if (downloadState === 'unavailable' || !localUri) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, windowFill]}>
         <Text style={styles.unavailableIcon}>📵</Text>
         <Text style={styles.unavailableTitle}>Not available</Text>
         <Text style={styles.unavailableText}>
@@ -471,6 +564,11 @@ export default function WatchReactionScreen({
           source={{ uri: (playingAfterthought && reaction?.afterthoughtUri) ? reaction.afterthoughtUri : localUri }}
           style={{ width, height }}
           resizeMode="cover"
+          // Studio_share clip watched directly (no separate source PIP) IS the shared content, so show
+          // its thread thumbnail as the poster until the first frame decodes (else it's black on load).
+          poster={(reaction?.threadKind === 'studio_share' && !studioSourceUri && reaction?.threadThumbnail)
+            ? { source: { uri: reaction.threadThumbnail }, resizeMode: 'cover' }
+            : undefined}
           paused={paused || !canPlay}
           // No-headphones recordings captured speaker bleed → mute the clip and let the clean
           // sync-locked source carry audio. NEVER mute the afterthought outro (voice-only, no
@@ -502,16 +600,18 @@ export default function WatchReactionScreen({
         />
       </View>
 
-      {/* Tap-to-play background — only when there's NO source PIP (or Instagram, which can't drive the
-          reaction via embed events so the user taps to play directly). Facebook is special: the START
-          must come ONLY from FB's play button ('startedPlaying'), so the background does nothing until
-          the reaction has started — after which a main-area tap pauses/plays BOTH (via the FB sync). */}
+      {/* Tap-to-play background — active for sources that can't be paused via their own embed chrome:
+          Instagram, TikTok, and sourceless reactions all toggle play/pause on a main-area tap (the paused
+          state is mirrored onto the source by the per-source sync effects). Only YouTube stays hands-off
+          (its embed has full native controls + the `play` prop sync). Facebook is special: the START must
+          come ONLY from FB's play button ('startedPlaying'), so the background does nothing until the
+          reaction has started — after which a main-area tap pauses/plays BOTH (via the FB sync). */}
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={
           reaction?.source_type === 'facebook'
             ? (hasStarted ? handlePlayPause : undefined)
-            : (reaction?.yt_video_id && reaction.source_type !== 'instagram' ? undefined : handlePlayPause)
+            : (reaction?.yt_video_id && reaction.source_type !== 'instagram' && reaction.source_type !== 'tiktok' ? undefined : handlePlayPause)
         }
       />
 
@@ -546,12 +646,45 @@ export default function WatchReactionScreen({
                 ref={igRef}
                 uri={studioSourceUri}
                 startMuted={false}
+                poster={reaction?.threadThumbnail ?? undefined}
                 style={{ width, height }}
+                onReady={() => setSourceReady(true)}
                 onCurrentTime={(t) => { igTimeRef.current = t; }}
               />
+              {/* The full-screen source Video swallows taps before the corner-dock, so the background
+                  play-Pressable never sees them — overlay one here so a tap starts/pauses (both sync). */}
+              <Pressable style={StyleSheet.absoluteFill} onPress={handlePlayPause} />
             </View>
           ) : reaction.source_type === 'instagram' ? (
+            igIsVideo === false ? (
+              // IG PHOTO post — no playable video, so pull the ACTUAL post inline (like the recorder)
+              // via the IG page, not just the OG thumbnail. A photo has no video to sync, and the tap
+              // that drives play/pause comes from an in-page `touchend` (reliable first tap on Android —
+              // see IG_PHOTO_TAP_JS) rather than a native overlay that Android would make you tap twice.
+              <View style={{ width, height }}>
+                <WebView
+                  style={{ width, height, backgroundColor: '#000' }}
+                  source={{ uri: `https://www.instagram.com/reel/${reaction.yt_video_id}/?l=1` }}
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  allowsFullscreenVideo={false}
+                  javaScriptEnabled
+                  setSupportMultipleWindows={false}
+                  onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
+                  onLoadEnd={() => setSourceReady(true)}
+                  injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
+                  injectedJavaScript={IG_PHOTO_TAP_JS}
+                  onMessage={(e) => {
+                    try {
+                      const msg = JSON.parse(e.nativeEvent.data);
+                      if (msg.type === 'tap') { handlePlayPause(); }
+                    } catch { /* ignore */ }
+                  }}
+                />
+              </View>
+            ) : igIsVideo === true ? (
             <WebView
+              ref={igReelRef}
               style={{ width, height, backgroundColor: '#000' }}
               source={{ uri: `https://www.instagram.com/reel/${reaction.yt_video_id}/?l=1` }}
               allowsInlineMediaPlayback
@@ -563,6 +696,8 @@ export default function WatchReactionScreen({
               // deep-linking into the IG app. See igBlockLaunch / the IG_BLOCK_LAUNCH_JS docs.
               setSupportMultipleWindows={false}
               onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:')}
+              // No explicit 'ready' event from the reel — treat the page load as source-ready for the gate.
+              onLoadEnd={() => setSourceReady(true)}
               injectedJavaScriptBeforeContentLoaded={IG_BLOCK_LAUNCH_JS}
               // Source always carries audio now (the clip is muted for no-headphones), so play
               // the reel rather than muting it.
@@ -570,11 +705,15 @@ export default function WatchReactionScreen({
               onMessage={(e) => {
                 try {
                   const msg = JSON.parse(e.nativeEvent.data);
-                  // Ignore 'paused' — fires during buffering; only 'playing' drives the reaction start.
-                  if (msg.type && msg.type !== 'paused') { handleYtStateChange(msg.type); }
+                  // IG drives the reaction like the YouTube embed — playing/paused/ended all flow through.
+                  // Ignore ONLY the pre-start 'paused' (igReelJs's autoplay-then-pause dance before the
+                  // first real tap); once started, an IG pause pauses the reaction in sync.
+                  if (msg.type === 'paused' && !hasStarted) { return; }
+                  if (msg.type) { handleYtStateChange(msg.type); }
                 } catch { /* ignore */ }
               }}
             />
+            ) : null   /* IG post-type still detecting — the load gate covers this */
           ) : reaction.source_type === 'facebook' ? (
             // Facebook JS SDK embed (NOT the uncontrollable plugins/video.php iframe): the player fires a
             // 'startedPlaying' event, which we postMessage out and feed into handleYtStateChange — so the
@@ -600,7 +739,7 @@ export default function WatchReactionScreen({
                 onShouldStartLoadWithRequest={req => req.url.startsWith('https://') || req.url.startsWith('about:') || req.url.startsWith('data:')}
                 onMessage={(e) => {
                   const d = e.nativeEvent.data;
-                  if (d === 'ready') { setFbReady(true); }
+                  if (d === 'ready') { setSourceReady(true); }
                   else if (d === 'playing') { handleYtStateChange('playing'); }
                 }}
               />
@@ -615,6 +754,7 @@ export default function WatchReactionScreen({
               videoId={reaction.yt_video_id as string}
               onChangeState={handleYtStateChange}
               onReady={() => {
+                setSourceReady(true);
                 const offset = reaction.yt_start_offset ?? 0;
                 if (offset > 0) { ttRef.current?.seekTo(offset); }
               }}
@@ -635,6 +775,7 @@ export default function WatchReactionScreen({
                   initialPlayerParams={{ controls: true, rel: false, mute: 1 } as any}
                   webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
                   onReady={() => {
+                    setSourceReady(true);
                     const offset = reaction.yt_start_offset ?? 0;
                     if (offset > 0) { ytRef.current?.seekTo(offset, true); }
                   }}
@@ -646,12 +787,24 @@ export default function WatchReactionScreen({
         </Animated.View>
       )}
 
-      {/* Facebook load gate: a black screen + spinner that covers everything (and absorbs taps) while the
-          FB embed initialises behind it. Lifts on 'ready', revealing the full-screen FB source. Keeps the
-          reaction video from flashing first and blocks an early tap from starting things out of order. */}
-      {reaction?.source_type === 'facebook' && !fbReady && !srcDismissed && (
-        <View style={styles.fbGate}>
+      {/* Load gate: a black spinner over everything until BOTH the reaction (first frame) and the source
+          are ready, then it lifts to reveal them stacked — so the reaction never flashes first with the
+          source loading over it. A Pressable so it also absorbs taps (nothing can start before it lifts);
+          the controls (close) render after this, so they stay tappable above it. */}
+      {!srcDismissed && !(canPlay && sourceReady) && (
+        <Pressable style={[styles.fbGate, windowFill]} onPress={() => {}}>
           <ActivityIndicator size="large" color={C.ACCENT_HOT} />
+        </Pressable>
+      )}
+
+      {/* Play button over the IG / TikTok / studio source. Their players sit above the reaction and hide
+          the base play icon (above), so surface one here once loaded. Visual only (pointerEvents="none"):
+          the tap falls through to the embed / source tap-surface (which drives play/pause). */}
+      {(reaction?.source_type === 'instagram' || reaction?.source_type === 'tiktok' || !!studioSourceUri) && paused && !srcDismissed && canPlay && sourceReady && (
+        <View style={styles.playOverlay} pointerEvents="none">
+          <View style={styles.playCircle}>
+            <Text style={styles.playIcon}>▶</Text>
+          </View>
         </View>
       )}
 
@@ -730,6 +883,16 @@ export default function WatchReactionScreen({
         onPress={() => navigation.goBack()}>
         <Text style={styles.closeTxt}>✕</Text>
       </TouchableOpacity>
+
+      {/* Restart — rewind the reaction + source to the top and play (like the recorder's ↺). */}
+      {hasStarted && !srcDismissed && (
+        <TouchableOpacity
+          style={[styles.restartBtn, { bottom: bottomInset + SPACE.LG }]}
+          onPress={handleRestart}
+          activeOpacity={0.85}>
+          <Ionicons name="refresh" size={22} color={C.WHITE} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -863,6 +1026,12 @@ const styles = StyleSheet.create({
   shareBtn: {
     position: 'absolute', right: SPACE.LG + 44,
     width: 36, height: 36, borderRadius: RADIUS.FULL,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  restartBtn: {
+    position: 'absolute', left: SPACE.LG,
+    width: 44, height: 44, borderRadius: RADIUS.FULL,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center', justifyContent: 'center',
   },

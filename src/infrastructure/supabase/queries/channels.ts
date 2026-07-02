@@ -1460,13 +1460,24 @@ export async function postChannelAudio({
   const { data, error } = await (supabase as any)
     .from('channel_posts')
     .insert({ channel_id: channelId, poster_id: userId, post_type: 'audio',
-              video_url: null, storage_mode: 'local', duration: Math.round(duration) })
+              video_url: null, storage_mode: 'cloud', duration: Math.round(duration) })
     .select('id').single();
   if (error) { throw error; }
   const postId = data.id as string;
+  // Seed a local copy for the sender's instant playback…
   const dir = `${RNFS.DocumentDirectoryPath}/channel-clips`;
   if (!(await RNFS.exists(dir))) { await RNFS.mkdir(dir); }
-  await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), `${dir}/${postId}.m4a`);
+  const localPath = `${dir}/${postId}.m4a`;
+  await RNFS.moveFile(filePath.replace(/^file:\/\//, ''), localPath);
+  // …then UPLOAD it so the recipient can download and play it. Audio was previously stored local-only,
+  // so recipients (who never have the file) always saw "unavailable". channel-clips is a public bucket,
+  // so video_url is a plain public URL the recipient downloads directly (mirrors uploadChannelClipRelay).
+  try {
+    const cloudUrl = await uploadToR2('channel-clips', `${userId}/${postId}.m4a`, localPath, 'audio/mp4');
+    await (supabase as any).from('channel_posts').update({ video_url: cloudUrl }).eq('id', postId);
+  } catch (e) {
+    log.error('[postChannelAudio] cloud upload failed:', JSON.stringify(e));
+  }
   return postId;
 }
 

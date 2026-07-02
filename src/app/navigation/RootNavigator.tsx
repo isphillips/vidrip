@@ -195,6 +195,11 @@ export default function RootNavigator() {
       // receiving the previous user's notifications).
       const prevUserId = useAuthStore.getState().user?.id;
       setSession(s);
+      // Authenticate the realtime socket with the user's JWT. Without this, postgres_changes on
+      // RLS-protected tables (reactions, channel_posts) connect as anon and RLS silently drops every
+      // event — the channel subscribes fine, but nothing ever arrives (live DM/thread refresh no-ops).
+      // Fires on INITIAL_SESSION (restore), SIGNED_IN, and TOKEN_REFRESHED so the socket stays authed.
+      supabase.realtime.setAuth(s?.access_token ?? null);
       setTimeout(async () => {
         try {
           if (s?.user) {

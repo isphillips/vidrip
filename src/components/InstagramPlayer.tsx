@@ -24,6 +24,9 @@ type Props = {
   // Mute on ready — used for the source PIP on watch screens (the reaction carries
   // the audio, mirroring the muted YouTube/TikTok PIP).
   startMuted?: boolean;
+  // Optional still shown until the first frame decodes — e.g. a studio clip's thumbnail, so the
+  // source shows its poster instead of black while the MP4 loads.
+  poster?: string;
   onChangeState?: (state: PlayerState) => void;
   onReady?: () => void;
   onCurrentTime?: (currentTime: number, duration: number) => void;
@@ -31,7 +34,7 @@ type Props = {
 };
 
 const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function InstagramPlayer(
-  { uri, startMuted = false, onChangeState, onReady, onCurrentTime, style },
+  { uri, startMuted = false, poster, onChangeState, onReady, onCurrentTime, style },
   ref,
 ) {
   const videoRef = useRef<any>(null);
@@ -62,6 +65,7 @@ const InstagramPlayer = forwardRef<InstagramPlayerHandle, Props>(function Instag
       ref={videoRef}
       source={{ uri }}
       style={style}
+      poster={poster ? { source: { uri: poster }, resizeMode: 'cover' } : undefined}
       paused={paused || !canPlay}
       muted={muted}
       // Render into a TextureView (not the default SurfaceView) on Android so this

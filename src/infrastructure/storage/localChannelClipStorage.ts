@@ -49,3 +49,26 @@ export function localPathForAudio(postId: string): string {
 export async function hasLocalAudio(postId: string): Promise<boolean> {
   return RNFS.exists(localPathForAudio(postId));
 }
+
+/** Recipient side: pull an audio message's uploaded copy to this device (mirrors downloadChannelClip). */
+export async function downloadChannelAudio(
+  postId: string,
+  url: string,
+  onProgress?: (pct: number) => void,
+): Promise<string> {
+  await ensureClipsDir();
+  const dest = localPathForAudio(postId);
+
+  const result = await RNFS.downloadFile({
+    fromUrl: url,
+    toFile: dest,
+    progress: onProgress
+      ? (res) => onProgress(Math.round((res.bytesWritten / res.contentLength) * 100))
+      : undefined,
+  }).promise;
+
+  if (result.statusCode !== 200) {
+    throw new Error(`Download failed with status ${result.statusCode}`);
+  }
+  return dest;
+}

@@ -1,6 +1,8 @@
 import * as tus from 'tus-js-client';
 import { supabase } from '../supabase/client';
 import type { OverlayRecipe } from '../../features/studio/effectRecipe';
+import { R2_ENABLED } from '../storage/r2Config';
+import { uploadToR2 } from '../storage/uploadToR2';
 
 /** The stored animated-overlay recipe for a creator video (null if it has none). */
 export async function fetchOverlayRecipe(postId: string): Promise<OverlayRecipe | null> {
@@ -35,20 +37,28 @@ const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
  * (Bunny's own thumbnail is token-gated, so we host our own from the source video.)
  */
 export async function uploadCreatorThumbnail(localPath: string): Promise<string> {
-  const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  if (!token) { throw new Error('Not authenticated'); }
-  const path = `creator-thumbs/${session!.user.id}-${Date.now()}.jpg`;
+  const uid = session?.user?.id;
+  if (!token || !uid) { throw new Error('Not authenticated'); }
+  // Key MUST start with the uploader's uid — the R2 upload Function enforces "key must live under your
+  // own uid" (same convention as commentThumbStoragePath = `${uid}/…`).
+  const key = `${uid}/creator-thumbs/${Date.now()}.jpg`;
+  // channel-clips is a PUBLIC bucket, so R2 returns a plain public URL (clips.vidrip.app) usable
+  // directly as a video_thumbnail. The legacy Supabase write below is dead once R2_ENABLED (it 400s
+  // now that the bucket has migrated) — kept only for the pre-migration flag-off path.
+  if (R2_ENABLED) { return uploadToR2('channel-clips', key, localPath, 'image/jpeg'); }
+
+  const fileUri = localPath.startsWith('file://') ? localPath : `file://${localPath}`;
   const form = new FormData();
   (form as any).append('file', { uri: fileUri, type: 'image/jpeg', name: 'cover.jpg' });
-  const res = await fetch(`${STORAGE_BASE}/channel-clips/${path}`, {
+  const res = await fetch(`${STORAGE_BASE}/channel-clips/${key}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, apikey: ANON_KEY, 'x-upsert': 'true' },
     body: form,
   });
-  if (!res.ok) { throw new Error(`thumb upload ${res.status}`); }
-  return supabase.storage.from('channel-clips').getPublicUrl(path).data.publicUrl;
+  if (!res.ok) { const body = await res.text().catch(() => ''); throw new Error(`thumb upload ${res.status}: ${body}`); }
+  return supabase.storage.from('channel-clips').getPublicUrl(key).data.publicUrl;
 }
 
 /** Reserve a Bunny video + post row; returns the TUS upload credentials. `releaseDate` (ISO) marks

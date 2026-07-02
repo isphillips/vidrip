@@ -1,0 +1,46 @@
+name: Prune OTA bundles
+
+# Weekly retention for hot-updater OTA bundles on Tigris: keep the newest N enabled bundles per
+# (platform, channel, target_app_version) group + a grace window, delete the rest, and GC unreferenced
+# content-addressed assets. Safe at any cadence — a superseded bundle is never served to a client, so
+# deleting it can't roll anyone back (see scripts/hot-updater/purge-tigris-bundles.mjs). Weekly just
+# keeps the bucket bounded. Trigger manually (workflow_dispatch) with dryRun to preview.
+on:
+  schedule:
+    - cron: '17 5 * * 1'   # Mondays 05:17 UTC
+  workflow_dispatch:
+    inputs:
+      dryRun:
+        description: 'Report only (no deletes)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: prune-bundles
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: corepack enable
+      - run: yarn install --immutable
+      - name: Prune Tigris bundles
+        env:
+          # Supabase: bundle metadata (which bundles exist / are enabled).
+          HOT_UPDATER_SUPABASE_URL: ${{ secrets.HOT_UPDATER_SUPABASE_URL }}
+          HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY }}
+          # Tigris: bundle files to prune.
+          HOT_UPDATER_S3_ENDPOINT: ${{ secrets.HOT_UPDATER_S3_ENDPOINT }}
+          HOT_UPDATER_S3_REGION: ${{ secrets.HOT_UPDATER_S3_REGION }}
+          HOT_UPDATER_S3_ACCESS_KEY_ID: ${{ secrets.HOT_UPDATER_S3_ACCESS_KEY_ID }}
+          HOT_UPDATER_S3_SECRET_ACCESS_KEY: ${{ secrets.HOT_UPDATER_S3_SECRET_ACCESS_KEY }}
+          HOT_UPDATER_S3_BUCKET_NAME: ${{ secrets.HOT_UPDATER_S3_BUCKET_NAME }}
+          # Retention knobs (optional overrides).
+          PURGE_KEEP_PER_GROUP: '2'
+          PURGE_GRACE_DAYS: '14'
+        run: node scripts/hot-updater/purge-tigris-bundles.mjs ${{ (github.event_name == 'workflow_dispatch' && inputs.dryRun) && '' || '--confirm' }}

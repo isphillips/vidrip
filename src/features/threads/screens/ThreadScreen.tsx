@@ -46,6 +46,7 @@ import {
   removeEmojiReaction,
 } from '../../../infrastructure/supabase/queries/reactions';
 import type { FeedStackScreenProps } from '../../../app/navigation/types';
+import { supabase } from '../../../infrastructure/supabase/client';
 
 type DlStatus = 'local' | 'downloading' | 'unavailable';
 
@@ -118,6 +119,26 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
   // useFocusEffect fires on the initial (focused) mount and on every refocus, so a
   // separate mount-only useEffect would double the thread+reactions fetch on first open.
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Live refresh: a new reaction landing on THIS thread (someone reacts / a video/audio message arrives)
+  // should appear without a close/reopen. Subscribe once per thread and refetch on any change; call load
+  // through a ref so the subscription isn't torn down and rebuilt each time `load`'s identity changes.
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
+  useEffect(() => {
+    if (!threadId) { return; }
+    // Unique topic per subscription — supabase.channel() reuses a channel by name, and on a fast
+    // refocus that would re-.on() an already-subscribed object ("cannot add callbacks after subscribe").
+    const channel = (supabase as any)
+      .channel(`thread-live-${threadId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reactions', filter: `thread_id=eq.${threadId}` },
+        () => { loadRef.current(); },
+      )
+      .subscribe();
+    return () => { (supabase as any).removeChannel(channel); };
+  }, [threadId]);
 
   // Refetch the moment a background upload finishes, so a just-posted reaction
   // becomes visible as soon as its relay upload completes — no close/reopen.
@@ -222,6 +243,9 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
     ? (displayReactions.find(r => (r.user as any)?.id === thread.sender_id) ?? null)
     : null;
   const listReactions = studioClip ? displayReactions.filter(r => r.id !== studioClip.id) : displayReactions;
+  // Tapping the headline (studio clip or source thumbnail) jumps straight into the reaction viewer at the
+  // first reaction below; WatchReaction loads the rest of the thread's reactions to swipe through.
+  const firstReactionId = listReactions[0]?.id ?? null;
 
   const obscured = canReact;
   const thumbnail = thread.video_thumbnail ??
@@ -238,8 +262,16 @@ export default function ThreadScreen({ route, navigation }: FeedStackScreenProps
             <Image source={require('../../../assets/questionmark.png')} style={styles.thumbBlindImg} resizeMode="contain" />
           </View>
         ) : isStudioShare && studioClip ? (
+          // Headline jumps to the first reaction below; with no reactions yet, fall back to the creator's clip.
           <TouchableOpacity activeOpacity={0.9} style={StyleSheet.absoluteFill}
-            onPress={() => navigation.navigate('WatchReaction', { reactionId: studioClip.id })}>
+            onPress={() => navigation.navigate('WatchReaction', { reactionId: firstReactionId ?? studioClip.id })}>
+            <Image source={{ uri: thumbnail ?? undefined }} style={styles.thumb} resizeMode="cover" />
+            <View style={styles.studioPlayBadge}><Text style={styles.studioPlayIcon}>▶</Text></View>
+          </TouchableOpacity>
+        ) : firstReactionId ? (
+          // Already revealed: tap the source thumbnail to start watching reactions at the first one.
+          <TouchableOpacity activeOpacity={0.9} style={StyleSheet.absoluteFill}
+            onPress={() => navigation.navigate('WatchReaction', { reactionId: firstReactionId })}>
             <Image source={{ uri: thumbnail ?? undefined }} style={styles.thumb} resizeMode="cover" />
             <View style={styles.studioPlayBadge}><Text style={styles.studioPlayIcon}>▶</Text></View>
           </TouchableOpacity>
