@@ -13,6 +13,7 @@ import {
 } from '../../../infrastructure/supabase/queries/channels';
 import { pickVideo } from '../../../infrastructure/media/imagePicker';
 import { useUploadStore } from '../../../store/uploadStore';
+import { MONETIZATION_ENABLED } from '../../../infrastructure/config/monetization';
 
 const CREATOR_STUDIO_URL = 'https://www.vidrip.app/dashboard';
 
@@ -213,18 +214,23 @@ export default function ChannelSettingsSheet({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
-            onPress={() => {
-              onClose();
-              Linking.openURL(CREATOR_STUDIO_URL).catch(() =>
-                Alert.alert('Could not open', 'Unable to open Creator Studio right now.'));
-            }}>
-            <Text style={styles.menuRowIcon}>↗</Text>
-            <View style={styles.menuRowText}>
-              <Text style={styles.menuRowLabel}>Creator Studio</Text>
-              <Text style={styles.menuRowSub}>Open your dashboard on the web</Text>
-            </View>
-          </TouchableOpacity>
+          {/* External link to the web creator dashboard (monetization / payouts). Hidden while
+              monetization is off — an in-app button linking out to a purchasing/account mechanism is
+              exactly what App Store 3.1.1 prohibits. */}
+          {MONETIZATION_ENABLED && (
+            <TouchableOpacity style={styles.menuRow} activeOpacity={0.7}
+              onPress={() => {
+                onClose();
+                Linking.openURL(CREATOR_STUDIO_URL).catch(() =>
+                  Alert.alert('Could not open', 'Unable to open Creator Studio right now.'));
+              }}>
+              <Text style={styles.menuRowIcon}>↗</Text>
+              <View style={styles.menuRowText}>
+                <Text style={styles.menuRowLabel}>Creator Studio</Text>
+                <Text style={styles.menuRowSub}>Open your dashboard on the web</Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity style={styles.modalClose} onPress={onClose}>
             <Text style={styles.modalCloseTxt}>Close</Text>
