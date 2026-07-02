@@ -19,6 +19,11 @@ const hotUpdater = createHotUpdater({
     supabaseUrl,
     supabaseServiceRoleKey,
   }),
+  // Bundle files now live on Tigris and are stored with a public https:// storage_uri, which the
+  // hot-updater server runtime returns verbatim + reads via fetch() — so NO Tigris adapter is needed
+  // here. The supabase storage adapter below is kept ONLY to resolve LEGACY supabase-storage:// bundles
+  // until they age out (see scripts/hot-updater/drain-supabase-bundles.mjs); remove it once every
+  // bundle's storage_uri is https.
   storages: [
     supabaseEdgeFunctionStorage({
       supabaseUrl,

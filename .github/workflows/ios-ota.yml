@@ -63,8 +63,15 @@ jobs:
       - name: Deploy iOS OTA
         if: steps.cls.outputs.native == 'false' && steps.cls.outputs.js == 'true'
         env:
+          # Supabase: bundle metadata + update-check server (database plugin).
           HOT_UPDATER_SUPABASE_URL: ${{ secrets.HOT_UPDATER_SUPABASE_URL }}
           HOT_UPDATER_SUPABASE_ANON_KEY: ${{ secrets.HOT_UPDATER_SUPABASE_ANON_KEY }}
           HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HOT_UPDATER_SUPABASE_SERVICE_ROLE_KEY }}
-          HOT_UPDATER_SUPABASE_BUCKET_NAME: ${{ secrets.HOT_UPDATER_SUPABASE_BUCKET_NAME }}
+          # Tigris: bundle files (S3-compatible storage plugin — see hot-updater-tigris.ts).
+          HOT_UPDATER_S3_ENDPOINT: ${{ secrets.HOT_UPDATER_S3_ENDPOINT }}
+          HOT_UPDATER_S3_REGION: ${{ secrets.HOT_UPDATER_S3_REGION }}
+          HOT_UPDATER_S3_ACCESS_KEY_ID: ${{ secrets.HOT_UPDATER_S3_ACCESS_KEY_ID }}
+          HOT_UPDATER_S3_SECRET_ACCESS_KEY: ${{ secrets.HOT_UPDATER_S3_SECRET_ACCESS_KEY }}
+          HOT_UPDATER_S3_BUCKET_NAME: ${{ secrets.HOT_UPDATER_S3_BUCKET_NAME }}
+          HOT_UPDATER_S3_PUBLIC_URL: ${{ secrets.HOT_UPDATER_S3_PUBLIC_URL }}
         run: npx hot-updater deploy -p ios -t "${{ steps.ver.outputs.value }}" -m "$(git log -1 --pretty=%s)" -f

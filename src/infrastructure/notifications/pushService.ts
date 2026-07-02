@@ -15,9 +15,26 @@ if (Platform.OS === 'ios') {
 let messaging: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let messagingInstance: any = null;
+// Notifee (Android only): FCM auto-displays a banner only when the app is BACKGROUNDED. To show one
+// while the app is FOREGROUNDED (like iOS does), we display it ourselves from onMessage via Notifee.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let notifee: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let AndroidImportance: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let EventType: any = null;
+// The foreground banner reuses the same look as FCM's backgrounded banner (see AndroidManifest
+// default_notification_icon / color).
+const ANDROID_CHANNEL_ID = 'default';
+const NOTIF_ICON = 'ic_notification';
+const NOTIF_COLOR = '#E73D93';
 if (Platform.OS === 'android') {
   const { getApp } = require('@react-native-firebase/app');
   messaging = require('@react-native-firebase/messaging');
+  const notifeeMod = require('@notifee/react-native');
+  notifee = notifeeMod.default;
+  AndroidImportance = notifeeMod.AndroidImportance;
+  EventType = notifeeMod.EventType;
   const app = getApp();
   messagingInstance = messaging.getMessaging(app);
   // A placeholder google-services.json can never obtain a real FCM token, so Android push silently
@@ -148,6 +165,34 @@ function handleAndroidNotification(remoteMessage: any): void {
   route(remoteMessage?.data);
 }
 
+// Public wrapper so index.js's Notifee BACKGROUND-event handler can route a tapped foreground banner.
+export function routeNotificationData(data: Record<string, string> | undefined): void {
+  route(data as any);
+}
+
+// Android foreground banner: FCM doesn't auto-display while the app is open, so we display it via
+// Notifee (same icon/color as the backgrounded banner). The routing `data` rides along so a tap routes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function displayForegroundBanner(remoteMessage: any): Promise<void> {
+  if (!notifee || !remoteMessage?.notification) { return; }   // data-only messages need no banner
+  // Ensure the channel exists (idempotent) — guards the race where a push lands before bootstrap's
+  // createChannel resolves; displayNotification requires an existing channel on Android.
+  await notifee.createChannel({
+    id: ANDROID_CHANNEL_ID, name: 'General', importance: AndroidImportance.HIGH, sound: 'default',
+  });
+  await notifee.displayNotification({
+    title: remoteMessage.notification.title,
+    body: remoteMessage.notification.body,
+    data: remoteMessage.data ?? {},
+    android: {
+      channelId: ANDROID_CHANNEL_ID,
+      smallIcon: NOTIF_ICON,
+      color: NOTIF_COLOR,
+      pressAction: { id: 'default' },   // tap opens the app and emits a PRESS event
+    },
+  });
+}
+
 // ── Bootstrap — call once at app startup ─────────────────────────────────────
 
 export function bootstrapNotifications(): () => void {
@@ -183,19 +228,37 @@ export function bootstrapNotifications(): () => void {
   }
 
   if (Platform.OS === 'android') {
-    // Foreground messages: DON'T navigate. onMessage fires when a push arrives while the app is open —
-    // routing here yanked the user to the target screen with no banner ("it just goes directly"). The
-    // in-app lists already update via realtime, so a foreground push needs no action. (FCM only auto-
-    // displays a banner when the app is backgrounded; a foreground banner would need a local-notif lib.)
-    const unsubForeground = messaging.onMessage(messagingInstance, () => { /* no-op — navigate only on tap */ });
+    // The channel a foreground banner is posted to (idempotent — safe to (re)create at each boot).
+    notifee.createChannel({
+      id: ANDROID_CHANNEL_ID,
+      name: 'General',
+      importance: AndroidImportance.HIGH,   // heads-up banner while the app is open
+      sound: 'default',
+    }).catch((e: any) => log.warn('[Push] notifee createChannel failed:', JSON.stringify(e)));
 
-    // Background/quit TAP → route to the target screen.
+    // Foreground messages: FCM stays silent while the app is open, so DISPLAY the banner ourselves via
+    // Notifee (don't navigate — navigating on arrival used to yank the user to the target with no banner).
+    // A tap on this banner routes via the Notifee foreground/background press events below.
+    const unsubForeground = messaging.onMessage(messagingInstance, (remoteMessage: any) => {
+      displayForegroundBanner(remoteMessage).catch((e) => log.warn('[Push] foreground banner failed:', JSON.stringify(e)));
+    });
+
+    // Tap on a Notifee-displayed (foreground) banner while the app is still open.
+    const unsubNotifeeForeground = notifee.onForegroundEvent(({ type, detail }: any) => {
+      if (type === EventType.PRESS) { route(detail?.notification?.data); }
+    });
+
+    // Tap on an FCM-displayed (backgrounded) banner → route to the target screen.
     messaging.onNotificationOpenedApp(messagingInstance, handleAndroidNotification);
 
-    // App opened from quit state
+    // App opened from quit state — check BOTH sources: FCM (backgrounded banner) + Notifee (a
+    // foreground banner the user backgrounded, then the app was killed, then reopened via tap).
     messaging.getInitialNotification(messagingInstance).then((remoteMessage: any) => {
       if (remoteMessage) { handleAndroidNotification(remoteMessage); }
     });
+    notifee.getInitialNotification().then((initial: any) => {
+      if (initial?.notification?.data) { route(initial.notification.data); }
+    }).catch(() => {});
 
     // FCM token refresh
     const unsubTokenRefresh = messaging.onTokenRefresh(messagingInstance, async (token: string) => {
@@ -206,6 +269,7 @@ export function bootstrapNotifications(): () => void {
 
     return () => {
       unsubForeground();
+      unsubNotifeeForeground();
       unsubTokenRefresh();
     };
   }

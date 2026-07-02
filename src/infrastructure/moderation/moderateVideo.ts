@@ -41,45 +41,83 @@ function sampleStampsMs(durationSec: number): number[] {
 async function frameAt(url: string, timeStamp: number): Promise<string | null> {
   let thumbPath: string | null = null;
   try {
-    const thumb = await createThumbnail({ url, timeStamp, format: 'jpeg' });
+    // createThumbnail's native side is picky about the path form: some builds want a bare filesystem
+    // path, others a file:// URL — the wrong one throws NSCocoaError ("no such file") on a clip that
+    // plays perfectly in AVPlayer. Try the file:// URL, then fall back to the bare path.
+    let thumb;
+    try {
+      thumb = await createThumbnail({ url, timeStamp, format: 'jpeg' });
+    } catch {
+      thumb = await createThumbnail({ url: url.replace(/^file:\/\//, ''), timeStamp, format: 'jpeg' });
+    }
     thumbPath = thumb.path;
+    const bare = thumbPath.replace(/^file:\/\//, '');
     const w = thumb.width || 0;
     const h = thumb.height || 0;
-    const scale = w && h ? Math.min(1, FRAME_MAX_EDGE / Math.max(w, h)) : 1;
-    const cropUri = thumbPath.startsWith('file://') ? thumbPath : `file://${thumbPath}`;
-    const cropped = await ImageEditor.cropImage(cropUri, {
-      offset: { x: 0, y: 0 },
-      size: { width: w || FRAME_MAX_EDGE, height: h || FRAME_MAX_EDGE },
-      displaySize: { width: Math.round((w || FRAME_MAX_EDGE) * scale), height: Math.round((h || FRAME_MAX_EDGE) * scale) },
-      resizeMode: 'contain',
-      quality: 0.6,
-      format: 'jpeg',
-      includeBase64: true,
-    });
-    if (cropped.uri) { RNFS.unlink(cropped.uri.replace('file://', '')).catch(() => {}); }
-    return cropped.base64 ?? null;
+
+    // Downscale to keep the moderation payload small. On some devices ImageEditor.cropImage throws an
+    // NSCocoaError reading/writing the just-written thumbnail — don't drop the frame over that: fall back
+    // to the full-size JPEG (a bigger payload still moderates; a skipped frame silently bypasses the check).
+    try {
+      const scale = w && h ? Math.min(1, FRAME_MAX_EDGE / Math.max(w, h)) : 1;
+      const cropUri = thumbPath.startsWith('file://') ? thumbPath : `file://${thumbPath}`;
+      const cropped = await ImageEditor.cropImage(cropUri, {
+        offset: { x: 0, y: 0 },
+        size: { width: w || FRAME_MAX_EDGE, height: h || FRAME_MAX_EDGE },
+        displaySize: { width: Math.round((w || FRAME_MAX_EDGE) * scale), height: Math.round((h || FRAME_MAX_EDGE) * scale) },
+        resizeMode: 'contain',
+        quality: 0.6,
+        format: 'jpeg',
+        includeBase64: true,
+      });
+      if (cropped.uri) { RNFS.unlink(cropped.uri.replace('file://', '')).catch(() => {}); }
+      if (cropped.base64) { return cropped.base64; }
+    } catch (cropErr: any) {
+      log.warn('[moderation] downscale failed, using full frame:', cropErr?.code ?? cropErr?.message ?? String(cropErr));
+    }
+    // Fallback: read the raw createThumbnail JPEG straight to base64.
+    return await RNFS.readFile(bare, 'base64');
   } catch (e: any) {
-    // createThumbnail uses AVAssetImageGenerator; on a just-recorded clip it can throw
-    // AVFoundationErrorDomain -11800 / OSStatus -12780 ("operation could not be completed") when the
-    // frame at this timestamp isn't readable. We fail-open (skip the frame) — log WHY so the noisy raw
-    // native "[unknown/unknown] -11800" lines are attributable to moderation frame-sampling, not a lost
-    // recording. Run-of-the-mill on the last/near-EOF timestamps.
-    log.warn(`[moderation] frame extract failed at t=${timeStamp.toFixed(1)}s (skipping):`, e?.code ?? e?.message ?? String(e));
+    // createThumbnail uses AVAssetImageGenerator; on a just-recorded clip it can throw when the frame at
+    // this timestamp isn't readable. Fail-open (skip the frame) — log WHY so the native error lines are
+    // attributable to moderation frame-sampling, not a lost recording.
+    log.warn(`[moderation] frame extract failed at t=${(timeStamp / 1000).toFixed(1)}s (skipping):`, e?.code ?? e?.message ?? String(e));
     return null;
   } finally {
     if (thumbPath) { RNFS.unlink(thumbPath.replace('file://', '')).catch(() => {}); }
   }
 }
 
-/** Pull downscaled JPEG frames from a local video file (limited concurrency). */
-async function extractFrames(filePath: string, durationSec: number): Promise<string[]> {
-  const url = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
-  const stamps = sampleStampsMs(durationSec);
+/** One extraction pass: pull downscaled JPEG frames from a local video file (limited concurrency). */
+async function extractPass(url: string, stamps: number[]): Promise<string[]> {
   const out: string[] = [];
   for (let i = 0; i < stamps.length; i += EXTRACT_CONCURRENCY) {
     const batch = stamps.slice(i, i + EXTRACT_CONCURRENCY);
     const results = await Promise.all(batch.map(t => frameAt(url, t)));
     for (const f of results) { if (f) { out.push(f); } }
+  }
+  return out;
+}
+
+/** Pull downscaled JPEG frames from a local video file. Retries once after a short settle if the first
+ *  pass yields nothing — AVAssetImageGenerator can throw NSCocoaError reading a file the moment it lands
+ *  on disk (e.g. just moved into the cache), even though it's a perfectly readable clip a beat later. */
+async function extractFrames(filePath: string, durationSec: number): Promise<string[]> {
+  const bare = filePath.replace(/^file:\/\//, '');
+  const url = filePath.startsWith('file://') ? filePath : `file://${filePath}`;
+  const stamps = sampleStampsMs(durationSec);
+
+  // A missing / zero-byte file means the wrong path reached here — surface it, since it silently skips
+  // moderation (fail-open below) rather than being a genuine "clip is clean" result.
+  try {
+    const st = await RNFS.stat(bare);
+    if (!st || Number(st.size) === 0) { log.error(`[moderation] source file missing/empty, cannot moderate: ${bare}`); return []; }
+  } catch { log.error(`[moderation] source file not found, cannot moderate: ${bare}`); return []; }
+
+  let out = await extractPass(url, stamps);
+  if (out.length === 0) {
+    await new Promise<void>(r => setTimeout(r, 800));   // let the file settle, then try once more
+    out = await extractPass(url, stamps);
   }
   return out;
 }
@@ -97,7 +135,12 @@ export async function assertVideoAllowed(
   opts: { durationSec: number; contentType: ModerationContentType },
 ): Promise<void> {
   const frames = await extractFrames(filePath, opts.durationSec);
-  if (frames.length === 0) { return; }   // fail open
+  if (frames.length === 0) {
+    // Fail open so a device-side extraction hiccup never blocks a legitimate post — but say so loudly:
+    // this clip went UNMODERATED, which matters for the 1.2 guarantee (vs. a normal "clean" pass).
+    log.error(`[moderation] no frames extracted — ${opts.contentType} posted WITHOUT a moderation check`);
+    return;
+  }
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) { return; } // fail open (normal flow will surface auth errors)

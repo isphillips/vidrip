@@ -133,7 +133,7 @@ export default function MessagesHomeScreen({ navigation }: MessagesStackScreenPr
         ) : (
           <ConversationRow
             customAvatar={<GroupAvatarGrid members={item.group.memberAvatars} />}
-            fallbackInitial="👥"
+            fallbackInitial=""
             title={item.group.name}
             subtitle={item.group.unreadCount > 0
               ? `${item.group.unreadCount} new`

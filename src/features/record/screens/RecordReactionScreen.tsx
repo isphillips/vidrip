@@ -7,10 +7,11 @@ import { usePendingChannelReactionsStore } from '../../../store/pendingChannelRe
 import { useIntroSeenStore } from '../../../store/introSeenStore';
 import { saveReaction } from '../../../infrastructure/storage/reactionStorage';
 import { localPathForReaction } from '../../../infrastructure/storage/localReactionStorage';
+import { localPathForClip, deleteClip } from '../../../infrastructure/storage/localChannelClipStorage';
 import { assertVideoAllowed } from '../../../infrastructure/moderation/moderateVideo';
 import { STORAGE_MODE } from '../../../infrastructure/storage/config';
 import {
-  fetchChannelPost, fetchChannelPosts, commitChannelClip, uploadChannelClipRelay,
+  fetchChannelPost, fetchChannelPosts, commitChannelClip, uploadChannelClipRelay, deleteChannelPost,
 } from '../../../infrastructure/supabase/queries/channels';
 import { signCreatorVideo, fetchOverlayRecipe } from '../../../infrastructure/creatorStudio/api';
 import ReactionRecorder, { type ReactionMetrics } from '../components/ReactionRecorder';
@@ -36,7 +37,9 @@ export default function RecordReactionScreen({
   const { user, profile } = useAuthStore();
   const enqueue = useUploadStore(s => s.enqueue);
   const addPendingReaction = usePendingReactionsStore(s => s.add);
+  const removePendingReaction = usePendingReactionsStore(s => s.remove);
   const addPendingChannelReaction = usePendingChannelReactionsStore(s => s.add);
+  const removePendingChannelReaction = usePendingChannelReactionsStore(s => s.remove);
 
   // Sender intro shares the once-per-session gate with ThreadScreen — if the
   // recipient already saw it on opening the video, don't replay it here.
@@ -165,14 +168,16 @@ export default function RecordReactionScreen({
 
     // ── Channel-post reaction: commit a clip under the post (mirrors WatchYouTubePostScreen). ──
     if (isChannel && postId && channelId) {
+      const parentPostId = postId;
       enqueue('Posting reaction…', async () => {
-        await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'channel_clip' });
+        // Commit + show the clip immediately (local copy is playable), then moderate — which gates the
+        // relay upload/distribution, not the local display. A reject retracts before anything is uploaded.
         const newPostId = await commitChannelClip({
-          channelId, userId: user!.id, filePath, duration, parentPostId: postId, recordedWithHeadphones,
+          channelId, userId: user!.id, filePath, duration, parentPostId, recordedWithHeadphones,
           overlayRecipe: lensTrack ? faceLensRecipe(lensTrack) : null,
           metrics,
         });
-        addPendingChannelReaction(postId, {
+        addPendingChannelReaction(parentPostId, {
           id: newPostId, channel_id: channelId, poster_id: user!.id,
           poster: { handle: profile?.handle ?? '' },
           post_type: 'clip', source_type: chSourceType,
@@ -180,9 +185,18 @@ export default function RecordReactionScreen({
           video_url: null, duration: Math.round(duration), is_pinned: false,
           created_at: new Date().toISOString(), message: null,
           emoji_reactions: [], reaction_count: 0, has_my_reaction: true,
-          review_count: 0, has_my_review: false, parent_post_id: postId,
+          review_count: 0, has_my_review: false, parent_post_id: parentPostId,
           parent_yt_video_id: null, parent_source_type: chSourceType,
         });
+        try {
+          await assertVideoAllowed(localPathForClip(newPostId), { durationSec: duration, contentType: 'channel_clip' });
+        } catch (e) {
+          // Rejected → retract the optimistic clip + row + local file before it's ever uploaded.
+          removePendingChannelReaction(parentPostId, newPostId);
+          try { await deleteChannelPost(newPostId); } catch { /* best-effort */ }
+          try { await deleteClip(newPostId); } catch { /* best-effort */ }
+          throw e;   // surface the reason in the upload toast
+        }
         await uploadChannelClipRelay(newPostId, user!.id);
       });
       return;
@@ -190,8 +204,6 @@ export default function RecordReactionScreen({
 
     // ── Friend/group thread reaction. ──
     enqueue('Saving reaction…', async () => {
-      // Gate on automated moderation before anything is uploaded or inserted.
-      await assertVideoAllowed(filePath, { durationSec: duration, contentType: 'reaction' });
       // A Studio-clip reaction has no external source video — store it as a plain reaction
       // ('youtube' placeholder, no source id) so it plays standalone in the viewer.
       const storedSourceType = sourceType === 'studio' ? 'youtube' : sourceType;
@@ -210,7 +222,7 @@ export default function RecordReactionScreen({
         emojiTrack: emojiTrack ?? null,
         metrics,
         // Surface the reaction in the thread immediately (plays from the local
-        // copy), before the relay upload finishes. Reconciled once it's fetched.
+        // copy), before moderation + the relay upload run. Reconciled once it's fetched.
         onCommitted: (reactionId) => {
           addPendingReaction({
             id: reactionId,
@@ -229,6 +241,11 @@ export default function RecordReactionScreen({
             needsDownload: false,
           });
         },
+        // Moderation runs on the local copy AFTER the reaction is shown, and gates the upload — not the
+        // display. A reject retracts the optimistic pending entry (saveReaction already deleted the row +
+        // local file) and re-throws so the toast shows why.
+        moderate: (localPath) => assertVideoAllowed(localPath, { durationSec: duration, contentType: 'reaction' }),
+        onRejected: (reactionId) => removePendingReaction(reactionId),
       });
     });
   }, [isChannel, postId, channelId, user, profile, threadId, videoId, sourceType, enqueue, addPendingReaction, addPendingChannelReaction]);

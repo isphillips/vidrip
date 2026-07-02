@@ -1,6 +1,6 @@
 import { log } from '../logging/logger';
 import { supabase } from '../supabase/client';
-import { moveToReactionsDir, localPathForReaction, downloadReaction, hasLocalCopy } from './localReactionStorage';
+import { moveToReactionsDir, localPathForReaction, downloadReaction, hasLocalCopy, deleteReaction } from './localReactionStorage';
 import { R2_ENABLED } from './r2Config';
 import { uploadToR2, signR2Url } from './uploadToR2';
 import type { StorageMode } from './config';
@@ -27,6 +27,13 @@ export interface SaveReactionParams {
   // Fires once the row is inserted and the local copy is in place (before the
   // slow relay upload), so the caller can show the reaction immediately.
   onCommitted?: (reactionId: string) => void;
+  // Moderation gate, run on the LOCAL copy AFTER onCommitted (so the poster sees their clip instantly)
+  // but BEFORE the relay upload — moderation gates DISTRIBUTION, not display. A throw (ModerationRejected)
+  // retracts the row + local copy so nothing is ever uploaded/distributed. Omit to skip moderation.
+  moderate?: (localPath: string) => Promise<void>;
+  // Called after a moderation rejection has deleted the row + local copy, so the caller can drop the
+  // optimistic pending entry it added in onCommitted.
+  onRejected?: (reactionId: string) => void;
 }
 
 export type ReactionMetricsInput = { peakSmile: number | null; peakSurprise: number | null; emojiDensity: number | null };
@@ -120,6 +127,27 @@ export async function uploadToCloud(localPath: string, uploadPath: string, upser
 
 // ─── Main facade ──────────────────────────────────────────────────────────
 
+/** Run the moderation gate on the local copy; on rejection, retract the row + local file and notify the
+ *  caller so it can drop the optimistic pending entry. Re-throws so the enqueue task surfaces the reason.
+ *  No-op when `moderate` is omitted. */
+async function moderateOrRetract(
+  reactionId: string,
+  localPath: string,
+  moderate?: (localPath: string) => Promise<void>,
+  onRejected?: (reactionId: string) => void,
+): Promise<void> {
+  if (!moderate) { return; }
+  try {
+    await moderate(localPath);
+  } catch (e) {
+    log.warn('[saveReaction] moderation rejected — retracting reaction', reactionId);
+    try { await (supabase as any).from('reactions').delete().eq('id', reactionId); } catch { /* best-effort */ }
+    try { await deleteReaction(reactionId); } catch { /* best-effort */ }
+    onRejected?.(reactionId);
+    throw e;
+  }
+}
+
 export async function saveReaction({
   userId,
   threadId,
@@ -134,64 +162,12 @@ export async function saveReaction({
   emojiTrack = null,
   metrics = null,
   onCommitted,
+  moderate,
+  onRejected,
 }: SaveReactionParams): Promise<SaveReactionResult> {
-
-  if (mode === 'cloud') {
-    // Insert the row first (video_url null) so it has an id, and keep a local copy
-    // keyed by that id — the reaction is committed + playable on THIS device before
-    // the (slow) relay upload, so it can show in the thread immediately. Other
-    // devices download it once video_url is set below.
-    const { data, error: insertError } = await (supabase as any)
-      .from('reactions')
-      .insert({
-        thread_id: threadId,
-        user_id: userId,
-        video_url: null,
-        duration: Math.round(duration),
-        storage_mode: 'cloud',
-        source_type: sourceType,
-        recorded_with_headphones: recordedWithHeadphones,
-        ...(ytVideoId ? { yt_video_id: ytVideoId, yt_start_offset: ytStartOffset } : {}),
-      })
-      .select('id')
-      .single();
-    if (insertError) { throw insertError; }
-
-    const reactionId: string = data.id;
-    const localPath = await moveToReactionsDir(filePath, reactionId);
-    await saveEmojiTrack(reactionId, emojiTrack);
-    await saveReactionMetrics(reactionId, metrics);
-    onCommitted?.(reactionId);
-
-    let cloudUrl: string | null = null;
-    try {
-      const uploadPath = `${userId}/${threadId}/${reactionId}.mp4`;
-      cloudUrl = await uploadToCloud(localPath, uploadPath);
-      const { error: urlErr } = await (supabase as any)
-        .from('reactions').update({ video_url: cloudUrl }).eq('id', reactionId);
-      // The clip is in storage, but if this write is rejected (e.g. a missing column GRANT)
-      // video_url stays null and recipients see "Not available". Surface it loudly instead of
-      // failing silently — and don't report a cloudUrl the row doesn't actually carry.
-      if (urlErr) { cloudUrl = null; throw urlErr; }
-    } catch (e) {
-      log.error('[saveReaction] cloud relay upload/link failed:', JSON.stringify(e));
-    }
-
-    if (afterthought) { await relayAfterthought(userId, threadId, reactionId, afterthought); }
-
-    await (supabase as any)
-      .from('thread_members')
-      .update({ status: 'reacted' })
-      .eq('thread_id', threadId)
-      .eq('user_id', userId);
-
-    return { reactionId, localPath, cloudUrl, storageMode: 'cloud' };
-  }
-
-  // ─── Local (ephemeral relay) mode ───────────────────────────────────────
-  // The recorder keeps a permanent local copy; a relay copy is ALSO uploaded so
-  // recipients can download it. A TTL cleanup job removes the cloud relay later.
-  // 1. Insert DB row first to get the UUID (video_url nullable in Phase 1 migration)
+  // Insert the row (video_url null) so it has an id, and keep a local copy keyed by that id — the
+  // reaction is committed + playable on THIS device immediately, so it shows in the thread before the
+  // (slow) moderation + relay upload run. Other devices download it once video_url is set below.
   const { data, error: insertError } = await (supabase as any)
     .from('reactions')
     .insert({
@@ -199,7 +175,7 @@ export async function saveReaction({
       user_id: userId,
       video_url: null,
       duration: Math.round(duration),
-      storage_mode: 'local',
+      storage_mode: mode,
       source_type: sourceType,
       recorded_with_headphones: recordedWithHeadphones,
       ...(ytVideoId ? { yt_video_id: ytVideoId, yt_start_offset: ytStartOffset } : {}),
@@ -209,24 +185,27 @@ export async function saveReaction({
   if (insertError) { throw insertError; }
 
   const reactionId: string = data.id;
-
-  // 2. Move temp file to permanent local location keyed by the reaction UUID
   const localPath = await moveToReactionsDir(filePath, reactionId);
+  onCommitted?.(reactionId);   // local copy ready → caller shows it NOW (off the moderation/upload path)
+
+  // Engagement metadata — best-effort, off the show path (the reaction is already visible).
   await saveEmojiTrack(reactionId, emojiTrack);
   await saveReactionMetrics(reactionId, metrics);
-  onCommitted?.(reactionId);   // local copy ready → caller can show it now
 
-  // 3. Upload the relay copy so recipients can fetch it (best-effort; the local
-  //    copy is the source of truth for the recorder). Path is deterministic so
-  //    the TTL cleanup can find and delete it.
+  // Moderation gates DISTRIBUTION, not display: the poster already sees their own clip; a reject retracts
+  // it before anything is uploaded, so objectionable content never reaches anyone else (App Store 1.2).
+  await moderateOrRetract(reactionId, localPath, moderate, onRejected);
+
+  // ── Publish: relay upload → video_url → afterthought → mark reacted. ──
   let cloudUrl: string | null = null;
   try {
     const uploadPath = `${userId}/${threadId}/${reactionId}.mp4`;
     cloudUrl = await uploadToCloud(localPath, uploadPath);
     const { error: urlErr } = await (supabase as any)
       .from('reactions').update({ video_url: cloudUrl }).eq('id', reactionId);
-    // See cloud-path note above: a silently-rejected video_url write leaves recipients with
-    // "Not available" while the clip sits in storage. Surface it.
+    // The clip is in storage, but if this write is rejected (e.g. a missing column GRANT) video_url stays
+    // null and recipients see "Not available". Surface it instead of failing silently — and don't report
+    // a cloudUrl the row doesn't actually carry.
     if (urlErr) { cloudUrl = null; throw urlErr; }
   } catch (e) {
     log.error('[saveReaction] relay upload/link failed:', JSON.stringify(e));
@@ -234,14 +213,13 @@ export async function saveReaction({
 
   if (afterthought) { await relayAfterthought(userId, threadId, reactionId, afterthought); }
 
-  // 4. Mark thread member as reacted
   await (supabase as any)
     .from('thread_members')
     .update({ status: 'reacted' })
     .eq('thread_id', threadId)
     .eq('user_id', userId);
 
-  return { reactionId, localPath, cloudUrl, storageMode: 'local' };
+  return { reactionId, localPath, cloudUrl, storageMode: mode };
 }
 
 /** Sign a reactions-bucket URL for playback (used for afterthought outro clips). */
